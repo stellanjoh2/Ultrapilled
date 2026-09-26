@@ -36,6 +36,7 @@ import { pickTheme, resolveTextColor, resolveTextSwatchIndex, textSwatches } fro
 import { mountProTip, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
+import { acidState, blankState, TEMPLATES, templateLabel } from "./templates";
 import { mountExportPanel } from "./export/exportPanel";
 import { openAbout, isAboutOpen } from "./aboutPanel";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
@@ -65,44 +66,7 @@ import "./style.css";
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("#app missing");
 
-function freshState() {
-  const next = demoState();
-  const presetIcon = (name: string, amount: number, colorIndex: number, extra: Partial<ImageSlot> = {}) => {
-    const icon = ICON_PRESETS.find((preset) => preset.label === name);
-    if (!icon) return null;
-    return defaultImageSlot({
-      src: icon.src,
-      name: icon.label,
-      size: 56,
-      amount,
-      colorIndex,
-      ...extra,
-    });
-  };
-  const [techno, nope, hardcore, singleAf, noWay, dnb, acid, friday, tokyo, doors, oh] = next.slots;
-  next.slots = [
-    techno,
-    defaultImageSlot({ src: "", name: "Cool", emoji: "😎", size: 56, amount: 2, colorIndex: 1, scale: 0.7 }),
-    nope,
-    acid,
-    presetIcon("Clovers", 3, 3),
-    defaultImageSlot({ src: "", name: "Skull", emoji: "💀", size: 56, amount: 2, colorIndex: 1, scale: 0.65 }),
-    hardcore,
-    presetIcon("Stars", 2, 1),
-    friday,
-    singleAf,
-    noWay,
-    presetIcon("Stars", 3, 4, { gradient: true, gradientColorIndex: 0, gradientAngle: 253 }),
-    defaultImageSlot({ src: "", name: "Fire", emoji: "🔥", size: 56, amount: 3, colorIndex: 2, scale: 0.7 }),
-    dnb,
-    tokyo,
-    doors,
-    oh,
-  ].filter((slot): slot is Slot => slot != null);
-  return next;
-}
-
-const state = freshState();
+const state = acidState();
 let panelTab: "physics" | "background" | "export" = "physics";
 const openSlots = new Set<string>();
 let pickedSlotId: string | null = null;
@@ -674,10 +638,25 @@ function openWeightMenu(
   getValue: () => number,
   onPick: (weight: number) => void,
 ) {
+  const choices = weightsFor(family).map((weight) => ({
+    value: weight,
+    label: weightName(weight),
+    style: { fontFamily: `"${family}", sans-serif`, fontWeight: String(weight) },
+  }));
+  openChoiceMenu(trigger, choices, getValue(), onPick);
+}
+
+type Choice<T> = { value: T; label: string; style?: Partial<CSSStyleDeclaration> };
+
+function openChoiceMenu<T>(
+  trigger: HTMLButtonElement,
+  choices: Choice<T>[],
+  selected: T,
+  onPick: (value: T) => void,
+) {
   closeFontMenu();
   const abort = new AbortController();
   const { signal } = abort;
-  const weights = weightsFor(family);
   const menu = document.createElement("div");
   menu.className = "font-menu";
   const list = document.createElement("div");
@@ -687,10 +666,10 @@ function openWeightMenu(
   menu.append(list);
   document.body.append(menu);
   trigger.setAttribute("aria-expanded", "true");
-  trigger.setAttribute("aria-controls", "weight-menu-list");
-  list.id = "weight-menu-list";
+  trigger.setAttribute("aria-controls", "choice-menu-list");
+  list.id = "choice-menu-list";
 
-  let active = Math.max(0, weights.indexOf(getValue()));
+  let active = Math.max(0, choices.findIndex((choice) => choice.value === selected));
   const buttons: HTMLButtonElement[] = [];
 
   const markActive = () => {
@@ -698,22 +677,21 @@ function openWeightMenu(
     buttons[active]?.scrollIntoView({ block: "nearest" });
   };
 
-  weights.forEach((weight, index) => {
+  choices.forEach((choice, index) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "font-menu-item";
     btn.tabIndex = -1;
     btn.setAttribute("role", "option");
-    btn.setAttribute("aria-selected", String(weight === getValue()));
-    if (weight === getValue()) btn.classList.add("is-on");
+    btn.setAttribute("aria-selected", String(choice.value === selected));
+    if (choice.value === selected) btn.classList.add("is-on");
     if (index === active) btn.classList.add("is-active");
-    btn.textContent = weightName(weight);
-    btn.style.fontFamily = `"${family}", sans-serif`;
-    btn.style.fontWeight = String(weight);
+    btn.textContent = choice.label;
+    if (choice.style) Object.assign(btn.style, choice.style);
     btn.addEventListener("click", () => {
       const pick = onPick;
       closeFontMenu();
-      pick(weight);
+      pick(choice.value);
     });
     list.append(btn);
     buttons.push(btn);
@@ -727,7 +705,7 @@ function openWeightMenu(
   list.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      active = Math.min(weights.length - 1, active + 1);
+      active = Math.min(choices.length - 1, active + 1);
       markActive();
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
@@ -1199,6 +1177,16 @@ function renderPanel() {
       </div>
     </section>
     <section class="section">
+      <h2 data-tip="Start empty or from a ready-made scene">Templates</h2>
+      <div class="segment" role="group" aria-label="Templates">
+        <button type="button" class="pill${state.template === "blank" ? " is-on" : ""}" id="template-blank" aria-pressed="${state.template === "blank"}" data-tip="Start from an empty canvas">Blank</button>
+        <button type="button" class="pill template-pick${templateLabel(state.template) ? " is-on" : ""}" id="template-pick" aria-haspopup="listbox" aria-expanded="false" data-tip="Load a ready-made scene">
+          <span class="font-pick-value">${templateLabel(state.template) ?? "Template"}</span>
+          <span class="font-pick-chevron" aria-hidden="true"></span>
+        </button>
+      </div>
+    </section>
+    <section class="section">
       <div class="section-head">
         <h2 data-tip="Overall size and spacing of pieces">Composition</h2>
         <button type="button" class="section-reset" id="reset-master" aria-label="Reset composition" data-tip="Reset composition sliders">${RESET_ICON}</button>
@@ -1400,6 +1388,22 @@ function renderPanel() {
     button.addEventListener("click", () => {
       const next = button.dataset.canvas;
       if (next === "16:9" || next === "9:16") selectCanvas(next);
+    });
+  });
+
+  panel.querySelector("#template-blank")?.addEventListener("click", () => {
+    loadTemplate(blankState());
+  });
+  const templatePick = panel.querySelector<HTMLButtonElement>("#template-pick");
+  templatePick?.addEventListener("click", () => {
+    if (templatePick.getAttribute("aria-expanded") === "true") {
+      closeFontMenu();
+      return;
+    }
+    const choices = TEMPLATES.map((template) => ({ value: template.id as string, label: template.label }));
+    openChoiceMenu(templatePick, choices, state.template ?? "", (id) => {
+      const template = TEMPLATES.find((item) => item.id === id);
+      if (template) loadTemplate(template.build());
     });
   });
 
@@ -1661,9 +1665,10 @@ function renderPanel() {
   if (revealSlotId) {
     const card = panel.querySelector<HTMLElement>(`[data-id="${revealSlotId}"]`);
     if (!inserted) {
-      card?.scrollIntoView({ block: "nearest" });
+      // inline:"nearest" avoids horizontal document scroll when a card is tall.
+      card?.scrollIntoView({ block: "nearest", inline: "nearest" });
       if (card && !card.nextElementSibling) {
-        card.parentElement?.nextElementSibling?.scrollIntoView({ block: "nearest" });
+        card.parentElement?.nextElementSibling?.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
     }
     if (card && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -2313,8 +2318,8 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     </label>`
         : ""
     }
-    <label class="field">${settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="100" step="0.05" value="${slot.scale}" />
+    <label class="field">${settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
+      <input type="range" data-key="scale" min="0.25" max="2" step="0.05" value="${slot.scale}" />
     </label>
     <label class="field">${settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${AMOUNT_SOFT_CAP}" value="${slot.amount}" />
@@ -2364,6 +2369,8 @@ function pickImageFiles(multiple = false): Promise<File[]> {
     input.hidden = true;
     const finish = (files: File[]) => {
       input.remove();
+      // Native file dialogs can collapse the stage for a frame; restore before import.
+      resize();
       resolve(files);
     };
     input.addEventListener("change", () => {
@@ -2386,8 +2393,9 @@ function importSlotSize(nativeW: number, nativeH: number, opts?: { minWidth?: nu
     const widthFrac = Math.max(nativeW, 1) / long;
     displayLong = Math.max(displayLong, opts.minWidth / widthFrac);
   }
-  const scale = fitScale();
-  return Math.max(8, displayLong / Math.max(scale, 0.001));
+  // Read layout scale only — fitScale() also drives simulation and must not run mid-measure.
+  const scale = Math.max(0.001, state.masterScale * layoutScale(currentFrame()));
+  return Math.max(8, displayLong / scale);
 }
 
 /** Set slot image from a local file; awaits trim (and SVG collider match) so aspect updates before remesh. */
@@ -2399,6 +2407,7 @@ function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
   slot.emoji = undefined;
   slot.collider = undefined;
   slot.tint = undefined;
+  slot.inverted = undefined;
   if (svg) slot.radius = 0;
   return ensureTrim(url, file.name)
     .then((trim) => {
@@ -2439,6 +2448,8 @@ function addImagesFromFiles(files: Iterable<File>, at?: { clientX: number; clien
   playCreate();
   const ids = slots.map((slot) => slot.id);
   void Promise.all(slots.map((slot, i) => assignImageFile(slot, images[i]!))).then(() => {
+    // File-dialog focus / async trim can leave a collapsed frame — heal before place-at.
+    resize();
     renderPanel();
     if (at) {
       const { x, y } = playfieldPoint(at.clientX, at.clientY);
@@ -2456,7 +2467,12 @@ function addImagesFromFiles(files: Iterable<File>, at?: { clientX: number; clien
 
 function playfieldPoint(clientX: number, clientY: number) {
   const rect = playfield.getBoundingClientRect();
-  return { x: clientX - rect.left, y: clientY - rect.top };
+  const w = Math.max(0, rect.width);
+  const h = Math.max(0, rect.height);
+  return {
+    x: Math.min(Math.max(clientX - rect.left, 0), w),
+    y: Math.min(Math.max(clientY - rect.top, 0), h),
+  };
 }
 
 function placeFold(wrap: HTMLElement, editor: HTMLElement, open: boolean) {
@@ -2483,6 +2499,18 @@ function iconSrc(slot: ImageSlot): string {
 
 function uploadedShape(slot: ImageSlot): boolean {
   return Boolean(slot.src) && !slot.emoji && !presetIdForSrc(slot.src);
+}
+
+function scaleFieldName(slot: Slot): string {
+  if (slot.kind === "text") return "Text scale";
+  if (slot.kind === "image" && uploadedShape(slot)) return "Image scale";
+  return "Shape scale";
+}
+
+/** Uploaded images cap at 2 so they can't swamp the frame. */
+function clampSlotScale(slot: Slot, scale: number): number {
+  const max = slot.kind === "text" ? 4 : slot.kind === "image" && uploadedShape(slot) ? 2 : 100;
+  return Math.min(max, Math.max(0.25, Math.round(scale * 100) / 100));
 }
 
 function isRasterUpload(slot: ImageSlot): boolean {
@@ -3233,10 +3261,10 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         }
       }
       if (key === "scale") {
+        slot.scale = clampSlotScale(slot, Number(value));
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
-          const name = slot.kind === "text" ? "Text scale" : "Shape scale";
-          caption.textContent = `${name} ${Number(input.value).toFixed(2)}`;
+          caption.textContent = `${scaleFieldName(slot)} ${slot.scale.toFixed(2)}`;
         }
       }
       paintFieldReset(input.closest(".field, .check-row") ?? root, slot, key);
@@ -3405,8 +3433,7 @@ function syncSlotScaleUi(slot: Slot) {
   }
   const caption = card.querySelector('[data-range-label="scale"]');
   if (caption) {
-    const name = slot.kind === "text" ? "Text scale" : "Shape scale";
-    caption.textContent = `${name} ${slot.scale.toFixed(2)}`;
+    caption.textContent = `${scaleFieldName(slot)} ${slot.scale.toFixed(2)}`;
   }
   paintFieldReset(card, slot, "scale");
 }
@@ -3479,8 +3506,9 @@ function scaleChip(id: string, scale: number, phase: "start" | "move" | "end") {
     remember(`canvas-scale:${id}`);
     return;
   }
-  if (slot.scale !== scale) {
-    slot.scale = scale;
+  const next = clampSlotScale(slot, scale);
+  if (slot.scale !== next) {
+    slot.scale = next;
     syncSlotScaleUi(slot);
   }
   // World grows the collider live while dragging; remesh once on release so the
@@ -3682,6 +3710,13 @@ function invertSlot(id: string) {
   const slot = state.slots.find((item) => item.id === id);
   if (!slot) return;
   remember();
+  // Rasters aren't color-masked — invert pixels instead of theme ink.
+  if (slot.kind === "image" && isRasterUpload(slot)) {
+    slot.inverted = !slot.inverted;
+    playInvert();
+    liveChip(id);
+    return;
+  }
   if (slot.kind === "image" && uploadedShape(slot) && isSvgSource(slot) && !slot.tint) {
     slot.tint = true;
   }
@@ -4017,6 +4052,10 @@ function openSlotMenu(x: number, y: number, id: string) {
   }
   if (slot?.kind === "text") {
     actions.push({ label: "Edit text", run: () => editChipText(id, false) });
+  }
+  // Invert: text/SVG/presets flip ink; rasters toggle pixel invert. Recolor is SVG-only.
+  actions.push({ label: "Duplicate", run: () => duplicateSlot(id) });
+  if (slot?.kind === "text") {
     actions.push({
       label: slot.textAnim ? "Stop Animation" : "Animate",
       run: () => {
@@ -4027,9 +4066,7 @@ function openSlotMenu(x: number, y: number, id: string) {
       },
     });
   }
-  // Invert applies to text and images (SVGs may enable tint first). Rasters keep Invert; Recolor is SVG-only.
   actions.push(
-    { label: "Duplicate", run: () => duplicateSlot(id) },
     {
       label: "Invert",
       stay: true,
@@ -4497,6 +4534,10 @@ function refreshUploadPreviews() {
 }
 
 function live() {
+  for (const slot of state.slots) {
+    const next = clampSlotScale(slot, slot.scale);
+    if (next !== slot.scale) slot.scale = next;
+  }
   const bump = () => {
     refreshUploadPreviews();
     const before = world.chipCount();
@@ -4571,6 +4612,8 @@ const PLAY_IDLE_MS = 3000;
 
 let shownScale = 1;
 let frameKey = "";
+/** Ignore transient collapsed sizes (file dialogs / focus glitches). */
+const MIN_FRAME_PX = 64;
 
 function workBox() {
   const width = stage.clientWidth;
@@ -4609,7 +4652,7 @@ function layoutScale(frame: CanvasFrame): number {
 
 function fitScale() {
   const scale = layoutScale(currentFrame());
-  shownScale = scale;
+  // shownScale is owned by syncCanvas — mutating it here desyncs refits after import.
   world.setSimulationScale(scale);
   return state.masterScale * scale;
 }
@@ -4639,6 +4682,8 @@ function placeFrame(frame: ReturnType<typeof currentFrame>) {
 
 function syncCanvas(refitChips: boolean) {
   const frame = currentFrame();
+  // Don't lock in a collapsed playfield from a transient layout read.
+  if (frame.width < MIN_FRAME_PX || frame.height < MIN_FRAME_PX) return false;
   const scale = layoutScale(frame);
   const key = `${state.canvas}:${frame.x},${frame.y},${frame.width},${frame.height}`;
   if (key === frameKey) return false;
@@ -4856,6 +4901,7 @@ function adoptState(next: typeof state) {
   state.textTracking = next.textTracking;
   state.shapeAmount = next.shapeAmount;
   state.theme = next.theme;
+  state.template = next.template;
   state.post = {
     ...next.post,
     bloomOpacity: next.post.bloomOpacity ?? 80,
@@ -4971,13 +5017,31 @@ app.querySelector("#reset-defaults")?.addEventListener("click", () => {
   appliedFont = "";
   pickedSlotId = null;
   world.setPicked(null);
-  adoptState(freshState());
+  adoptState(acidState());
   for (const slot of state.slots) captureBaseline(slot);
   applyBackground();
   applyPost();
   syncCanvas(false);
   renderPanel();
 });
+
+function loadTemplate(next: AppState) {
+  closeFontMenu();
+  remember();
+  setRunning(false);
+  machineFont = "";
+  appliedFont = "";
+  pickedSlotId = null;
+  world.setPicked(null);
+  openSlots.clear();
+  adoptState(next);
+  for (const slot of state.slots) captureBaseline(slot);
+  applyBackground();
+  applyPost();
+  syncCanvas(false);
+  renderPanel();
+  if (state.slots.length) triggerPhysics();
+}
 
 copyBtn.addEventListener("click", async () => {
   const payload = {

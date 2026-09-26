@@ -524,7 +524,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
    Stroke thickness is compensated by --chrome-scale so CSS scale
    (live scale drag / audio pulse) doesn't thin or break the line. */
 .chip-xform-frame {
-  --chrome-stroke: calc(2px / var(--chrome-scale, 1));
+  --chrome-stroke: calc(4px / var(--chrome-scale, 1));
   position: absolute;
   z-index: 3;
   left: calc(-1 * var(--xform-pad, 12px));
@@ -538,9 +538,10 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
+  /* Same 0.14s ease as slot-menu / topbar chrome. */
   transition:
-    opacity 0.12s ease,
-    visibility 0.12s;
+    opacity 0.14s ease,
+    visibility 0s linear 0.14s;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -554,6 +555,9 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 .chip.is-picked > .chip-xform-frame {
   opacity: 1;
   visibility: visible;
+  transition:
+    opacity 0.14s ease,
+    visibility 0s;
 }
 
 .chip-xform-frame::before {
@@ -581,11 +585,13 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   }
 }
 
-/* Kreska-style transform: two large grab targets (rotate + scale). */
+/* Transform grab (SE): polar drag — radial = scale, angular = rotate. */
 .chip-xform-handle {
   --xform-pop: 0.92;
   position: absolute;
   z-index: 5;
+  right: calc(-1 * var(--xform-pad, 12px));
+  bottom: calc(-1 * var(--xform-pad, 12px));
   width: 76px;
   height: 76px;
   margin: 0;
@@ -605,10 +611,11 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   cursor: grab;
   opacity: 0;
   visibility: hidden;
+  transform: translate(calc(100% + 6px), calc(100% + 6px)) scale(var(--xform-pop));
   transition:
-    opacity 0.12s ease,
-    visibility 0.12s,
-    transform 0.12s ease,
+    opacity 0.14s ease,
+    visibility 0s linear 0.14s,
+    transform 0.14s ease,
     background-color 0.1s ease,
     color 0.1s ease;
 }
@@ -624,11 +631,17 @@ html[data-theme="day"] .chip-xform-handle {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+  transition:
+    opacity 0.14s ease,
+    visibility 0s,
+    transform 0.14s ease,
+    background-color 0.1s ease,
+    color 0.1s ease;
 }
 
 .chip-xform-handle:active,
-.chip.is-scaling > .chip-xform-handle--scale,
-.chip.is-rotating > .chip-xform-handle--rotate {
+.chip.is-scaling > .chip-xform-handle,
+.chip.is-rotating > .chip-xform-handle {
   cursor: grabbing;
   background: #fff;
   color: #111;
@@ -639,23 +652,6 @@ html[data-theme="day"] .chip-xform-handle {
   height: 40px;
   display: block;
   pointer-events: none;
-}
-
-/* Outside the frame corners (NW rotate ↔ SE scale). */
-.chip-xform-handle--rotate {
-  top: calc(-1 * var(--xform-pad, 12px));
-  left: calc(-1 * var(--xform-pad, 12px));
-  transform: translate(calc(-100% - 6px), calc(-100% - 6px)) scale(var(--xform-pop));
-}
-
-.chip-xform-handle--scale {
-  right: calc(-1 * var(--xform-pad, 12px));
-  bottom: calc(-1 * var(--xform-pad, 12px));
-  transform: translate(calc(100% + 6px), calc(100% + 6px)) scale(var(--xform-pop));
-  cursor: nwse-resize;
-}
-
-.chip-xform-handle--scale svg {
   transform: scaleX(-1);
 }
 
@@ -665,15 +661,17 @@ html[data-theme="day"] .chip-xform-handle {
   }
 
   .chip.is-picked > .chip-xform-handle:active,
-  .chip.is-scaling > .chip-xform-handle--scale,
-  .chip.is-rotating > .chip-xform-handle--rotate {
+  .chip.is-scaling > .chip-xform-handle,
+  .chip.is-rotating > .chip-xform-handle {
     --xform-pop: 0.96;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .chip-xform-frame,
-  .chip-xform-handle {
+  .chip.is-picked > .chip-xform-frame,
+  .chip-xform-handle,
+  .chip.is-picked > .chip-xform-handle {
     transition: none;
   }
 
@@ -682,13 +680,8 @@ html[data-theme="day"] .chip-xform-handle {
   }
 }
 
-/* Keep handles a constant screen size while the chip CSS-previews scale. */
-.chip.is-scaling > .chip-xform-handle--rotate {
-  transform: translate(calc(-100% - 6px), calc(-100% - 6px))
-    scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
-}
-
-.chip.is-scaling > .chip-xform-handle--scale {
+/* Keep the handle a constant screen size while the chip CSS-previews scale. */
+.chip.is-scaling > .chip-xform-handle {
   transform: translate(calc(100% + 6px), calc(100% + 6px))
     scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
 }
@@ -700,17 +693,24 @@ html[data-theme="day"] .chip-xform-handle {
   left: 50%;
   top: 50%;
   translate: -50% -50%;
+  scale: 0.5;
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
   transition:
-    opacity 0.12s ease,
-    visibility 0.12s;
+    opacity 0.15s ease,
+    scale 0.15s ease,
+    visibility 0s linear 0.15s;
 }
 
 .chip.is-picked > .chip-grad-wheel {
   opacity: 1;
   visibility: visible;
+  scale: 1;
+  transition:
+    opacity 0.15s ease-out,
+    scale 0.15s ease-out,
+    visibility 0s;
 }
 
 .chip-grad-wheel__hit {
@@ -729,8 +729,12 @@ html[data-theme="day"] .chip-xform-handle {
   stroke: transparent;
   /* Fallback; syncGradWheel sets stroke-width in viewBox units from chip size. */
   stroke-width: 14;
-  pointer-events: stroke;
+  pointer-events: none;
   cursor: grab;
+}
+
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__hit-ring {
+  pointer-events: stroke;
 }
 
 .chip.is-grad-angling .chip-grad-wheel__hit-ring {
@@ -818,19 +822,23 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   left: 50%;
   top: 50%;
   z-index: 1;
-  width: calc(24px / var(--chrome-scale, 1));
-  height: calc(24px / var(--chrome-scale, 1));
+  width: calc(28px / var(--chrome-scale, 1));
+  height: calc(28px / var(--chrome-scale, 1));
   margin: 0;
   padding: 0;
   border: calc(2px / var(--chrome-scale, 1)) solid #fff;
   border-radius: 50%;
   box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) #111;
   box-sizing: border-box;
-  pointer-events: auto;
+  pointer-events: none;
   touch-action: none;
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+}
+
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop {
+  pointer-events: auto;
 }
 
 .chip-grad-wheel__stop:focus-visible {
@@ -843,8 +851,10 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chip-grad-wheel {
+  .chip-grad-wheel,
+  .chip.is-picked > .chip-grad-wheel {
     transition: none;
+    scale: 1;
   }
 }
 
@@ -2053,6 +2063,17 @@ button.pill.is-on:hover {
 
 button.pill.is-on:active {
   background: var(--primary-press);
+}
+
+button.pill.template-pick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-0);
+}
+
+button.pill.template-pick .font-pick-chevron {
+  border-top-color: currentColor;
 }
 
 button.pill:disabled,
@@ -3406,8 +3427,8 @@ input.slot-live:focus {
 .reconnect__card {
   position: relative;
   z-index: 1;
-  width: min(420px, 100%);
-  padding: var(--space-3);
+  width: min(483px, 100%);
+  padding: calc(var(--space-3) * 1.15);
   border-radius: var(--radius-reconnect);
   background: var(--canvas);
   box-shadow: var(--shadow-2);
@@ -3419,7 +3440,7 @@ input.slot-live:focus {
   margin: 0 0 var(--space-2);
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: clamp(28px, 4vw, 36px);
+  font-size: clamp(32px, 4.6vw, 41px);
   font-weight: 400;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -3429,7 +3450,7 @@ input.slot-live:focus {
   margin: 0 auto var(--space-3);
   max-width: 28em;
   color: var(--ink-secondary);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 300;
   line-height: 1.45;
   letter-spacing: -0.01em;
@@ -3444,6 +3465,7 @@ input.slot-live:focus {
 .reconnect__actions .pill {
   width: 100%;
   min-width: 0;
+  min-height: 54px;
 }
 
 html[data-theme="day"] .reconnect__scrim {

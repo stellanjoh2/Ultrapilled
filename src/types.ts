@@ -73,6 +73,8 @@ export type ImageSlot = {
   scale: number;
   /** Corner round on Image uploads (JPG/PNG/GIF). Ignored for SVG. */
   radius?: number;
+  /** Pixel invert for raster uploads (JPG/PNG/GIF). Ignored when the image is color-masked. */
+  inverted?: boolean;
   /** Recolor an uploaded SVG with theme ink. Off keeps the file’s original colors. */
   tint?: boolean;
   /** Preset collider for an upload. Unset uses a box. An SVG is matched when the file is picked. */
@@ -234,7 +236,7 @@ export function defaultBackground(): BackgroundSettings {
     grid: true,
     gridDensity: "base",
     gridColor: "#ffffff",
-    gridOpacity: 24,
+    gridOpacity: 20,
   };
 }
 
@@ -266,6 +268,8 @@ export type AppState = {
   textTracking: number;
   shapeAmount: number;
   theme: string[];
+  /** Last template loaded: "blank" or a template id. Unset for older drafts and files. */
+  template?: string;
 };
 
 export const FONTS = [
@@ -279,6 +283,11 @@ export const FONTS = [
   { id: "Fraunces", label: "Fraunces", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
   { id: "Archivo Black", label: "Archivo Black", weights: [400] },
   { id: "Bebas Neue", label: "Bebas Neue", weights: [400] },
+  { id: "Anton", label: "Anton", weights: [400] },
+  { id: "Playfair Display", label: "Playfair Display", weights: [400, 500, 600, 700, 800, 900] },
+  { id: "DM Serif Display", label: "DM Serif Display", weights: [400] },
+  { id: "Libre Baskerville", label: "Libre Baskerville", weights: [400, 700] },
+  { id: "Libre Franklin", label: "Libre Franklin", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
   { id: "Impact", label: "Impact", weights: [400] },
   { id: "Georgia", label: "Georgia", weights: [400, 700] },
   { id: "system-ui", label: "System UI", weights: [400, 500, 600, 700] },
@@ -379,9 +388,11 @@ export function demoState(): AppState {
         gradient: true,
         gradientFromIndex: 2,
         gradientColorIndex: 0,
-        gradientAngle: 140,
+        gradientAngle: 121.83994792805277,
         tracking: -61,
         pillPad: 27,
+        gradientScale: 52,
+        animatedGradient: true,
       },
       { text: "HARDCORE", colorIndex: 3, stroked: true, stroke: 2, pillPad: 24, scale: 1.35 },
       {
@@ -392,11 +403,11 @@ export function demoState(): AppState {
         color: "#3b00ff",
         gradientColor: "#c4ff00",
         animatedGradient: true,
-        gradientScale: 90,
-        gradientAngle: 152,
+        gradientScale: 48,
+        gradientAngle: 152.81405842527124,
         gradientSpeed: 14,
       },
-      { text: "NO WAY", colorIndex: 1, stroked: true, stroke: 4 },
+      { text: "NO WAY", colorIndex: 1, stroked: true, stroke: 4, scale: 1.17 },
       { text: "DNB", colorIndex: 3 },
       {
         text: "ACID",
@@ -429,7 +440,7 @@ export function demoState(): AppState {
         fontFamily: "Bebas Neue",
         fontWeight: 400,
         textHeight: 42,
-        scale: 1.45,
+        scale: 2.14,
         shape: "box" as const,
         radius: 4,
         stroked: false,
@@ -442,9 +453,10 @@ export function demoState(): AppState {
         gradientColor: "#ff3b00",
         animatedGradient: true,
         gradientSpeed: 100,
-        gradientScale: 8,
+        gradientScale: 33,
         gradientFromIndex: 4,
         gradientFrom: "#3b00ff",
+        gradientAngle: 146.074817770199,
       },
       {
         text: "DOORS OPEN AT 9PM",

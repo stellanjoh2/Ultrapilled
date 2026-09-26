@@ -172,6 +172,7 @@ function parseState(value: unknown): AppState | null {
     textTracking: Number(record.textTracking) || 0,
     shapeAmount: Number(record.shapeAmount) || 0,
     theme,
+    template: typeof record.template === "string" ? record.template : undefined,
   };
 }
 

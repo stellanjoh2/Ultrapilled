@@ -17,7 +17,8 @@ const HINTS: Hint[] = [
   { text: "Double-click text to type on the canvas" },
   { text: "Right-click a piece to recolor, edit, duplicate, invert, or remove it" },
   { text: "The more stuff you add the slower the app becomes" },
-  { text: "Bloom looks great but it’s heavy — turn on Performance mode in Settings" },
+  { text: "Want to use bloom but it feels laggy? Try Performance mode in Settings" },
+  { text: "Save your scene as a .pill file from Settings" },
 ];
 
 function typing(target: EventTarget | null): boolean {

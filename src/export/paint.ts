@@ -238,10 +238,17 @@ function drawChip(
       drawMask(ctx, img, chip.fill, width, height, slot.gradient ? gradientEnd(theme, slot) : "", slot.gradientAngle, phase, slot.gradientScale);
     } else {
       const radius = chip.radius * scale;
+      const invert = Boolean(slot.inverted);
       if (radius > 0) {
         ctx.save();
         round(ctx, width, height, radius);
         ctx.clip();
+        if (invert) ctx.filter = "invert(1)";
+        drawContain(ctx, img, width, height);
+        ctx.restore();
+      } else if (invert) {
+        ctx.save();
+        ctx.filter = "invert(1)";
         drawContain(ctx, img, width, height);
         ctx.restore();
       } else {

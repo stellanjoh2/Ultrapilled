@@ -283,7 +283,7 @@ function mountGrid(panel: HTMLElement, controller: BackgroundController) {
   const density: GridDensity = background.gridDensity === "fine" ? "fine" : "base";
   const base = gridDivisions(canvas, "base");
   const fine = gridDivisions(canvas, "fine");
-  const opacity = background.gridOpacity ?? 24;
+  const opacity = background.gridOpacity ?? 20;
   const color = background.gridColor || "#ffffff";
   const section = document.createElement("section");
   section.className = "section";
