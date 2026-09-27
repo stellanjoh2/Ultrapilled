@@ -3341,7 +3341,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (ids.size === 0 || bounds.height < 8) return;
     const stageH = bounds.height;
     const stageW = bounds.width;
-    const maxUp = Math.abs(speed) * 1.1;
+    // Headroom for sizeMul boost on large chips (up to ~1.5×).
+    const maxUp = Math.abs(speed) * 1.7;
     let any = false;
     for (const chip of chips) {
       if (!ids.has(chip.slotId)) continue;
@@ -3360,7 +3361,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
       // Fade the hop toward the top of the canvas.
       const climb = Math.max(0, Math.min(1, (y - stageH * 0.12) / (stageH * 0.5)));
-      const kick = speed * (0.85 + Math.random() * 0.3) * climb;
+      // Larger chips bury deeper in contacts — give them a bit more lift so bass reads.
+      const span = Math.hypot(chip.width, chip.height);
+      const sizeMul = Math.min(1.5, Math.max(1, Math.sqrt(span / 110)));
+      const kick = speed * (0.85 + Math.random() * 0.3) * climb * sizeMul;
       if (kick < 0.35) continue;
 
       Sleeping.set(chip.body, false);

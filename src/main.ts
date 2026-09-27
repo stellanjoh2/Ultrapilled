@@ -1361,7 +1361,7 @@ function renderPanel() {
     </section>
     <section class="section">
       <div class="section-head">
-        <h2 data-tip="Bass swells pills; sharp hits make icons hop">Audio react</h2>
+        <h2 data-tip="Bass hops everything and swells pills; sharp hits make icons hop">Audio react</h2>
         <button type="button" class="section-reset" id="reset-audio-react" aria-label="Reset audio react" data-tip="Reset audio react">${RESET_ICON}</button>
       </div>
       <button type="button" class="pill smash-btn${state.audioReact.enabled ? " is-on" : ""}" id="audio-mic" aria-pressed="${state.audioReact.enabled}" data-tip="Ask for mic access and drive scale from live audio">
@@ -4711,10 +4711,11 @@ async function loadLocalFonts() {
   }
 }
 
-/** Pills swell on bass; icons on sharp (−20%) with a stronger hop. */
+/** Pills swell on bass; all chips hop on bass; icons shrink (−20%) + hop on sharp. */
 const AUDIO_SHARP_SCALE = 0.8;
 const AUDIO_ICON_JUMP = 13;
-const AUDIO_TEXT_JUMP = AUDIO_ICON_JUMP / 3;
+/** Bass hop for every chip — was pill-only at ICON/3 and missed big type / photos. */
+const AUDIO_BASS_JUMP = 11;
 const AUDIO_PEAK_COOLDOWN_MS = 160;
 const AUDIO_JUMP_COOLDOWN_MS = 340;
 const AUDIO_HOLD_MS = 220;
@@ -4786,11 +4787,12 @@ function pushAudioGroup(group: "text" | "icon", mul: number) {
       world.impulseAudioJump(ids, AUDIO_ICON_JUMP * bounce);
     }
   } else {
-    const ids = state.slots.filter(isBassBoostSlot).map((slot) => slot.id);
+    // Swell stays pill-only above; hop every chip so heavy type / photos thump on kicks.
+    const ids = state.slots.map((slot) => slot.id);
     const now = performance.now();
     if (now - audioTextJumpAt >= AUDIO_JUMP_COOLDOWN_MS) {
       audioTextJumpAt = now;
-      world.impulseAudioJump(ids, AUDIO_TEXT_JUMP * bounce);
+      world.impulseAudioJump(ids, AUDIO_BASS_JUMP * bounce);
     }
   }
 }
