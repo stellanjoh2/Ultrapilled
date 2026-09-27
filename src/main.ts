@@ -64,8 +64,9 @@ import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
 import "./style.css";
 
-const app = document.querySelector<HTMLDivElement>("#app");
-if (!app) throw new Error("#app missing");
+const appRoot = document.querySelector<HTMLDivElement>("#app");
+if (!appRoot) throw new Error("#app missing");
+const app: HTMLDivElement = appRoot;
 
 const state = blankState();
 let panelTab: "physics" | "background" | "export" = "physics";
@@ -3399,7 +3400,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
           caption.textContent = `${name} ${Math.round(Number(input.value))}`;
         }
       }
-      if (key === "scale") {
+      if (key === "scale" && input instanceof HTMLInputElement) {
         slot.scale = clampSlotScale(slot, Number(value));
         input.max = String(slotScaleSliderMax(slot));
         const caption = input.closest("label")?.querySelector("[data-range-label]");
