@@ -36,7 +36,7 @@ import { pickTheme, resolveTextColor, resolveTextSwatchIndex, textSwatches } fro
 import { mountProTip, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
-import { acidState, blankState, TEMPLATES, templateLabel } from "./templates";
+import { blankPrefabText, blankState, TEMPLATES, templateLabel } from "./templates";
 import { mountExportPanel } from "./export/exportPanel";
 import { openAbout, isAboutOpen } from "./aboutPanel";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
@@ -57,7 +57,8 @@ import { ensureTrim, ensureTrims, peekTrim } from "./trim";
 import { pillPadOf, trackingOf } from "./measure";
 import { createWorld, isColorMask, isSvgSource } from "./world";
 import { bindSlotDrag, cancelSlotDrag } from "./slotDrag";
-import { bindUiClickSounds, bindUiTypeSounds, playButton, playCaution, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
+import { bindUiClickSounds, bindUiTypeSounds, playButton, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
+import gsap from "gsap";
 import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
 import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?raw";
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
@@ -66,10 +67,11 @@ import "./style.css";
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("#app missing");
 
-const state = acidState();
+const state = blankState();
 let panelTab: "physics" | "background" | "export" = "physics";
 const openSlots = new Set<string>();
 let pickedSlotId: string | null = null;
+const pickedSlotIds = new Set<string>();
 let focusSlotId: string | null = null;
 let revealSlotId: string | null = null;
 let revealTheme = false;
@@ -95,7 +97,10 @@ let tintPicker: { anchor: HTMLElement; close: () => void } | null = null;
 const world = createWorld();
 
 app.innerHTML = `
-  <div class="app">
+  <div class="app ui-hidden">
+    <div class="app-intro" id="app-intro" aria-hidden="true">
+      <img class="app-intro__gif" alt="" width="300" height="300" />
+    </div>
     <div class="stage" id="stage">
       <div class="stage-veil" id="stage-veil" hidden>
         <div data-side="top"></div>
@@ -116,10 +121,11 @@ app.innerHTML = `
             </div>
           </div>
         </div>
-        <div class="post-grain" aria-hidden="true"></div>
+        <div class="post-grain" aria-hidden="true"><div class="post-grain-tex"></div></div>
         <div class="post-vignette" aria-hidden="true"></div>
         <canvas class="phys-debug" id="phys-debug" aria-hidden="true" hidden></canvas>
         <p class="canvas-welcome" id="canvas-welcome" hidden>Press spacebar to trigger physics</p>
+        <p class="canvas-nudge" id="canvas-nudge" hidden aria-live="polite"></p>
       </div>
     </div>
     <header class="topbar">
@@ -194,7 +200,10 @@ const playfield = app.querySelector<HTMLElement>("#playfield")!;
 const stageVeil = app.querySelector<HTMLElement>("#stage-veil")!;
 const physDebugCanvas = app.querySelector<HTMLCanvasElement>("#phys-debug")!;
 const canvasWelcome = app.querySelector<HTMLElement>("#canvas-welcome")!;
+const canvasNudge = app.querySelector<HTMLElement>("#canvas-nudge")!;
 let physDebugOn = false;
+let nudgeFadeTimer = 0;
+let shapeBlinkTimer = 0;
 
 const WELCOME_KEY = "falldown.welcomeDismissed";
 let welcomeDismissed = false;
@@ -882,7 +891,9 @@ function applyPost() {
   stage.style.setProperty("--bloom", `${bloom}px`);
   stage.style.setProperty("--bloom-opacity", bloomOpacity);
   stage.style.setProperty("--post-blend", state.post.blend);
-  stage.style.setProperty("--post-grain", `${state.post.grain / 100}`);
+  const grain = state.post.grain / 100;
+  stage.style.setProperty("--post-grain", `${Math.min(1, grain)}`);
+  stage.style.setProperty("--post-grain-contrast", `${1 + Math.max(0, grain - 1) * 0.85}`);
   stage.style.setProperty("--post-vig", `${state.post.vignette / 140}`);
   stage.style.setProperty("--post-sat", `${state.post.saturate / 100}`);
   const hueDeg = Math.round(state.post.hue + audioHueOffset);
@@ -1048,6 +1059,11 @@ const AMOUNT_SOFT_CAP = 8;
 const SHAPE_TOTAL_SOFT_CAP = 36;
 const SCALE_PERF_WARN = 5;
 const SHAPE_PERF_WARN = 20;
+/** Slider ceiling for text/shape/SVG scale. Templates top out ~5; canvas drag can go higher. */
+const SCALE_SLIDER_MAX = 6;
+/** Hard ceiling for canvas / programmatic scale (raster uploads stay at 2). */
+const SCALE_HARD_MAX = 100;
+const SCALE_UPLOAD_MAX = 4;
 
 function shapeAmountRange() {
   const count = fallingImages().length;
@@ -1239,7 +1255,7 @@ function renderPanel() {
       </datalist>
       <button type="button" class="pill" id="load-local-fonts" data-tip="Let the browser list fonts installed on this computer">Load local fonts</button>
     </section>
-    <section class="section">
+    <section class="section" id="shape-create">
       <h2 data-tip="The pieces that drop into the frame">What falls down</h2>
       <div class="slot-stack" id="slots"></div>
       <div class="slot-adds">
@@ -1251,9 +1267,13 @@ function renderPanel() {
           <span class="slot-add__icon" aria-hidden="true">${plus}</span>
           Add Text
         </button>
-        <button type="button" class="pill slot-add" id="add-image" data-tip="Add a shape or emoji icon">
+        <button type="button" class="pill slot-add" id="add-shape" data-tip="Add a built-in shape from the library">
           <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-          Add icon
+          Add shape
+        </button>
+        <button type="button" class="pill slot-add" id="add-emoji" data-tip="Add an emoji">
+          <span class="slot-add__icon" aria-hidden="true">${plus}</span>
+          Add emoji
         </button>
         <button type="button" class="pill slot-add" id="add-photo" data-tip="Add an SVG, PNG, JPG, or GIF">
           <span class="slot-add__icon" aria-hidden="true">${plus}</span>
@@ -1282,8 +1302,8 @@ function renderPanel() {
         </label>
       </div>
       <div class="row">
-        <label class="field" data-tip="How springy collisions are"><span data-range-label="bounce">Bounciness ${state.physics.bounce.toFixed(2)}</span>
-          <input type="range" id="bounce" min="0" max="1" step="0.05" value="${state.physics.bounce}" />
+        <label class="field" data-tip="How springy collisions are (above 1 = super-bouncy)"><span data-range-label="bounce">Bounciness ${state.physics.bounce.toFixed(2)}</span>
+          <input type="range" id="bounce" min="0" max="2" step="0.05" value="${state.physics.bounce}" />
         </label>
       </div>
       <div class="row">
@@ -1317,7 +1337,7 @@ function renderPanel() {
         <input type="range" id="bloomOpacity" min="0" max="100" step="1" value="${state.post.bloomOpacity}" />
       </label>
       <label class="field" data-tip="Film-grain texture over the frame"><span data-range-label="grain">Grain ${state.post.grain}</span>
-        <input type="range" id="grain" min="0" max="100" step="1" value="${state.post.grain}" />
+        <input type="range" id="grain" min="0" max="200" step="1" value="${state.post.grain}" />
       </label>
       <label class="field" data-tip="Darken the edges of the frame"><span data-range-label="vignette">Vignette ${state.post.vignette}</span>
         <input type="range" id="vignette" min="0" max="100" step="1" value="${state.post.vignette}" />
@@ -1411,53 +1431,10 @@ function renderPanel() {
   for (const slot of state.slots) slotStack.append(renderSlotCard(slot));
   bindSlotDrag(slotStack, panel, applySlotOrder);
 
-  panel.querySelector("#add-text")?.addEventListener("click", () => {
-    remember();
-    const font: Partial<TextSlot> = {};
-    if (appliedFont) {
-      font.fontFamily = appliedFont;
-      const weight = sharedFamily() === appliedFont ? sharedWeight() : null;
-      font.fontWeight = chosenWeight(appliedFont, weight ?? 700);
-    }
-    const slot = defaultTextSlot({ colorIndex: state.slots.length % state.theme.length, ...font });
-    captureBaseline(slot);
-    state.slots.push(slot);
-    openOnly(slot.id);
-    focusSlotId = slot.id;
-    revealSlotId = slot.id;
-    playCreate();
-    renderPanel();
-    live();
-  });
-  panel.querySelector("#add-type")?.addEventListener("click", () => {
-    remember();
-    const font: Partial<TextSlot> = {};
-    if (appliedFont) {
-      font.fontFamily = appliedFont;
-      const weight = sharedFamily() === appliedFont ? sharedWeight() : null;
-      font.fontWeight = chosenWeight(appliedFont, weight ?? 700);
-    }
-    const slot = defaultTypeSlot({ colorIndex: state.slots.length % state.theme.length, ...font });
-    captureBaseline(slot);
-    state.slots.push(slot);
-    openOnly(slot.id);
-    focusSlotId = slot.id;
-    revealSlotId = slot.id;
-    playCreate();
-    renderPanel();
-    live();
-  });
-  panel.querySelector("#add-image")?.addEventListener("click", () => {
-    remember();
-    const slot = defaultImageSlot({ colorIndex: state.slots.length % state.theme.length });
-    captureBaseline(slot);
-    state.slots.push(slot);
-    openOnly(slot.id);
-    revealSlotId = slot.id;
-    playCreate();
-    renderPanel();
-    live();
-  });
+  panel.querySelector("#add-text")?.addEventListener("click", () => addPillSlot());
+  panel.querySelector("#add-type")?.addEventListener("click", () => addTypeSlot());
+  panel.querySelector("#add-shape")?.addEventListener("click", () => addShapeSlot());
+  panel.querySelector("#add-emoji")?.addEventListener("click", () => addEmojiSlot());
   panel.querySelector("#add-photo")?.addEventListener("click", () => {
     void pickImageFiles(true).then((files) => {
       if (!files.length) return;
@@ -1748,7 +1725,7 @@ function bindRange(
 function renderSlotCard(slot: Slot): HTMLElement {
   const card = document.createElement("article");
   const open = openSlots.has(slot.id);
-  card.className = `slot-card${open ? " is-open" : ""}${slot.id === pickedSlotId ? " is-picked" : ""}`;
+  card.className = `slot-card${open ? " is-open" : ""}${pickedSlotIds.has(slot.id) ? " is-picked" : ""}`;
   card.dataset.id = slot.id;
   card.addEventListener("contextmenu", (event) => {
     if (
@@ -1779,7 +1756,7 @@ function textColorChip(slot: TextSlot): HTMLElement {
   const chip = document.createElement("span");
   chip.className = "slot-chip";
   chip.style.background = chipPreview(slot);
-  if (slot.gradient && slot.animatedGradient && !slot.stroked && slot.shape !== "none") {
+  if (slot.gradient && slot.animatedGradient && !slot.stroked) {
     chip.classList.add("is-gradient-animated");
     chip.style.setProperty("--sweep-duration", `${gradientPeriodMs(slot.gradientSpeed) / 1000}s`);
     chip.style.setProperty("--grad-angle", String(gradientAngleOf(slot.gradientAngle)));
@@ -1857,6 +1834,8 @@ function openOnly(id: string) {
   openSlots.clear();
   openSlots.add(id);
   pickedSlotId = id;
+  pickedSlotIds.clear();
+  pickedSlotIds.add(id);
   world.setPicked(id);
 }
 
@@ -1918,6 +1897,10 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
   };
   toggle.addEventListener("click", (event) => {
     if (event.target instanceof HTMLInputElement) return;
+    if (event.shiftKey) {
+      pickSlot(slot.id, { additive: true, force: true });
+      return;
+    }
     toggleOpen(true);
   });
   toggle.addEventListener("keydown", (event) => {
@@ -1969,7 +1952,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         </label>
       </div>
       <label class="field">${settingLabel(slot, "Text scale", "scale", slot.scale.toFixed(2))}
-        <input type="range" data-key="scale" min="0.25" max="4" step="0.05" value="${slot.scale}" />
+        <input type="range" data-key="scale" min="0.25" max="${slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
       </label>
       <label class="field">${settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
         <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
@@ -1977,9 +1960,13 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       <label class="field">${settingLabel(slot, "Tracking", "tracking", String(trackingOf(slot, state.textTracking)))}
         <input type="range" data-key="tracking" min="-100" max="100" step="1" value="${trackingOf(slot, state.textTracking)}" />
       </label>
-      <div class="field">${settingLabel(slot, "Text color", "textColor")}
+      ${
+        slot.shape !== "none"
+          ? `<div class="field">${settingLabel(slot, "Text color", "textColor")}
         ${textTintRow(slot)}
-      </div>
+      </div>`
+          : ""
+      }
     </div>
     <div class="slot-group">
       <p class="slot-label">Shape</p>
@@ -2013,21 +2000,21 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       </div>
       ${slot.stroked ? `<label class="field">${settingLabel(slot, "Stroke", "stroke", String(slot.stroke))}
         <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke}" />
-      </label>` : ""}
+      </label>` : ""}`
+          : ""
+      }
       <div class="check-row">
         <label class="check">
           ${checkInput(`data-key="gradient" ${slot.gradient ? "checked" : ""}`)}
           Gradient
         </label>
         ${resetControl("Gradient", "gradient", fieldDirty(slot, "gradient"))}
-      </div>`
-          : ""
-      }
-      <div class="field">${settingLabel(slot, slot.shape === "none" ? "Color" : slot.gradient ? "Start color" : "Shape color", "color")}
+      </div>
+      <div class="field">${settingLabel(slot, slot.gradient ? "Start color" : slot.shape === "none" ? "Color" : "Shape color", "color")}
         ${tintRow(slot, slot.shape === "none" ? "Color" : "Shape color")}
       </div>
       ${
-        slot.shape !== "none" && slot.gradient
+        slot.gradient
           ? `<div class="field">${settingLabel(slot, "End color", "gradientColor")}
         ${gradientTintRow(slot)}
       </div>
@@ -2057,7 +2044,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
           : ""
       }
       ${
-        slot.shape !== "none" && slot.gradient
+        slot.gradient
           ? `<div class="check-row">
         <label class="check">
           ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""}`)}
@@ -2107,13 +2094,17 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
 }
 
 function imageFields(slot: ImageSlot, open: boolean): HTMLElement {
+  return slot.emoji ? emojiFields(slot, open) : shapeFields(slot, open);
+}
+
+function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "slot-body";
   wrap.append(slotHead(slot, open));
   const editor = document.createElement("div");
   editor.className = "slot-editor";
   editor.innerHTML = `
-    <div class="pick-now">${pickPreview(slot)}${resetControl("Icon", "icon", fieldDirty(slot, "icon"))}</div>
+    <div class="pick-now">${pickPreview(slot)}${resetControl("Shape", "icon", fieldDirty(slot, "icon"))}</div>
     <div class="field">${settingLabel(slot, slot.gradient && iconCanGradient(slot) ? "Start color" : "Color", "color")}
       ${tintRow(slot)}
     </div>
@@ -2157,14 +2148,8 @@ function imageFields(slot: ImageSlot, open: boolean): HTMLElement {
     }
     <p class="slot-label">Shapes</p>
     <div class="icon-grid" data-presets></div>
-    <p class="slot-label">Emoji</p>
-    <div class="emoji-grid" data-emoji-featured></div>
-    <label class="field">Search emoji
-      <input type="search" data-emoji-search placeholder="heart, fire, cat…" />
-    </label>
-    <div class="emoji-grid" data-emoji-results></div>
     <label class="field">${settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="100" step="0.05" value="${slot.scale}" />
+      <input type="range" data-key="scale" min="0.25" max="${slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     <label class="field">${settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${AMOUNT_SOFT_CAP}" value="${slot.amount}" />
@@ -2178,8 +2163,8 @@ function imageFields(slot: ImageSlot, open: boolean): HTMLElement {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.title = icon.label;
-    btn.className = !slot.emoji && slot.src === icon.src ? "is-on" : "";
-    btn.setAttribute("aria-pressed", String(!slot.emoji && slot.src === icon.src));
+    btn.className = slot.src === icon.src ? "is-on" : "";
+    btn.setAttribute("aria-pressed", String(slot.src === icon.src));
     btn.append(shapeSwatch(icon.src, swatchColor));
     btn.addEventListener("click", () => {
       remember();
@@ -2193,6 +2178,34 @@ function imageFields(slot: ImageSlot, open: boolean): HTMLElement {
     });
     grid.append(btn);
   }
+
+  bindTint(editor, slot);
+  bindSlotInputs(editor, slot);
+  return wrap;
+}
+
+function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "slot-body";
+  wrap.append(slotHead(slot, open));
+  const editor = document.createElement("div");
+  editor.className = "slot-editor";
+  editor.innerHTML = `
+    <div class="pick-now">${pickPreview(slot)}${resetControl("Emoji", "icon", fieldDirty(slot, "icon"))}</div>
+    <p class="slot-label">Emoji</p>
+    <div class="emoji-grid" data-emoji-featured></div>
+    <label class="field">Search emoji
+      <input type="search" data-emoji-search placeholder="heart, fire, cat…" />
+    </label>
+    <div class="emoji-grid" data-emoji-results></div>
+    <label class="field">${settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
+      <input type="range" data-key="scale" min="0.25" max="${slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+    </label>
+    <label class="field">${settingLabel(slot, "Amount", "amount", String(slot.amount))}
+      <input type="range" data-key="amount" min="1" max="${AMOUNT_SOFT_CAP}" value="${slot.amount}" />
+    </label>
+  `;
+  placeFold(wrap, editor, open);
 
   const pickEmoji = (item: EmojiItem) => {
     remember();
@@ -2236,7 +2249,6 @@ function imageFields(slot: ImageSlot, open: boolean): HTMLElement {
     paintResults(searchEmoji((e.target as HTMLInputElement).value));
   });
 
-  bindTint(editor, slot);
   bindSlotInputs(editor, slot);
   return wrap;
 }
@@ -2313,13 +2325,30 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     </label>
     ${
       isRasterUpload(slot)
-        ? `<label class="field">${settingLabel(slot, "Radius", "radius", String(Math.round(slot.radius ?? 0)))}
+        ? `<div class="check-row">
+      <label class="check">
+        ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
+        Stroked
+      </label>
+      ${resetControl("Stroked", "stroked", fieldDirty(slot, "stroked"))}
+    </div>
+    ${
+      slot.stroked
+        ? `<label class="field">${settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
+      <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke ?? 4}" />
+    </label>
+    <div class="field">${settingLabel(slot, "Stroke color", "color")}
+      ${tintRow(slot, "Stroke color")}
+    </div>`
+        : ""
+    }
+    <label class="field">${settingLabel(slot, "Radius", "radius", String(Math.round(slot.radius ?? 0)))}
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
     </label>`
         : ""
     }
     <label class="field">${settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="2" step="0.05" value="${slot.scale}" />
+      <input type="range" data-key="scale" min="0.25" max="${slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     <label class="field">${settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${AMOUNT_SOFT_CAP}" value="${slot.amount}" />
@@ -2327,7 +2356,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
   `;
   placeFold(wrap, editor, open);
 
-  if (canTint) bindTint(editor, slot);
+  if (canTint || (isRasterUpload(slot) && slot.stroked)) bindTint(editor, slot);
   editor.querySelector<HTMLInputElement>("[data-file]")?.addEventListener("change", (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file || !isImageFile(file)) return;
@@ -2408,7 +2437,10 @@ function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
   slot.collider = undefined;
   slot.tint = undefined;
   slot.inverted = undefined;
-  if (svg) slot.radius = 0;
+  if (svg) {
+    slot.radius = 0;
+    slot.stroked = undefined;
+  }
   return ensureTrim(url, file.name)
     .then((trim) => {
       if (slot.src !== url) return null;
@@ -2475,6 +2507,94 @@ function playfieldPoint(clientX: number, clientY: number) {
   };
 }
 
+type PlaceAt = { clientX: number; clientY: number };
+
+function armSlotPlace(id: string, at?: PlaceAt) {
+  if (!at) return;
+  const { x, y } = playfieldPoint(at.clientX, at.clientY);
+  world.armPlaceAt([id], x, y);
+}
+
+function addPillSlot(at?: PlaceAt) {
+  remember();
+  const font: Partial<TextSlot> = {};
+  if (appliedFont) {
+    font.fontFamily = appliedFont;
+    const weight = sharedFamily() === appliedFont ? sharedWeight() : null;
+    font.fontWeight = chosenWeight(appliedFont, weight ?? 700);
+  }
+  const prefab = state.template === "blank" ? { text: blankPrefabText(allTextSlots().length) } : {};
+  const slot = defaultTextSlot({ colorIndex: state.slots.length % state.theme.length, ...font, ...prefab });
+  captureBaseline(slot);
+  state.slots.push(slot);
+  openOnly(slot.id);
+  focusSlotId = slot.id;
+  revealSlotId = slot.id;
+  armSlotPlace(slot.id, at);
+  playCreate();
+  renderPanel();
+  live();
+}
+
+function addTypeSlot(at?: PlaceAt) {
+  remember();
+  const font: Partial<TextSlot> = {};
+  if (appliedFont) {
+    font.fontFamily = appliedFont;
+    const weight = sharedFamily() === appliedFont ? sharedWeight() : null;
+    font.fontWeight = chosenWeight(appliedFont, weight ?? 700);
+  }
+  const prefab = state.template === "blank" ? { text: blankPrefabText(allTextSlots().length) } : {};
+  const slot = defaultTypeSlot({ colorIndex: state.slots.length % state.theme.length, ...font, ...prefab });
+  captureBaseline(slot);
+  state.slots.push(slot);
+  openOnly(slot.id);
+  focusSlotId = slot.id;
+  revealSlotId = slot.id;
+  armSlotPlace(slot.id, at);
+  playCreate();
+  renderPanel();
+  live();
+}
+
+function addShapeSlot(at?: PlaceAt) {
+  remember();
+  const preset = ICON_PRESETS[0]!;
+  const slot = defaultImageSlot({
+    colorIndex: state.slots.length % state.theme.length,
+    src: preset.src,
+    name: preset.label,
+  });
+  captureBaseline(slot);
+  state.slots.push(slot);
+  openOnly(slot.id);
+  revealSlotId = slot.id;
+  armSlotPlace(slot.id, at);
+  playCreate();
+  renderPanel();
+  live();
+}
+
+function addEmojiSlot(at?: PlaceAt) {
+  remember();
+  const item = FEATURED_EMOJI[0]!;
+  const slot = defaultImageSlot({
+    colorIndex: state.slots.length % state.theme.length,
+    src: "",
+    name: item.name,
+    emoji: item.char,
+    size: 56,
+  });
+  captureBaseline(slot);
+  state.slots.push(slot);
+  openOnly(slot.id);
+  revealSlotId = slot.id;
+  armSlotPlace(slot.id, at);
+  playCreate();
+  renderPanel();
+  live();
+}
+
 function placeFold(wrap: HTMLElement, editor: HTMLElement, open: boolean) {
   const fold = document.createElement("div");
   fold.className = "slot-fold";
@@ -2507,10 +2627,17 @@ function scaleFieldName(slot: Slot): string {
   return "Shape scale";
 }
 
-/** Uploaded images cap at 2 so they can't swamp the frame. */
+/** Raster uploads cap at 2 so they can't swamp the frame. SVGs/text/shapes keep a high hard max for canvas drag. */
 function clampSlotScale(slot: Slot, scale: number): number {
-  const max = slot.kind === "text" ? 4 : slot.kind === "image" && uploadedShape(slot) ? 2 : 100;
+  const max = slot.kind === "image" && uploadedShape(slot) && !isSvgSource(slot) ? SCALE_UPLOAD_MAX : SCALE_HARD_MAX;
   return Math.min(max, Math.max(0.25, Math.round(scale * 100) / 100));
+}
+
+/** Soft slider range; expands if the current value was set higher via canvas drag. */
+function slotScaleSliderMax(slot: Slot): number {
+  const soft =
+    slot.kind === "image" && uploadedShape(slot) && !isSvgSource(slot) ? SCALE_UPLOAD_MAX : SCALE_SLIDER_MAX;
+  return Math.max(soft, slot.scale);
 }
 
 function isRasterUpload(slot: ImageSlot): boolean {
@@ -2550,7 +2677,7 @@ function paintIconSwatches(root: HTMLElement, slot: ImageSlot) {
 }
 
 function chipPreview(slot: TextSlot): string {
-  if (!slot.gradient || slot.stroked || slot.shape === "none") return slotColor(slot);
+  if (!slot.gradient || slot.stroked) return slotColor(slot);
   if (slot.animatedGradient) return pillSweepGradient(slotColor(slot), gradientEnd(state.theme, slot), slot.gradientAngle, slot.gradientScale);
   return pillGradient(slotColor(slot), gradientEnd(state.theme, slot), slot.gradientAngle, slot.gradientScale);
 }
@@ -2830,6 +2957,8 @@ type ImageBaseline = Pick<
   | "animatedGradient"
   | "gradientSpeed"
   | "radius"
+  | "stroked"
+  | "stroke"
   | "tint"
   | "collider"
 >;
@@ -2893,6 +3022,8 @@ function captureBaseline(slot: Slot) {
     animatedGradient: slot.animatedGradient,
     gradientSpeed: slot.gradientSpeed,
     radius: slot.radius ?? 0,
+    stroked: Boolean(slot.stroked),
+    stroke: slot.stroke ?? 4,
     tint: slot.tint,
     collider: slot.collider,
   });
@@ -2952,6 +3083,8 @@ function imageBaseline(slot: ImageSlot): ImageBaseline {
     animatedGradient: seed.animatedGradient,
     gradientSpeed: seed.gradientSpeed,
     radius: seed.radius ?? 0,
+    stroked: Boolean(seed.stroked),
+    stroke: seed.stroke ?? 4,
     tint: seed.tint,
     collider: seed.collider,
   };
@@ -3028,6 +3161,10 @@ function fieldDirty(slot: Slot, key: string): boolean {
       return slot.amount !== base.amount;
     case "radius":
       return (slot.radius ?? 0) !== (base.radius ?? 0);
+    case "stroked":
+      return Boolean(slot.stroked) !== Boolean(base.stroked);
+    case "stroke":
+      return (slot.stroke ?? 4) !== (base.stroke ?? 4);
     case "tint":
       return Boolean(slot.tint) !== Boolean(base.tint);
     case "color":
@@ -3115,6 +3252,8 @@ function applyFieldReset(slot: Slot, key: string) {
     } else if (key === "scale") slot.scale = base.scale;
     else if (key === "amount") slot.amount = base.amount;
     else if (key === "radius") slot.radius = base.radius ?? 0;
+    else if (key === "stroked") slot.stroked = base.stroked;
+    else if (key === "stroke") slot.stroke = base.stroke ?? 4;
     else if (key === "tint") {
       slot.tint = base.tint;
       if (!slot.tint) {
@@ -3212,7 +3351,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
             const chip = card.querySelector<HTMLElement>(".slot-chip");
             if (chip) {
               chip.style.background = chipPreview(slot);
-              const sweep = Boolean(slot.gradient && slot.animatedGradient && !slot.stroked && slot.shape !== "none");
+              const sweep = Boolean(slot.gradient && slot.animatedGradient && !slot.stroked);
               chip.classList.toggle("is-gradient-animated", sweep);
               if (sweep) {
                 chip.style.setProperty("--sweep-duration", `${gradientPeriodMs(slot.gradientSpeed) / 1000}s`);
@@ -3262,6 +3401,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       }
       if (key === "scale") {
         slot.scale = clampSlotScale(slot, Number(value));
+        input.max = String(slotScaleSliderMax(slot));
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
           caption.textContent = `${scaleFieldName(slot)} ${slot.scale.toFixed(2)}`;
@@ -3368,27 +3508,60 @@ function openCanvasMenu(x: number, y: number) {
   closeSlotMenu();
   const abort = new AbortController();
   const menu = document.createElement("div");
-  menu.className = "slot-menu";
+  menu.className = "canvas-add-menu";
   menu.setAttribute("role", "menu");
 
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "slot-menu__item";
-  btn.setAttribute("role", "menuitem");
-  btn.textContent = "Import image";
-  btn.addEventListener("click", () => {
-    closeSlotMenu();
-    void pickImageFiles(true).then((files) => {
-      if (!files.length) return;
-      addImagesFromFiles(files, { clientX: x, clientY: y });
-    });
-  });
-  menu.append(btn);
+  const at: PlaceAt = { clientX: x, clientY: y };
+  const entries: { label: string; run: () => void }[] = [
+    { label: "Add pill", run: () => addPillSlot(at) },
+    { label: "Add Text", run: () => addTypeSlot(at) },
+    { label: "Add shape", run: () => addShapeSlot(at) },
+    { label: "Add emoji", run: () => addEmojiSlot(at) },
+    {
+      label: "Add image",
+      run: () => {
+        void pickImageFiles(true).then((files) => {
+          if (!files.length) return;
+          addImagesFromFiles(files, at);
+        });
+      },
+    },
+  ];
 
-  placeSlotMenu(menu, x, y);
+  const buttons: HTMLButtonElement[] = [];
+  for (const entry of entries) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pill slot-add";
+    btn.setAttribute("role", "menuitem");
+    btn.innerHTML = `<span class="slot-add__icon" aria-hidden="true">${plus}</span>${entry.label}`;
+    btn.addEventListener("click", () => {
+      closeSlotMenu();
+      entry.run();
+    });
+    menu.append(btn);
+    buttons.push(btn);
+  }
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.body.append(menu);
+  const gap = 8;
+  const left = Math.max(gap, Math.min(x, window.innerWidth - menu.offsetWidth - gap));
+  const top = Math.max(gap, Math.min(y, window.innerHeight - menu.offsetHeight - gap));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+
+  if (!reduceMotion) {
+    gsap.fromTo(
+      buttons,
+      { autoAlpha: 0, y: -10 },
+      { autoAlpha: 1, y: 0, duration: 0.22, stagger: 0.05, ease: "power2.out" },
+    );
+  }
 
   const closeCurrent = () => {
     abort.abort();
+    gsap.killTweensOf(buttons);
     if (closeSlotMenu === closeCurrent) closeSlotMenu = () => {};
     menu.remove();
   };
@@ -3428,6 +3601,7 @@ function syncSlotScaleUi(slot: Slot) {
   if (!card) return;
   const input = card.querySelector<HTMLInputElement>('input[data-key="scale"]');
   if (input) {
+    input.max = String(slotScaleSliderMax(slot));
     input.value = String(slot.scale);
     paintRange(input);
   }
@@ -3463,7 +3637,7 @@ function syncSlotGradientWheelUi(slot: Slot) {
     const chip = card.querySelector<HTMLElement>(".slot-chip");
     if (chip) {
       chip.style.background = chipPreview(slot);
-      const sweep = Boolean(slot.gradient && slot.animatedGradient && !slot.stroked && slot.shape !== "none");
+      const sweep = Boolean(slot.gradient && slot.animatedGradient && !slot.stroked);
       chip.classList.toggle("is-gradient-animated", sweep);
       if (sweep) {
         chip.style.setProperty("--sweep-duration", `${gradientPeriodMs(slot.gradientSpeed) / 1000}s`);
@@ -3482,7 +3656,7 @@ function gradientWheelOf(id: string): { from: string; to: string; angle: number;
   const slot = state.slots.find((item) => item.id === id);
   if (!slot || !slot.gradient) return null;
   if (slot.kind === "text") {
-    if (slot.stroked || slot.shape === "none") return null;
+    if (slot.stroked) return null;
     return {
       from: slotColor(slot),
       to: gradientEnd(state.theme, slot),
@@ -3624,7 +3798,8 @@ function editChipText(id: string, wipe: boolean) {
   // Drop the pick outline so it doesn't read as an edit chrome box.
   world.setPicked(null);
   pickedSlotId = null;
-  panel.querySelector(".slot-card.is-picked")?.classList.remove("is-picked");
+  pickedSlotIds.clear();
+  panel.querySelectorAll(".slot-card.is-picked").forEach((el) => el.classList.remove("is-picked"));
   liveChip(id);
 
   const edit = world.chipEl(id)?.querySelector<HTMLElement>(":scope > .chip-edit");
@@ -3866,12 +4041,80 @@ function openSlotMenu(x: number, y: number, id: string) {
       holdScrollClose(() => liveChip(slot.id));
     };
     const mountImageInk = () => {
-      if (!iconCanGradient(slot)) return;
       clearMenuInk(menu);
+      const nodes: HTMLElement[] = [];
+      if (isRasterUpload(slot)) {
+        if (slot.stroked) {
+          nodes.push(menuColorRow("Stroke Color:", slot.color ? null : (slot.colorIndex ?? 0), paintShapeColor));
+        }
+        nodes.push(
+          menuCheckRow("Stroked", Boolean(slot.stroked), (next) => {
+            remember();
+            slot.stroked = next;
+            if (next && slot.stroke == null) slot.stroke = 4;
+            panelNeedsSync = true;
+            clearMenuStroke();
+            holdScrollClose(() => liveChip(slot.id));
+            mountImageInk();
+            placeSlotMenu(menu, x, y);
+          }),
+        );
+      } else if (iconCanGradient(slot)) {
+        if (slot.gradient) {
+          nodes.push(
+            menuColorRow("Start color:", slot.color ? null : (slot.colorIndex ?? 0), paintShapeColor),
+            menuColorRow(
+              "End color:",
+              slot.gradientColor ? null : gradientEndIndex(state.theme, slot),
+              paintGradColor,
+            ),
+          );
+        } else {
+          nodes.push(menuColorRow("Color:", slot.color ? null : (slot.colorIndex ?? 0), paintShapeColor));
+        }
+        nodes.push(
+          menuCheckRow("Gradient", Boolean(slot.gradient), (next) => {
+            remember();
+            slot.gradient = next || undefined;
+            if (!next) slot.animatedGradient = undefined;
+            else if (slot.gradientColorIndex == null && !slot.gradientColor) {
+              slot.gradientColorIndex = gradientEndIndex(state.theme, slot);
+            }
+            panelNeedsSync = true;
+            clearMenuStroke();
+            holdScrollClose(() => liveChip(slot.id));
+            mountImageInk();
+            placeSlotMenu(menu, x, y);
+          }),
+        );
+      }
+      if (nodes.length) insertMenuInk(menu, nodes);
+    };
+    revealImageInk = mountImageInk;
+    if (iconCanGradient(slot) || isRasterUpload(slot)) mountImageInk();
+  } else if (slot?.kind === "text" && slot.shape === "none") {
+    const mountBareInk = () => {
+      clearMenuInk(menu);
+      const paintColor = (index: number) => {
+        remember();
+        slot.colorIndex = index;
+        slot.color = undefined;
+        slot.textColorIndex = undefined;
+        slot.textColor = undefined;
+        clearMenuStroke();
+        holdScrollClose(() => liveChip(slot.id));
+      };
+      const paintGradColor = (index: number) => {
+        remember();
+        slot.gradientColorIndex = index;
+        slot.gradientColor = undefined;
+        clearMenuStroke();
+        holdScrollClose(() => liveChip(slot.id));
+      };
       const nodes: HTMLElement[] = [];
       if (slot.gradient) {
         nodes.push(
-          menuColorRow("Start color:", slot.color ? null : (slot.colorIndex ?? 0), paintShapeColor),
+          menuColorRow("Start color:", slot.color ? null : (slot.colorIndex ?? 0), paintColor),
           menuColorRow(
             "End color:",
             slot.gradientColor ? null : gradientEndIndex(state.theme, slot),
@@ -3879,40 +4122,32 @@ function openSlotMenu(x: number, y: number, id: string) {
           ),
         );
       } else {
-        nodes.push(menuColorRow("Color:", slot.color ? null : (slot.colorIndex ?? 0), paintShapeColor));
+        nodes.push(menuColorRow("Color:", slot.color ? null : (slot.colorIndex ?? 0), paintColor));
       }
       nodes.push(
         menuCheckRow("Gradient", Boolean(slot.gradient), (next) => {
           remember();
-          slot.gradient = next || undefined;
-          if (!next) slot.animatedGradient = undefined;
-          else if (slot.gradientColorIndex == null && !slot.gradientColor) {
-            slot.gradientColorIndex = gradientEndIndex(state.theme, slot);
+          if (next) {
+            recallGradient(slot);
+            slot.gradient = true;
+            if (slot.gradientColorIndex == null && !slot.gradientColor) {
+              slot.gradientColorIndex = gradientEndIndex(state.theme, slot);
+            }
+          } else {
+            storeGradient(slot);
+            slot.gradient = false;
+            slot.animatedGradient = undefined;
           }
           panelNeedsSync = true;
           clearMenuStroke();
           holdScrollClose(() => liveChip(slot.id));
-          mountImageInk();
+          mountBareInk();
           placeSlotMenu(menu, x, y);
         }),
       );
       insertMenuInk(menu, nodes);
     };
-    revealImageInk = mountImageInk;
-    if (iconCanGradient(slot)) mountImageInk();
-  } else if (slot?.kind === "text" && slot.shape === "none") {
-    const paintColor = (index: number) => {
-      remember();
-      slot.colorIndex = index;
-      slot.color = undefined;
-      slot.textColorIndex = undefined;
-      slot.textColor = undefined;
-      clearMenuStroke();
-      holdScrollClose(() => liveChip(slot.id));
-    };
-    insertMenuInk(menu, [
-      menuColorRow("Color:", slot.color ? null : (slot.colorIndex ?? 0), paintColor),
-    ]);
+    mountBareInk();
   } else if (slot?.kind === "text") {
     const mountTextInk = () => {
       clearMenuInk(menu);
@@ -4464,7 +4699,6 @@ async function setAudioReactEnabled(on: boolean) {
   if (!ok) {
     state.audioReact.enabled = false;
     setUiSoundsMuted(false);
-    playCaution();
     window.alert("Microphone access was blocked or unavailable.");
     renderPanel();
     return;
@@ -4504,7 +4738,7 @@ function tickAudioReact(now: number) {
 }
 
 function relayout() {
-  world.refresh(
+  return world.refresh(
     state.slots,
     state.physics,
     fitScale(),
@@ -4541,9 +4775,9 @@ function live() {
   const bump = () => {
     refreshUploadPreviews();
     const before = world.chipCount();
-    relayout();
-    // Additions and removals should keep the frame loop syncing and wake a held pile.
-    if (world.chipCount() !== before) {
+    const disturbed = relayout();
+    // Add/remove or remesh (Composition Scale etc.) should wake a held pile.
+    if (disturbed || world.chipCount() !== before) {
       lastInteractAt = performance.now();
       if (phase === "holding") {
         posePinned = false;
@@ -4566,6 +4800,80 @@ const playBtn = app.querySelector<HTMLButtonElement>("#play")!;
 const loopBtn = app.querySelector<HTMLButtonElement>("#loop")!;
 const copyBtn = app.querySelector<HTMLButtonElement>("#copy-settings")!;
 const devPanel = app.querySelector<HTMLElement>("#dev-panel")!;
+
+/** One playthrough of public/images/intropill.gif (40 frames × 5cs) + 0.25s fade to black. */
+const INTRO_MS = 2250;
+const INTRO_SRC = "/images/intropill.gif";
+let introActive = true;
+/** Resolves when the intro animation has finished (overlay may still cover). */
+let resolveIntroAnim: (() => void) | null = null;
+const introAnimDone = new Promise<void>((resolve) => {
+  resolveIntroAnim = resolve;
+});
+/** Hold UI reveal until draft/reconnect boot finishes. */
+let resolveBootHold: (() => void) | null = null;
+const bootHold = new Promise<void>((resolve) => {
+  resolveBootHold = resolve;
+});
+
+function finishIntro() {
+  if (!introActive) return;
+  introActive = false;
+  resolveIntroAnim?.();
+  resolveIntroAnim = null;
+  void bootHold.then(() => {
+    const intro = app.querySelector<HTMLElement>("#app-intro");
+    shell.classList.remove("ui-hidden");
+    resize();
+    if (!intro) return;
+    intro.classList.add("is-done");
+    const remove = () => intro.remove();
+    intro.addEventListener("transitionend", remove, { once: true });
+    window.setTimeout(remove, 500);
+  });
+}
+
+async function preloadIntroGif(): Promise<void> {
+  const warm = new Image();
+  warm.src = INTRO_SRC;
+  if (warm.decode) await warm.decode();
+  else if (!warm.complete) {
+    await new Promise<void>((resolve, reject) => {
+      warm.onload = () => resolve();
+      warm.onerror = () => reject();
+    });
+  }
+}
+
+async function startIntro() {
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const intro = app.querySelector<HTMLElement>("#app-intro");
+  if (reduceMotion || !intro) {
+    intro?.remove();
+    // Defer so `resize` (declared later) exists before finishIntro runs.
+    window.setTimeout(finishIntro, 0);
+    return;
+  }
+
+  const img = intro.querySelector<HTMLImageElement>(".app-intro__gif");
+  try {
+    await preloadIntroGif();
+  } catch {
+    /* still show intro; image may load in place */
+  }
+  if (img) {
+    img.src = INTRO_SRC;
+    try {
+      if (img.decode) await img.decode();
+    } catch {
+      /* ignore decode failures */
+    }
+  }
+  intro.classList.add("is-ready");
+  window.setTimeout(finishIntro, INTRO_MS);
+}
+
+void startIntro();
 
 const DEV_RADIUS: Record<string, { css: string; label: string; value: number }> = {
   panel: { css: "--radius-panel", label: "Panel", value: 44 },
@@ -4825,13 +5133,109 @@ function finishRun() {
   paintWelcome();
 }
 
+function reducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function clearCanvasNudge() {
+  window.clearTimeout(nudgeFadeTimer);
+  gsap.killTweensOf(canvasNudge);
+  gsap.killTweensOf(canvasNudge.querySelectorAll(".canvas-nudge__word"));
+  canvasNudge.hidden = true;
+  canvasNudge.replaceChildren();
+  gsap.set(canvasNudge, { clearProps: "all" });
+}
+
+function showAddShapeNudge() {
+  clearCanvasNudge();
+  canvasWelcome.hidden = true;
+
+  const words = "Please add your first shape!".split(/\s+/);
+  for (const word of words) {
+    const span = document.createElement("span");
+    span.className = "canvas-nudge__word";
+    span.textContent = word;
+    canvasNudge.append(span);
+  }
+  canvasNudge.hidden = false;
+
+  const wordEls = canvasNudge.querySelectorAll<HTMLElement>(".canvas-nudge__word");
+  if (reducedMotion()) {
+    gsap.set(wordEls, { autoAlpha: 1, y: 0 });
+  } else {
+    gsap.fromTo(
+      wordEls,
+      { y: 22, autoAlpha: 0 },
+      { y: 0, autoAlpha: 1, duration: 0.75, stagger: 0.075, ease: "power2.out" },
+    );
+  }
+
+  nudgeFadeTimer = window.setTimeout(() => {
+    if (reducedMotion()) {
+      clearCanvasNudge();
+      paintWelcome();
+      return;
+    }
+    gsap.to(canvasNudge, {
+      autoAlpha: 0,
+      duration: 0.35,
+      ease: "power1.in",
+      onComplete: () => {
+        clearCanvasNudge();
+        paintWelcome();
+      },
+    });
+  }, 2800);
+}
+
+function blinkShapeCreate(section: HTMLElement) {
+  window.clearTimeout(shapeBlinkTimer);
+  section.classList.remove("is-blink");
+  // Retrigger CSS animation
+  void section.offsetWidth;
+  section.classList.add("is-blink");
+  shapeBlinkTimer = window.setTimeout(() => {
+    section.classList.remove("is-blink");
+    shapeBlinkTimer = 0;
+  }, 1400);
+}
+
+function nudgeEmptyScene() {
+  if (shell.classList.contains("ui-hidden")) {
+    shell.classList.remove("ui-hidden");
+    playTransition(true);
+    resize();
+  }
+
+  if (panelTab !== "physics") {
+    panelTab = "physics";
+    panel.scrollTop = 0;
+    renderPanel();
+  }
+
+  showAddShapeNudge();
+
+  const section = panel.querySelector<HTMLElement>("#shape-create");
+  if (!section) return;
+  scrollPanelTo(section);
+  blinkShapeCreate(section);
+}
+
 function triggerPhysics() {
+  if (!state.slots.length) {
+    nudgeEmptyScene();
+    return;
+  }
   playButton();
   setRunning(true);
 }
 
 function togglePause() {
   if (!running) {
+    if (!state.slots.length) {
+      nudgeEmptyScene();
+      return;
+    }
     setRunning(true);
     return;
   }
@@ -5016,8 +5420,9 @@ app.querySelector("#reset-defaults")?.addEventListener("click", () => {
   machineFont = "";
   appliedFont = "";
   pickedSlotId = null;
+  pickedSlotIds.clear();
   world.setPicked(null);
-  adoptState(acidState());
+  adoptState(blankState());
   for (const slot of state.slots) captureBaseline(slot);
   applyBackground();
   applyPost();
@@ -5032,6 +5437,7 @@ function loadTemplate(next: AppState) {
   machineFont = "";
   appliedFont = "";
   pickedSlotId = null;
+  pickedSlotIds.clear();
   world.setPicked(null);
   openSlots.clear();
   adoptState(next);
@@ -5097,6 +5503,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "h" || event.key === "H") {
+    if (introActive) return;
     shell.classList.toggle("ui-hidden");
     playTransition(!shell.classList.contains("ui-hidden"));
     resize();
@@ -5151,50 +5558,86 @@ function scrollPanelTo(card: HTMLElement, shrinkAbove = 0) {
   panelScrollFrame = requestAnimationFrame(step);
 }
 
-function showPick(id: string) {
-  if (pickedSlotId && pickedSlotId !== id) {
-    panel.querySelector<HTMLElement>(`[data-id="${pickedSlotId}"]`)?.classList.remove("is-picked");
+function syncPanelPicks() {
+  for (const card of panel.querySelectorAll<HTMLElement>(".slot-card[data-id]")) {
+    const id = card.dataset.id;
+    card.classList.toggle("is-picked", Boolean(id && pickedSlotIds.has(id)));
   }
+}
+
+function applyWorldPick() {
+  if (!pickedSlotId) {
+    world.setPicked(null);
+    return;
+  }
+  world.setPicked(pickedSlotId, { ids: [...pickedSlotIds] });
+}
+
+function showPick(id: string) {
+  pickedSlotIds.clear();
+  pickedSlotIds.add(id);
   pickedSlotId = id;
-  world.setPicked(id);
-  panel.querySelector<HTMLElement>(`[data-id="${id}"]`)?.classList.add("is-picked");
+  applyWorldPick();
+  syncPanelPicks();
 }
 
 function releasePick(id: string) {
-  if (pickedSlotId !== id) return;
-  pickedSlotId = null;
-  world.setPicked(null);
+  if (!pickedSlotIds.has(id)) return;
+  pickedSlotIds.delete(id);
+  if (pickedSlotId === id) pickedSlotId = [...pickedSlotIds].at(-1) ?? null;
+  applyWorldPick();
   panel.querySelector<HTMLElement>(`[data-id="${id}"]`)?.classList.remove("is-picked");
 }
 
 function dismissPick() {
   endChipEdit();
   closeSlotMenu();
-  const id = pickedSlotId;
-  if (!id) return;
-  const card = panel.querySelector<HTMLElement>(`[data-id="${id}"]`);
-  const slot = state.slots.find((item) => item.id === id);
-  const toggle = card?.querySelector<HTMLElement>(".slot-toggle");
+  if (pickedSlotIds.size === 0) return;
+  const primary = pickedSlotId;
   pickedSlotId = null;
+  pickedSlotIds.clear();
   world.setPicked(null);
-  card?.classList.remove("is-picked");
+  syncPanelPicks();
   playRemove();
-  if (slot && toggle && openSlots.has(id)) setSlotOpen(toggle, slot, false, false);
+  if (primary) {
+    const card = panel.querySelector<HTMLElement>(`[data-id="${primary}"]`);
+    const slot = state.slots.find((item) => item.id === primary);
+    const toggle = card?.querySelector<HTMLElement>(".slot-toggle");
+    if (slot && toggle && openSlots.has(primary)) setSlotOpen(toggle, slot, false, false);
+  }
 }
 
-function pickSlot(id: string | null, opts?: { force?: boolean }) {
+function pickSlot(id: string | null, opts?: { force?: boolean; additive?: boolean }) {
   if (!id) {
     dismissPick();
     return;
   }
   const editing = world.editingId();
   if (editing && editing !== id) endChipEdit();
+
+  if (opts?.additive) {
+    if (pickedSlotIds.has(id) && pickedSlotIds.size > 1) {
+      pickedSlotIds.delete(id);
+      if (pickedSlotId === id) pickedSlotId = [...pickedSlotIds].at(-1) ?? null;
+    } else if (pickedSlotIds.has(id) && pickedSlotIds.size === 1) {
+      dismissPick();
+      return;
+    } else {
+      pickedSlotIds.add(id);
+      pickedSlotId = id;
+    }
+    applyWorldPick();
+    syncPanelPicks();
+    playClick();
+    return;
+  }
+
   const jumped = panelTab !== "physics";
   if (jumped) {
     panelTab = "physics";
     panel.scrollTop = 0;
     renderPanel();
-  } else if (!opts?.force && id === pickedSlotId) {
+  } else if (!opts?.force && id === pickedSlotId && pickedSlotIds.size <= 1) {
     dismissPick();
     return;
   }
@@ -5213,9 +5656,11 @@ function pickSlot(id: string | null, opts?: { force?: boolean }) {
     }
   }
 
+  pickedSlotIds.clear();
+  pickedSlotIds.add(id);
   pickedSlotId = id;
-  world.setPicked(id);
-  card.classList.add("is-picked");
+  applyWorldPick();
+  syncPanelPicks();
   playClick();
   if (!openSlots.has(id)) setSlotOpen(toggle, slot, true, false);
   else closeOtherSlots(id);
@@ -5230,7 +5675,7 @@ panel.addEventListener("pointerdown", stopPanelScroll);
   setProTipsEnabled(prefs.tipsOn);
   setTooltipsEnabled(prefs.tooltipsOn);
 }
-mountProTip(shell);
+mountProTip(shell, { blank: () => state.template === "blank" });
 mountTooltips(document);
 world.attach(
   stage,
@@ -5386,6 +5831,10 @@ window.addEventListener("pagehide", () => {
 });
 
 void (async () => {
+  const releaseBoot = () => {
+    resolveBootHold?.();
+    resolveBootHold = null;
+  };
   try {
     if (!getPrefs().rememberLast) {
       draftReady = true;
@@ -5399,7 +5848,12 @@ void (async () => {
       paintWelcome();
       return;
     }
+    // Keep load overlay up; modal alone until the user chooses.
+    await introAnimDone;
+    const intro = app.querySelector<HTMLElement>("#app-intro");
+    intro?.querySelector(".app-intro__gif")?.remove();
     const ok = await askReconnect();
+    releaseBoot();
     if (!ok) {
       lastDraftJson = serializePillProject(currentPillProject());
       await clearDraft().catch(() => {});
@@ -5412,5 +5866,7 @@ void (async () => {
   } catch {
     draftReady = true;
     paintWelcome();
+  } finally {
+    releaseBoot();
   }
 })();

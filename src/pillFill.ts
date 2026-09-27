@@ -86,7 +86,8 @@ export function gradientEnd(theme: ColorTheme, slot: GradientEnd): string {
 /** Color used to pick automatic text ink. Gradients sample the middle of the blend. */
 export function fillSample(theme: ColorTheme, slot: GradientSlot): string {
   const fill = slot.color ?? pickTheme(theme, slot.colorIndex ?? 0);
-  if (!slot.gradient || slot.stroked || slot.shape === "none") return fill;
+  if (!slot.gradient || slot.stroked) return fill;
+  // Bare type: the gradient is the ink itself — mid blend for any contrast pickers.
   return mixHue(fill, gradientEnd(theme, slot), 0.5);
 }
 
@@ -240,4 +241,22 @@ export function gradientLine(width: number, height: number, angle?: number): { x
     x1: cx + dx * half,
     y1: cy + dy * half,
   };
+}
+
+/** Canvas fill for gradient text ink (bare type or export). */
+export function textGradientFill(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  from: string,
+  to: string,
+  angle?: number,
+  scale?: number,
+  phase?: number,
+): CanvasGradient {
+  const line = gradientLine(width, height, angle);
+  const gradient = ctx.createLinearGradient(line.x0, line.y0, line.x1, line.y1);
+  const stops = phase == null ? pillGradientStops(from, to, scale) : pillSweepStops(from, to, phase, scale);
+  for (const stop of stops) gradient.addColorStop(stop.at, stop.color);
+  return gradient;
 }

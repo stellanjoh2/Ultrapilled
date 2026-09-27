@@ -1,14 +1,14 @@
 import { backgroundImage, isSvgLogo, paintBackdrop, paintGrid, paintLogo } from "../background";
-import { gradientEnd, gradientLine, gradientPhase, pillGradientStops, pillSweepStops } from "../pillFill";
+import { gradientEnd, gradientLine, gradientPhase, pillGradientStops, pillSweepStops, textGradientFill } from "../pillFill";
 import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
 import { measureTextInk, paintTextInk } from "../measure";
 import { peekTrim } from "../trim";
 import { canvasBlend, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
-import { isColorMask, type ChipDraw } from "../world";
+import { isColorMask, isSvgSource, type ChipDraw } from "../world";
 
 const GRAIN_URL =
-  "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
+  "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix type='saturate' values='0' in='t' result='m'/%3E%3CfeComponentTransfer in='m'%3E%3CfeFuncR type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncG type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncB type='linear' slope='2.2' intercept='-0.6'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
 
 const images = new Map<string, Promise<HTMLImageElement | null>>();
 const maskCanvas = document.createElement("canvas");
@@ -195,7 +195,20 @@ function drawText(
   if (bare) {
     const drawSlot = scale === 1 ? slot : { ...slot, fontSize: slot.fontSize * scale };
     const ink = measureTextInk(drawSlot, chip.tracking);
-    paintTextInk(ctx, drawSlot, chip.tracking, chip.ink, chip.shiftEm, ink);
+    const fill =
+      slot.gradient && !slot.stroked
+        ? textGradientFill(
+            ctx,
+            width,
+            height,
+            chip.fill,
+            gradientEnd(theme, slot),
+            slot.gradientAngle,
+            slot.gradientScale,
+            slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined,
+          )
+        : chip.ink;
+    paintTextInk(ctx, drawSlot, chip.tracking, fill, chip.shiftEm, ink);
     return;
   }
   ctx.font = `${slot.fontWeight} ${slot.fontSize * scale}px "${slot.fontFamily}", sans-serif`;
@@ -239,12 +252,20 @@ function drawChip(
     } else {
       const radius = chip.radius * scale;
       const invert = Boolean(slot.inverted);
-      if (radius > 0) {
+      const ring = Boolean(slot.stroked) && !isSvgSource(slot);
+      if (radius > 0 || ring) {
         ctx.save();
         round(ctx, width, height, radius);
         ctx.clip();
         if (invert) ctx.filter = "invert(1)";
         drawContain(ctx, img, width, height);
+        if (invert) ctx.filter = "none";
+        if (ring) {
+          round(ctx, width, height, radius);
+          ctx.lineWidth = Math.max(1, slot.stroke ?? 4) * scale * 2;
+          ctx.strokeStyle = chip.fill;
+          ctx.stroke();
+        }
         ctx.restore();
       } else if (invert) {
         ctx.save();
@@ -353,13 +374,16 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
       grainTile.height = tile;
       const tileCtx = grainTile.getContext("2d");
       if (tileCtx) {
+        const strength = scene.post.grain / 100;
         tileCtx.clearRect(0, 0, tile, tile);
+        tileCtx.filter = strength > 1 ? `contrast(${1 + (strength - 1) * 0.85})` : "none";
         tileCtx.drawImage(grain, 0, 0, tile, tile);
+        tileCtx.filter = "none";
         const sized = ctx.createPattern(grainTile, "repeat");
         if (sized) {
           ctx.save();
-          ctx.globalCompositeOperation = "overlay";
-          ctx.globalAlpha = scene.post.grain / 100;
+          ctx.globalCompositeOperation = "soft-light";
+          ctx.globalAlpha = Math.min(1, strength);
           ctx.fillStyle = sized;
           ctx.fillRect(0, 0, scene.width, scene.height);
           ctx.restore();

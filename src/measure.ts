@@ -72,7 +72,7 @@ export function paintTextInk(
   ctx: CanvasRenderingContext2D,
   slot: TextSlot,
   tracking: number,
-  color: string,
+  color: string | CanvasGradient,
   shiftEm: number,
   ink: TextInk = measureTextInk(slot, tracking),
 ) {
@@ -143,7 +143,12 @@ export function scaleSlot(slot: Slot, scale: number): Slot {
       stroke: slot.stroke * factor,
     };
   }
-  return { ...slot, size: slot.size * factor, radius: (slot.radius ?? 0) * factor };
+  return {
+    ...slot,
+    size: slot.size * factor,
+    radius: (slot.radius ?? 0) * factor,
+    stroke: (slot.stroke ?? 4) * factor,
+  };
 }
 
 export function cornerRadius(slot: Slot, size: ChipSize): number {

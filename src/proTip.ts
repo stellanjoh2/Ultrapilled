@@ -1,5 +1,5 @@
-const SHOW_DELAY_MS = 1400;
-const HOLD_MS = 4000;
+const SHOW_DELAY_MS = 5000;
+const HOLD_MS = 5000;
 const GAP_MS = 5000;
 const ANIM_MS = 1000;
 
@@ -9,8 +9,11 @@ type Hint = {
   after?: string;
 };
 
+const BLANK_FIRST: Hint = { text: "Add your first asset in the create tab" };
+
 const HINTS: Hint[] = [
   { text: "Hit", key: "Space", after: "to play" },
+  { text: "Need ideas? Explore the templates in the Create tab" },
   { text: "Hide the UI for a clean canvas", key: "H" },
   { text: "Click a piece to edit it" },
   { text: "Double-click one shape in a group to edit it alone" },
@@ -18,8 +21,15 @@ const HINTS: Hint[] = [
   { text: "Right-click a piece to recolor, edit, duplicate, invert, or remove it" },
   { text: "The more stuff you add the slower the app becomes" },
   { text: "Want to use bloom but it feels laggy? Try Performance mode in Settings" },
+  { text: "Do you hate sound? You can turn that off in the Settings" },
   { text: "Save your scene as a .pill file from Settings" },
 ];
+
+let isBlank: () => boolean = () => false;
+
+function queue(): Hint[] {
+  return isBlank() ? [BLANK_FIRST, ...HINTS] : HINTS;
+}
 
 function typing(target: EventTarget | null): boolean {
   return (
@@ -72,7 +82,7 @@ function dismiss() {
     if (done || tip !== node) return;
     done = true;
     remove();
-    if (!enabled || index + 1 >= HINTS.length) return;
+    if (!enabled || index + 1 >= queue().length) return;
     gapTimer = window.setTimeout(() => show(index + 1), GAP_MS);
   };
   if (animMs() === 0) {
@@ -95,7 +105,7 @@ function onKey(event: KeyboardEvent) {
 
 function show(index: number) {
   if (!enabled || !hostEl) return;
-  const hint = HINTS[index];
+  const hint = queue()[index];
   if (!hint) return;
 
   const node = document.createElement("div");
@@ -158,8 +168,9 @@ export function setProTipsEnabled(on: boolean) {
   remove();
 }
 
-export function mountProTip(host: Element): void {
+export function mountProTip(host: Element, opts?: { blank?: () => boolean }): void {
   hostEl = host;
+  isBlank = opts?.blank ?? (() => false);
   if (!enabled) return;
   showTimer = window.setTimeout(() => show(0), SHOW_DELAY_MS);
 }

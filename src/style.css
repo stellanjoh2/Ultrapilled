@@ -113,6 +113,67 @@ body,
   height: 100%;
 }
 
+.app-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: #000;
+  transition: opacity 0.35s ease;
+}
+
+.app-intro.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-intro__gif {
+  display: block;
+  width: min(42vw, 300px);
+  height: auto;
+  image-rendering: auto;
+  opacity: 0;
+  transform: scale(1);
+}
+
+.app-intro.is-ready .app-intro__gif {
+  animation:
+    app-intro-opacity 2.25s ease-out forwards,
+    app-intro-scale 2s ease-out forwards;
+}
+
+/* Fade in 0.2s, hold through the gif, fade to black over the last 0.25s. */
+@keyframes app-intro-opacity {
+  0% {
+    opacity: 0;
+  }
+  8.888% {
+    opacity: 1;
+  }
+  88.888% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes app-intro-scale {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-intro {
+    display: none;
+  }
+}
+
 .app.ui-hidden .pro-tip,
 body:has(.app.ui-hidden) .ui-tip {
   display: none;
@@ -227,6 +288,7 @@ body:has(.app.ui-hidden) .ui-tip {
   --bloom-opacity: 0;
   --post-blend: normal;
   --post-grain: 0;
+  --post-grain-contrast: 1;
   --post-vig: 0;
   --post-sat: 1;
   --post-hue: 0deg;
@@ -423,8 +485,15 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 .post-grain {
   opacity: var(--post-grain);
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+
+.post-grain-tex {
+  position: absolute;
+  inset: 0;
+  filter: contrast(var(--post-grain-contrast));
+  /* Mid-gray-centered mono noise: soft-light stays luminance-neutral while local contrast keeps grain readable. */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix type='saturate' values='0' in='t' result='m'/%3E%3CfeComponentTransfer in='m'%3E%3CfeFuncR type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncG type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncB type='linear' slope='2.2' intercept='-0.6'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 180px 180px;
 }
 
@@ -462,6 +531,36 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 .canvas-welcome[hidden] {
   display: none;
+}
+
+.canvas-nudge {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  margin: 0;
+  padding: var(--space-2);
+  color: #ffffff;
+  font-family: var(--font-section);
+  font-size: clamp(36px, 5.2vw, 56px);
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-align: center;
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.5);
+  pointer-events: none;
+}
+
+.canvas-nudge[hidden] {
+  display: none;
+}
+
+.canvas-nudge__word {
+  display: inline-block;
 }
 
 .dev-panel {
@@ -585,7 +684,8 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   }
 }
 
-/* Transform grab (SE): polar drag — radial = scale, angular = rotate. */
+/* Transform grab (SE by default): polar drag — radial = scale, angular = rotate.
+   Flips to NE (--ne) when the SE corner would clip outside the stage. */
 .chip-xform-handle {
   --xform-pop: 0.92;
   position: absolute;
@@ -618,6 +718,12 @@ html[data-theme="day"] .stage.is-portrait .playfield {
     transform 0.14s ease,
     background-color 0.1s ease,
     color 0.1s ease;
+}
+
+.chip-xform-handle.chip-xform-handle--ne {
+  bottom: auto;
+  top: calc(-1 * var(--xform-pad, 12px));
+  transform: translate(calc(100% + 6px), calc(-100% - 6px)) scale(var(--xform-pop));
 }
 
 html[data-theme="day"] .chip-xform-handle {
@@ -655,6 +761,10 @@ html[data-theme="day"] .chip-xform-handle {
   transform: scaleX(-1);
 }
 
+.chip-xform-handle--ne svg {
+  transform: scale(-1);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .chip.is-picked > .chip-xform-handle:hover {
     --xform-pop: 1.08;
@@ -683,6 +793,11 @@ html[data-theme="day"] .chip-xform-handle {
 /* Keep the handle a constant screen size while the chip CSS-previews scale. */
 .chip.is-scaling > .chip-xform-handle {
   transform: translate(calc(100% + 6px), calc(100% + 6px))
+    scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
+}
+
+.chip.is-scaling > .chip-xform-handle--ne {
+  transform: translate(calc(100% + 6px), calc(-100% - 6px))
     scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
 }
 
@@ -865,6 +980,31 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   pointer-events: none;
 }
 
+/* Gradient ink on bare type (no holding shape). */
+.chip-label.is-text-gradient,
+.chip-edit.is-text-gradient {
+  background-color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.chip-edit.is-text-gradient {
+  caret-color: #fff;
+}
+
+.chip-label.is-text-gradient.is-gradient-animated,
+.chip-edit.is-text-gradient.is-gradient-animated {
+  background-size: 200% 200%;
+}
+
+.chip-label.is-text-gradient .char,
+.chip-edit.is-text-gradient .char {
+  color: inherit;
+  -webkit-text-fill-color: inherit;
+}
+
 .chip-label.is-text-anim,
 .smash-btn__text.is-text-anim {
   display: block;
@@ -971,7 +1111,9 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   }
 
   .slot-chip.is-gradient-animated,
-  .shape-swatch.is-gradient-animated {
+  .shape-swatch.is-gradient-animated,
+  .chip-label.is-text-gradient.is-gradient-animated,
+  .chip-edit.is-text-gradient.is-gradient-animated {
     background-size: 200% 200%;
     animation: pill-gradient-preview var(--sweep-duration, 3s) linear infinite;
   }
@@ -1489,6 +1631,32 @@ button.pill.smash-btn.is-on::after {
   flex-direction: column;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+}
+
+.section.is-blink {
+  border-radius: 12px;
+  animation: section-blink 0.45s ease-in-out 3;
+}
+
+@keyframes section-blink {
+  0%,
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  50% {
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 28%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section.is-blink {
+    animation: none;
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 28%, transparent);
+  }
 }
 
 .theme-launch {
@@ -2168,6 +2336,26 @@ button.slot-add {
 .slot-add__icon svg {
   width: 16px;
   height: 16px;
+}
+
+/* Empty-canvas right-click: same pills as the panel, ~half width. */
+.canvas-add-menu {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 168px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.canvas-add-menu > .slot-add {
+  width: 100%;
+  pointer-events: auto;
+  box-shadow: var(--shadow-1);
 }
 
 .slot-stack {
@@ -3222,11 +3410,11 @@ input.slot-live:focus {
 
 .slot-menu__item {
   display: block;
-  width: 100%;
-  margin: 0;
+  width: auto;
+  margin: 0 calc(-1 * var(--space-1));
   padding: var(--space-0) var(--space-1);
   border: 0;
-  border-radius: 12px;
+  border-radius: 0;
   background: transparent;
   color: var(--ink);
   font: inherit;
@@ -3235,6 +3423,17 @@ input.slot-live:focus {
   line-height: 1.4;
   text-align: left;
   cursor: pointer;
+}
+
+/* Solo menus (e.g. Import image): item fills the pill so hover brightens the whole shape. */
+.slot-menu:has(> .slot-menu__item:only-child) {
+  padding: 0;
+}
+
+.slot-menu:has(> .slot-menu__item:only-child) > .slot-menu__item {
+  margin: 0;
+  padding: var(--space-1);
+  border-radius: inherit;
 }
 
 .slot-menu__item:hover,
@@ -3409,7 +3608,8 @@ input.slot-live:focus {
 .reconnect {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  /* Above .app-intro (200) so the modal can sit solo on the load screen. */
+  z-index: 210;
   display: grid;
   place-items: center;
   padding: var(--space-2);

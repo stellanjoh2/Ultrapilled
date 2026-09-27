@@ -30,13 +30,13 @@ npx shadcn add https://soundcn.xyz/r/<sound-name>.json
 
 Bundled under `public/templates/<id>/`. Full per-file notes also live in each folder’s `CREDITS.txt`.
 
-**Acid** (early–mid 1990s European rave / club; **CC BY / CC BY-SA** — attribution required)
+**Acid** (early–mid 1990s European rave / club; **CC BY / CC BY-SA**)
 
 | File | Work | Author | License |
 |------|------|--------|---------|
-| `love-parade.jpg` | [Love Parade Berlin 1996 1](https://commons.wikimedia.org/wiki/File:Love_Parade_Berlin_1996_1.jpg) | Gerd Danigel | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| `piccadilly.jpg` | [Piccadilly Circus at night in 1988](https://commons.wikimedia.org/wiki/File:Piccadilly_Circus_at_night_in_1988_-_geograph.org.uk_-_2687917.jpg) | Peter Shimmon | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) |
 | `yen-sung.jpg` | [DJ Yen Sung in Lisbon, Portugal (1993)](https://commons.wikimedia.org/wiki/File:DJ_Yen_Sung_in_Lisbon,_Portugal_(1993).jpg) | Ithaka Darin Pappas | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
-| `dubmission.jpg` | [Love-parade 1995-dubmission halle-weissensee](https://commons.wikimedia.org/wiki/File:Love-parade_1995-dubmission_halle-weissensee.jpg) | Das Kraftfuttermischwerk | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| `fish-chips.jpg` | [Anstruther Fish Supper](https://commons.wikimedia.org/wiki/File:Anstruther_Fish_Supper.jpg) | Edinburgh Blog | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
 
 **New York** (1960s B&W; public domain)
 

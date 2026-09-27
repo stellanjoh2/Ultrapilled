@@ -95,9 +95,9 @@ export function playClick() {
   requestPlay(pick(TAP_URLS));
 }
 
-/** Trigger Physics primary control. */
+/** Trigger Physics primary control — notification.wav retired. */
 export function playButton() {
-  requestPlay(S("notification"));
+  requestPlay(S("select"));
 }
 
 /** Add / upload / duplicate. */
@@ -117,20 +117,16 @@ export function playRemove() {
   requestPlay(S("transition_down"));
 }
 
-/** Soft success (clipboard, quick confirm). */
-export function playNotify() {
-  requestPlay(S("notification"));
-}
+/** Soft success (clipboard, quick confirm) — notification.wav retired. */
+export function playNotify() {}
 
 /** Bigger success (export finished). */
 export function playCelebrate() {
   requestPlay(S("celebration"));
 }
 
-/** Error / cancel / warning. */
-export function playCaution() {
-  requestPlay(S("caution"));
-}
+/** Error / cancel / warning — caution.wav retired. */
+export function playCaution() {}
 
 /** Checkbox / boolean control. */
 export function playSwitch(on = true) {

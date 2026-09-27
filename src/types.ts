@@ -21,7 +21,7 @@ export type TextSlot = {
   stroke: number;
   colorIndex: number;
   color?: string;
-  /** Overlapping discs from the shape color to an end color. Off keeps a solid fill. */
+  /** Blend from the start color to an end color. On a holding shape this fills the shape; with no shape it fills the glyphs. */
   gradient?: boolean;
   /** Start color kept while a stroke is showing, so the gradient can come back. */
   gradientFromIndex?: number;
@@ -73,6 +73,10 @@ export type ImageSlot = {
   scale: number;
   /** Corner round on Image uploads (JPG/PNG/GIF). Ignored for SVG. */
   radius?: number;
+  /** Inner outline on raster uploads (JPG/PNG/GIF). Ignored for SVG / color-masked icons. */
+  stroked?: boolean;
+  /** Inner stroke width in px (pre–master-scale). Used when stroked. */
+  stroke?: number;
   /** Pixel invert for raster uploads (JPG/PNG/GIF). Ignored when the image is color-masked. */
   inverted?: boolean;
   /** Recolor an uploaded SVG with theme ink. Off keeps the file’s original colors. */
@@ -111,7 +115,7 @@ export const DEFAULT_PHYSICS: PhysicsSettings = {
   weight: 1,
   gravity: 2,
   speed: 1,
-  bounce: 0.1,
+  bounce: 1.0,
   /** High enough that piles always stop once they land. */
   friction: 0.5,
   grip: 0.85,
@@ -359,6 +363,8 @@ export function defaultImageSlot(partial: Partial<ImageSlot> = {}): ImageSlot {
     colorIndex: 0,
     scale: 1,
     radius: 0,
+    stroked: false,
+    stroke: 4,
     ...partial,
   };
 }
@@ -368,7 +374,7 @@ export function demoState(): AppState {
     stageColor: DEFAULT_STAGE,
     background: defaultBackground(),
     canvas: "16:9",
-    masterScale: 4,
+    masterScale: 3.5,
     sizeRandom: 100,
     pillPad: 14,
     textTracking: 37,

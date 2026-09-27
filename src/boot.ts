@@ -16,5 +16,8 @@ if (mobile) {
     </main>
   `;
 } else {
+  const intro = new Image();
+  intro.src = "/images/intropill.gif";
+  void intro.decode().catch(() => {});
   await import("./main.ts");
 }
