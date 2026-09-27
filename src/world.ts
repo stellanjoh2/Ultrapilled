@@ -883,6 +883,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let pendingPlace: { ids: Set<string>; x: number; y: number } | null = null;
   let clickChip: DroppedChip | null = null;
   let drag: {
+    /** Chip under the pointer (click / release still key off this). */
     chip: DroppedChip;
     pointerId: number;
     x: number;
@@ -890,7 +891,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     originX: number;
     originY: number;
     moved: boolean;
-    pin: Matter.Constraint;
+    /** One soft pin per transform target so multi-select tags along. */
+    pins: { chip: DroppedChip; pin: Matter.Constraint }[];
   } | null = null;
   let pending: {
     chip: DroppedChip;
@@ -1141,7 +1143,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const reach = Math.hypot(chip.width, chip.height) / 2;
       if (chip.body.position.y - reach < limitY + Math.max(480, reach + 240)) return true;
       if (pending?.chip === chip) cancelPending();
-      if (drag?.chip === chip) dropPin();
+      if (drag?.pins.some((entry) => entry.chip === chip)) dropPin();
       Composite.remove(engine.world, chip.body);
       stopTextAnimIn(chip.el);
       stopTextAnimIn(chip.glow);
@@ -1157,8 +1159,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function dropPin() {
     if (!drag) return;
-    Composite.remove(engine.world, drag.pin);
-    drag.chip.el.classList.remove("is-held");
+    for (const { chip, pin } of drag.pins) {
+      Composite.remove(engine.world, pin);
+      chip.el.classList.remove("is-held");
+    }
     drag = null;
   }
 
@@ -1174,21 +1178,27 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     pending = null;
     clickChip = null;
     const { chip, pointerId, x, y, originX, originY } = armed;
-    const body = chip.body;
     dropPin();
-    const pin = Constraint.create({
-      pointA: { x, y },
-      bodyB: body,
-      pointB: { x: x - body.position.x, y: y - body.position.y },
-      stiffness: GRAB_STIFFNESS,
-      damping: GRAB_DAMPING,
-      length: 0.01,
+    // Same set as scale/rotate: multi-select (or same-slot group) moves together.
+    const targets = xformTargets(chip.slotId);
+    const group = targets.some((item) => item.body.id === chip.body.id) ? targets : [chip];
+    const pins = group.map((item) => {
+      const body = item.body;
+      const pin = Constraint.create({
+        pointA: { x, y },
+        bodyB: body,
+        pointB: { x: x - body.position.x, y: y - body.position.y },
+        stiffness: GRAB_STIFFNESS,
+        damping: GRAB_DAMPING,
+        length: 0.01,
+      });
+      Object.assign(pin, { angularStiffness: 1 });
+      Composite.add(engine.world, pin);
+      item.el.classList.add("is-held");
+      Sleeping.set(body, false);
+      return { chip: item, pin };
     });
-    Object.assign(pin, { angularStiffness: 1 });
-    Composite.add(engine.world, pin);
-    drag = { chip, pointerId, x, y, originX, originY, moved: false, pin };
-    chip.el.classList.add("is-held");
-    Sleeping.set(body, false);
+    drag = { chip, pointerId, x, y, originX, originY, moved: false, pins };
     setRunning(true);
   }
 
@@ -1262,10 +1272,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function pushScale(body: Matter.Body, hard = false): number {
-    if (body.isStatic || body === drag?.chip.body || isHandleBody(body)) return 0;
+    if (body.isStatic || isDraggedBody(body) || isHandleBody(body)) return 0;
     // Soft passes leave sleepers alone so settle/loop aren't fought awake.
     if (!hard && body.isSleeping) return 0;
     return body.inverseMass;
+  }
+
+  function isDraggedBody(body: Matter.Body) {
+    return Boolean(drag?.pins.some((entry) => entry.chip.body === body));
   }
 
   function isHandleBody(body: Matter.Body) {
@@ -1275,7 +1289,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function resolveOverlap(a: Matter.Body, b: Matter.Body, hard = false): boolean {
-    if ((a.isStatic || a === drag?.chip.body || isHandleBody(a)) && (b.isStatic || b === drag?.chip.body || isHandleBody(b))) {
+    if ((a.isStatic || isDraggedBody(a) || isHandleBody(a)) && (b.isStatic || isDraggedBody(b) || isHandleBody(b))) {
       return false;
     }
     // Don't dig wide chips out of side walls — that shove launches the pile off-screen.
@@ -1312,8 +1326,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       handleDrag ||
       parentA.speed > QUIET_SEPARATE_SPEED ||
       parentB.speed > QUIET_SEPARATE_SPEED ||
-      parentA === drag?.chip.body ||
-      parentB === drag?.chip.body;
+      isDraggedBody(parentA) ||
+      isDraggedBody(parentB);
 
     // Sleep-island dig: fix frozen intersections with position only — never wake.
     // Waking here used to reset the settle clock every frame so Loop never opened.
@@ -1322,8 +1336,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       !handleDrag &&
       parentA.isSleeping &&
       parentB.isSleeping &&
-      parentA !== drag?.chip.body &&
-      parentB !== drag?.chip.body;
+      !isDraggedBody(parentA) &&
+      !isDraggedBody(parentB);
 
     const invA = sleepIsland
       ? (parentA.isStatic ? 0 : parentA.inverseMass)
@@ -1525,7 +1539,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function discardChip(chip: DroppedChip) {
     if (pending?.chip === chip) cancelPending();
-    if (drag?.chip === chip) dropPin();
+    if (drag?.pins.some((entry) => entry.chip === chip)) dropPin();
     if (editingId === chip.slotId) editingId = null;
     if (soloBodyId === chip.body.id) soloBodyId = null;
     bounceCount.delete(chip.body.id);
@@ -1554,7 +1568,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     chamfer: number,
     physics: PhysicsSettings,
   ) {
-    if (drag?.chip === chip) dropPin();
+    if (drag?.pins.some((entry) => entry.chip === chip)) dropPin();
     const { position, angle, velocity, angularVelocity } = chip.body;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
@@ -2716,8 +2730,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function pullDrag() {
     if (!drag) return;
-    Sleeping.set(drag.chip.body, false);
-    drag.pin.pointA = { x: drag.x, y: drag.y };
+    for (const { chip, pin } of drag.pins) {
+      Sleeping.set(chip.body, false);
+      pin.pointA = { x: drag.x, y: drag.y };
+    }
   }
 
   function onPointerDown(event: PointerEvent) {

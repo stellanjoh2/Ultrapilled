@@ -1657,12 +1657,11 @@ function renderPanel() {
   panel.scrollTop = scroll;
   if (revealSlotId) {
     const card = panel.querySelector<HTMLElement>(`[data-id="${revealSlotId}"]`);
-    if (!inserted) {
-      // inline:"nearest" avoids horizontal document scroll when a card is tall.
-      card?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      if (card && !card.nextElementSibling) {
-        card.parentElement?.nextElementSibling?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      }
+    if (!inserted && card) {
+      // scrollIntoView can shift the whole document (looks like the screen slid off).
+      // Keep the scroll inside #panel — especially after Listening / Audio was scrolled into view.
+      const adds = !card.nextElementSibling ? card.parentElement?.nextElementSibling : null;
+      scrollPanelTo(adds instanceof HTMLElement ? adds : card);
     }
     if (card && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       card.classList.add("is-new");
@@ -1678,6 +1677,7 @@ function renderPanel() {
   if (inserted) growInsertedSlot(inserted);
   focusSlotId = null;
   paintMicTextAnim();
+  pinPageScroll();
 }
 
 function syncInheritedPillPads() {
@@ -4463,6 +4463,23 @@ function openSlotMenu(x: number, y: number, id: string) {
   }
   // Invert: text/SVG/presets flip ink; rasters toggle pixel invert. Recolor is SVG-only.
   actions.push({ label: "Duplicate", run: () => duplicateSlot(id) });
+  if (slot) {
+    actions.push({
+      label: "Copy style",
+      stay: true,
+      run: () => {
+        copySlotStyle(slot);
+        menu.querySelectorAll<HTMLButtonElement>(".slot-menu__item").forEach((btn) => {
+          if (btn.textContent === "Paste style") btn.disabled = !canPasteSlotStyle(slot);
+        });
+      },
+    });
+    actions.push({
+      label: "Paste style",
+      disabled: () => !canPasteSlotStyle(slot),
+      run: () => pasteSlotStyle(id),
+    });
+  }
   if (slot?.kind === "text") {
     actions.push({
       label: slot.textAnim ? "Stop Animation" : "Animate",
@@ -4534,10 +4551,8 @@ function openSlotMenu(x: number, y: number, id: string) {
     btn.className = "slot-menu__item";
     btn.setAttribute("role", "menuitem");
     btn.textContent = action.label;
-    if (action.layer) {
-      btn.dataset.layer = action.layer;
-      btn.disabled = Boolean(action.disabled?.());
-    }
+    if (action.layer) btn.dataset.layer = action.layer;
+    if (action.disabled) btn.disabled = action.disabled();
     btn.addEventListener("click", () => {
       if (btn.disabled) return;
       clearMenuStroke();
@@ -4593,6 +4608,139 @@ function duplicateSlot(id: string) {
   live();
 }
 
+/** Look-only clipboard — never includes text / image contents. */
+type TextStyleClip = Omit<TextSlot, "id" | "kind" | "text">;
+type ImageStyleClip = Omit<ImageSlot, "id" | "kind" | "src" | "name" | "size" | "amount" | "emoji" | "collider">;
+type SlotStyleClipboard =
+  | { kind: "text"; style: TextStyleClip }
+  | { kind: "image"; style: ImageStyleClip };
+
+let styleClipboard: SlotStyleClipboard | null = null;
+
+function copySlotStyle(slot: Slot) {
+  if (slot.kind === "text") {
+    styleClipboard = {
+      kind: "text",
+      style: {
+        fontFamily: slot.fontFamily,
+        fontWeight: slot.fontWeight,
+        fontSize: slot.fontSize,
+        textHeight: slot.textHeight,
+        pillPad: slot.pillPad,
+        tracking: slot.tracking,
+        shape: slot.shape,
+        radius: slot.radius,
+        stroked: slot.stroked,
+        stroke: slot.stroke,
+        colorIndex: slot.colorIndex,
+        color: slot.color,
+        gradient: slot.gradient,
+        gradientFromIndex: slot.gradientFromIndex,
+        gradientFrom: slot.gradientFrom,
+        gradientColorIndex: slot.gradientColorIndex,
+        gradientColor: slot.gradientColor,
+        gradientAngle: slot.gradientAngle,
+        gradientScale: slot.gradientScale,
+        animatedGradient: slot.animatedGradient,
+        gradientSpeed: slot.gradientSpeed,
+        textAnim: slot.textAnim,
+        textAnimSpeed: slot.textAnimSpeed,
+        textColorIndex: slot.textColorIndex,
+        textColor: slot.textColor,
+        scale: slot.scale,
+      },
+    };
+  } else {
+    styleClipboard = {
+      kind: "image",
+      style: {
+        colorIndex: slot.colorIndex,
+        color: slot.color,
+        gradient: slot.gradient,
+        gradientColorIndex: slot.gradientColorIndex,
+        gradientColor: slot.gradientColor,
+        gradientAngle: slot.gradientAngle,
+        gradientScale: slot.gradientScale,
+        animatedGradient: slot.animatedGradient,
+        gradientSpeed: slot.gradientSpeed,
+        scale: slot.scale,
+        radius: slot.radius,
+        stroked: slot.stroked,
+        stroke: slot.stroke,
+        inverted: slot.inverted,
+        tint: slot.tint,
+      },
+    };
+  }
+  playClick();
+}
+
+function canPasteSlotStyle(slot: Slot): boolean {
+  return styleClipboard != null && styleClipboard.kind === slot.kind;
+}
+
+function pasteSlotStyle(id: string) {
+  const slot = state.slots.find((item) => item.id === id);
+  if (!slot || !canPasteSlotStyle(slot) || !styleClipboard) return;
+  remember();
+  if (slot.kind === "text" && styleClipboard.kind === "text") {
+    const style = styleClipboard.style;
+    slot.fontFamily = style.fontFamily;
+    slot.fontWeight = style.fontWeight;
+    slot.fontSize = style.fontSize;
+    slot.textHeight = style.textHeight;
+    slot.pillPad = style.pillPad;
+    slot.tracking = style.tracking;
+    slot.shape = style.shape;
+    slot.radius = style.radius;
+    slot.stroked = style.stroked;
+    slot.stroke = style.stroke;
+    slot.colorIndex = style.colorIndex;
+    slot.color = style.color;
+    slot.gradient = style.gradient;
+    slot.gradientFromIndex = style.gradientFromIndex;
+    slot.gradientFrom = style.gradientFrom;
+    slot.gradientColorIndex = style.gradientColorIndex;
+    slot.gradientColor = style.gradientColor;
+    slot.gradientAngle = style.gradientAngle;
+    slot.gradientScale = style.gradientScale;
+    slot.animatedGradient = style.animatedGradient;
+    slot.gradientSpeed = style.gradientSpeed;
+    slot.textAnim = style.textAnim;
+    slot.textAnimSpeed = style.textAnimSpeed;
+    slot.textColorIndex = style.textColorIndex;
+    slot.textColor = style.textColor;
+    slot.scale = style.scale;
+    playClick();
+    void settleFont(slot.fontFamily, slot.fontWeight).then(() => {
+      renderPanel();
+      live();
+    });
+    return;
+  }
+  if (slot.kind === "image" && styleClipboard.kind === "image") {
+    const style = styleClipboard.style;
+    slot.colorIndex = style.colorIndex;
+    slot.color = style.color;
+    slot.gradient = style.gradient;
+    slot.gradientColorIndex = style.gradientColorIndex;
+    slot.gradientColor = style.gradientColor;
+    slot.gradientAngle = style.gradientAngle;
+    slot.gradientScale = style.gradientScale;
+    slot.animatedGradient = style.animatedGradient;
+    slot.gradientSpeed = style.gradientSpeed;
+    slot.scale = style.scale;
+    slot.radius = style.radius;
+    slot.stroked = style.stroked;
+    slot.stroke = style.stroke;
+    slot.inverted = style.inverted;
+    slot.tint = style.tint;
+    playClick();
+    renderPanel();
+    live();
+  }
+}
+
 const INSERT_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 const INSERT_MS = 280;
 
@@ -4646,7 +4794,8 @@ function growInsertedSlot(motion: InsertMotion) {
       card.style.marginBottom = "";
       card.style.overflow = "";
       anim.cancel();
-      card.scrollIntoView({ block: "nearest" });
+      scrollPanelTo(card);
+      pinPageScroll();
     })
     .catch(() => {});
 }
@@ -5809,6 +5958,13 @@ window.addEventListener("keydown", (event) => {
 
 let panelScrollFrame = 0;
 
+/** scrollIntoView can still move documentElement even with overflow:hidden on html/body. */
+function pinPageScroll() {
+  if (document.documentElement.scrollTop) document.documentElement.scrollTop = 0;
+  if (document.body.scrollTop) document.body.scrollTop = 0;
+  if (window.scrollY) window.scrollTo(0, 0);
+}
+
 function stopPanelScroll() {
   if (!panelScrollFrame) return;
   cancelAnimationFrame(panelScrollFrame);
@@ -5828,6 +5984,7 @@ function scrollPanelTo(card: HTMLElement, shrinkAbove = 0) {
   const from = panel.scrollTop;
   const delta = dest - from;
   stopPanelScroll();
+  pinPageScroll();
   if (Math.abs(delta) < 1) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     panel.scrollTop = dest;
@@ -5846,6 +6003,7 @@ function scrollPanelTo(card: HTMLElement, shrinkAbove = 0) {
     }
     panelScrollFrame = 0;
     panel.style.overflowAnchor = "";
+    pinPageScroll();
   };
   panelScrollFrame = requestAnimationFrame(step);
 }
