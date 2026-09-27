@@ -1,4 +1,6 @@
 import gsap from "gsap";
+import moonIcon from "@phosphor-icons/core/assets/regular/moon.svg?raw";
+import sunIcon from "@phosphor-icons/core/assets/regular/sun.svg?raw";
 import { getPrefs, setPrefs, type AppPrefs, type ChromeTheme } from "./prefs";
 import {
   defaultPillFileName,
@@ -71,8 +73,8 @@ function panelHtml(prefs: AppPrefs): string {
     <section class="section">
       <h2 data-tip="Editor chrome colors">UI theme</h2>
       <div class="segment" role="group" aria-label="UI theme">
-        <button type="button" class="pill${prefs.theme === "night" ? " is-on" : ""}" data-theme-chrome="night" aria-pressed="${prefs.theme === "night"}" data-tip="Dark editor chrome">Night</button>
-        <button type="button" class="pill${prefs.theme === "day" ? " is-on" : ""}" data-theme-chrome="day" aria-pressed="${prefs.theme === "day"}" data-tip="Light editor chrome">Day</button>
+        <button type="button" class="pill${prefs.theme === "night" ? " is-on" : ""}" data-theme-chrome="night" aria-pressed="${prefs.theme === "night"}" data-tip="Dark editor chrome"><span class="theme-chrome__icon" aria-hidden="true">${moonIcon}</span>Night</button>
+        <button type="button" class="pill${prefs.theme === "day" ? " is-on" : ""}" data-theme-chrome="day" aria-pressed="${prefs.theme === "day"}" data-tip="Light editor chrome"><span class="theme-chrome__icon" aria-hidden="true">${sunIcon}</span>Day</button>
       </div>
     </section>
     <section class="section">

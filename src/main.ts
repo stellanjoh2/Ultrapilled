@@ -72,6 +72,8 @@ const app: HTMLDivElement = appRoot;
 const state = blankState();
 let panelTab: "physics" | "background" | "export" = "physics";
 const openSlots = new Set<string>();
+/** Create-tab sections open by default: composition, color, typeface, what falls. */
+const openSections = new Set(["composition", "color", "typeface", "what-falls"]);
 let pickedSlotId: string | null = null;
 const pickedSlotIds = new Set<string>();
 let focusSlotId: string | null = null;
@@ -911,6 +913,64 @@ function applyPost() {
 const RESET_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 3v5h5"/></svg>';
 
+function sectionMarkup(
+  id: string,
+  title: string,
+  tip: string,
+  body: string,
+  options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string },
+): string {
+  const open = openSections.has(id);
+  const reset =
+    options?.resetId && options.resetLabel && options.resetTip
+      ? `<button type="button" class="section-reset" id="${options.resetId}" aria-label="${options.resetLabel}" data-tip="${options.resetTip}">${RESET_ICON}</button>`
+      : "";
+  const domId = options?.sectionId ? ` id="${options.sectionId}"` : "";
+  return `
+    <section class="section${open ? " is-open" : ""}" data-section="${id}"${domId}>
+      <div class="section-head">
+        <button type="button" class="section-toggle" aria-expanded="${open}">
+          <span class="section-toggle__label" data-tip="${tip}">${title}</span>
+        </button>
+        ${reset}
+        <span class="section-chevron" aria-hidden="true"></span>
+      </div>
+      <div class="section-fold"${open ? "" : " inert"} aria-hidden="${open ? "false" : "true"}">
+        <div class="section-fold-clip">
+          ${body}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function setSectionOpen(id: string, open: boolean) {
+  if (open) openSections.add(id);
+  else openSections.delete(id);
+  const section = panel.querySelector<HTMLElement>(`[data-section="${id}"]`);
+  if (!section) return;
+  section.classList.toggle("is-open", open);
+  section.querySelector(".section-toggle")?.setAttribute("aria-expanded", String(open));
+  const fold = section.querySelector<HTMLElement>(".section-fold");
+  if (fold) {
+    fold.inert = !open;
+    fold.setAttribute("aria-hidden", String(!open));
+  }
+}
+
+function bindSectionFolds(root: HTMLElement) {
+  root.querySelectorAll<HTMLElement>("[data-section]").forEach((section) => {
+    const id = section.dataset.section;
+    if (!id) return;
+    section.querySelector(".section-head")?.addEventListener("click", (event) => {
+      if ((event.target as Element).closest(".section-reset")) return;
+      const open = !openSections.has(id);
+      setSectionOpen(id, open);
+      playTransition(open);
+    });
+  });
+}
+
 const exportController = {
   prepare: async () => {
     await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
@@ -1204,12 +1264,11 @@ function renderPanel() {
         </button>
       </div>
     </section>
-    <section class="section">
-      <div class="section-head">
-        <h2 data-tip="Overall size and spacing of pieces">Composition</h2>
-        <button type="button" class="section-reset" id="reset-master" aria-label="Reset composition" data-tip="Reset composition sliders">${RESET_ICON}</button>
-      </div>
-      <label class="field" data-tip="Overall size of every piece"><span data-range-label="masterScale">Scale ${(state.masterScale * 10).toFixed(0)}</span>
+    ${sectionMarkup(
+      "composition",
+      "Composition",
+      "Overall size and spacing of pieces",
+      `<label class="field" data-tip="Overall size of every piece"><span data-range-label="masterScale">Scale ${(state.masterScale * 10).toFixed(0)}</span>
         <input type="range" id="masterScale" min="4" max="100" step="1" value="${state.masterScale * 10}" />
       </label>
       <p class="hint" id="scale-perf-hint"${state.masterScale >= SCALE_PERF_WARN ? "" : " hidden"}>High scale can drop below 60 fps with many shapes.</p>
@@ -1225,11 +1284,14 @@ function renderPanel() {
       <label class="field" data-tip="How many pieces drop into the frame"><span data-range-label="shapeAmount">Amount of shapes ${state.shapeAmount}</span>
         <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${state.shapeAmount}" />
       </label>
-      <p class="hint" id="amount-perf-hint"${state.shapeAmount >= SHAPE_PERF_WARN ? "" : " hidden"}>Many shapes can drop below 60 fps.</p>
-    </section>
-    <section class="section">
-      <h2 data-tip="Colors used by pills and shapes">Color theme</h2>
-      <div class="theme-row" style="--theme-count:${state.theme.length}">
+      <p class="hint" id="amount-perf-hint"${state.shapeAmount >= SHAPE_PERF_WARN ? "" : " hidden"}>Many shapes can drop below 60 fps.</p>`,
+      { resetId: "reset-master", resetLabel: "Reset composition", resetTip: "Reset composition sliders" },
+    )}
+    ${sectionMarkup(
+      "color",
+      "Color theme",
+      "Colors used by pills and shapes",
+      `<div class="theme-row" style="--theme-count:${state.theme.length}">
         ${state.theme
           .map(
             (color, i) =>
@@ -1237,11 +1299,13 @@ function renderPanel() {
           )
           .join("")}
       </div>
-      <button type="button" class="pill theme-launch" id="view-themes" data-tip="Browse ready-made color palettes">View Themes</button>
-    </section>
-    <section class="section">
-      <h2 data-tip="Fonts for all text pills">Typeface</h2>
-      <div class="field" data-tip="Apply one font to every text piece">All text
+      <button type="button" class="pill theme-launch" id="view-themes" data-tip="Browse ready-made color palettes">View Themes</button>`,
+    )}
+    ${sectionMarkup(
+      "typeface",
+      "Typeface",
+      "Fonts for all text pills",
+      `<div class="field" data-tip="Apply one font to every text piece">All text
         <div class="font-pick" id="global-font"></div>
       </div>
       <div class="field" data-tip="Default weight for all text">Weight
@@ -1255,11 +1319,13 @@ function renderPanel() {
       <datalist id="local-font-list">
         ${localFamilies.map((name) => `<option value="${escapeAttr(name)}"></option>`).join("")}
       </datalist>
-      <button type="button" class="pill" id="load-local-fonts" data-tip="Let the browser list fonts installed on this computer">Load local fonts</button>
-    </section>
-    <section class="section" id="shape-create">
-      <h2 data-tip="The pieces that drop into the frame. In Layout mode, list order is layer order — top sits in front">What falls down</h2>
-      <div class="slot-stack" id="slots"></div>
+      <button type="button" class="pill" id="load-local-fonts" data-tip="Let the browser list fonts installed on this computer">Load local fonts</button>`,
+    )}
+    ${sectionMarkup(
+      "what-falls",
+      "What falls down",
+      "The pieces that drop into the frame. In Layout mode, list order is layer order — top sits in front",
+      `<div class="slot-stack" id="slots"></div>
       <div class="slot-adds">
         <button type="button" class="pill slot-add" id="add-text" data-tip="Add a text label inside a rounded pill">
           <span class="slot-add__icon" aria-hidden="true">${plus}</span>
@@ -1281,14 +1347,14 @@ function renderPanel() {
           <span class="slot-add__icon" aria-hidden="true">${plus}</span>
           Add image
         </button>
-      </div>
-    </section>
-    <section class="section">
-      <div class="section-head">
-        <h2 data-tip="How pieces fall, bounce, and settle — or place them freely">Physics</h2>
-        <button type="button" class="section-reset" id="reset-physics" aria-label="Reset physics" data-tip="Reset physics sliders">${RESET_ICON}</button>
-      </div>
-      <div class="segment" role="group" aria-label="Placement mode">
+      </div>`,
+      { sectionId: "shape-create" },
+    )}
+    ${sectionMarkup(
+      "physics",
+      "Physics",
+      "How pieces fall, bounce, and settle — or place them freely",
+      `<div class="segment" role="group" aria-label="Placement mode">
         <button type="button" class="pill${!state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!state.physics.layoutMode}" data-tip="Pieces fall, bounce, and stack">Physics</button>
         <button type="button" class="pill${state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${state.physics.layoutMode}" data-tip="Place freely like a design tool — pieces can overlap">Layout</button>
       </div>
@@ -1331,11 +1397,14 @@ function renderPanel() {
       <label class="field" data-tip="How long the floor stays closed before opening"><span data-range-label="hold">Floor pause ${state.physics.hold.toFixed(2)}s</span>
         <input type="range" id="hold" min="0.2" max="4" step="0.05" value="${state.physics.hold}"${state.physics.layoutMode ? " disabled" : ""} />
       </label>
-      </div>
-    </section>
-    <section class="section">
-      <h2 data-tip="Post-process color and glow on the whole frame">Look</h2>
-      <label class="field" data-tip="Shift all colors around the wheel"><span data-range-label="hue">Hue ${state.post.hue}°</span>
+      </div>`,
+      { resetId: "reset-physics", resetLabel: "Reset physics", resetTip: "Reset physics sliders" },
+    )}
+    ${sectionMarkup(
+      "look",
+      "Look",
+      "Post-process color and glow on the whole frame",
+      `<label class="field" data-tip="Shift all colors around the wheel"><span data-range-label="hue">Hue ${state.post.hue}°</span>
         <input type="range" id="hue" min="0" max="360" step="1" value="${state.post.hue}" />
       </label>
       <label class="field" data-tip="Soft glow around bright areas"><span data-range-label="bloom">Bloom ${state.post.bloom}</span>
@@ -1357,14 +1426,13 @@ function renderPanel() {
         <select id="blend">
           ${BLEND_MODES.map((mode) => `<option value="${mode.id}"${state.post.blend === mode.id ? " selected" : ""}>${mode.label}</option>`).join("")}
         </select>
-      </label>
-    </section>
-    <section class="section">
-      <div class="section-head">
-        <h2 data-tip="Bass hops everything and swells pills; sharp hits make icons hop">Audio react</h2>
-        <button type="button" class="section-reset" id="reset-audio-react" aria-label="Reset audio react" data-tip="Reset audio react">${RESET_ICON}</button>
-      </div>
-      <button type="button" class="pill smash-btn${state.audioReact.enabled ? " is-on" : ""}" id="audio-mic" aria-pressed="${state.audioReact.enabled}" data-tip="Ask for mic access and drive scale from live audio">
+      </label>`,
+    )}
+    ${sectionMarkup(
+      "audio-react",
+      "Audio react",
+      "Bass hops everything and swells pills; sharp hits make icons hop",
+      `<button type="button" class="pill smash-btn${state.audioReact.enabled ? " is-on" : ""}" id="audio-mic" aria-pressed="${state.audioReact.enabled}" data-tip="Ask for mic access and drive scale from live audio">
         <span class="smash-btn__label">
           <svg class="smash-btn__icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3z"></path>
@@ -1383,8 +1451,9 @@ function renderPanel() {
       </label>
       <label class="field" data-tip="Small color-wheel kick on sharp hits that snaps back"><span data-range-label="audioHueNudge">Hue nudge ${Math.round(state.audioReact.hueNudge)}°</span>
         <input type="range" id="audioHueNudge" min="0" max="30" step="1" value="${state.audioReact.hueNudge}" />
-      </label>
-    </section>
+      </label>`,
+      { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react" },
+    )}
     <footer class="panel-credit">
       <span class="panel-credit__s" aria-hidden="true"></span>
       <p>
@@ -1407,6 +1476,8 @@ function renderPanel() {
       </p>
     </footer>
   `;
+
+  bindSectionFolds(panel);
 
   panel.querySelector("#open-about")?.addEventListener("click", () => {
     openAbout();
@@ -5601,6 +5672,7 @@ function nudgeEmptyScene() {
 
   showAddShapeNudge();
 
+  setSectionOpen("what-falls", true);
   const section = panel.querySelector<HTMLElement>("#shape-create");
   if (!section) return;
   scrollPanelTo(section);
