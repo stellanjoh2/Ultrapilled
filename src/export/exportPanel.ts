@@ -5,11 +5,14 @@ import { ExportCancelled } from "./simulate";
 import {
   frameSize,
   GIF_PRESETS,
-  SIZE_PRESETS,
+  IMAGE_SIZE_PRESETS,
+  sizeLabel,
+  VIDEO_SIZE_PRESETS,
   type FrameRate,
   type GifPreset,
+  type ImageSizePreset,
   type LoopCount,
-  type SizePreset,
+  type VideoSizePreset,
 } from "./size";
 import { playCaution, playCelebrate, playNotify, startProgress, stopProgress } from "../uiSounds";
 
@@ -24,7 +27,8 @@ type ExportKind = "png" | "png-alpha" | "png-seq" | "jpg" | "jpg-seq" | "mp4" | 
 
 let frameRate: FrameRate = 30;
 let loops: LoopCount = 1;
-let sizePreset: SizePreset = "screen";
+let imagePreset: ImageSizePreset = "screen";
+let videoPreset: VideoSizePreset = "screen";
 let gifPreset: GifPreset = "480p";
 let busy = false;
 let cancelRequested = false;
@@ -62,16 +66,18 @@ function paintChoices() {
   });
 }
 
-function sizeLine(controller: ExportController, preset: SizePreset | GifPreset): string {
+function sizeLine(controller: ExportController, preset: ImageSizePreset | GifPreset): string {
   const stage = controller.stageSize();
   const { width, height } = frameSize(stage.width, stage.height, preset);
   return `${width}×${height}`;
 }
 
 function paintSizes(controller: ExportController) {
-  const size = panelEl?.querySelector("#export-size-meta");
+  const image = panelEl?.querySelector("#image-size-meta");
+  const video = panelEl?.querySelector("#video-size-meta");
   const gif = panelEl?.querySelector("#gif-size-meta");
-  if (size) size.textContent = sizeLine(controller, sizePreset);
+  if (image) image.textContent = sizeLine(controller, imagePreset);
+  if (video) video.textContent = sizeLine(controller, videoPreset);
   if (gif) gif.textContent = sizeLine(controller, gifPreset);
 }
 
@@ -82,18 +88,16 @@ function doneMessage(note: LoopResult, fps: FrameRate): string {
   return `Exported ${count}.`;
 }
 
-function sizeLabel(preset: SizePreset): string {
-  return preset === "screen" ? "Screen" : preset;
+function optionsHtml(presets: readonly string[], selected: string): string {
+  return presets
+    .map(
+      (preset) =>
+        `<option value="${preset}"${preset === selected ? " selected" : ""}>${sizeLabel(preset as ImageSizePreset | GifPreset)}</option>`,
+    )
+    .join("");
 }
 
 function panelHtml(): string {
-  const sizes = SIZE_PRESETS.map(
-    (preset) =>
-      `<option value="${preset}"${preset === sizePreset ? " selected" : ""}>${sizeLabel(preset)}</option>`,
-  ).join("");
-  const gifs = GIF_PRESETS.map(
-    (preset) => `<option value="${preset}"${preset === gifPreset ? " selected" : ""}>${preset}</option>`,
-  ).join("");
   return `
     <section class="section">
       <h2 data-tip="Frames per second for sequences and video">Frame rate</h2>
@@ -106,49 +110,41 @@ function panelHtml(): string {
         <button type="button" class="pill${loops === 1 ? " is-on" : ""}" data-loops="1" aria-pressed="${loops === 1}" data-tip="Export a single fall">1 loop</button>
         <button type="button" class="pill${loops === 2 ? " is-on" : ""}" data-loops="2" aria-pressed="${loops === 2}" data-tip="Play the fall twice in the file">2 loops</button>
       </div>
-      <label class="field" data-tip="Output pixel size for stills, sequences, MP4, and MOV">Resolution
-        <select id="export-size">${sizes}</select>
-      </label>
-      <p class="hint" id="export-size-meta"></p>
-      <p class="hint">Stills are the canvas right now. Sequences, MP4, GIF, and MOV render a new loop. 60 fps files are much larger.</p>
+      <p class="hint">Stills are the canvas right now. Sequences and video render a new loop. 60 fps files are much larger.</p>
     </section>
     <section class="section">
-      <h2 data-tip="Lossless stills and frame sequences">PNG</h2>
+      <h2 data-tip="Still frames and image sequences">Images</h2>
+      <label class="field" data-tip="Pixel size for PNG and JPG exports. Up to 8K for stills and sequences.">Resolution
+        <select id="image-size">${optionsHtml(IMAGE_SIZE_PRESETS, imagePreset)}</select>
+      </label>
+      <p class="hint" id="image-size-meta"></p>
       <div class="export-list">
         <button type="button" class="pill" data-export="png" data-tip="Save the current frame as a PNG">Export PNG frame</button>
         <button type="button" class="pill" data-export="png-alpha" data-tip="Save the current frame with a transparent background">Export transparent PNG</button>
         <button type="button" class="pill" data-export="png-seq" data-tip="Save every frame of a new loop as PNGs">Export PNG sequence</button>
-      </div>
-    </section>
-    <section class="section">
-      <h2 data-tip="Compressed stills and frame sequences">JPG</h2>
-      <div class="export-list">
         <button type="button" class="pill" data-export="jpg" data-tip="Save the current frame as a JPG">Export JPG frame</button>
         <button type="button" class="pill" data-export="jpg-seq" data-tip="Save every frame of a new loop as JPGs">Export JPG sequence</button>
       </div>
     </section>
     <section class="section">
-      <h2 data-tip="H.264 video of a full loop">MP4</h2>
+      <h2 data-tip="Rendered video of a full loop">Video</h2>
+      <label class="field" data-tip="Pixel size for MP4 and MOV. Up to 4K.">Resolution
+        <select id="video-size">${optionsHtml(VIDEO_SIZE_PRESETS, videoPreset)}</select>
+      </label>
+      <p class="hint" id="video-size-meta"></p>
       <div class="export-list">
         <button type="button" class="pill" data-export="mp4" data-tip="Render a new loop to an MP4 file">Export MP4</button>
-      </div>
-    </section>
-    <section class="section">
-      <h2 data-tip="Animated GIF of a loop">GIF</h2>
-      <label class="field" data-tip="GIF pixel size. Long loops may stop early to stay small.">Resolution
-        <select id="gif-size">${gifs}</select>
-      </label>
-      <p class="hint" id="gif-size-meta"></p>
-      <p class="hint">Same frame rate. If the loop is long, the GIF stops before it gets too large. The sequence and video keep the full loop.</p>
-      <div class="export-list">
-        <button type="button" class="pill" data-export="gif" data-tip="Render a new loop to a GIF">Export GIF</button>
-      </div>
-    </section>
-    <section class="section">
-      <h2 data-tip="ProRes video, including transparency">MOV</h2>
-      <div class="export-list">
         <button type="button" class="pill" data-export="mov" data-tip="Render a new loop to a MOV file">Export MOV</button>
         <button type="button" class="pill" data-export="mov-alpha" data-tip="Render a MOV with a transparent background">Export transparent MOV</button>
+      </div>
+      <h2 data-tip="Animated GIF of a loop">GIF</h2>
+      <label class="field" data-tip="GIF pixel size. Long loops may stop early to stay small.">Resolution
+        <select id="gif-size">${optionsHtml(GIF_PRESETS, gifPreset)}</select>
+      </label>
+      <p class="hint" id="gif-size-meta"></p>
+      <p class="hint">Same frame rate. If the loop is long, the GIF stops before it gets too large.</p>
+      <div class="export-list">
+        <button type="button" class="pill" data-export="gif" data-tip="Render a new loop to a GIF">Export GIF</button>
       </div>
     </section>
     <p class="hint" id="export-status" role="status"></p>
@@ -182,9 +178,14 @@ export function mountExportPanel(panel: HTMLElement, controller: ExportControlle
       paintChoices();
     }, { signal });
   });
-  panel.querySelector<HTMLSelectElement>("#export-size")?.addEventListener("change", (event) => {
+  panel.querySelector<HTMLSelectElement>("#image-size")?.addEventListener("change", (event) => {
     const value = (event.target as HTMLSelectElement).value;
-    if ((SIZE_PRESETS as readonly string[]).includes(value)) sizePreset = value as SizePreset;
+    if ((IMAGE_SIZE_PRESETS as readonly string[]).includes(value)) imagePreset = value as ImageSizePreset;
+    paintSizes(controller);
+  }, { signal });
+  panel.querySelector<HTMLSelectElement>("#video-size")?.addEventListener("change", (event) => {
+    const value = (event.target as HTMLSelectElement).value;
+    if ((VIDEO_SIZE_PRESETS as readonly string[]).includes(value)) videoPreset = value as VideoSizePreset;
     paintSizes(controller);
   }, { signal });
   panel.querySelector<HTMLSelectElement>("#gif-size")?.addEventListener("change", (event) => {
@@ -213,7 +214,8 @@ async function runExport(kind: ExportKind, controller: ExportController) {
   setStatus("Rendering…");
   const fps = frameRate;
   const loopCount = loops;
-  const preset = sizePreset;
+  const image = imagePreset;
+  const video = videoPreset;
   const gif = gifPreset;
   const longJob = kind !== "png" && kind !== "png-alpha" && kind !== "jpg";
   if (longJob) startProgress();
@@ -233,7 +235,7 @@ async function runExport(kind: ExportKind, controller: ExportController) {
         state,
         stageWidth: stage.width,
         stageHeight: stage.height,
-        preset,
+        preset: image,
         kind: kind === "jpg" ? "jpg" : "png",
         transparent: kind === "png-alpha",
       });
@@ -253,14 +255,14 @@ async function runExport(kind: ExportKind, controller: ExportController) {
     };
     const note =
       kind === "png-seq"
-        ? await exportSequence({ ...shared, preset, kind: "png", transparent: false })
+        ? await exportSequence({ ...shared, preset: image, kind: "png", transparent: false })
         : kind === "jpg-seq"
-          ? await exportSequence({ ...shared, preset, kind: "jpg", transparent: false })
+          ? await exportSequence({ ...shared, preset: image, kind: "jpg", transparent: false })
           : kind === "mp4"
-            ? await exportMp4({ ...shared, preset })
+            ? await exportMp4({ ...shared, preset: video })
             : kind === "gif"
               ? await exportGif({ ...shared, preset: gif })
-              : await exportMov({ ...shared, preset, transparent: kind === "mov-alpha" });
+              : await exportMov({ ...shared, preset: video, transparent: kind === "mov-alpha" });
     setStatus(doneMessage(note, fps));
     playCelebrate();
   } catch (error) {

@@ -261,8 +261,11 @@ body:has(.app.ui-hidden) .ui-tip {
 .theme-shelf__tabs,
 .theme-shelf__scroll,
 .theme-shelf__foot,
+.pro-tip__mark,
+.pro-tip__head,
 .pro-tip__title,
-.pro-tip__body {
+.pro-tip__body,
+.pro-tip__stop {
   position: relative;
   z-index: 2;
 }
@@ -538,10 +541,10 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   inset: 0;
   z-index: 5;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.35em;
+  gap: 0.45em;
   margin: 0;
   padding: var(--space-2);
   color: #ffffff;
@@ -559,8 +562,28 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   display: none;
 }
 
+.canvas-nudge__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+}
+
 .canvas-nudge__word {
   display: inline-block;
+}
+
+.canvas-nudge__hint {
+  margin: 0;
+  max-width: 22em;
+  color: rgb(255 255 255 / 0.72);
+  font-family: var(--font-section);
+  font-size: 33.333%;
+  font-weight: 400;
+  font-synthesis: none;
+  line-height: 1.35;
+  letter-spacing: 0;
 }
 
 .dev-panel {
@@ -1526,6 +1549,11 @@ button.pill.smash-btn.is-on::after {
 
 .segment {
   grid-template-columns: 1fr 1fr;
+}
+
+.physics-dynamics[inert] {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .segment.is-3 {
@@ -3425,6 +3453,11 @@ input.slot-live:focus {
   cursor: pointer;
 }
 
+.slot-menu__item:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* Solo menus (e.g. Import image): item fills the pill so hover brightens the whole shape. */
 .slot-menu:has(> .slot-menu__item:only-child) {
   padding: 0;
@@ -3510,6 +3543,47 @@ input.slot-live:focus {
   transform: none;
 }
 
+.pro-tip__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 7.5px;
+}
+
+.pro-tip__mark {
+  flex: 0 0 18px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  opacity: 0;
+  transform: scale(0.7);
+}
+
+.pro-tip__mark svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.pro-tip__title,
+.pro-tip__body,
+.pro-tip__stop {
+  opacity: 0;
+  transform: translateX(-8px);
+}
+
+.pro-tip.is-leaving .pro-tip__mark,
+.pro-tip.is-leaving .pro-tip__title,
+.pro-tip.is-leaving .pro-tip__body,
+.pro-tip.is-leaving .pro-tip__stop {
+  opacity: 1;
+  transform: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .pro-tip {
     transition:
@@ -3519,6 +3593,26 @@ input.slot-live:focus {
 
   .pro-tip.is-in::before {
     animation: pro-tip-flash 0.28s ease-out;
+  }
+
+  .pro-tip.is-in .pro-tip__mark {
+    animation: pro-tip-mark-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.7s forwards;
+  }
+
+  .pro-tip.is-in .pro-tip__title,
+  .pro-tip.is-in .pro-tip__body,
+  .pro-tip.is-in .pro-tip__stop {
+    animation: pro-tip-copy-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 1.1s forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pro-tip__mark,
+  .pro-tip__title,
+  .pro-tip__body,
+  .pro-tip__stop {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -3534,8 +3628,32 @@ input.slot-live:focus {
   }
 }
 
+@keyframes pro-tip-mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pro-tip-copy-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .pro-tip__title {
-  margin: 0 0 7.5px;
+  margin: 0;
   color: var(--ink-mute);
   font-size: 16.25px;
   font-weight: 400;
@@ -3550,6 +3668,26 @@ input.slot-live:focus {
   font-size: 18.75px;
   font-weight: 300;
   line-height: 1.4;
+}
+
+.pro-tip__stop {
+  display: block;
+  margin: 10px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-mute);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.pro-tip__stop:hover {
+  color: var(--ink);
 }
 
 .pro-tip__body kbd {
@@ -3636,6 +3774,51 @@ input.slot-live:focus {
   transform-origin: 50% 50%;
 }
 
+/* Loop green→purple spinning stroke — feelgood for a recovered draft. */
+.reconnect__stroke {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  box-sizing: border-box;
+  padding: 1.5px;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.reconnect__stroke::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--loop-stroke-a) 0deg,
+    var(--loop-stroke-b) 90deg,
+    transparent 130deg,
+    transparent 230deg,
+    var(--loop-stroke-a) 360deg
+  );
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reconnect__stroke::before {
+    animation: smash-stroke-spin 2s linear infinite;
+  }
+}
+
 .reconnect__title {
   margin: 0 0 var(--space-2);
   color: var(--ink);
@@ -3666,6 +3849,9 @@ input.slot-live:focus {
   width: 100%;
   min-width: 0;
   min-height: 54px;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
 }
 
 html[data-theme="day"] .reconnect__scrim {

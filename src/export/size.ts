@@ -1,5 +1,8 @@
-export const SIZE_PRESETS = ["screen", "1080p", "1440p", "2160p"] as const;
-export type SizePreset = (typeof SIZE_PRESETS)[number];
+export const VIDEO_SIZE_PRESETS = ["screen", "1080p", "1440p", "2160p"] as const;
+export type VideoSizePreset = (typeof VIDEO_SIZE_PRESETS)[number];
+
+export const IMAGE_SIZE_PRESETS = ["screen", "1080p", "1440p", "2160p", "4320p"] as const;
+export type ImageSizePreset = (typeof IMAGE_SIZE_PRESETS)[number];
 
 export const GIF_PRESETS = ["480p", "720p"] as const;
 export type GifPreset = (typeof GIF_PRESETS)[number];
@@ -7,10 +10,11 @@ export type GifPreset = (typeof GIF_PRESETS)[number];
 export type FrameRate = 30 | 60;
 export type LoopCount = 1 | 2;
 
-const SHORT_SIDE: Record<Exclude<SizePreset, "screen"> | GifPreset, number> = {
+const SHORT_SIDE: Record<Exclude<ImageSizePreset, "screen"> | GifPreset, number> = {
   "1080p": 1080,
   "1440p": 1440,
   "2160p": 2160,
+  "4320p": 4320,
   "480p": 480,
   "720p": 720,
 };
@@ -25,10 +29,17 @@ function devicePixels(): number {
   return ratio > 0 && Number.isFinite(ratio) ? ratio : 1;
 }
 
+export function sizeLabel(preset: ImageSizePreset | GifPreset): string {
+  if (preset === "screen") return "Screen";
+  if (preset === "2160p") return "2160p (4K)";
+  if (preset === "4320p") return "4320p (8K)";
+  return preset;
+}
+
 export function frameSize(
   stageWidth: number,
   stageHeight: number,
-  preset: SizePreset | GifPreset,
+  preset: ImageSizePreset | GifPreset,
 ): { width: number; height: number } {
   if (preset === "screen") {
     const ratio = devicePixels();

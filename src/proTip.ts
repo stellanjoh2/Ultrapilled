@@ -1,7 +1,12 @@
+import exclamationMark from "@phosphor-icons/core/assets/regular/exclamation-mark.svg?raw";
+import { setPrefs } from "./prefs";
+
 const SHOW_DELAY_MS = 5000;
 const HOLD_MS = 5000;
 const GAP_MS = 5000;
 const ANIM_MS = 1000;
+/** Slide + mark + copy stagger (see .pro-tip CSS). */
+const REVEAL_MS = 1500;
 
 type Hint = {
   text: string;
@@ -9,7 +14,9 @@ type Hint = {
   after?: string;
 };
 
-const BLANK_FIRST: Hint = { text: "Add your first asset in the create tab" };
+const BLANK_FIRST: Hint = {
+  text: "Add your first asset in the Create tab — or right-click the canvas",
+};
 
 const HINTS: Hint[] = [
   { text: "Hit", key: "Space", after: "to play" },
@@ -46,7 +53,6 @@ let enterTimer = 0;
 let removeTimer = 0;
 let gapTimer = 0;
 let showTimer = 0;
-let onEnter: ((event: TransitionEvent) => void) | null = null;
 
 function animMs(): number {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ANIM_MS;
@@ -54,8 +60,6 @@ function animMs(): number {
 
 function remove() {
   window.clearTimeout(removeTimer);
-  if (tip && onEnter) tip.removeEventListener("transitionend", onEnter);
-  onEnter = null;
   tip?.remove();
   tip = null;
   document.removeEventListener("keydown", onKey);
@@ -72,10 +76,9 @@ function clearTimers() {
 function dismiss() {
   if (!tip) return;
   clearTimers();
-  if (onEnter) tip.removeEventListener("transitionend", onEnter);
-  onEnter = null;
   const node = tip;
   const index = Number(node.dataset.index);
+  node.classList.add("is-leaving");
   node.classList.remove("is-in");
   let done = false;
   const finish = () => {
@@ -113,9 +116,19 @@ function show(index: number) {
   node.dataset.index = String(index);
   node.setAttribute("role", "status");
 
+  const mark = document.createElement("span");
+  mark.className = "pro-tip__mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.innerHTML = exclamationMark;
+
+  const head = document.createElement("div");
+  head.className = "pro-tip__head";
+
   const title = document.createElement("p");
   title.className = "pro-tip__title";
   title.textContent = "Pro Tip";
+
+  head.append(mark, title);
 
   const body = document.createElement("p");
   body.className = "pro-tip__body";
@@ -127,8 +140,18 @@ function show(index: number) {
     body.append(key);
   }
   if (hint.after) body.append(` ${hint.after}`);
+  body.append(".");
 
-  node.append(title, body);
+  const stop = document.createElement("button");
+  stop.type = "button";
+  stop.className = "pro-tip__stop";
+  stop.textContent = "Stop showing me these";
+  stop.addEventListener("click", () => {
+    setPrefs({ tipsOn: false });
+    setProTipsEnabled(false);
+  });
+
+  node.append(head, body, stop);
   hostEl.append(node);
   tip = node;
   document.addEventListener("keydown", onKey);
@@ -148,15 +171,7 @@ function show(index: number) {
         settle();
         return;
       }
-      const onIn = (event: TransitionEvent) => {
-        if (event.target !== node || event.propertyName !== "transform") return;
-        node.removeEventListener("transitionend", onIn);
-        if (onEnter === onIn) onEnter = null;
-        settle();
-      };
-      onEnter = onIn;
-      node.addEventListener("transitionend", onIn);
-      enterTimer = window.setTimeout(settle, animMs() + 80);
+      enterTimer = window.setTimeout(settle, REVEAL_MS + 80);
     });
   });
 }

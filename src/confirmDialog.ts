@@ -5,26 +5,30 @@ function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Branded reconnect confirm. Resolves true to restore, false to abandon. */
-export function askReconnect(): Promise<boolean> {
+function openDialog(opts: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+}): Promise<boolean> {
   return new Promise((resolve) => {
     const root = document.createElement("div");
     root.className = "reconnect";
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
-    root.setAttribute("aria-labelledby", "reconnect-title");
-    root.setAttribute("aria-describedby", "reconnect-body");
+    root.setAttribute("aria-labelledby", "confirm-title");
+    root.setAttribute("aria-describedby", "confirm-body");
+    const cancel = opts.cancelLabel
+      ? `<button type="button" class="pill" data-confirm="cancel">${opts.cancelLabel}</button>`
+      : "";
     root.innerHTML = `
-      <div class="reconnect__scrim" data-reconnect="abandon"></div>
+      <div class="reconnect__scrim" data-confirm="cancel"></div>
       <div class="reconnect__card">
-        <div class="reconnect__stroke" aria-hidden="true"></div>
-        <h2 class="reconnect__title" id="reconnect-title">Reconnect available</h2>
-        <p class="reconnect__body" id="reconnect-body">
-          The last session closed before it was saved. Pick up where you left off, or start fresh.
-        </p>
+        <h2 class="reconnect__title" id="confirm-title">${opts.title}</h2>
+        <p class="reconnect__body" id="confirm-body">${opts.body}</p>
         <div class="reconnect__actions">
-          <button type="button" class="pill" data-reconnect="abandon">New Project</button>
-          <button type="button" class="pill is-on" data-reconnect="restore" autofocus>Reconnect</button>
+          ${cancel}
+          <button type="button" class="pill is-on" data-confirm="ok" autofocus>${opts.confirmLabel}</button>
         </div>
       </div>
     `;
@@ -34,8 +38,9 @@ export function askReconnect(): Promise<boolean> {
     const title = root.querySelector<HTMLElement>(".reconnect__title")!;
     const body = root.querySelector<HTMLElement>(".reconnect__body")!;
     const actions = root.querySelector<HTMLElement>(".reconnect__actions")!;
-    const restoreBtn = root.querySelector<HTMLButtonElement>('[data-reconnect="restore"]')!;
+    const okBtn = root.querySelector<HTMLButtonElement>('[data-confirm="ok"]')!;
     const content = [title, body, actions];
+    const canCancel = Boolean(opts.cancelLabel);
 
     let settled = false;
     const finish = (ok: boolean) => {
@@ -76,7 +81,7 @@ export function askReconnect(): Promise<boolean> {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        finish(false);
+        finish(canCancel ? false : true);
       } else if (event.key === "Enter" && !event.isComposing) {
         event.preventDefault();
         finish(true);
@@ -86,15 +91,15 @@ export function askReconnect(): Promise<boolean> {
     root.addEventListener("click", (event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
-      const action = target.closest<HTMLElement>("[data-reconnect]")?.dataset.reconnect;
-      if (action === "restore") finish(true);
-      else if (action === "abandon") finish(false);
+      const action = target.closest<HTMLElement>("[data-confirm]")?.dataset.confirm;
+      if (action === "ok") finish(true);
+      else if (action === "cancel") finish(canCancel ? false : true);
     });
 
     document.body.append(root);
     window.addEventListener("keydown", onKey);
     playCaution();
-    restoreBtn.focus({ preventScroll: true });
+    okBtn.focus({ preventScroll: true });
 
     gsap.set(scrim, { autoAlpha: 0 });
     gsap.set(card, { autoAlpha: 0, scale: 0.92, y: 28 });
@@ -115,4 +120,27 @@ export function askReconnect(): Promise<boolean> {
       stagger: 0.055,
     }, 0.16);
   });
+}
+
+/** Branded confirm. Resolves true on confirm, false on cancel / Escape / scrim. */
+export function askConfirm(opts: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  cancelLabel: string;
+}): Promise<boolean> {
+  return openDialog(opts);
+}
+
+/** Branded notice. Resolves when dismissed. */
+export function askNotice(opts: {
+  title: string;
+  body: string;
+  confirmLabel?: string;
+}): Promise<void> {
+  return openDialog({
+    title: opts.title,
+    body: opts.body,
+    confirmLabel: opts.confirmLabel ?? "Got it",
+  }).then(() => undefined);
 }

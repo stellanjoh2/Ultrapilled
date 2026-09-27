@@ -43,6 +43,7 @@ import { openSettings, isSettingsOpen } from "./settingsPanel";
 import { checkInput, wrapCheckInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
+import { askConfirm, askNotice } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
   defaultPillFileName,
@@ -126,7 +127,7 @@ app.innerHTML = `
         <div class="post-vignette" aria-hidden="true"></div>
         <canvas class="phys-debug" id="phys-debug" aria-hidden="true" hidden></canvas>
         <p class="canvas-welcome" id="canvas-welcome" hidden>Press spacebar to trigger physics</p>
-        <p class="canvas-nudge" id="canvas-nudge" hidden aria-live="polite"></p>
+        <div class="canvas-nudge" id="canvas-nudge" hidden aria-live="polite"></div>
       </div>
     </div>
     <header class="topbar">
@@ -1219,7 +1220,7 @@ function renderPanel() {
         <input type="range" id="pillPad" min="0" max="100" step="1" value="${state.pillPad}" />
       </label>
       <label class="field" data-tip="Letter spacing for text"><span data-range-label="textTracking">Tracking ${state.textTracking}</span>
-        <input type="range" id="textTracking" min="-100" max="100" step="1" value="${state.textTracking}" />
+        <input type="range" id="textTracking" min="-200" max="500" step="1" value="${state.textTracking}" />
       </label>
       <label class="field" data-tip="How many pieces drop into the frame"><span data-range-label="shapeAmount">Amount of shapes ${state.shapeAmount}</span>
         <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${state.shapeAmount}" />
@@ -1257,7 +1258,7 @@ function renderPanel() {
       <button type="button" class="pill" id="load-local-fonts" data-tip="Let the browser list fonts installed on this computer">Load local fonts</button>
     </section>
     <section class="section" id="shape-create">
-      <h2 data-tip="The pieces that drop into the frame">What falls down</h2>
+      <h2 data-tip="The pieces that drop into the frame. In Layout mode, list order is layer order — top sits in front">What falls down</h2>
       <div class="slot-stack" id="slots"></div>
       <div class="slot-adds">
         <button type="button" class="pill slot-add" id="add-text" data-tip="Add a text label inside a rounded pill">
@@ -1284,47 +1285,53 @@ function renderPanel() {
     </section>
     <section class="section">
       <div class="section-head">
-        <h2 data-tip="How pieces fall, bounce, and settle">Physics</h2>
+        <h2 data-tip="How pieces fall, bounce, and settle — or place them freely">Physics</h2>
         <button type="button" class="section-reset" id="reset-physics" aria-label="Reset physics" data-tip="Reset physics sliders">${RESET_ICON}</button>
+      </div>
+      <div class="segment" role="group" aria-label="Placement mode">
+        <button type="button" class="pill${!state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!state.physics.layoutMode}" data-tip="Pieces fall, bounce, and stack">Physics</button>
+        <button type="button" class="pill${state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${state.physics.layoutMode}" data-tip="Place freely like a design tool — pieces can overlap">Layout</button>
       </div>
       <label class="field" data-tip="Simple = boxes, Normal = circle/box, Ultra = traced icon shapes. Higher is heavier on the CPU.">Physics complexity
         <select id="physics-complexity">
           ${PHYSICS_COMPLEXITY.map((tier) => `<option value="${tier.id}"${state.physics.complexity === tier.id ? " selected" : ""}>${tier.label}</option>`).join("")}
         </select>
       </label>
+      <div class="physics-dynamics"${state.physics.layoutMode ? " inert" : ""}>
       <div class="row">
         <label class="field" data-tip="How hard pieces pull downward"><span data-range-label="gravity">Gravity ${state.physics.gravity.toFixed(2)}</span>
-          <input type="range" id="gravity" min="0" max="3" step="0.05" value="${state.physics.gravity}" />
+          <input type="range" id="gravity" min="0" max="3" step="0.05" value="${state.physics.gravity}"${state.physics.layoutMode ? " disabled" : ""} />
         </label>
       </div>
       <div class="row">
         <label class="field" data-tip="How fast the simulation runs"><span data-range-label="speed">Speed ${state.physics.speed.toFixed(2)}</span>
-          <input type="range" id="speed" min="0.2" max="2" step="0.05" value="${state.physics.speed}" />
+          <input type="range" id="speed" min="0.2" max="2" step="0.05" value="${state.physics.speed}"${state.physics.layoutMode ? " disabled" : ""} />
         </label>
       </div>
       <div class="row">
         <label class="field" data-tip="How springy collisions are (above 1 = super-bouncy)"><span data-range-label="bounce">Bounciness ${state.physics.bounce.toFixed(2)}</span>
-          <input type="range" id="bounce" min="0" max="2" step="0.05" value="${state.physics.bounce}" />
+          <input type="range" id="bounce" min="0" max="2" step="0.05" value="${state.physics.bounce}"${state.physics.layoutMode ? " disabled" : ""} />
         </label>
       </div>
       <div class="row">
         <label class="field" data-tip="Slide resistance when pieces touch"><span data-range-label="friction">Friction ${state.physics.friction.toFixed(2)}</span>
-          <input type="range" id="friction" min="0" max="1" step="0.05" value="${state.physics.friction}" />
+          <input type="range" id="friction" min="0" max="1" step="0.05" value="${state.physics.friction}"${state.physics.layoutMode ? " disabled" : ""} />
         </label>
       </div>
       <div class="row">
         <label class="field" data-tip="How much pieces stick while sliding"><span data-range-label="grip">Grip ${state.physics.grip.toFixed(2)}</span>
-          <input type="range" id="grip" min="0" max="1" step="0.05" value="${state.physics.grip}" />
+          <input type="range" id="grip" min="0" max="1" step="0.05" value="${state.physics.grip}"${state.physics.layoutMode ? " disabled" : ""} />
         </label>
       </div>
       <div class="row">
         <label class="field" data-tip="How quickly spinning slows down"><span data-range-label="spin">Spin drag ${state.physics.spin.toFixed(2)}</span>
-          <input type="range" id="spin" min="0" max="0.12" step="0.01" value="${state.physics.spin}" />
+          <input type="range" id="spin" min="0" max="0.12" step="0.01" value="${state.physics.spin}"${state.physics.layoutMode ? " disabled" : ""} />
         </label>
       </div>
       <label class="field" data-tip="How long the floor stays closed before opening"><span data-range-label="hold">Floor pause ${state.physics.hold.toFixed(2)}s</span>
-        <input type="range" id="hold" min="0.2" max="4" step="0.05" value="${state.physics.hold}" />
+        <input type="range" id="hold" min="0.2" max="4" step="0.05" value="${state.physics.hold}"${state.physics.layoutMode ? " disabled" : ""} />
       </label>
+      </div>
     </section>
     <section class="section">
       <h2 data-tip="Post-process color and glow on the whole frame">Look</h2>
@@ -1429,7 +1436,8 @@ function renderPanel() {
   });
 
   const slotStack = panel.querySelector<HTMLElement>("#slots")!;
-  for (const slot of state.slots) slotStack.append(renderSlotCard(slot));
+  // Front of the pile at the top of the list (last slot in state = front on canvas).
+  for (const slot of state.slots.slice().reverse()) slotStack.append(renderSlotCard(slot));
   bindSlotDrag(slotStack, panel, applySlotOrder);
 
   panel.querySelector("#add-text")?.addEventListener("click", () => addPillSlot());
@@ -1548,6 +1556,13 @@ function renderPanel() {
     state.physics = { ...DEFAULT_PHYSICS };
     live();
     renderPanel();
+  });
+  panel.querySelectorAll<HTMLButtonElement>("[data-layout-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const next = btn.dataset.layoutMode === "layout";
+      if (next === state.physics.layoutMode) return;
+      void setLayoutMode(next);
+    });
   });
   panel.querySelector<HTMLSelectElement>("#physics-complexity")?.addEventListener("change", (e) => {
     remember();
@@ -1959,7 +1974,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
       </label>
       <label class="field">${settingLabel(slot, "Tracking", "tracking", String(trackingOf(slot, state.textTracking)))}
-        <input type="range" data-key="tracking" min="-100" max="100" step="1" value="${trackingOf(slot, state.textTracking)}" />
+        <input type="range" data-key="tracking" min="-200" max="500" step="1" value="${trackingOf(slot, state.textTracking)}" />
       </label>
       ${
         slot.shape !== "none"
@@ -3440,7 +3455,9 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
   });
 }
 
-function applySlotOrder(ids: string[]) {
+function applySlotOrder(visualIds: string[]) {
+  // List UI is front→back (top→bottom); state stays back→front for spawn order.
+  const ids = visualIds.slice().reverse();
   if (ids.length !== state.slots.length) return;
   if (ids.every((id, index) => id === state.slots[index]?.id)) return;
   const byId = new Map(state.slots.map((slot) => [slot.id, slot]));
@@ -3452,7 +3469,46 @@ function applySlotOrder(ids: string[]) {
   }
   remember();
   state.slots = ordered;
+  if (state.physics.layoutMode) world.syncLayerOrder(ids);
   playClick();
+}
+
+type LayerMove = "front" | "forward" | "backward" | "back";
+
+function canMoveSlotLayer(id: string, where: LayerMove): boolean {
+  const index = state.slots.findIndex((slot) => slot.id === id);
+  if (index < 0 || state.slots.length < 2) return false;
+  const last = state.slots.length - 1;
+  if (where === "front" || where === "forward") return index < last;
+  return index > 0;
+}
+
+/** Reorder one slot in the pile. State is back→front; list UI shows the reverse. */
+function moveSlotLayer(id: string, where: LayerMove): boolean {
+  if (!canMoveSlotLayer(id, where)) return false;
+  const index = state.slots.findIndex((slot) => slot.id === id);
+  const last = state.slots.length - 1;
+  const next =
+    where === "front" ? last : where === "forward" ? index + 1 : where === "backward" ? index - 1 : 0;
+  remember();
+  const [slot] = state.slots.splice(index, 1);
+  state.slots.splice(next, 0, slot!);
+  if (state.physics.layoutMode) {
+    world.syncLayerOrder(state.slots.map((item) => item.id));
+  }
+  syncSlotCardOrder();
+  playClick();
+  return true;
+}
+
+/** Keep slot cards in front→back list order without remounting (preserves open cards / menu). */
+function syncSlotCardOrder() {
+  const stack = panel.querySelector<HTMLElement>("#slots");
+  if (!stack) return;
+  for (const slot of state.slots.slice().reverse()) {
+    const card = stack.querySelector<HTMLElement>(`:scope > .slot-card[data-id="${slot.id}"]`);
+    if (card) stack.append(card);
+  }
 }
 
 let closeSlotMenu = () => {};
@@ -3482,6 +3538,7 @@ function bindSlotMenuDismiss(
     (event) => {
       const target = event.target;
       if (!(target instanceof Node) || menu.contains(target)) return;
+      if (target instanceof Element && target.closest(".color-pop")) return;
       onClose();
     },
     { signal, capture: true },
@@ -3906,10 +3963,32 @@ function invertSlot(id: string) {
   liveChip(id);
 }
 
+function openMenuDotPicker(btn: HTMLButtonElement, value: string, onChange: (hex: string) => void) {
+  if (tintPicker?.anchor === btn) return;
+  tintPicker?.close();
+  const gestureKey = "menu-dot";
+  const picker = mountColorPicker({
+    anchor: btn,
+    value,
+    onChange(hex) {
+      remember(gestureKey);
+      onChange(hex);
+      btn.style.background = hex;
+    },
+    onClose() {
+      if (gesture === gestureKey) endGesture();
+      if (tintPicker?.anchor === btn) tintPicker = null;
+    },
+  });
+  tintPicker = { anchor: btn, close: picker.close };
+}
+
 function menuColorRow(
   label: string,
   selectedIndex: number | null,
   onPick: (index: number) => void,
+  onCustom?: (index: number, hex: string) => void,
+  custom?: string,
 ): HTMLElement {
   const row = document.createElement("div");
   row.className = "slot-menu__colors";
@@ -3928,9 +4007,9 @@ function menuColorRow(
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "slot-menu__dot";
-    btn.style.background = color;
-    btn.setAttribute("aria-label", `${label} ${index + 1}`);
     const selected = selectedIndex === index;
+    btn.style.background = selected && custom ? custom : color;
+    btn.setAttribute("aria-label", `${label} ${index + 1}`);
     btn.setAttribute("aria-pressed", String(selected));
     if (selected) {
       btn.classList.add("is-on");
@@ -3938,14 +4017,27 @@ function menuColorRow(
     }
     btn.addEventListener("click", () => {
       playClick();
+      if (onBtn === btn && onCustom) {
+        openMenuDotPicker(btn, custom ?? color, (hex) => {
+          custom = hex;
+          onCustom(index, hex);
+        });
+        return;
+      }
       onPick(index);
-      if (onBtn === btn) return;
-      onBtn?.classList.remove("is-on");
-      onBtn?.setAttribute("aria-pressed", "false");
+      custom = undefined;
+      if (onBtn && onBtn !== btn) {
+        const prev = state.theme[Number(onBtn.dataset.themeIndex)];
+        if (prev) onBtn.style.background = prev;
+        onBtn.classList.remove("is-on");
+        onBtn.setAttribute("aria-pressed", "false");
+      }
+      btn.style.background = color;
       btn.classList.add("is-on");
       btn.setAttribute("aria-pressed", "true");
       onBtn = btn;
     });
+    btn.dataset.themeIndex = String(index);
     dots.append(btn);
   });
   row.append(dots);
@@ -4034,10 +4126,22 @@ function openSlotMenu(x: number, y: number, id: string) {
       clearMenuStroke();
       holdScrollClose(() => liveChip(slot.id));
     };
+    const paintShapeCustom = (index: number, hex: string) => {
+      slot.colorIndex = index;
+      slot.color = hex;
+      clearMenuStroke();
+      holdScrollClose(() => liveChip(slot.id));
+    };
     const paintGradColor = (index: number) => {
       remember();
       slot.gradientColorIndex = index;
       slot.gradientColor = undefined;
+      clearMenuStroke();
+      holdScrollClose(() => liveChip(slot.id));
+    };
+    const paintGradCustom = (index: number, hex: string) => {
+      slot.gradientColorIndex = index;
+      slot.gradientColor = hex;
       clearMenuStroke();
       holdScrollClose(() => liveChip(slot.id));
     };
@@ -4046,7 +4150,9 @@ function openSlotMenu(x: number, y: number, id: string) {
       const nodes: HTMLElement[] = [];
       if (isRasterUpload(slot)) {
         if (slot.stroked) {
-          nodes.push(menuColorRow("Stroke Color:", slot.color ? null : (slot.colorIndex ?? 0), paintShapeColor));
+          nodes.push(
+            menuColorRow("Stroke Color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),
+          );
         }
         nodes.push(
           menuCheckRow("Stroked", Boolean(slot.stroked), (next) => {
@@ -4063,15 +4169,19 @@ function openSlotMenu(x: number, y: number, id: string) {
       } else if (iconCanGradient(slot)) {
         if (slot.gradient) {
           nodes.push(
-            menuColorRow("Start color:", slot.color ? null : (slot.colorIndex ?? 0), paintShapeColor),
+            menuColorRow("Start color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),
             menuColorRow(
               "End color:",
-              slot.gradientColor ? null : gradientEndIndex(state.theme, slot),
+              gradientEndIndex(state.theme, slot),
               paintGradColor,
+              paintGradCustom,
+              slot.gradientColor,
             ),
           );
         } else {
-          nodes.push(menuColorRow("Color:", slot.color ? null : (slot.colorIndex ?? 0), paintShapeColor));
+          nodes.push(
+            menuColorRow("Color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),
+          );
         }
         nodes.push(
           menuCheckRow("Gradient", Boolean(slot.gradient), (next) => {
@@ -4105,6 +4215,14 @@ function openSlotMenu(x: number, y: number, id: string) {
         clearMenuStroke();
         holdScrollClose(() => liveChip(slot.id));
       };
+      const paintCustom = (index: number, hex: string) => {
+        slot.colorIndex = index;
+        slot.color = hex;
+        slot.textColorIndex = undefined;
+        slot.textColor = undefined;
+        clearMenuStroke();
+        holdScrollClose(() => liveChip(slot.id));
+      };
       const paintGradColor = (index: number) => {
         remember();
         slot.gradientColorIndex = index;
@@ -4112,18 +4230,26 @@ function openSlotMenu(x: number, y: number, id: string) {
         clearMenuStroke();
         holdScrollClose(() => liveChip(slot.id));
       };
+      const paintGradCustom = (index: number, hex: string) => {
+        slot.gradientColorIndex = index;
+        slot.gradientColor = hex;
+        clearMenuStroke();
+        holdScrollClose(() => liveChip(slot.id));
+      };
       const nodes: HTMLElement[] = [];
       if (slot.gradient) {
         nodes.push(
-          menuColorRow("Start color:", slot.color ? null : (slot.colorIndex ?? 0), paintColor),
+          menuColorRow("Start color:", slot.colorIndex ?? 0, paintColor, paintCustom, slot.color),
           menuColorRow(
             "End color:",
-            slot.gradientColor ? null : gradientEndIndex(state.theme, slot),
+            gradientEndIndex(state.theme, slot),
             paintGradColor,
+            paintGradCustom,
+            slot.gradientColor,
           ),
         );
       } else {
-        nodes.push(menuColorRow("Color:", slot.color ? null : (slot.colorIndex ?? 0), paintColor));
+        nodes.push(menuColorRow("Color:", slot.colorIndex ?? 0, paintColor, paintCustom, slot.color));
       }
       nodes.push(
         menuCheckRow("Gradient", Boolean(slot.gradient), (next) => {
@@ -4153,31 +4279,53 @@ function openSlotMenu(x: number, y: number, id: string) {
     const mountTextInk = () => {
       clearMenuInk(menu);
       const textSelected =
-        slot.textColor || slot.textColorIndex == null || slot.textColorIndex >= state.theme.length
+        slot.textColorIndex == null || slot.textColorIndex >= state.theme.length
           ? null
           : slot.textColorIndex;
-      const shapeSelected = slot.color ? null : (slot.colorIndex ?? 0);
+      const shapeSelected = slot.colorIndex ?? 0;
       const nodes: HTMLElement[] = [
-        menuColorRow("Text Color:", textSelected, (index) => {
-          remember();
-          slot.textColorIndex = index;
-          slot.textColor = undefined;
-          clearMenuStroke();
-          holdScrollClose(() => liveChip(slot.id));
-        }),
+        menuColorRow(
+          "Text Color:",
+          textSelected,
+          (index) => {
+            remember();
+            slot.textColorIndex = index;
+            slot.textColor = undefined;
+            clearMenuStroke();
+            holdScrollClose(() => liveChip(slot.id));
+          },
+          (index, hex) => {
+            slot.textColorIndex = index;
+            slot.textColor = hex;
+            clearMenuStroke();
+            holdScrollClose(() => liveChip(slot.id));
+          },
+          slot.textColor,
+        ),
       ];
       if (slot.gradient && !slot.stroked) {
         nodes.push(
-          menuColorRow("Start color:", shapeSelected, (index) => {
-            remember();
-            slot.colorIndex = index;
-            slot.color = undefined;
-            clearMenuStroke();
-            holdScrollClose(() => liveChip(slot.id));
-          }),
+          menuColorRow(
+            "Start color:",
+            shapeSelected,
+            (index) => {
+              remember();
+              slot.colorIndex = index;
+              slot.color = undefined;
+              clearMenuStroke();
+              holdScrollClose(() => liveChip(slot.id));
+            },
+            (index, hex) => {
+              slot.colorIndex = index;
+              slot.color = hex;
+              clearMenuStroke();
+              holdScrollClose(() => liveChip(slot.id));
+            },
+            slot.color,
+          ),
           menuColorRow(
             "End color:",
-            slot.gradientColor ? null : gradientEndIndex(state.theme, slot),
+            gradientEndIndex(state.theme, slot),
             (index) => {
               remember();
               slot.gradientColorIndex = index;
@@ -4185,17 +4333,35 @@ function openSlotMenu(x: number, y: number, id: string) {
               clearMenuStroke();
               holdScrollClose(() => liveChip(slot.id));
             },
+            (index, hex) => {
+              slot.gradientColorIndex = index;
+              slot.gradientColor = hex;
+              clearMenuStroke();
+              holdScrollClose(() => liveChip(slot.id));
+            },
+            slot.gradientColor,
           ),
         );
       } else {
         nodes.push(
-          menuColorRow(slot.stroked ? "Stroke Color:" : "Shape Color:", shapeSelected, (index) => {
-            remember();
-            slot.colorIndex = index;
-            slot.color = undefined;
-            clearMenuStroke();
-            holdScrollClose(() => liveChip(slot.id));
-          }),
+          menuColorRow(
+            slot.stroked ? "Stroke Color:" : "Shape Color:",
+            shapeSelected,
+            (index) => {
+              remember();
+              slot.colorIndex = index;
+              slot.color = undefined;
+              clearMenuStroke();
+              holdScrollClose(() => liveChip(slot.id));
+            },
+            (index, hex) => {
+              slot.colorIndex = index;
+              slot.color = hex;
+              clearMenuStroke();
+              holdScrollClose(() => liveChip(slot.id));
+            },
+            slot.color,
+          ),
         );
       }
       nodes.push(
@@ -4238,7 +4404,13 @@ function openSlotMenu(x: number, y: number, id: string) {
     mountTextInk();
   }
 
-  const actions: { label: string; run: () => void; stay?: boolean }[] = [];
+  const actions: {
+    label: string;
+    run: () => void;
+    stay?: boolean;
+    layer?: LayerMove;
+    disabled?: () => boolean;
+  }[] = [];
   if (slot?.kind === "image" && uploadedShape(slot)) {
     actions.push({
       label: "Replace image",
@@ -4302,6 +4474,25 @@ function openSlotMenu(x: number, y: number, id: string) {
       },
     });
   }
+  if (state.physics.layoutMode && state.slots.length > 1) {
+    const layers: { label: string; where: LayerMove; stay?: boolean }[] = [
+      { label: "Bring to front", where: "front" },
+      { label: "Bring forward", where: "forward", stay: true },
+      { label: "Send backward", where: "backward", stay: true },
+      { label: "Send to back", where: "back" },
+    ];
+    for (const item of layers) {
+      actions.push({
+        label: item.label,
+        stay: item.stay,
+        layer: item.where,
+        disabled: () => !canMoveSlotLayer(id, item.where),
+        run: () => {
+          moveSlotLayer(id, item.where);
+        },
+      });
+    }
+  }
   actions.push(
     {
       label: "Invert",
@@ -4330,16 +4521,29 @@ function openSlotMenu(x: number, y: number, id: string) {
     },
     { label: "Remove", run: () => removeSlot(id) },
   );
+  const refreshDisabled = () => {
+    menu.querySelectorAll<HTMLButtonElement>(".slot-menu__item[data-layer]").forEach((btn) => {
+      const where = btn.dataset.layer as LayerMove | undefined;
+      if (!where) return;
+      btn.disabled = !canMoveSlotLayer(id, where);
+    });
+  };
   for (const action of actions) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "slot-menu__item";
     btn.setAttribute("role", "menuitem");
     btn.textContent = action.label;
+    if (action.layer) {
+      btn.dataset.layer = action.layer;
+      btn.disabled = Boolean(action.disabled?.());
+    }
     btn.addEventListener("click", () => {
+      if (btn.disabled) return;
       clearMenuStroke();
       if (!action.stay) closeSlotMenu();
       action.run();
+      if (action.layer && action.stay) refreshDisabled();
       if (action.label === "Recolor") {
         btn.remove();
         placeSlotMenu(menu, x, y);
@@ -4353,6 +4557,7 @@ function openSlotMenu(x: number, y: number, id: string) {
   const closeCurrent = () => {
     abort.abort();
     if (closeSlotMenu === closeCurrent) closeSlotMenu = () => {};
+    if (tintPicker && menu.contains(tintPicker.anchor)) tintPicker.close();
     clearMenuStroke();
     menu.remove();
     if (panelNeedsSync) {
@@ -4780,12 +4985,20 @@ function live() {
     // Add/remove or remesh (Composition Scale etc.) should wake a held pile.
     if (disturbed || world.chipCount() !== before) {
       lastInteractAt = performance.now();
-      if (phase === "holding") {
+      if (phase === "holding" && !state.physics.layoutMode) {
         posePinned = false;
         phase = "falling";
         settledSince = 0;
         holdStarted = 0;
+      } else if (state.physics.layoutMode && world.chipCount() > 0) {
+        world.freezePile();
+        world.sync();
+        posePinned = true;
+        if (running) phase = "holding";
       }
+    }
+    if (state.physics.layoutMode) {
+      world.syncLayerOrder(state.slots.map((slot) => slot.id));
     }
   };
   bump();
@@ -5043,7 +5256,15 @@ async function drop() {
   settledSince = 0;
   holdStarted = 0;
   lastInteractAt = 0;
-  phase = "falling";
+  if (state.physics.layoutMode) {
+    world.freezePile();
+    world.sync();
+    posePinned = true;
+    phase = "holding";
+    holdStarted = performance.now();
+  } else {
+    phase = "falling";
+  }
   scheduleDraft();
 }
 
@@ -5141,7 +5362,7 @@ function reducedMotion(): boolean {
 function clearCanvasNudge() {
   window.clearTimeout(nudgeFadeTimer);
   gsap.killTweensOf(canvasNudge);
-  gsap.killTweensOf(canvasNudge.querySelectorAll(".canvas-nudge__word"));
+  gsap.killTweensOf(canvasNudge.querySelectorAll(".canvas-nudge__word, .canvas-nudge__hint"));
   canvasNudge.hidden = true;
   canvasNudge.replaceChildren();
   gsap.set(canvasNudge, { clearProps: "all" });
@@ -5151,23 +5372,36 @@ function showAddShapeNudge() {
   clearCanvasNudge();
   canvasWelcome.hidden = true;
 
+  const title = document.createElement("div");
+  title.className = "canvas-nudge__title";
   const words = "Please add your first shape!".split(/\s+/);
   for (const word of words) {
     const span = document.createElement("span");
     span.className = "canvas-nudge__word";
     span.textContent = word;
-    canvasNudge.append(span);
+    title.append(span);
   }
+
+  const hint = document.createElement("p");
+  hint.className = "canvas-nudge__hint";
+  hint.textContent = "(Try right-clicking on the canvas)";
+
+  canvasNudge.append(title, hint);
   canvasNudge.hidden = false;
 
-  const wordEls = canvasNudge.querySelectorAll<HTMLElement>(".canvas-nudge__word");
+  const wordEls = title.querySelectorAll<HTMLElement>(".canvas-nudge__word");
   if (reducedMotion()) {
-    gsap.set(wordEls, { autoAlpha: 1, y: 0 });
+    gsap.set([wordEls, hint], { autoAlpha: 1, y: 0 });
   } else {
     gsap.fromTo(
       wordEls,
       { y: 22, autoAlpha: 0 },
       { y: 0, autoAlpha: 1, duration: 0.75, stagger: 0.075, ease: "power2.out" },
+    );
+    gsap.fromTo(
+      hint,
+      { y: 10, autoAlpha: 0 },
+      { y: 0, autoAlpha: 1, duration: 0.55, delay: 0.35, ease: "power2.out" },
     );
   }
 
@@ -5222,13 +5456,67 @@ function nudgeEmptyScene() {
   blinkShapeCreate(section);
 }
 
-function triggerPhysics() {
+async function triggerPhysics() {
   if (!state.slots.length) {
     nudgeEmptyScene();
     return;
   }
+  if (state.physics.layoutMode) {
+    await askNotice({
+      title: "Can't trigger physics",
+      body: "Layout mode is on. Turn on Physics first.",
+    });
+    return;
+  }
   playButton();
   setRunning(true);
+}
+
+async function setLayoutMode(next: boolean) {
+  if (next === state.physics.layoutMode) return;
+
+  if (!next && world.chipCount() > 0 && world.chipsOverlap()) {
+    const ok = await askConfirm({
+      title: "Turn physics back on?",
+      body: "Overlapping pieces will push apart and your layout will change. Continue?",
+      confirmLabel: "Turn on physics",
+      cancelLabel: "Keep layout",
+    });
+    if (!ok) {
+      renderPanel();
+      return;
+    }
+  }
+
+  remember();
+  playClick();
+  state.physics.layoutMode = next;
+  if (next) {
+    if (world.chipCount() > 0) {
+      live();
+      world.freezePile();
+      world.sync();
+      posePinned = true;
+      if (running) {
+        phase = "holding";
+        holdStarted = performance.now();
+        settledSince = 0;
+      }
+    } else {
+      live();
+    }
+  } else {
+    posePinned = false;
+    live();
+    if (running && world.chipCount() > 0) {
+      phase = "falling";
+      settledSince = 0;
+      holdStarted = 0;
+      lastInteractAt = performance.now();
+    }
+  }
+  renderPanel();
+  scheduleDraft();
 }
 
 function togglePause() {
@@ -5275,6 +5563,7 @@ function adoptState(next: typeof state) {
     ...DEFAULT_PHYSICS,
     ...next.physics,
     complexity: physicsComplexity(next.physics?.complexity),
+    layoutMode: Boolean(next.physics?.layoutMode),
   };
   state.audioReact = {
     ...DEFAULT_AUDIO_REACT,
@@ -5778,11 +6067,22 @@ function frame(now: number) {
 
   if (running && playing) {
     holdSequenceClock(dt);
-    if (phase === "holding") {
+    if (phase === "holding" && !state.physics.layoutMode) {
       posePinned = false;
       phase = "falling";
       settledSince = 0;
       holdStarted = 0;
+    }
+    return requestAnimationFrame(frame);
+  }
+
+  if (running && state.physics.layoutMode) {
+    if (phase !== "holding" && phase !== "preparing") {
+      phase = "holding";
+      holdStarted = now;
+      world.freezePile();
+      world.sync();
+      posePinned = true;
     }
     return requestAnimationFrame(frame);
   }

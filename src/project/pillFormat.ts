@@ -148,6 +148,7 @@ function parseState(value: unknown): AppState | null {
       complexity: physicsComplexity(
         typeof physicsRaw.complexity === "string" ? physicsRaw.complexity : undefined,
       ),
+      layoutMode: Boolean(physicsRaw.layoutMode),
     },
     audioReact: {
       ...DEFAULT_AUDIO_REACT,

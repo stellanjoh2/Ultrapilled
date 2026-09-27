@@ -3,7 +3,14 @@ import type { AppState } from "../types";
 import type { ChipDraw } from "../world";
 import { paintFrame } from "./paint";
 import { renderLoop, yieldToUi } from "./simulate";
-import { frameSize, type FrameRate, type GifPreset, type LoopCount, type SizePreset } from "./size";
+import {
+  frameSize,
+  type FrameRate,
+  type GifPreset,
+  type ImageSizePreset,
+  type LoopCount,
+  type VideoSizePreset,
+} from "./size";
 
 const GIF_QUALITY = 90;
 
@@ -73,7 +80,7 @@ export async function exportStill(options: {
   state: AppState;
   stageWidth: number;
   stageHeight: number;
-  preset: SizePreset;
+  preset: ImageSizePreset;
   kind: "png" | "jpg";
   transparent: boolean;
 }): Promise<void> {
@@ -102,7 +109,7 @@ export async function exportSequence(options: {
   state: AppState;
   stageWidth: number;
   stageHeight: number;
-  preset: SizePreset;
+  preset: ImageSizePreset;
   kind: "png" | "jpg";
   transparent: boolean;
   fps: FrameRate;
@@ -143,7 +150,7 @@ async function exportVideo(options: {
   state: AppState;
   stageWidth: number;
   stageHeight: number;
-  preset: SizePreset;
+  preset: VideoSizePreset;
   fps: FrameRate;
   loops: LoopCount;
   transparent: boolean;
@@ -232,7 +239,7 @@ export function exportMp4(options: {
   state: AppState;
   stageWidth: number;
   stageHeight: number;
-  preset: SizePreset;
+  preset: VideoSizePreset;
   fps: FrameRate;
   loops: LoopCount;
   shouldStop?: () => boolean;
@@ -245,7 +252,7 @@ export function exportMov(options: {
   state: AppState;
   stageWidth: number;
   stageHeight: number;
-  preset: SizePreset;
+  preset: VideoSizePreset;
   fps: FrameRate;
   loops: LoopCount;
   transparent: boolean;

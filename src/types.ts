@@ -109,6 +109,8 @@ export type PhysicsSettings = {
   spin: number;
   hold: number;
   complexity: PhysicsComplexity;
+  /** Free placement — no gravity, no chip–chip collision (Figma-style). */
+  layoutMode: boolean;
 };
 
 export const DEFAULT_PHYSICS: PhysicsSettings = {
@@ -123,6 +125,7 @@ export const DEFAULT_PHYSICS: PhysicsSettings = {
   spin: 0.06,
   hold: 0.8,
   complexity: "normal",
+  layoutMode: false,
 };
 
 export type AudioReactSettings = {

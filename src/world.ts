@@ -242,6 +242,13 @@ export type WorldHandle = {
   armPlaceAt: (slotIds: Iterable<string>, x: number, y: number) => void;
   /** Move chips for these slots to a playfield point and shove overlapping neighbors out. */
   placeSlotsAt: (slotIds: Iterable<string>, x: number, y: number) => void;
+  /** True when any two chip colliders intersect (used before leaving layout mode). */
+  chipsOverlap: () => boolean;
+  /**
+   * Match canvas paint order to slot list order (back → front = first → last in `slotIds`).
+   * The panel shows that order reversed so the front layer sits at the top.
+   */
+  syncLayerOrder: (slotIds: readonly string[]) => void;
   /** Place chips at saved poses (scaled from `frame` to the current playfield). */
   restore: (
     slots: Slot[],
@@ -839,10 +846,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let spinDrag = 0;
   let contactSteps = 1;
   let physicsKey = "";
+  let layoutMode = false;
   let quality = PHYSICS_QUALITY.normal;
   let simScale = 1;
   let audioScaleBySlot = new Map<string, number>();
   let sides: Matter.Body[] = [];
+  let roof: Matter.Body | null = null;
   let floor: Matter.Body | null = null;
   let floorOpen = false;
   let bounds = { width: 0, height: 0 };
@@ -979,20 +988,23 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const wide = tooWideForWalls(chip);
     const filter = chip.body.collisionFilter;
     const category = wide ? CAT_WIDE : CAT_CHIP;
-    if (filter.category !== category) {
+    // Wide: everything except side walls. Fitting: default (collide with walls).
+    let mask = wide ? 0xffffffff ^ CAT_WALL : 0xffffffff;
+    // Layout mode: no chip–chip contacts (still hit floor / walls).
+    if (layoutMode) mask &= ~(CAT_CHIP | CAT_WIDE);
+    if (filter.category !== category || filter.mask !== mask) {
       filter.category = category;
-      // Wide: everything except side walls. Fitting: default (collide with walls).
-      filter.mask = wide ? 0xffffffff ^ CAT_WALL : 0xffffffff;
+      filter.mask = mask;
       for (const part of chip.body.parts) {
         if (part === chip.body) continue;
         part.collisionFilter.category = category;
-        part.collisionFilter.mask = filter.mask;
+        part.collisionFilter.mask = mask;
       }
     }
     if (wide) pinInsideWalls(chip);
   }
 
-  /** Keep a chip fully between the hard side walls (no roof). */
+  /** Keep a chip fully between the hard side walls. */
   function pinInsideWalls(chip: DroppedChip) {
     if (bounds.width < 16) return;
     const mul = Math.max(chip.audioMul, 1) * scalePreviewFactor(chip);
@@ -1012,6 +1024,17 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function releaseGrowth(grown: DroppedChip[]) {
     if (grown.length === 0 || bounds.width < 16) return;
     for (const chip of grown) pinInsideWalls(chip);
+
+    // Layout mode keeps overlaps — only stay inside the side walls.
+    if (layoutMode) {
+      for (const chip of chips) {
+        Body.setVelocity(chip.body, { x: 0, y: 0 });
+        Body.setAngularVelocity(chip.body, 0);
+        Sleeping.set(chip.body, true);
+        pinInsideWalls(chip);
+      }
+      return;
+    }
 
     for (const chip of grown) {
       const gx = chip.body.position.x;
@@ -1041,7 +1064,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function buildSides(width: number, height: number) {
     const t = wallThick();
-    // No roof. Sides run far above the canvas so a tall pile stays walled in.
+    // Sides + ceiling far above the canvas so tall piles stay in and hard throws come back down.
     const above = Math.max(height * 6, maxSpan * 8, 6000);
     const below = Math.max(height, 1200);
     const top = -above;
@@ -1049,11 +1072,24 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const tall = bottom - top;
     const midY = top + tall / 2;
     Composite.remove(engine.world, sides);
+    if (roof) {
+      Composite.remove(engine.world, roof);
+      roof = null;
+    }
     sides = [
       Bodies.rectangle(EDGE - t / 2, midY, t, tall, surfaceProps("wall")),
       Bodies.rectangle(width - EDGE + t / 2, midY, t, tall, surfaceProps("wall")),
     ];
+    // Floor-style collision so wide chips (which skip side walls) still bounce off the ceiling.
+    roof = Bodies.rectangle(
+      width / 2,
+      top - t / 2,
+      width + t * 4,
+      t,
+      surfaceProps("floor"),
+    );
     Composite.add(engine.world, sides);
+    Composite.add(engine.world, roof);
   }
 
   function setFloorOpen(open: boolean) {
@@ -1184,11 +1220,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function applyPhysics(physics: PhysicsSettings) {
     const weight = chipWeight(physics);
     const complexity = physicsComplexity(physics.complexity);
-    const key = `${weight}|${physics.gravity}|${physics.speed}|${physics.bounce}|${physics.friction}|${physics.grip}|${physics.spin}|${complexity}`;
+    const nextLayout = Boolean(physics.layoutMode);
+    const key = `${weight}|${physics.gravity}|${physics.speed}|${physics.bounce}|${physics.friction}|${physics.grip}|${physics.spin}|${complexity}|${nextLayout ? 1 : 0}`;
     const changed = key !== physicsKey;
+    const layoutChanged = nextLayout !== layoutMode;
     physicsKey = key;
+    layoutMode = nextLayout;
     quality = PHYSICS_QUALITY[complexity];
-    engine.gravity.y = physics.gravity;
+    engine.gravity.y = layoutMode ? 0 : physics.gravity;
     engine.gravity.scale = GRAVITY_SCALE;
     engine.timing.timeScale = physics.speed;
     spinDrag = physics.spin;
@@ -1202,7 +1241,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         part.frictionStatic = physics.grip;
         part.frictionAir = AIR_FRICTION;
       }
-      if (changed) Sleeping.set(chip.body, false);
+      if (layoutChanged || changed) syncWallCollision(chip);
+      if (layoutMode) {
+        Body.setVelocity(chip.body, { x: 0, y: 0 });
+        Body.setAngularVelocity(chip.body, 0);
+        Sleeping.set(chip.body, true);
+      } else if (changed) {
+        Sleeping.set(chip.body, false);
+      }
     }
   }
 
@@ -1328,7 +1374,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function separateOverlaps(hard: false | true | "audio" = false) {
-    if (chips.length === 0) return;
+    if (layoutMode || chips.length === 0) return;
     const intense = hard === "audio";
     const force = Boolean(hard);
     // Soft digs on a fully sleeping pile desync DOM during hold (no sync) and
@@ -1338,6 +1384,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const bodies: Matter.Body[] = [];
     for (const chip of chips) bodies.push(chip.body);
     for (const side of sides) bodies.push(side);
+    if (roof) bodies.push(roof);
     if (floor) bodies.push(floor);
 
     const cell = Math.max(48, maxSpan * 0.35);
@@ -1739,6 +1786,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           Body.setVelocity(chip.body, { x: 0, y: 0 });
           placed.push(chip);
           placeIndex += 1;
+        } else if (layoutMode) {
+          Body.setVelocity(chip.body, { x: 0, y: 0 });
+          Body.setAngularVelocity(chip.body, 0);
+          Sleeping.set(chip.body, true);
         } else {
           // Nudge so the frame loop treats the pile as busy and keeps syncing.
           Body.setVelocity(chip.body, { x: (Math.random() - 0.5) * 2, y: 2 });
@@ -1763,13 +1814,23 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     for (const chip of chips) syncWallCollision(chip);
     // Composition/slot scale remeshes colliders in place. Without a wake, a frozen or
     // runner-stopped pile keeps the new meshes asleep mid-air (shrink gaps especially).
-    if (disturbed) {
-      wakeAll();
-      if (!running) setRunning(true);
+    if (layoutMode) {
+      if (grown.length > 0) releaseGrowth(grown);
+      for (const chip of chips) {
+        Body.setVelocity(chip.body, { x: 0, y: 0 });
+        Body.setAngularVelocity(chip.body, 0);
+        Sleeping.set(chip.body, true);
+        pinInsideWalls(chip);
+      }
+    } else {
+      if (disturbed) {
+        wakeAll();
+        if (!running) setRunning(true);
+      }
+      if (grown.length > 0) releaseGrowth(grown);
+      else if (remeshed > 0) separateOverlaps(true);
+      for (const chip of chips) pinInsideWalls(chip);
     }
-    if (grown.length > 0) releaseGrowth(grown);
-    else if (remeshed > 0) separateOverlaps(true);
-    for (const chip of chips) pinInsideWalls(chip);
     // seat() alone is enough for the first paint; sync again so any body nudges show up
     // even when main's phase is idle and the frame loop skips sync.
     sync();
@@ -1816,14 +1877,24 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       // Quiet: live scale already depenetrated — remesh without the upward shove.
       if (opts?.quiet) {
         for (const chip of grown) pinInsideWalls(chip);
-        separateOverlaps(true);
+        if (!layoutMode) separateOverlaps(true);
       } else {
         releaseGrowth(grown);
       }
     } else if (remeshed > 0) {
-      wakeAll();
-      if (!running) setRunning(true);
-      separateOverlaps(true);
+      if (layoutMode) {
+        for (const chip of chips) {
+          if (chip.slotId !== slotId) continue;
+          Body.setVelocity(chip.body, { x: 0, y: 0 });
+          Body.setAngularVelocity(chip.body, 0);
+          Sleeping.set(chip.body, true);
+          pinInsideWalls(chip);
+        }
+      } else {
+        wakeAll();
+        if (!running) setRunning(true);
+        separateOverlaps(true);
+      }
     }
     sync();
   }
@@ -1860,7 +1931,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     floorOpen = false;
     resize(stageW, stageH);
 
-    let spawnY = -160;
+    let spawnY = layoutMode ? stageH * 0.28 : -160;
 
     falling.forEach((slot, index) => {
       const { size } = layouts[index];
@@ -1869,11 +1940,17 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const span = Math.max(0, stageW - inset * 2);
       const x = inset + Math.random() * span;
       const tight = size.width > stageW * 0.65;
-      const angle = (Math.random() - 0.5) * (tight ? 0.12 : 0.8);
+      const angle = layoutMode ? 0 : (Math.random() - 0.5) * (tight ? 0.12 : 0.8);
       const half = tiltedHalfHeight(size.width, size.height, angle);
-      spawnY -= half + 16;
-      const y = spawnY;
-      spawnY -= half;
+      let y: number;
+      if (layoutMode) {
+        y = Math.min(stageH * 0.72, Math.max(half + 16, spawnY));
+        spawnY = y + half + 18;
+      } else {
+        spawnY -= half + 16;
+        y = spawnY;
+        spawnY -= half;
+      }
       spawnChip(
         slot,
         x,
@@ -1889,6 +1966,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         index,
         falling.length,
       );
+      if (layoutMode) {
+        const chip = chips[chips.length - 1];
+        if (chip) {
+          Body.setVelocity(chip.body, { x: 0, y: 0 });
+          Body.setAngularVelocity(chip.body, 0);
+          Sleeping.set(chip.body, true);
+        }
+      }
     });
     paintPicked();
   }
@@ -1930,10 +2015,36 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       Body.setAngle(chip.body, 0);
       Body.setVelocity(chip.body, { x: 0, y: 0 });
       Body.setAngularVelocity(chip.body, 0);
-      Sleeping.set(chip.body, false);
+      Sleeping.set(chip.body, layoutMode);
     }
-    releaseGrowth(targets);
+    if (layoutMode) {
+      for (const chip of targets) pinInsideWalls(chip);
+    } else {
+      releaseGrowth(targets);
+    }
     sync();
+  }
+
+  function chipsOverlap(): boolean {
+    for (let i = 0; i < chips.length; i++) {
+      for (let j = i + 1; j < chips.length; j++) {
+        const a = chips[i]!.body;
+        const b = chips[j]!.body;
+        if (boundsMiss(a, b)) continue;
+        const aParts = solidParts(a);
+        const bParts = solidParts(b);
+        for (let pa = 0; pa < aParts.length; pa++) {
+          const partA = aParts[pa]!;
+          for (let pb = 0; pb < bParts.length; pb++) {
+            const partB = bParts[pb]!;
+            if (boundsMiss(partA, partB)) continue;
+            const hit = Collision.collides(partA, partB);
+            if (hit && hit.depth > 0.5) return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   function armPlaceAt(slotIds: Iterable<string>, x: number, y: number) {
@@ -3077,6 +3188,37 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
   }
 
+  function syncLayerOrder(slotIds: readonly string[]) {
+    if (!layer || !bloomLayer || chips.length === 0) return;
+
+    const groups = new Map<string, DroppedChip[]>();
+    for (const chip of chips) {
+      const group = groups.get(chip.slotId);
+      if (group) group.push(chip);
+      else groups.set(chip.slotId, [chip]);
+    }
+
+    const ordered: DroppedChip[] = [];
+    const seen = new Set<string>();
+    for (const id of slotIds) {
+      const group = groups.get(id);
+      if (!group) continue;
+      ordered.push(...group);
+      seen.add(id);
+    }
+    for (const chip of chips) {
+      if (!seen.has(chip.slotId)) ordered.push(chip);
+    }
+
+    if (ordered.length === chips.length && ordered.every((chip, i) => chip === chips[i])) return;
+
+    chips = ordered;
+    for (const chip of chips) {
+      layer.append(chip.el);
+      bloomLayer.append(chip.glow);
+    }
+  }
+
   function draws(): ChipDraw[] {
     const out: ChipDraw[] = [];
     for (const chip of chips) {
@@ -3278,6 +3420,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     poses,
     armPlaceAt,
     placeSlotsAt,
+    chipsOverlap,
+    syncLayerOrder,
     restore,
     wireframes,
     step,
