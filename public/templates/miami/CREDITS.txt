@@ -1,18 +1,19 @@
-Miami template photos: 1980–1982 color slides by John Margolies, Miami Beach.
-From Wikimedia Commons (Library of Congress, John Margolies Roadside America Photograph Archive).
-Slide-mount borders cropped; resized to under 960 px wide.
-
-fontainebleau.jpg
-  "Fontainebleau Hilton, Miami Beach, Florida" (1982) by John Margolies
-  License: Public domain
-  https://commons.wikimedia.org/wiki/File:Fontainebleau_Hilton,_Miami_Beach,_Florida_LCCN2017711381.tif
+Miami template photos: 1980s color film, Miami and Miami Beach.
+From Wikimedia Commons, resized to 960 px wide or less.
 
 neron.jpg
   "Neron Hotel, Miami Beach, Florida" (1980) by John Margolies
-  License: Public domain
+  License: Public domain (Library of Congress, John Margolies Roadside America Photograph Archive)
+  Slide-mount border cropped.
   https://commons.wikimedia.org/wiki/File:Neron_Hotel,_Miami_Beach,_Florida_LCCN2017711369.tif
 
-berkeley-shore.jpg
-  "Berkeley Shore Hotel, Miami Beach, Florida" (1980) by John Margolies
-  License: Public domain
-  https://commons.wikimedia.org/wiki/File:Berkeley_Shore_Hotel,_Miami_Beach,_Florida_LCCN2017711376.tif
+coast-guard.jpg
+  "President Ronald Reagan Visit to US Coast Guard Cutter Dauntless, Miami Beach, Florida" (17 November 1982),
+  drug enforcement briefing. White House Photographic Office.
+  License: Public domain (work of the U.S. federal government)
+  https://commons.wikimedia.org/wiki/File:President_Ronald_Reagan_Visit_to_Us_Coast_Guard_Cutter_Dauntless_Miami_Beach_Florida_Speaking_at_Podium_-_DPLA_-_0999c396e6877565b8d4b748419005ec.jpg
+
+metrorail.jpg
+  "Passengers aboard the Metrorail in Miami" (1980s), Florida Department of Commerce, Florida Film Bureau
+  License: CC0 1.0 (public domain dedication)
+  https://commons.wikimedia.org/wiki/File:Passengers_aboard_the_Metrorail_in_Miami.jpg
