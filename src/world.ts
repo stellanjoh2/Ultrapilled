@@ -123,9 +123,16 @@ type DroppedChip = {
   sizeUnit: number;
   /** Extra size from solo canvas scale (1 = slot scale only). */
   scaleMul: number;
+  /** Local-space mirror toggles (Figma-style flip). */
+  flipX: boolean;
+  flipY: boolean;
   look: ChipLook | null;
   /** Physics/visual audio pulse currently applied to this chip (1 = base). */
   audioMul: number;
+  /** Spawn/discard scale baked into `seat()` transform (1 = normal). */
+  popScale: number;
+  /** While true, seat around the visual box center so pop doesn't drift. */
+  popping: boolean;
 };
 
 export type ChipDraw = {
@@ -136,6 +143,8 @@ export type ChipDraw = {
   height: number;
   anchorX: number;
   anchorY: number;
+  flipX?: boolean;
+  flipY?: boolean;
   slot: Slot;
   radius: number;
   fill: string;
@@ -151,6 +160,8 @@ export type ChipPose = {
   sizeUnit: number;
   /** Extra size from solo canvas scale (1 = default). */
   scaleMul?: number;
+  flipX?: boolean;
+  flipY?: boolean;
   x: number;
   y: number;
   angle: number;
@@ -187,6 +198,8 @@ export type WorldHandle = {
     sizeRandom: number,
   ) => boolean;
   clear: () => void;
+  /** Scale-down-remove every chip without touching app slot data. */
+  discardAll: () => void;
   resize: (width: number, height: number) => void;
   refit: (width: number, height: number, factor: number) => void;
   setRunning: (on: boolean) => void;
@@ -262,6 +275,8 @@ export type WorldHandle = {
     poses: ChipPose[],
     frame: { width: number; height: number },
   ) => void;
+  /** Toggle Figma-style flip on chips for a slot (or current xform targets). */
+  flipChips: (slotId: string, axis: "x" | "y") => void;
   /** Convex hulls of each solid collider part, in stage pixels. */
   wireframes: () => { x: number; y: number }[][];
   step: (delta?: number) => void;
@@ -625,7 +640,8 @@ function applyVisual(
     el.style.fontSize = `${slot.fontSize}px`;
     el.style.letterSpacing = `${tracking}em`;
 
-    if (bare && !bareCss) {
+    // Live edit needs a DOM text node for the caret — never the ink canvas.
+    if (bare && !bareCss && !liveEdit) {
       // Solid or static-gradient ink canvas (tight AABB).
       paintBareText(el, slot, width, height, tracking, textGradient ? fill : ink, shiftEm, textGradient ? gradientTo : "");
       return;
@@ -672,12 +688,13 @@ function applyVisual(
       stopTextAnim(label);
       label.textContent = slot.text;
     }
-    if (textGradient) {
+    // Gradient clip hides the native caret — use solid ink while typing.
+    if (textGradient && !liveEdit) {
       paintBareTextCss(label, fill, gradientTo, slot.gradientAngle, slot.gradientScale, Boolean(slot.animatedGradient), slot.gradientSpeed);
-      // Start color is the shape/color field for bare gradients.
       el.style.color = "transparent";
     } else {
       paintBareTextCss(label, "", "");
+      if (liveEdit && textGradient) el.style.color = fill;
     }
     label.style.transform = `translateY(${shiftEm}em)`;
     return;
@@ -1537,6 +1554,70 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     else separateOverlaps();
   });
 
+  /** Opacity + scale pop for spawn/discard — baked into `seat()` transform (not CSS `scale`). */
+  const CHIP_POP_MS = 250;
+  const CHIP_SPAWN_MS = 250;
+
+  function chipPopMs(spawn: boolean) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return 0;
+    return spawn ? CHIP_SPAWN_MS : CHIP_POP_MS;
+  }
+
+  function chipNodes(chip: DroppedChip) {
+    return [chip.el, chip.glow, ...chip.mirrors.flatMap((mirror) => [mirror.face, mirror.glow])];
+  }
+
+  /** Ease matching CSS `ease` closely enough for short discard pops. */
+  function chipPopEase(t: number) {
+    return t * t * (3 - 2 * t);
+  }
+
+  /** easeOutCirc — decelerates hard into the final size. */
+  function chipPopEaseOutCirc(t: number) {
+    return Math.sqrt(1 - (t - 1) ** 2);
+  }
+
+  function animateChipPop(chip: DroppedChip, from: number, to: number, onDone?: () => void) {
+    const nodes = chipNodes(chip);
+    const spawn = to > from;
+    const duration = chipPopMs(spawn);
+    const ease = spawn ? chipPopEaseOutCirc : chipPopEase;
+    chip.popping = true;
+    chip.popScale = from;
+    for (const node of nodes) {
+      node.style.opacity = String(from);
+      if (to < from) node.style.pointerEvents = "none";
+    }
+    seat(chip);
+    if (duration === 0) {
+      chip.popScale = to;
+      chip.popping = false;
+      for (const node of nodes) node.style.opacity = String(to);
+      if (to > 0) seat(chip);
+      onDone?.();
+      return;
+    }
+    const t0 = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - t0) / duration);
+      const k = ease(t);
+      const value = from + (to - from) * k;
+      chip.popScale = value;
+      for (const node of nodes) node.style.opacity = String(value);
+      seat(chip);
+      if (t < 1) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      chip.popScale = to;
+      chip.popping = false;
+      for (const node of nodes) node.style.opacity = String(to);
+      if (to > 0) seat(chip);
+      onDone?.();
+    };
+    requestAnimationFrame(tick);
+  }
+
   function discardChip(chip: DroppedChip) {
     if (pending?.chip === chip) cancelPending();
     if (drag?.pins.some((entry) => entry.chip === chip)) dropPin();
@@ -1544,21 +1625,27 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (soloBodyId === chip.body.id) soloBodyId = null;
     bounceCount.delete(chip.body.id);
     Composite.remove(engine.world, chip.body);
-    const nodes = [chip.el, chip.glow, ...chip.mirrors.flatMap((mirror) => [mirror.face, mirror.glow])];
-    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 250;
-    if (duration === 0) {
+    const nodes = chipNodes(chip);
+    animateChipPop(chip, 1, 0, () => {
       for (const node of nodes) node.remove();
-      return;
-    }
-    for (const node of nodes) {
-      node.style.pointerEvents = "none";
-      const anim = node.animate([{ opacity: 1 }, { opacity: 0 }], {
-        duration,
-        easing: "ease",
-        fill: "forwards",
-      });
-      anim.finished.then(() => node.remove()).catch(() => node.remove());
-    }
+    });
+  }
+
+  /** Scale-down discard every chip (layout clear). Slots stay with the app. */
+  function discardAll() {
+    cancelPending();
+    dropPin();
+    endXformDrag();
+    endGradAngleDrag();
+    editingId = null;
+    clickChip = null;
+    soloBodyId = null;
+    const outgoing = chips;
+    chips = [];
+    for (const chip of outgoing) discardChip(chip);
+    bounceCount.clear();
+    prevVel.clear();
+    maxSpan = 0;
   }
 
   function replaceBody(
@@ -1599,6 +1686,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     chip.height = size.height;
     chip.chamfer = chamfer;
     if (chip.audioMul !== 1) Body.scale(body, chip.audioMul, chip.audioMul);
+    applyBodyFlip(chip);
     if (chip.slotId === editingId) Body.setStatic(body, true);
     noteSpan(size.width, size.height);
     buildSides(bounds.width, bounds.height);
@@ -1664,17 +1752,23 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       meshKey: meshKey(slot, size.width, size.height, chamfer, physicsComplexity(physics.complexity)),
       sizeUnit,
       scaleMul,
+      flipX: false,
+      flipY: false,
       look: null,
       audioMul: 1,
+      popScale: 0,
+      popping: true,
     };
     mountMirrors(chip);
     paint(chip, scaled, size, radius, theme, trackingEm(trackingOf(slot, tracking)), glyphShift(slot));
     syncWallCollision(chip);
+    for (const node of chipNodes(chip)) node.style.opacity = "0";
     seat(chip);
     layer!.append(el);
     bloomLayer!.append(glow);
     Composite.add(engine.world, body);
     chips.push(chip);
+    animateChipPop(chip, 0, 1);
     return chip;
   }
 
@@ -1998,10 +2092,45 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       seqIndex: chip.seqIndex,
       sizeUnit: chip.sizeUnit,
       scaleMul: chip.scaleMul === 1 ? undefined : chip.scaleMul,
+      flipX: chip.flipX || undefined,
+      flipY: chip.flipY || undefined,
       x: chip.body.position.x,
       y: chip.body.position.y,
       angle: chip.body.angle,
     }));
+  }
+
+  /** Mirror Matter vertices to match visual flip. */
+  function applyBodyFlip(chip: DroppedChip) {
+    if (chip.flipX) Body.scale(chip.body, -1, 1);
+    if (chip.flipY) Body.scale(chip.body, 1, -1);
+  }
+
+  function flipChips(slotId: string, axis: "x" | "y") {
+    const targets = xformTargets(slotId);
+    if (!targets.length) return;
+    for (const chip of targets) {
+      if (axis === "x") {
+        chip.flipX = !chip.flipX;
+        Body.scale(chip.body, -1, 1);
+      } else {
+        chip.flipY = !chip.flipY;
+        Body.scale(chip.body, 1, -1);
+      }
+      syncWallCollision(chip);
+      seat(chip);
+    }
+    if (layoutMode) {
+      for (const chip of targets) {
+        Body.setVelocity(chip.body, { x: 0, y: 0 });
+        Body.setAngularVelocity(chip.body, 0);
+        Sleeping.set(chip.body, true);
+        pinInsideWalls(chip);
+      }
+    } else {
+      wakeAll();
+      if (!running) setRunning(true);
+    }
   }
 
   /** Keep import / drop points inside the playfield so a stale click can't shove the pile off-canvas. */
@@ -2121,6 +2250,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       );
       const chip = chips[chips.length - 1];
       if (!chip) return;
+      chip.flipX = Boolean(pose.flipX);
+      chip.flipY = Boolean(pose.flipY);
+      applyBodyFlip(chip);
       Body.setVelocity(chip.body, { x: 0, y: 0 });
       Body.setAngularVelocity(chip.body, 0);
       Sleeping.set(chip.body, true);
@@ -3139,32 +3271,50 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     height: number,
     anchorX: number,
     anchorY: number,
-    audioScale = 1,
+    scaleX = 1,
+    scaleY = 1,
   ) {
     const originX = width / 2 - anchorX;
     const originY = height / 2 - anchorY;
     el.style.transformOrigin = `${originX}px ${originY}px`;
-    const scalePart = audioScale === 1 ? "" : ` scale(${audioScale})`;
+    const scalePart =
+      scaleX === 1 && scaleY === 1 ? "" : ` scale(${scaleX}, ${scaleY})`;
     el.style.transform = `translate(${x - originX}px, ${y - originY}px) rotate(${angle}rad)${scalePart}`;
   }
 
   function seat(chip: DroppedChip) {
     const body = chip.body;
-    const x = body.position.x;
-    const y = body.position.y;
     const angle = body.angle;
     const preview = scalePreviewFactor(chip);
     const audioScale = (audioScaleBySlot.get(chip.slotId) ?? 1) * preview;
+    const pop = chip.popScale;
+    const scaleX = (chip.flipX ? -1 : 1) * audioScale * pop;
+    const scaleY = (chip.flipY ? -1 : 1) * audioScale * pop;
     // Keep selection / gradient chrome stroke width stable under CSS scale.
     if (Math.abs(audioScale - 1) > 0.001) chip.el.style.setProperty("--chrome-scale", String(audioScale));
     else chip.el.style.removeProperty("--chrome-scale");
     if (preview !== 1) chip.el.style.setProperty("--scale-preview", String(preview));
     else chip.el.style.removeProperty("--scale-preview");
-    place(chip.el, x, y, angle, chip.width, chip.height, chip.anchorX, chip.anchorY, audioScale);
-    place(chip.glow, x, y, angle, chip.width, chip.height, chip.anchorX, chip.anchorY, audioScale);
+
+    let x = body.position.x;
+    let y = body.position.y;
+    let anchorX = chip.anchorX;
+    let anchorY = chip.anchorY;
+    // During spawn/discard, pivot on the visual box center so scale doesn't drift.
+    if (chip.popping) {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      x = body.position.x + chip.anchorX * cos - chip.anchorY * sin;
+      y = body.position.y + chip.anchorX * sin + chip.anchorY * cos;
+      anchorX = 0;
+      anchorY = 0;
+    }
+
+    place(chip.el, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
+    place(chip.glow, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
     for (const mirror of chip.mirrors) {
-      place(mirror.face, x, y, angle, chip.width, chip.height, chip.anchorX, chip.anchorY, audioScale);
-      place(mirror.glow, x, y, angle, chip.width, chip.height, chip.anchorX, chip.anchorY, audioScale);
+      place(mirror.face, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
+      place(mirror.glow, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
     }
     // Keep the gradient wheel glued to the live visual size (incl. scale-drag preview).
     if (isPickPainted(chip)) {
@@ -3247,6 +3397,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         height: chip.height,
         anchorX: chip.anchorX,
         anchorY: chip.anchorY,
+        flipX: chip.flipX || undefined,
+        flipY: chip.flipY || undefined,
         slot: chip.look.slot,
         radius: chip.look.radius,
         fill: chip.look.fill,
@@ -3415,6 +3567,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     play,
     refresh,
     clear,
+    discardAll,
     resize,
     refit,
     setRunning,
@@ -3443,6 +3596,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     chipsOverlap,
     syncLayerOrder,
     restore,
+    flipChips,
     wireframes,
     step,
     destroy,

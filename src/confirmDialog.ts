@@ -7,28 +7,39 @@ function reducedMotion(): boolean {
 
 function openDialog(opts: {
   title: string;
-  body: string;
+  body?: string;
   confirmLabel: string;
   cancelLabel?: string;
-}): Promise<boolean> {
+  input?: { placeholder?: string; initial?: string };
+}): Promise<boolean | string> {
   return new Promise((resolve) => {
     const root = document.createElement("div");
     root.className = "reconnect";
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-labelledby", "confirm-title");
-    root.setAttribute("aria-describedby", "confirm-body");
+    if (opts.body) root.setAttribute("aria-describedby", "confirm-body");
     const cancel = opts.cancelLabel
       ? `<button type="button" class="pill" data-confirm="cancel">${opts.cancelLabel}</button>`
       : "";
+    const bodyHtml = opts.body
+      ? `<p class="reconnect__body" id="confirm-body">${opts.body}</p>`
+      : "";
+    const escapeAttr = (value: string) =>
+      value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    const inputHtml = opts.input
+      ? `<input type="text" class="reconnect__input" id="confirm-input" maxlength="48" placeholder="${escapeAttr(opts.input.placeholder ?? "")}" value="${escapeAttr(opts.input.initial ?? "")}" autocomplete="off" spellcheck="false" />`
+      : "";
+    const titleOnly = !opts.body && !opts.input;
     root.innerHTML = `
       <div class="reconnect__scrim" data-confirm="cancel"></div>
-      <div class="reconnect__card">
+      <div class="reconnect__card${titleOnly ? " is-title-only" : ""}">
         <h2 class="reconnect__title" id="confirm-title">${opts.title}</h2>
-        <p class="reconnect__body" id="confirm-body">${opts.body}</p>
+        ${bodyHtml}
+        ${inputHtml}
         <div class="reconnect__actions">
           ${cancel}
-          <button type="button" class="pill is-on" data-confirm="ok" autofocus>${opts.confirmLabel}</button>
+          <button type="button" class="pill is-on" data-confirm="ok"${opts.input ? "" : " autofocus"}>${opts.confirmLabel}</button>
         </div>
       </div>
     `;
@@ -36,10 +47,11 @@ function openDialog(opts: {
     const card = root.querySelector<HTMLElement>(".reconnect__card")!;
     const scrim = root.querySelector<HTMLElement>(".reconnect__scrim")!;
     const title = root.querySelector<HTMLElement>(".reconnect__title")!;
-    const body = root.querySelector<HTMLElement>(".reconnect__body")!;
+    const body = root.querySelector<HTMLElement>(".reconnect__body");
+    const input = root.querySelector<HTMLInputElement>(".reconnect__input");
     const actions = root.querySelector<HTMLElement>(".reconnect__actions")!;
     const okBtn = root.querySelector<HTMLButtonElement>('[data-confirm="ok"]')!;
-    const content = [title, body, actions];
+    const content = [title, body, input, actions].filter((el): el is HTMLElement => Boolean(el));
     const canCancel = Boolean(opts.cancelLabel);
 
     let settled = false;
@@ -47,12 +59,20 @@ function openDialog(opts: {
       if (settled) return;
       settled = true;
       window.removeEventListener("keydown", onKey);
+      const value = input?.value.trim() ?? "";
+      if (ok && input && !value) {
+        settled = false;
+        window.addEventListener("keydown", onKey);
+        input.focus({ preventScroll: true });
+        input.select();
+        return;
+      }
       if (ok) playNotify();
       else playRemove();
 
       const done = () => {
         root.remove();
-        resolve(ok);
+        resolve(ok ? (input ? value : true) : false);
       };
 
       if (reducedMotion()) {
@@ -99,7 +119,12 @@ function openDialog(opts: {
     document.body.append(root);
     window.addEventListener("keydown", onKey);
     playCaution();
-    okBtn.focus({ preventScroll: true });
+    if (input) {
+      input.focus({ preventScroll: true });
+      input.select();
+    } else {
+      okBtn.focus({ preventScroll: true });
+    }
 
     gsap.set(scrim, { autoAlpha: 0 });
     gsap.set(card, { autoAlpha: 0, scale: 0.92, y: 28 });
@@ -125,11 +150,11 @@ function openDialog(opts: {
 /** Branded confirm. Resolves true on confirm, false on cancel / Escape / scrim. */
 export function askConfirm(opts: {
   title: string;
-  body: string;
+  body?: string;
   confirmLabel: string;
   cancelLabel: string;
 }): Promise<boolean> {
-  return openDialog(opts);
+  return openDialog(opts).then((result) => result === true);
 }
 
 /** Branded notice. Resolves when dismissed. */
@@ -143,4 +168,20 @@ export function askNotice(opts: {
     body: opts.body,
     confirmLabel: opts.confirmLabel ?? "Got it",
   }).then(() => undefined);
+}
+
+/** Branded name prompt. Resolves trimmed name, or null on cancel. */
+export function askPrompt(opts: {
+  title: string;
+  placeholder?: string;
+  initial?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+}): Promise<string | null> {
+  return openDialog({
+    title: opts.title,
+    confirmLabel: opts.confirmLabel ?? "Save",
+    cancelLabel: opts.cancelLabel ?? "Cancel",
+    input: { placeholder: opts.placeholder, initial: opts.initial },
+  }).then((result) => (typeof result === "string" ? result : null));
 }

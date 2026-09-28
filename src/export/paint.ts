@@ -81,9 +81,12 @@ function buffer(canvas: HTMLCanvasElement, width: number, height: number): Canva
 function withChip(ctx: CanvasRenderingContext2D, chip: ChipDraw, scale: number, draw: () => void) {
   const originX = (chip.width / 2 - chip.anchorX) * scale;
   const originY = (chip.height / 2 - chip.anchorY) * scale;
+  const sx = chip.flipX ? -1 : 1;
+  const sy = chip.flipY ? -1 : 1;
   ctx.save();
   ctx.translate(chip.x * scale, chip.y * scale);
   ctx.rotate(chip.angle);
+  if (sx !== 1 || sy !== 1) ctx.scale(sx, sy);
   ctx.translate(-originX, -originY);
   draw();
   ctx.restore();

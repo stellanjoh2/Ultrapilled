@@ -32,18 +32,28 @@ import { backgroundImage, backgroundPaint, gridDivisions, logoFill, logoSize, is
 import { mountColorPicker } from "./colorPicker";
 import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
 import { applyRollingText, stopTextAnim, textAnimSpeedOf } from "./textAnim";
-import { pickTheme, resolveTextColor, resolveTextSwatchIndex, textSwatches } from "./theme";
+import { pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import { mountProTip, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
 import { blankPrefabText, blankState, TEMPLATES, templateLabel } from "./templates";
+import {
+  customTemplateLabel,
+  deleteCustomTemplate,
+  embedSlotImages,
+  listCustomTemplates,
+  loadCustomTemplate,
+  saveCustomTemplate,
+} from "./customTemplates";
+import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
 import { openAbout, isAboutOpen } from "./aboutPanel";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
+import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
 import { checkInput, wrapCheckInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
-import { askConfirm, askNotice } from "./confirmDialog";
+import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
   defaultPillFileName,
@@ -659,7 +669,12 @@ function openWeightMenu(
   openChoiceMenu(trigger, choices, getValue(), onPick);
 }
 
-type Choice<T> = { value: T; label: string; style?: Partial<CSSStyleDeclaration> };
+type Choice<T> = {
+  value: T;
+  label: string;
+  style?: Partial<CSSStyleDeclaration>;
+  onRemove?: () => void;
+};
 
 function openChoiceMenu<T>(
   trigger: HTMLButtonElement,
@@ -699,7 +714,24 @@ function openChoiceMenu<T>(
     btn.setAttribute("aria-selected", String(choice.value === selected));
     if (choice.value === selected) btn.classList.add("is-on");
     if (index === active) btn.classList.add("is-active");
-    btn.textContent = choice.label;
+    const label = document.createElement("span");
+    label.className = "font-menu-item__label";
+    label.textContent = choice.label;
+    btn.append(label);
+    if (choice.onRemove) {
+      const remove = document.createElement("span");
+      remove.className = "font-menu-item__remove";
+      remove.setAttribute("role", "button");
+      remove.setAttribute("aria-label", `Delete ${choice.label}`);
+      remove.textContent = "×";
+      remove.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeFontMenu();
+        choice.onRemove?.();
+      });
+      btn.append(remove);
+    }
     if (choice.style) Object.assign(btn.style, choice.style);
     btn.addEventListener("click", () => {
       const pick = onPick;
@@ -1255,11 +1287,14 @@ function renderPanel() {
       </div>
     </section>
     <section class="section">
-      <h2 data-tip="Start empty or from a ready-made scene">Templates</h2>
+      <div class="templates-head">
+        <h2 data-tip="Start empty or from a ready-made scene">Templates</h2>
+        <button type="button" class="section-reset" id="save-template" aria-label="Save theme" data-tip="Save the current scene as a custom template">${floppyDisk}</button>
+      </div>
       <div class="segment" role="group" aria-label="Templates">
         <button type="button" class="pill${state.template === "blank" ? " is-on" : ""}" id="template-blank" aria-pressed="${state.template === "blank"}" data-tip="Start from an empty canvas">Blank</button>
-        <button type="button" class="pill template-pick${templateLabel(state.template) ? " is-on" : ""}" id="template-pick" aria-haspopup="listbox" aria-expanded="false" data-tip="Load a ready-made scene">
-          <span class="font-pick-value">${templateLabel(state.template) ?? "Template"}</span>
+        <button type="button" class="pill template-pick${activeTemplateLabel(state.template) ? " is-on" : ""}" id="template-pick" aria-haspopup="listbox" aria-expanded="false" data-tip="Load a ready-made scene">
+          <span class="font-pick-value">${activeTemplateLabel(state.template) ?? "Template"}</span>
           <span class="font-pick-chevron" aria-hidden="true"></span>
         </button>
       </div>
@@ -1345,7 +1380,7 @@ function renderPanel() {
         </button>
         <button type="button" class="pill slot-add" id="add-photo" data-tip="Add an SVG, PNG, JPG, or GIF">
           <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-          Add image
+          Upload image
         </button>
       </div>`,
       { sectionId: "shape-create" },
@@ -1493,16 +1528,32 @@ function renderPanel() {
   panel.querySelector("#template-blank")?.addEventListener("click", () => {
     loadTemplate(blankState());
   });
+  panel.querySelector("#save-template")?.addEventListener("click", () => {
+    void saveCurrentAsTemplate();
+  });
   const templatePick = panel.querySelector<HTMLButtonElement>("#template-pick");
   templatePick?.addEventListener("click", () => {
     if (templatePick.getAttribute("aria-expanded") === "true") {
       closeFontMenu();
       return;
     }
-    const choices = TEMPLATES.map((template) => ({ value: template.id as string, label: template.label }));
+    const choices: Choice<string>[] = [
+      ...TEMPLATES.map((template) => ({ value: template.id as string, label: template.label })),
+      ...listCustomTemplates().map((template) => ({
+        value: template.id,
+        label: template.label,
+        onRemove: () => {
+          void removeCustomTemplate(template.id);
+        },
+      })),
+    ];
     openChoiceMenu(templatePick, choices, state.template ?? "", (id) => {
-      const template = TEMPLATES.find((item) => item.id === id);
-      if (template) loadTemplate(template.build());
+      const builtIn = TEMPLATES.find((item) => item.id === id);
+      if (builtIn) {
+        loadTemplate(builtIn.build());
+        return;
+      }
+      void loadSavedTemplate(id);
     });
   });
 
@@ -2799,13 +2850,12 @@ function tintRow(slot: Slot, legend = "Color"): string {
 }
 
 function textTintRow(slot: TextSlot): string {
-  const colors = textSwatches(state.theme);
   const filled = shapeHasFill(slot);
   const index = resolveTextSwatchIndex(state.theme, fillSample(state.theme, slot), filled, slot.colorIndex ?? 0, slot.textColorIndex);
   const custom =
     slot.textColor ??
     (slot.textColorIndex == null && !filled && slot.color ? slot.color : undefined);
-  return swatchRow(colors, index, custom, "text-tint", "Text color");
+  return swatchRow(state.theme, index, custom, "text-tint", "Text color");
 }
 
 function gradientTintRow(slot: Slot): string {
@@ -2823,13 +2873,7 @@ function swatchRow(
     .map((color, index) => {
       const selected = selectedIndex === index;
       const fill = selected && custom ? custom : color;
-      const name =
-        dataName === "text-tint" && index === colors.length - 2
-          ? "black"
-          : dataName === "text-tint" && index === colors.length - 1
-            ? "white"
-            : String(index + 1);
-      return `<button type="button" class="tint${selected ? " is-on" : ""}" data-${dataName}="${index}" style="background:${fill}" aria-pressed="${selected}" aria-label="${legend} ${name}"></button>`;
+      return `<button type="button" class="tint${selected ? " is-on" : ""}" data-${dataName}="${index}" style="background:${fill}" aria-pressed="${selected}" aria-label="${legend} ${index + 1}"></button>`;
     })
     .join("")}</div>`;
 }
@@ -2991,13 +3035,12 @@ function syncImplicitTextRow(root: HTMLElement, slot: Slot, shapeHex: string) {
     return;
   }
   const index = resolveTextSwatchIndex(state.theme, fillSample(state.theme, slot), true, slot.colorIndex ?? 0, undefined);
-  const swatches = textSwatches(state.theme);
   root.querySelectorAll<HTMLButtonElement>("[data-text-tint]").forEach((btn) => {
     const chip = Number(btn.dataset.textTint);
     const on = chip === index;
     btn.classList.toggle("is-on", on);
     btn.setAttribute("aria-pressed", String(on));
-    btn.style.background = swatches[chip] ?? "";
+    btn.style.background = state.theme[chip] ?? "";
   });
 }
 
@@ -3633,6 +3676,49 @@ function bindSlotMenuDismiss(
   );
 }
 
+function clearCanvas() {
+  if (world.editingId()) endChipEdit(false);
+  remember();
+  openSlots.clear();
+  pickedSlotId = null;
+  pickedSlotIds.clear();
+  world.setPicked(null);
+
+  // Wipe prefabs; keep the active template label and color theme.
+  state.slots = [];
+  playRemove();
+  renderPanel();
+  scheduleDraft();
+
+  if (world.chipCount() > 0 && !state.physics.layoutMode) {
+    clearingDump = true;
+    posePinned = false;
+    dropTicket++;
+    world.setFloorOpen(true);
+    running = true;
+    paused = false;
+    world.setRunning(true);
+    phase = "dumping";
+    paintTransport();
+    return;
+  }
+
+  // Layout mode: same scale-down discard as right-click Remove.
+  if (running) {
+    running = false;
+    paused = false;
+    posePinned = false;
+    dropTicket++;
+    phase = "idle";
+    world.setRunning(false);
+    world.setFloorOpen(false);
+    paintTransport();
+  }
+  clearingDump = false;
+  world.discardAll();
+  paintWelcome();
+}
+
 function openCanvasMenu(x: number, y: number) {
   closeSlotMenu();
   const abort = new AbortController();
@@ -3641,13 +3727,13 @@ function openCanvasMenu(x: number, y: number) {
   menu.setAttribute("role", "menu");
 
   const at: PlaceAt = { clientX: x, clientY: y };
-  const entries: { label: string; run: () => void }[] = [
+  const entries: { label: string; run: () => void; clear?: boolean }[] = [
     { label: "Add pill", run: () => addPillSlot(at) },
     { label: "Add Text", run: () => addTypeSlot(at) },
     { label: "Add shape", run: () => addShapeSlot(at) },
     { label: "Add emoji", run: () => addEmojiSlot(at) },
     {
-      label: "Add image",
+      label: "Upload image",
       run: () => {
         void pickImageFiles(true).then((files) => {
           if (!files.length) return;
@@ -3655,13 +3741,22 @@ function openCanvasMenu(x: number, y: number) {
         });
       },
     },
+    {
+      label: "Add from Unsplash",
+      run: () => {
+        openUnsplashImport({
+          onPick: (file) => addImagesFromFiles([file], at),
+        });
+      },
+    },
+    { label: "Clear canvas", clear: true, run: () => clearCanvas() },
   ];
 
   const buttons: HTMLButtonElement[] = [];
   for (const entry of entries) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "pill slot-add";
+    btn.className = entry.clear ? "pill slot-add is-clear" : "pill slot-add";
     btn.setAttribute("role", "menuitem");
     btn.innerHTML = `<span class="slot-add__icon" aria-hidden="true">${plus}</span>${entry.label}`;
     btn.addEventListener("click", () => {
@@ -3709,6 +3804,17 @@ function endChipEdit(commit = true) {
     live();
     renderPanel();
   }
+}
+
+/** Empty contenteditable often hides the caret — keep a ZWSP placeholder while editing. */
+const EDIT_ZWSP = "\u200B";
+
+function readChipEditText(edit: HTMLElement): string {
+  return (edit.textContent ?? "").replaceAll(EDIT_ZWSP, "").replace(/\n/g, "");
+}
+
+function writeChipEditText(edit: HTMLElement, text: string) {
+  edit.textContent = text || EDIT_ZWSP;
 }
 
 function liveChip(id: string, opts?: { quiet?: boolean }) {
@@ -3944,18 +4050,27 @@ function editChipText(id: string, wipe: boolean) {
     if (slot && toggle) setSlotOpen(toggle, slot, true, true);
     return;
   }
-  edit.textContent = slot.text;
+  writeChipEditText(edit, slot.text);
   const abort = new AbortController();
   chipEditAbort = abort;
   const { signal } = abort;
   const panelInput = panel.querySelector<HTMLInputElement>(`[data-id="${id}"] .slot-live`);
+  // Ignore blur from the double-click / focus handoff that started this edit.
+  let armBlur = false;
+  window.setTimeout(() => {
+    armBlur = true;
+  }, 50);
 
   edit.addEventListener(
     "input",
     () => {
       remember(`canvas-text:${id}`);
-      slot.text = (edit.textContent ?? "").replace(/\n/g, "");
-      if (edit.textContent !== slot.text) edit.textContent = slot.text;
+      slot.text = readChipEditText(edit);
+      // Keep a ZWSP so an emptied field still shows a caret.
+      if (!slot.text && edit.textContent !== EDIT_ZWSP) {
+        writeChipEditText(edit, "");
+        selectChipEdit(edit, true);
+      }
       if (panelInput) panelInput.value = slot.text;
       liveChip(id);
     },
@@ -3975,6 +4090,7 @@ function editChipText(id: string, wipe: boolean) {
     "blur",
     () => {
       queueMicrotask(() => {
+        if (!armBlur) return;
         if (world.editingId() !== id) return;
         if (document.activeElement?.closest?.(".chip-edit, .slot-menu")) return;
         endChipEdit();
@@ -3983,11 +4099,12 @@ function editChipText(id: string, wipe: boolean) {
     { signal },
   );
 
-  queueMicrotask(() => {
+  // Focus after the dblclick event finishes so preventDefault/focus fights settle.
+  window.setTimeout(() => {
     if (world.editingId() !== id) return;
     edit.focus();
     selectChipEdit(edit, wipe);
-  });
+  }, 0);
 }
 
 function selectChipEdit(edit: HTMLElement | null | undefined, caretOnly: boolean) {
@@ -4032,6 +4149,12 @@ function invertSlot(id: string) {
   // Color-only: refresh this slot's chips. Avoid renderPanel/live — they remount or
   // repaint enough to make the open context menu flicker.
   liveChip(id);
+}
+
+function flipSlot(id: string, axis: "x" | "y") {
+  remember();
+  world.flipChips(id, axis);
+  playSwitch(true);
 }
 
 function openMenuDotPicker(btn: HTMLButtonElement, value: string, onChange: (hex: string) => void) {
@@ -4582,6 +4705,20 @@ function openSlotMenu(x: number, y: number, id: string) {
     }
   }
   actions.push(
+    {
+      label: "Flip horizontal",
+      stay: true,
+      run: () => {
+        holdScrollClose(() => flipSlot(id, "x"));
+      },
+    },
+    {
+      label: "Flip vertical",
+      stay: true,
+      run: () => {
+        holdScrollClose(() => flipSlot(id, "y"));
+      },
+    },
     {
       label: "Invert",
       stay: true,
@@ -5346,6 +5483,8 @@ let holdStarted = 0;
 let lastInteractAt = 0;
 let phase: "idle" | "preparing" | "falling" | "holding" | "dumping" = "idle";
 let dropTicket = 0;
+/** Floor-dump from Clear canvas — finish idle instead of looping a new drop. */
+let clearingDump = false;
 
 const MIN_CYCLE_MS = 1200;
 /** Extra ease time after motion is low before locking the hold pose. */
@@ -5943,6 +6082,58 @@ app.querySelector("#reset-defaults")?.addEventListener("click", () => {
   renderPanel();
 });
 
+function activeTemplateLabel(id: string | undefined): string | undefined {
+  return templateLabel(id) ?? customTemplateLabel(id);
+}
+
+async function saveCurrentAsTemplate() {
+  const name = await askPrompt({
+    title: "Theme name",
+    placeholder: "My theme",
+    confirmLabel: "Save",
+    cancelLabel: "Cancel",
+  });
+  if (!name) return;
+  try {
+    const project = await embedSlotImages(currentPillProject());
+    const saved = saveCustomTemplate(name, project);
+    state.template = saved.id;
+    renderPanel();
+  } catch {
+    await askNotice({
+      title: "Couldn’t save",
+      body: "This browser wouldn’t store the template. Try a shorter scene or fewer photos.",
+    });
+  }
+}
+
+async function loadSavedTemplate(id: string) {
+  const project = loadCustomTemplate(id);
+  if (!project) {
+    await askNotice({
+      title: "Missing template",
+      body: "That custom template is no longer available.",
+    });
+    return;
+  }
+  hydratePillImages(project.images);
+  loadTemplate(project.state);
+}
+
+async function removeCustomTemplate(id: string) {
+  const ok = await askConfirm({
+    title: "Delete your custom template?",
+    confirmLabel: "Yes",
+    cancelLabel: "No",
+  });
+  if (!ok) return;
+  deleteCustomTemplate(id);
+  if (state.template === id) {
+    state.template = undefined;
+    renderPanel();
+  }
+}
+
 function loadTemplate(next: AppState) {
   closeFontMenu();
   remember();
@@ -6007,7 +6198,7 @@ window.addEventListener("keydown", (event) => {
     }
   }
   if (typingInField(event.target)) return;
-  if (isSettingsOpen() || isAboutOpen()) return;
+  if (isSettingsOpen() || isAboutOpen() || isUnsplashOpen()) return;
   if (event.code === "Space") {
     event.preventDefault();
     if (event.repeat) return;
@@ -6349,7 +6540,11 @@ function frame(now: number) {
         world.sync();
       }
     } else if (phase === "dumping" && world.chipCount() === 0) {
-      if (!repeat) finishRun();
+      if (clearingDump) {
+        clearingDump = false;
+        world.setFloorOpen(false);
+        finishRun();
+      } else if (!repeat) finishRun();
       else void drop();
     }
   }

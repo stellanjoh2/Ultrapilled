@@ -23,15 +23,11 @@ export function inkOn(fill: string): string {
   return lum > 0.55 ? "#111111" : "#ffffff";
 }
 
-/** Always available beside the theme, so text can stay readable on any shape. */
+/** Auto-contrast ink when no text colour is chosen. Not theme swatches — pick via the colour picker. */
 export const TEXT_BLACK = "#000000";
 export const TEXT_WHITE = "#ffffff";
 
-export function textSwatches(theme: ColorTheme): string[] {
-  return [...theme, TEXT_BLACK, TEXT_WHITE];
-}
-
-/** Chosen text colour, or the colour the word already used before a pick. */
+/** Chosen text colour, or readable auto ink on filled shapes. */
 export function resolveTextColor(
   theme: ColorTheme,
   shapeFill: string,
@@ -40,21 +36,23 @@ export function resolveTextColor(
   textColor: string | undefined,
 ): string {
   if (textColor) return textColor;
-  const swatches = textSwatches(theme);
-  if (textColorIndex != null && swatches[textColorIndex]) return swatches[textColorIndex];
+  if (textColorIndex != null && theme[textColorIndex]) return theme[textColorIndex];
   if (!solid) return shapeFill;
   return inkOn(shapeFill) === "#ffffff" ? TEXT_WHITE : TEXT_BLACK;
 }
 
+/**
+ * Theme chip to highlight in the text-colour row.
+ * Returns -1 when auto-contrast ink is used (not a theme colour).
+ */
 export function resolveTextSwatchIndex(
-  theme: ColorTheme,
-  shapeFill: string,
+  _theme: ColorTheme,
+  _shapeFill: string,
   solid: boolean,
   shapeIndex: number,
   textColorIndex: number | undefined,
 ): number {
   if (textColorIndex != null) return textColorIndex;
   if (!solid) return shapeIndex;
-  const swatches = textSwatches(theme);
-  return inkOn(shapeFill) === "#ffffff" ? swatches.length - 1 : swatches.length - 2;
+  return -1;
 }

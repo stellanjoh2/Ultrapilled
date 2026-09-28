@@ -181,7 +181,7 @@ export function acidState(): AppState {
       gradientScale: 48,
       gradientAngle: 153,
       gradientSpeed: 14,
-      textColorIndex: 5,
+      textColor: "#000000",
     }),
     text({ text: "NUTTER", colorIndex: 4, textColorIndex: 0, stroked: true, stroke: 4, scale: 1.17 }),
     presetIcon("Stars", 3, 1, { gradient: false, gradientColorIndex: 0, gradientAngle: 253 }),
@@ -193,7 +193,7 @@ export function acidState(): AppState {
       fontWeight: 400,
       shape: "pill",
       colorIndex: 0,
-      textColorIndex: 5,
+      textColor: "#000000",
       scale: 0.38,
       pillPad: 28,
       tracking: -100,
@@ -220,7 +220,7 @@ export function acidState(): AppState {
       stroke: 2,
       pillPad: 24,
       colorIndex: 2,
-      textColorIndex: 6,
+      textColor: "#ffffff",
       gradient: true,
       gradientColorIndex: 3,
       animatedGradient: true,
@@ -347,7 +347,6 @@ export function miamiState(): AppState {
   const SUN = 2;
   const VIOLET = 3;
   const ORANGE = 4;
-  const WHITE = 6;
   const bare = "none" as const;
   const chrome = { gradient: true, gradientColorIndex: VIOLET, gradientAngle: 180, animatedGradient: true, gradientSpeed: 30 };
   const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
@@ -355,7 +354,7 @@ export function miamiState(): AppState {
     text({ text: "Miami", fontFamily: "Syne", fontWeight: 800, shape: bare, colorIndex: PINK, scale: 2.8, tracking: -100 }),
     emoji("🌴", "Palm", 3, 0.8),
     text({ text: "305", fontFamily: "Bebas Neue", fontWeight: 400, shape: bare, colorIndex: CYAN, scale: 3.6, tracking: -100 }),
-    text({ text: "Paradise", fontFamily: "Outfit", fontWeight: 800, textHeight: 54, shape: "pill", colorIndex: PINK, ...chrome, textColorIndex: WHITE, scale: 1.6, tracking: -100 }),
+    text({ text: "Paradise", fontFamily: "Outfit", fontWeight: 800, textHeight: 54, shape: "pill", colorIndex: PINK, ...chrome, textColor: "#ffffff", scale: 1.6, tracking: -100 }),
     presetIcon("Spheres", 1, SUN, { scale: 1.2, gradient: true, gradientColorIndex: ORANGE, gradientAngle: 180 }),
     photo("miami", "coast-guard.jpg", "Coast Guard", 115, 0, 1.1),
     text({ text: "Nights", fontFamily: "Fraunces", fontWeight: 800, shape: bare, colorIndex: CYAN, scale: 2.2, tracking: -73 }),
@@ -369,13 +368,13 @@ export function miamiState(): AppState {
     text({ text: "Ocean Drive", fontFamily: "Outfit", fontWeight: 200, shape: bare, colorIndex: CYAN, scale: 1.4, tracking: 100 }),
     text({ text: "Every Friday", fontFamily: "Space Grotesk", fontWeight: 700, shape: "pill", stroked: true, stroke: 2, colorIndex: CYAN, scale: 0.4 }),
     emoji("🦩", "Flamingo", 1, 0.8),
-    text({ text: "8PM–2AM", fontFamily: "Space Grotesk", fontWeight: 700, shape: "pill", colorIndex: PINK, textColorIndex: WHITE, scale: 0.9 }),
+    text({ text: "8PM–2AM", fontFamily: "Space Grotesk", fontWeight: 700, shape: "pill", colorIndex: PINK, textColor: "#ffffff", scale: 0.9 }),
     text({ text: "C90", fontFamily: "Outfit", fontWeight: 200, shape: bare, colorIndex: PINK, scale: 1.6 }),
     text({ text: "Hotel", fontFamily: "Fraunces", fontWeight: 800, shape: "box", radius: 0, colorIndex: CYAN, scale: 1.1, tracking: -63 }),
     presetIcon("Arches", 1, VIOLET, { scale: 0.8 }),
     text({ text: "Side A", fontFamily: "Space Mono", fontWeight: 700, shape: "box", radius: 0, stroked: true, stroke: 2, colorIndex: PINK, scale: 0.4 }),
     photo("miami", "metrorail.jpg", "Metrorail", 110, 14),
-    text({ text: "Open Late", fontFamily: "Bricolage Grotesque", fontWeight: 800, shape: "pill", colorIndex: ORANGE, textColorIndex: WHITE, scale: 0.9, textAnim: true }),
+    text({ text: "Open Late", fontFamily: "Bricolage Grotesque", fontWeight: 800, shape: "pill", colorIndex: ORANGE, textColor: "#ffffff", scale: 0.9, textAnim: true }),
     text({ text: "Tropical", fontFamily: "Fraunces", fontWeight: 700, shape: bare, colorIndex: ORANGE, scale: 1.4 }),
     text({ text: "Wish You Were Here", fontFamily: "Outfit", fontWeight: 600, shape: "pill", stroked: true, stroke: 2, colorIndex: SUN, scale: 0.35, tracking: -76 }),
   ].filter((slot): slot is Slot => slot != null);
@@ -409,8 +408,6 @@ export function berlinState(): AppState {
   const WHITE = 2;
   const GREEN = 3;
   const BLUE = 4;
-  const TEXT_BLACK = 5;
-  const TEXT_WHITE = 6;
   const bare = "none" as const;
   const box = { shape: "box" as const, radius: 0 };
   const condensed = { fontFamily: "Anton", fontWeight: 400, tracking: -70 };
@@ -426,16 +423,16 @@ export function berlinState(): AppState {
     text({ text: "Nacht", ...heavy, shape: bare, colorIndex: WHITE, scale: 2.4, tracking: -100 }),
     photo("berlin", "balloon.jpg", "Hi-Flyer", 110, 28),
     presetIcon("Xs", 2, PINK, { scale: 0.5 }),
-    text({ text: "Kunst", ...heavy, shape: "box", radius: 10, colorIndex: PINK, textColorIndex: TEXT_BLACK, scale: 1.6, tracking: -80 }),
+    text({ text: "Kunst", ...heavy, shape: "box", radius: 10, colorIndex: PINK, textColor: "#000000", scale: 1.6, tracking: -80 }),
     photo("berlin", "moma-queue.jpg", "MoMA Queue", 110, 0),
     text({ text: "24H", ...condensed, shape: bare, colorIndex: GREEN, scale: 3.6 }),
-    text({ text: "Undisclosed Location", ...heavy, ...box, colorIndex: ACID, textColorIndex: TEXT_BLACK, scale: 0.9, tracking: -40 }),
+    text({ text: "Undisclosed Location", ...heavy, ...box, colorIndex: ACID, textColor: "#000000", scale: 0.9, tracking: -40 }),
     text({ text: "Eintritt Frei", ...mono(700), shape: "box", radius: 8, stroked: true, stroke: 2, colorIndex: WHITE, scale: 0.35 }),
     presetIcon("Rings", 1, WHITE, { scale: 0.9 }),
-    text({ text: "Döner", ...heavy, shape: "box", radius: 14, colorIndex: ACID, textColorIndex: TEXT_BLACK, scale: 1.2, tracking: -80 }),
+    text({ text: "Döner", ...heavy, shape: "box", radius: 14, colorIndex: ACID, textColor: "#000000", scale: 1.2, tracking: -80 }),
     text({ text: "No Photos", ...heavy, shape: "box", radius: 22, colorIndex: WHITE, textColorIndex: PINK, scale: 1, tracking: -60 }),
     photo("berlin", "towers.jpg", "Potsdamer Platz", 110, 12),
-    text({ text: "Room 2", ...mono(700), shape: "pill", colorIndex: PINK, textColorIndex: TEXT_WHITE, scale: 0.8, textAnim: true }),
+    text({ text: "Room 2", ...mono(700), shape: "pill", colorIndex: PINK, textColor: "#ffffff", scale: 0.8, textAnim: true }),
     text({ text: "12AM–10AM", ...heavy, shape: bare, colorIndex: PINK, scale: 1.4, tracking: -80 }),
     text({
       text: "Afterhour",
@@ -447,14 +444,14 @@ export function berlinState(): AppState {
       gradientAngle: 90,
       animatedGradient: true,
       gradientSpeed: 45,
-      textColorIndex: TEXT_BLACK,
+      textColor: "#000000",
       scale: 1.5,
       tracking: -60,
     }),
     presetIcon("Chevrons", 1, ACID, { scale: 0.7 }),
     emoji("🖤", "Black Heart", 2, 0.6),
     text({ text: "Türsteher", ...swiss(700), shape: bare, colorIndex: WHITE, scale: 1.6, tracking: -100 }),
-    text({ text: "B2B", ...mono(700), shape: "box", radius: 6, colorIndex: BLUE, textColorIndex: TEXT_WHITE, scale: 0.9 }),
+    text({ text: "B2B", ...mono(700), shape: "box", radius: 6, colorIndex: BLUE, textColor: "#ffffff", scale: 0.9 }),
     text({ text: "Line Up TBA", ...mono(400), shape: "pill", stroked: true, stroke: 2, colorIndex: GREEN, scale: 0.4 }),
     text({ text: "Ost", ...heavy, shape: bare, colorIndex: BLUE, scale: 2.6, tracking: -100 }),
     presetIcon("Boxes", 1, GREEN, { scale: 0.8 }),

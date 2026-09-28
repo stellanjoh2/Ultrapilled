@@ -107,6 +107,8 @@ function parsePose(value: unknown): ChipPose | null {
     seqIndex: Math.max(0, Math.round(seqIndex)),
     sizeUnit,
     scaleMul: Number.isFinite(Number(record.scaleMul)) ? Math.max(0.1, Math.min(100, Number(record.scaleMul))) : undefined,
+    flipX: record.flipX === true ? true : undefined,
+    flipY: record.flipY === true ? true : undefined,
     x,
     y,
     angle,

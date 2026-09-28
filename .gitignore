@@ -25,3 +25,8 @@ dist-ssr
 
 # PartyKit local runtime (unused)
 .partykit
+
+# Env / secrets
+.env
+.env.*
+!.env.example
