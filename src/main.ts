@@ -2758,7 +2758,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
                   : key === "tracking"
                     ? "Tracking"
                     : key === "radius"
-                      ? "Radius"
+                      ? "Corner radius"
                       : key === "dropShadowRadius"
                         ? "Shadow radius"
                         : key === "dropShadowDistance"

@@ -344,7 +344,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
             <option value="box" ${slot.shape === "box" ? "selected" : ""}>Box</option>
           </select>
         </label>
-        <label class="field${slot.shape !== "box" ? " is-muted" : ""}">${H.settingLabel(slot, "Radius", "radius")}
+        <label class="field${slot.shape !== "box" ? " is-muted" : ""}">${H.settingLabel(slot, "Corner radius", "radius")}
           <input type="range" data-key="radius" min="0" max="40" value="${slot.radius}" ${slot.shape !== "box" ? "disabled" : ""} />
         </label>
       </div>
@@ -690,7 +690,6 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
         : ""
     }
     ${H.blendField(slot)}
-    ${H.dropShadowField(slot)}
     ${photoReplaceControl(slot)}
     <label class="field">${H.settingLabel(slot, "Collision", "collider")}
       <select data-key="collider">
@@ -716,10 +715,11 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     </div>`
         : ""
     }
-    <label class="field">${H.settingLabel(slot, "Radius", "radius", String(Math.round(slot.radius ?? 0)))}
+    ${H.dropShadowField(slot)}
+    <label class="field">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
     </label>`
-        : ""
+        : `${H.dropShadowField(slot)}`
     }
     <label class="field">${H.settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
