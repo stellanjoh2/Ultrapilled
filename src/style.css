@@ -372,7 +372,8 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 }
 
 .chip-layer,
-.bloom-layer {
+.bloom-layer,
+.chip-chrome-layer {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -439,6 +440,11 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   display: none;
   opacity: var(--bloom-opacity);
   mix-blend-mode: plus-lighter;
+}
+
+/* Selection chrome only — keeps assets at true layer order. */
+.chip-chrome-layer {
+  z-index: 3;
 }
 
 .bloom-blur {
@@ -663,12 +669,26 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   cursor: grabbing;
 }
 
-.chip-layer .chip.is-picked,
-.chip-layer .chip.is-grad-angling {
+.chip.is-picked,
+.chip.is-grad-angling,
+.chip-chrome.is-picked {
   --xform-pad: 12px;
   outline: none;
-  /* Keep selection chrome (xform handle + gradient wheel) above sibling chips. */
-  z-index: 3;
+}
+
+/* Empty transform host mirroring a chip — chrome children only, no asset paint. */
+.chip-chrome {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  cursor: default;
+  will-change: auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: transparent;
+  font-size: 0;
 }
 
 /* Bounding-box selection — Loop-style spinning gradient stroke.
@@ -703,7 +723,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   mask-composite: exclude;
 }
 
-.chip.is-picked > .chip-xform-frame {
+.chip-chrome.is-picked > .chip-xform-frame {
   opacity: 1;
   visibility: visible;
   transition:
@@ -731,7 +751,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .chip.is-picked > .chip-xform-frame::before {
+  .chip-chrome.is-picked > .chip-xform-frame::before {
     animation: smash-stroke-spin 1s linear infinite;
   }
 }
@@ -859,7 +879,7 @@ html[data-theme="day"] .chip-xform-handle {
 
 @media (prefers-reduced-motion: reduce) {
   .chip-xform-frame,
-  .chip.is-picked > .chip-xform-frame,
+  .chip-chrome.is-picked > .chip-xform-frame,
   .chip-xform-handle,
   .chip.is-picked > .chip-xform-handle {
     transition: none;
@@ -4095,9 +4115,14 @@ input.slot-live:focus {
   overflow: hidden;
   box-shadow: var(--shadow-2);
   color: var(--ink);
+  /* Tip must never steal canvas picks — only Stop is interactive. */
   pointer-events: none;
   opacity: 0;
   transform: translateX(calc(-100% - max(var(--panel-inset), env(safe-area-inset-left, 0px))));
+}
+
+.pro-tip * {
+  pointer-events: none;
 }
 
 .pro-tip::before {
@@ -4256,6 +4281,10 @@ input.slot-live:focus {
   line-height: 1.4;
   text-align: left;
   cursor: pointer;
+}
+
+/* Beat `.pro-tip *` so only this control stays clickable. */
+.pro-tip .pro-tip__stop {
   pointer-events: auto;
 }
 

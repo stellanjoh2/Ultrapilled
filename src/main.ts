@@ -141,6 +141,7 @@ app.innerHTML = `
               </div>
             </div>
           </div>
+          <div class="chip-chrome-layer" aria-hidden="true"></div>
         </div>
         <div class="post-grain" aria-hidden="true"><div class="post-grain-tex"></div></div>
         <div class="post-vignette" aria-hidden="true"></div>
