@@ -1,11 +1,13 @@
 import type { CanvasRatio } from "./canvas";
 import type { BackgroundSettings, GradientStop, GridDensity } from "./types";
 
-/** Perfect square divisions for the canvas ratio. Fine is half the base cell. */
+/** Perfect square divisions for the canvas ratio. Each finer step halves the cell. */
 export function gridDivisions(ratio: CanvasRatio, density: GridDensity): { cols: number; rows: number } {
-  const fine = density === "fine";
-  if (ratio === "9:16") return fine ? { cols: 18, rows: 32 } : { cols: 9, rows: 16 };
-  return fine ? { cols: 32, rows: 18 } : { cols: 16, rows: 9 };
+  const scale = density === "finest" ? 4 : density === "fine" ? 2 : 1;
+  if (ratio === "9:16") return { cols: 9 * scale, rows: 16 * scale };
+  if (ratio === "3:4") return { cols: 9 * scale, rows: 12 * scale };
+  if (ratio === "1:1") return { cols: 9 * scale, rows: 9 * scale };
+  return { cols: 16 * scale, rows: 9 * scale };
 }
 
 const LOGO_BOX = 0.5;
@@ -208,9 +210,9 @@ function cssUrl(src: string): string {
   return `url("${src.replace(/["\\\n\r()]/g, "")}")`;
 }
 
-/** 9:16 meets the top and bottom and crops the sides. 16:9 covers the frame. */
+/** Portrait frames meet the top and bottom and crop the sides. Landscape and square cover the frame. */
 export function imageFrame(ratio: CanvasRatio): { size: string; position: string } {
-  if (ratio === "9:16") return { size: "auto 100%", position: "center center" };
+  if (ratio === "9:16" || ratio === "3:4") return { size: "auto 100%", position: "center center" };
   return { size: "cover", position: "center center" };
 }
 
@@ -278,7 +280,7 @@ export function paintBackdrop(
     return;
   }
   if (background.kind !== "image" || !image || image.width < 1 || image.height < 1) return;
-  const cover = ratio !== "9:16";
+  const cover = ratio !== "9:16" && ratio !== "3:4";
   const scale = cover
     ? Math.max(width / image.width, height / image.height)
     : height / image.height;

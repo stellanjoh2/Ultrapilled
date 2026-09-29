@@ -1,7 +1,7 @@
-import { canvasFrame, type CanvasFrame, type CanvasRatio } from "./canvas";
+import { canvasFrame, isCanvasRatio, parseCanvasRatio, type CanvasFrame, type CanvasRatio } from "./canvas";
 import { FEATURED_EMOJI, searchEmoji, type EmojiItem } from "./emojis";
-import { ICON_PRESETS } from "./icons";
-import { isPresetId, matchCollider, presetIdForSrc } from "./iconMesh";
+import { ICON_PRESETS, IMAGE_COLLIDERS, imageColliderId } from "./icons";
+import { matchCollider, presetIdForSrc, simpleColliderKind } from "./iconMesh";
 import {
   bundledWeights,
   BLEND_MODES,
@@ -861,7 +861,7 @@ function applyGrid() {
   const on = background.grid;
   layer.hidden = !on;
   if (!on) return;
-  const { cols, rows } = gridDivisions(canvas, background.gridDensity === "fine" ? "fine" : "base");
+  const { cols, rows } = gridDivisions(canvas, background.gridDensity);
   layer.style.setProperty("--grid-color", background.gridColor || "#ffffff");
   layer.style.setProperty("--grid-opacity", `${(background.gridOpacity ?? 0) / 100}`);
   layer.style.setProperty("--grid-cols", String(cols));
@@ -1176,7 +1176,6 @@ function recountShapes() {
 /** Soft limits keep live play near 60 fps; export still uses the same amounts. */
 const AMOUNT_SOFT_CAP = 8;
 const SHAPE_TOTAL_SOFT_CAP = 36;
-const SCALE_PERF_WARN = 5;
 const SHAPE_PERF_WARN = 20;
 /** Slider ceiling for text/shape/SVG scale. Templates top out ~5; canvas drag can go higher. */
 const SCALE_SLIDER_MAX = 6;
@@ -1256,8 +1255,6 @@ function paintImageAmounts() {
 }
 
 function paintPerfHints() {
-  const scaleHint = panel.querySelector<HTMLElement>("#scale-perf-hint");
-  if (scaleHint) scaleHint.hidden = state.masterScale < SCALE_PERF_WARN;
   const amountHint = panel.querySelector<HTMLElement>("#amount-perf-hint");
   if (amountHint) amountHint.hidden = state.shapeAmount < SHAPE_PERF_WARN;
 }
@@ -1306,9 +1303,14 @@ function renderPanel() {
   panel.innerHTML = `
     <section class="section">
       <h2 data-tip="Widescreen or vertical frame">Canvas</h2>
-      <div class="segment" role="group" aria-label="Canvas">
-        <button type="button" class="pill${state.canvas === "16:9" ? " is-on" : ""}" data-canvas="16:9" aria-pressed="${state.canvas === "16:9"}" data-tip="Landscape frame">16:9</button>
-        <button type="button" class="pill${state.canvas === "9:16" ? " is-on" : ""}" data-canvas="9:16" aria-pressed="${state.canvas === "9:16"}" data-tip="Portrait frame">9:16</button>
+      <div class="canvas-controls">
+        <div class="segment is-4" role="group" aria-label="Canvas">
+          <button type="button" class="pill${state.canvas === "16:9" ? " is-on" : ""}" data-canvas="16:9" aria-pressed="${state.canvas === "16:9"}" data-tip="Landscape frame">16:9</button>
+          <button type="button" class="pill${state.canvas === "1:1" ? " is-on" : ""}" data-canvas="1:1" aria-pressed="${state.canvas === "1:1"}" data-tip="Square frame">1:1</button>
+          <button type="button" class="pill${state.canvas === "3:4" ? " is-on" : ""}" data-canvas="3:4" aria-pressed="${state.canvas === "3:4"}" data-tip="Photo portrait frame">3:4</button>
+          <button type="button" class="pill${state.canvas === "9:16" ? " is-on" : ""}" data-canvas="9:16" aria-pressed="${state.canvas === "9:16"}" data-tip="Tall portrait frame">9:16</button>
+        </div>
+        <button type="button" class="canvas-stage" id="canvas-stage" style="background:${state.stageColor}" aria-label="Stage color" data-tip="Canvas background color"></button>
       </div>
     </section>
     <section class="section">
@@ -1331,7 +1333,6 @@ function renderPanel() {
       `<label class="field" data-tip="Overall size of every piece"><span data-range-label="masterScale">Scale ${(state.masterScale * 10).toFixed(0)}</span>
         <input type="range" id="masterScale" min="4" max="100" step="1" value="${state.masterScale * 10}" />
       </label>
-      <p class="hint" id="scale-perf-hint"${state.masterScale >= SCALE_PERF_WARN ? "" : " hidden"}>High scale can drop below 60 fps with many shapes.</p>
       <label class="field" data-tip="How much piece sizes vary"><span data-range-label="sizeRandom">Size random ${state.sizeRandom}</span>
         <input type="range" id="sizeRandom" min="0" max="100" step="1" value="${state.sizeRandom}" />
       </label>
@@ -1415,15 +1416,15 @@ function renderPanel() {
       "Physics",
       "How pieces fall, bounce, and settle — or place them freely",
       `<div class="segment" role="group" aria-label="Placement mode">
-        <button type="button" class="pill${!state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!state.physics.layoutMode}" data-tip="Pieces fall, bounce, and stack">Physics</button>
-        <button type="button" class="pill${state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${state.physics.layoutMode}" data-tip="Place freely like a design tool — pieces can overlap">Layout</button>
+        <button type="button" class="pill${!state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!state.physics.layoutMode}" data-tip="Pieces fall, bounce, and stack">Activated</button>
+        <button type="button" class="pill${state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${state.physics.layoutMode}" data-tip="Place freely like Figma — no physics, no throws, pieces can overlap">Layout Mode</button>
       </div>
+      <div class="physics-dynamics"${state.physics.layoutMode ? " inert" : ""}>
       <label class="field" data-tip="Simple = boxes, Normal = circle/box, Ultra = traced icon shapes. Higher is heavier on the CPU.">Physics complexity
-        <select id="physics-complexity">
+        <select id="physics-complexity"${state.physics.layoutMode ? " disabled" : ""}>
           ${PHYSICS_COMPLEXITY.map((tier) => `<option value="${tier.id}"${state.physics.complexity === tier.id ? " selected" : ""}>${tier.label}</option>`).join("")}
         </select>
       </label>
-      <div class="physics-dynamics"${state.physics.layoutMode ? " inert" : ""}>
       <div class="row">
         <label class="field" data-tip="How hard pieces pull downward"><span data-range-label="gravity">Gravity ${state.physics.gravity.toFixed(2)}</span>
           <input type="range" id="gravity" min="0" max="3" step="0.05" value="${state.physics.gravity}"${state.physics.layoutMode ? " disabled" : ""} />
@@ -1546,8 +1547,12 @@ function renderPanel() {
   panel.querySelectorAll<HTMLButtonElement>("[data-canvas]").forEach((button) => {
     button.addEventListener("click", () => {
       const next = button.dataset.canvas;
-      if (next === "16:9" || next === "9:16") selectCanvas(next);
+      if (isCanvasRatio(next)) selectCanvas(next);
     });
+  });
+
+  panel.querySelector<HTMLButtonElement>("#canvas-stage")?.addEventListener("click", (event) => {
+    openCanvasStagePicker(event.currentTarget as HTMLButtonElement);
   });
 
   panel.querySelector("#template-blank")?.addEventListener("click", () => {
@@ -2047,8 +2052,10 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
     }
     const title = document.createElement("span");
     title.className = "slot-title";
-    title.textContent = slot.emoji || slot.src ? slot.name : "Empty";
-    if (!slot.emoji && !slot.src) title.classList.add("is-empty");
+    const named = Boolean(slot.emoji || slot.src);
+    title.textContent = named ? slot.name : "Empty";
+    if (!named) title.classList.add("is-empty");
+    else title.dataset.tip = slot.name;
     toggle.append(mark, title);
   }
 
@@ -2189,6 +2196,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       </label>`
           : ""
       }
+      ${blendField(slot)}
     </div>
     <div class="slot-group">
       <p class="slot-label">Animation</p>
@@ -2309,6 +2317,7 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
     }`
         : ""
     }
+    ${blendField(slot)}
     <p class="slot-label">Shapes</p>
     <div class="icon-grid" data-presets></div>
     <label class="field">${settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
@@ -2355,6 +2364,7 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
   editor.className = "slot-editor";
   editor.innerHTML = `
     <div class="pick-now">${pickPreview(slot)}${resetControl("Emoji", "icon", fieldDirty(slot, "icon"))}</div>
+    ${blendField(slot)}
     <p class="slot-label">Emoji</p>
     <div class="emoji-grid" data-emoji-featured></div>
     <label class="field">Search emoji
@@ -2431,7 +2441,6 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
   const svgUpload = isSvgSource(slot);
   const canTint = iconCanGradient(slot);
   editor.innerHTML = `
-    <div class="pick-now">${pickPreview(slot)}${resetControl("Image", "icon", fieldDirty(slot, "icon"))}</div>
     ${
       svgUpload
         ? `<div class="check-row">
@@ -2484,12 +2493,11 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     }`
         : ""
     }
-    <label class="field">Replace image
-      <input type="file" accept="${IMAGE_FILE_ACCEPT}" data-file />
-    </label>
+    ${blendField(slot)}
+    ${photoReplaceControl(slot)}
     <label class="field">${settingLabel(slot, "Collision", "collider")}
       <select data-key="collider">
-        ${ICON_PRESETS.map((icon) => `<option value="${icon.id}"${colliderOf(slot) === icon.id ? " selected" : ""}>${icon.label}</option>`).join("")}
+        ${IMAGE_COLLIDERS.map((icon) => `<option value="${icon.id}"${colliderOf(slot) === icon.id ? " selected" : ""}>${icon.label}</option>`).join("")}
       </select>
     </label>
     ${
@@ -2621,7 +2629,10 @@ function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
     })
     .then((id: string | null) => {
       if (slot.src !== url) return;
-      if (id) slot.collider = id;
+      // Uploads only offer box/sphere; map round silhouette matches to sphere.
+      if (id === "sphere" || (id && simpleColliderKind(id) === "circle")) {
+        slot.collider = "sphere";
+      }
     })
     .catch(() => {
       /* keep block collider */
@@ -2818,7 +2829,7 @@ function isRasterUpload(slot: ImageSlot): boolean {
 }
 
 function colliderOf(slot: ImageSlot): string {
-  return slot.collider && isPresetId(slot.collider) ? slot.collider : "block";
+  return imageColliderId(slot.collider);
 }
 
 function iconCanGradient(slot: ImageSlot): boolean {
@@ -2866,18 +2877,31 @@ function shapeSwatch(src: string, color: string): HTMLElement {
 }
 
 function pickPreview(slot: ImageSlot): string {
+  const label = (body: string) =>
+    `<span class="pick-now__label" data-tip="${escapeAttr(slot.name)}">${body}</span>`;
   if (slot.emoji) {
-    return `<span class="pick-glyph">${slot.emoji}</span><span>Selected <b>${escapeAttr(slot.name)}</b></span>`;
+    return `<span class="pick-glyph">${slot.emoji}</span>${label(`Selected <b>${escapeAttr(slot.name)}</b>`)}`;
   }
   if (slot.src && isColorMask(slot)) {
     const color = iconPreviewFill(slot);
     const src = iconSrc(slot);
-    return `<span class="pick-glyph shape-swatch" style="background:${color};-webkit-mask-image:url(&quot;${src}&quot;);mask-image:url(&quot;${src}&quot;)"></span><span>Selected <b>${escapeAttr(slot.name)}</b></span>`;
+    return `<span class="pick-glyph shape-swatch" style="background:${color};-webkit-mask-image:url(&quot;${src}&quot;);mask-image:url(&quot;${src}&quot;)"></span>${label(`Selected <b>${escapeAttr(slot.name)}</b>`)}`;
   }
   if (slot.src) {
-    return `<img class="pick-glyph" src="${iconSrc(slot)}" alt="" /><span>Selected <b>${escapeAttr(slot.name)}</b></span>`;
+    return `<img class="pick-glyph" src="${iconSrc(slot)}" alt="" />${label(`Selected <b>${escapeAttr(slot.name)}</b>`)}`;
   }
   return `<span class="pick-empty">Nothing selected</span>`;
+}
+
+function photoReplaceControl(slot: ImageSlot): string {
+  const src = iconSrc(slot);
+  return `<label class="field file-replace">
+    <span class="field-label"><span>Replace image</span>${resetControl("Image", "icon", fieldDirty(slot, "icon"))}</span>
+    <span class="file-replace__btn" style="background-image:url(&quot;${escapeAttr(src)}&quot;)" data-tip="${escapeAttr(slot.name)}">
+      <span class="file-replace__text">Replace</span>
+    </span>
+    <input type="file" class="file-replace__input" accept="${IMAGE_FILE_ACCEPT}" data-file />
+  </label>`;
 }
 
 function tintRow(slot: Slot, legend = "Color"): string {
@@ -2960,6 +2984,30 @@ function bindTint(root: HTMLElement, slot: Slot) {
       liveChip(slot.id);
     });
   });
+}
+
+function openCanvasStagePicker(btn: HTMLButtonElement) {
+  if (tintPicker?.anchor === btn) {
+    tintPicker.close();
+    return;
+  }
+  tintPicker?.close();
+  const picker = mountColorPicker({
+    anchor: btn,
+    value: state.stageColor,
+    onChange(hex) {
+      remember("canvas-stage");
+      state.stageColor = hex;
+      state.background.kind = "solid";
+      btn.style.background = hex;
+      applyBackground();
+    },
+    onClose() {
+      if (gesture === "canvas-stage") endGesture();
+      if (tintPicker?.anchor === btn) tintPicker = null;
+    },
+  });
+  tintPicker = { anchor: btn, close: picker.close };
 }
 
 function openThemeSwatch(btn: HTMLButtonElement) {
@@ -3102,6 +3150,7 @@ type TextBaseline = Pick<
   | "textAnimSpeed"
   | "textColorIndex"
   | "textColor"
+  | "blend"
   | "scale"
 >;
 
@@ -3126,6 +3175,7 @@ type ImageBaseline = Pick<
   | "stroke"
   | "tint"
   | "collider"
+  | "blend"
 >;
 
 const textBaselines = new Map<string, TextBaseline>();
@@ -3166,6 +3216,7 @@ function captureBaseline(slot: Slot) {
       textAnimSpeed: slot.textAnimSpeed,
       textColorIndex: slot.textColorIndex,
       textColor: slot.textColor,
+      blend: slot.blend,
       scale: slot.scale,
     });
     return;
@@ -3191,6 +3242,7 @@ function captureBaseline(slot: Slot) {
     stroke: slot.stroke ?? 4,
     tint: slot.tint,
     collider: slot.collider,
+    blend: slot.blend,
   });
 }
 
@@ -3222,6 +3274,7 @@ function textBaseline(slot: TextSlot): TextBaseline {
     textAnimSpeed: seed.textAnimSpeed,
     textColorIndex: seed.textColorIndex,
     textColor: seed.textColor,
+    blend: seed.blend,
     scale: seed.scale,
   };
   textBaselines.set(slot.id, base);
@@ -3252,6 +3305,7 @@ function imageBaseline(slot: ImageSlot): ImageBaseline {
     stroke: seed.stroke ?? 4,
     tint: seed.tint,
     collider: seed.collider,
+    blend: seed.blend,
   };
   imageBaselines.set(slot.id, base);
   return base;
@@ -3312,6 +3366,8 @@ function fieldDirty(slot: Slot, key: string): boolean {
         return textAnimSpeedOf(slot.textAnimSpeed) !== textAnimSpeedOf(base.textAnimSpeed);
       case "textColor":
         return slot.textColorIndex !== base.textColorIndex || (slot.textColor ?? "") !== (base.textColor ?? "");
+      case "blend":
+        return blendMode(slot.blend) !== blendMode(base.blend);
       default:
         return false;
     }
@@ -3347,7 +3403,9 @@ function fieldDirty(slot: Slot, key: string): boolean {
     case "gradientSpeed":
       return gradientSpeedOf(slot.gradientSpeed) !== gradientSpeedOf(base.gradientSpeed);
     case "collider":
-      return colliderOf(slot) !== (base.collider && isPresetId(base.collider) ? base.collider : "block");
+      return colliderOf(slot) !== imageColliderId(base.collider);
+    case "blend":
+      return blendMode(slot.blend) !== blendMode(base.blend);
     default:
       return false;
   }
@@ -3366,6 +3424,17 @@ function settingLabel(slot: Slot, name: string, key: string, value?: string): st
   const shown = value == null ? name : `${name} ${value}`;
   const marker = value == null ? "" : ` data-range-label="${key}"`;
   return `<span class="field-label"><span${marker}>${shown}</span>${resetControl(name, key, fieldDirty(slot, key))}</span>`;
+}
+
+/** Layer blend — only useful when pieces can overlap (layout mode). */
+function blendField(slot: Slot): string {
+  if (!state.physics.layoutMode) return "";
+  const current = blendMode(slot.blend);
+  return `<label class="field" data-tip="How this layer mixes with layers behind it">${settingLabel(slot, "Blend mode", "blend")}
+    <select data-key="blend">
+      ${BLEND_MODES.map((mode) => `<option value="${mode.id}"${current === mode.id ? " selected" : ""}>${mode.label}</option>`).join("")}
+    </select>
+  </label>`;
 }
 
 function applyFieldReset(slot: Slot, key: string) {
@@ -3401,7 +3470,7 @@ function applyFieldReset(slot: Slot, key: string) {
     else if (key === "textColor") {
       slot.textColorIndex = base.textColorIndex;
       slot.textColor = base.textColor;
-    }
+    } else if (key === "blend") slot.blend = base.blend;
     if (key === "fontFamily" || key === "fontWeight") {
       reflectGlobalWeight();
       void settleFont(slot.fontFamily, slot.fontWeight).then(() => liveChip(slot.id));
@@ -3437,6 +3506,7 @@ function applyFieldReset(slot: Slot, key: string) {
     else if (key === "animatedGradient") slot.animatedGradient = base.animatedGradient;
     else if (key === "gradientSpeed") slot.gradientSpeed = base.gradientSpeed;
     else if (key === "collider") slot.collider = base.collider;
+    else if (key === "blend") slot.blend = base.blend;
   }
   if (slot.kind === "image" && key === "amount") live();
   else liveChip(slot.id);
@@ -3484,6 +3554,10 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       if (input instanceof HTMLInputElement && input.type === "checkbox") playSwitch(Boolean(value));
       else if (input instanceof HTMLSelectElement) playClick();
       (slot as Record<string, unknown>)[key] = value;
+      if (key === "blend") {
+        const mode = blendMode(String(value));
+        slot.blend = mode === "normal" ? undefined : mode;
+      }
       if (slot.kind === "image" && key === "amount") {
         slot.amount = Math.max(1, Math.min(AMOUNT_SOFT_CAP, Math.round(Number(value))));
         recountShapes();
@@ -4184,6 +4258,12 @@ function flipSlot(id: string, axis: "x" | "y") {
   playSwitch(true);
 }
 
+function alignSlotStraight(id: string) {
+  remember();
+  world.alignChipsStraight(id);
+  playSwitch(true);
+}
+
 function openMenuDotPicker(btn: HTMLButtonElement, value: string, onChange: (hex: string) => void) {
   if (tintPicker?.anchor === btn) return;
   tintPicker?.close();
@@ -4731,6 +4811,15 @@ function openSlotMenu(x: number, y: number, id: string) {
       });
     }
   }
+  if (state.physics.layoutMode) {
+    actions.push({
+      label: "Align straight",
+      stay: true,
+      run: () => {
+        holdScrollClose(() => alignSlotStraight(id));
+      },
+    });
+  }
   actions.push(
     {
       label: "Flip horizontal",
@@ -4749,6 +4838,7 @@ function openSlotMenu(x: number, y: number, id: string) {
     {
       label: "Invert",
       stay: true,
+      disabled: () => Boolean(slot?.kind === "image" && slot.emoji),
       run: () => {
         const enableTint =
           slot?.kind === "image" && uploadedShape(slot) && isSvgSource(slot) && !slot.tint;
@@ -5558,7 +5648,7 @@ function currentFrame() {
 }
 
 function layoutScale(frame: CanvasFrame): number {
-  return state.canvas === "9:16" ? frame.scale : 1;
+  return frame.scale;
 }
 
 function fitScale() {
@@ -5574,10 +5664,10 @@ function placeFrame(frame: ReturnType<typeof currentFrame>) {
   playfield.style.width = `${frame.width}px`;
   playfield.style.height = `${frame.height}px`;
   applyBackground();
-  const portrait = state.canvas === "9:16";
-  stage.classList.toggle("is-portrait", portrait);
-  stageVeil.hidden = !portrait;
-  if (!portrait) return;
+  const framed = state.canvas !== "16:9";
+  stage.classList.toggle("is-portrait", framed);
+  stageVeil.hidden = !framed;
+  if (!framed) return;
   const right = frame.x + frame.width;
   const bottom = frame.y + frame.height;
   const side = (name: string) => stageVeil.querySelector<HTMLElement>(`[data-side="${name}"]`);
@@ -5600,7 +5690,7 @@ function syncCanvas(refitChips: boolean) {
   if (key === frameKey) return false;
   const factor = shownScale > 0 ? scale / shownScale : 1;
   placeFrame(frame);
-  const moveChips = refitChips && world.chipCount() > 0 && (state.canvas === "9:16" || Math.abs(factor - 1) > 0.0001);
+  const moveChips = refitChips && world.chipCount() > 0 && (state.canvas !== "16:9" || Math.abs(factor - 1) > 0.0001);
   if (moveChips) world.refit(frame.width, frame.height, factor);
   else world.resize(frame.width, frame.height);
   shownScale = scale;
@@ -5978,7 +6068,7 @@ function adoptState(next: typeof state) {
   };
   state.stageColor = next.stageColor;
   state.background = normalizeBackground(next.background);
-  state.canvas = next.canvas === "9:16" ? "9:16" : "16:9";
+  state.canvas = parseCanvasRatio(next.canvas);
   state.masterScale = next.masterScale;
   state.sizeRandom = next.sizeRandom;
   state.pillPad = next.pillPad;
@@ -6519,7 +6609,18 @@ function frame(now: number) {
 
   if (running && playing) {
     holdSequenceClock(dt);
-    if (phase === "holding" && !state.physics.layoutMode) {
+    if (state.physics.layoutMode) {
+      // Rigid layout: never leave leftover throw / coast after a grab.
+      if (!world.isDragging()) {
+        if (phase !== "holding" && phase !== "preparing") {
+          phase = "holding";
+          holdStarted = now;
+        }
+        world.freezePile();
+        world.sync();
+        posePinned = true;
+      }
+    } else if (phase === "holding") {
       posePinned = false;
       phase = "falling";
       settledSince = 0;

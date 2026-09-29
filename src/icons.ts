@@ -101,3 +101,12 @@ export const ICON_PRESETS: IconPreset[] = [
     src: pathIcon(GALLERY_SHAPE_PATHS[id]),
   })),
 ];
+
+/** Hitbox choices for uploaded images — box + circle cover photos; gallery silhouettes stay on shapes. */
+export const IMAGE_COLLIDERS: IconPreset[] = PRIMITIVES.filter(
+  (icon) => icon.id === "block" || icon.id === "sphere",
+);
+
+export function imageColliderId(id: string | undefined): "block" | "sphere" {
+  return id === "sphere" ? "sphere" : "block";
+}

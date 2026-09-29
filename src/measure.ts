@@ -10,6 +10,8 @@ export type TextInk = ChipSize & {
   originX: number;
   /** Distance from box top to the alphabetic baseline. */
   baseline: number;
+  /** Layout advance width (contenteditable / CSS), may exceed ink width. */
+  advance: number;
 };
 
 const measureCtx = document.createElement("canvas").getContext("2d");
@@ -36,7 +38,7 @@ export function textShiftEm(slider: number): number {
 /** Tight letterform bounds for free-standing type (no holding shape). */
 export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
   const fallback = Math.max(8, Math.ceil(slot.fontSize));
-  if (!measureCtx) return { width: fallback, height: fallback, originX: 0, baseline: fallback * 0.8 };
+  if (!measureCtx) return { width: fallback, height: fallback, originX: 0, baseline: fallback * 0.8, advance: fallback };
 
   measureCtx.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
   measureCtx.letterSpacing = `${tracking}em`;
@@ -56,6 +58,7 @@ export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
     slot.fontSize * 0.2;
   const inkW = left + right;
   const advance = metrics.width || slot.fontSize;
+  // Prefer ink for tight physics nesting; fall back to advance when ink is missing.
   const width = Math.max(1, Math.ceil(inkW > 0 ? inkW : advance));
   const height = Math.max(1, Math.ceil(ascent + descent));
 
@@ -64,6 +67,24 @@ export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
     height,
     originX: left,
     baseline: ascent,
+    advance: Math.max(1, Math.ceil(advance)),
+  };
+}
+
+/**
+ * Contenteditable sizes to advance width, which can exceed the ink AABB.
+ * Use while typing so glyphs / caret aren't clipped by the chip box.
+ */
+export function measureTextEditSize(slot: TextSlot, pad = 1, tracking = 0.02): ChipSize {
+  const caret = Math.max(2, Math.ceil(slot.fontSize * 0.08));
+  if (slot.shape !== "none") {
+    const base = measureTextSlot(slot, pad, tracking);
+    return { width: base.width + caret, height: base.height };
+  }
+  const ink = measureTextInk(slot, tracking);
+  return {
+    width: Math.max(ink.width, ink.advance) + caret,
+    height: ink.height,
   };
 }
 

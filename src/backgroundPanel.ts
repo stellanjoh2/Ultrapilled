@@ -136,7 +136,7 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
                   <button type="button" class="pill" id="bg-clear">Remove image</button>`
                 : ""
             }
-            <p class="hint" id="bg-note">${canvas === "9:16" ? "On 9:16 the image meets the top and bottom. Wider photos crop at the sides." : "JPG or PNG. The image covers the frame. Switch to 9:16 and it meets the top and bottom."}</p>`
+            <p class="hint" id="bg-note">${canvas === "9:16" || canvas === "3:4" ? "On portrait canvases the image meets the top and bottom. Wider photos crop at the sides." : "JPG or PNG. The image covers the frame."}</p>`
           : ""
       }
     </section>
@@ -280,9 +280,11 @@ function readLogoFile(file: File): Promise<{ src: string; name: string; width: n
 function mountGrid(panel: HTMLElement, controller: BackgroundController) {
   const { background, canvas } = controller.state();
   const on = background.grid;
-  const density: GridDensity = background.gridDensity === "fine" ? "fine" : "base";
+  const density: GridDensity =
+    background.gridDensity === "finest" || background.gridDensity === "fine" ? background.gridDensity : "base";
   const base = gridDivisions(canvas, "base");
   const fine = gridDivisions(canvas, "fine");
+  const finest = gridDivisions(canvas, "finest");
   const opacity = background.gridOpacity ?? 20;
   const color = background.gridColor || "#ffffff";
   const section = document.createElement("section");
@@ -295,9 +297,10 @@ function mountGrid(panel: HTMLElement, controller: BackgroundController) {
     </div>
     ${
       on
-        ? `<div class="segment" role="group" aria-label="Grid density">
+        ? `<div class="segment is-3" role="group" aria-label="Grid density">
             <button type="button" class="pill${density === "base" ? " is-on" : ""}" data-grid-density="base" aria-pressed="${density === "base"}">${base.cols}×${base.rows}</button>
             <button type="button" class="pill${density === "fine" ? " is-on" : ""}" data-grid-density="fine" aria-pressed="${density === "fine"}">${fine.cols}×${fine.rows}</button>
+            <button type="button" class="pill${density === "finest" ? " is-on" : ""}" data-grid-density="finest" aria-pressed="${density === "finest"}">${finest.cols}×${finest.rows}</button>
           </div>
           <label class="field"><span id="grid-opacity-label">Opacity ${Math.round(opacity)}</span>
             <input type="range" id="grid-opacity" min="0" max="100" step="1" value="${opacity}" />
@@ -325,7 +328,7 @@ function mountGrid(panel: HTMLElement, controller: BackgroundController) {
   section.querySelectorAll<HTMLButtonElement>("[data-grid-density]").forEach((button) => {
     button.addEventListener("click", () => {
       const value = button.dataset.gridDensity;
-      if (value !== "base" && value !== "fine") return;
+      if (value !== "base" && value !== "fine" && value !== "finest") return;
       const next = backgroundOf(controller);
       if (next.gridDensity === value) return;
       controller.remember();

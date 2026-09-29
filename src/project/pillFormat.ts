@@ -1,4 +1,5 @@
 import { backgroundImage, putBackgroundImage } from "../background";
+import { parseCanvasRatio } from "../canvas";
 import {
   blendMode,
   DEFAULT_AUDIO_REACT,
@@ -168,7 +169,7 @@ function parseState(value: unknown): AppState | null {
     },
     stageColor: typeof record.stageColor === "string" ? record.stageColor : "#080808",
     background: normalizeBackground(record.background as AppState["background"]),
-    canvas: record.canvas === "9:16" ? "9:16" : "16:9",
+    canvas: parseCanvasRatio(record.canvas),
     masterScale: Number(record.masterScale) || 3.5,
     sizeRandom: Number(record.sizeRandom) || 0,
     pillPad: Number(record.pillPad) || 30,

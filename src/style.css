@@ -643,12 +643,10 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 .chip.is-held {
   cursor: grabbing;
-  z-index: 2;
 }
 
 .chip-layer .chip.is-picked {
   --xform-pad: 12px;
-  z-index: 2;
   outline: none;
 }
 
@@ -1024,7 +1022,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 }
 
 .chip-edit.is-text-gradient {
-  caret-color: #111;
+  /* Match glyph ink — gradient clip is disabled while editing. */
+  caret-color: currentColor;
 }
 
 .chip-label.is-text-gradient.is-gradient-animated,
@@ -1083,7 +1082,6 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 .chip-edit {
   display: block;
   min-width: 1ch;
-  max-width: 100%;
   margin: 0;
   padding: 0;
   border: 0;
@@ -1094,8 +1092,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   font: inherit;
   line-height: 1;
   white-space: nowrap;
-  /* Dark standard caret — readable on white / light pills. */
-  caret-color: #111;
+  /* Follows glyph ink so the caret stays visible on light and dark surfaces. */
+  caret-color: currentColor;
   user-select: text;
   cursor: text;
   pointer-events: auto;
@@ -1111,7 +1109,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   z-index: 3;
   outline: none !important;
   animation: none !important;
-  overflow: hidden;
+  /* Ink-tight physics boxes are narrower than contenteditable layout — don't clip glyphs. */
+  overflow: visible;
 }
 
 .chip-fill,
@@ -1509,7 +1508,7 @@ button.pill.smash-btn.is-on::after {
   background: none;
   color: var(--ink-mute);
   font: inherit;
-  font-size: calc(14px * var(--ui-scale));
+  font-size: calc(13px * var(--ui-scale));
   font-weight: 400;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -1563,6 +1562,41 @@ button.pill.smash-btn.is-on::after {
   grid-template-columns: 1fr 1fr;
 }
 
+.canvas-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.canvas-controls .segment {
+  flex: 1;
+  min-width: 0;
+}
+
+.canvas-stage {
+  flex-shrink: 0;
+  width: calc(40px * var(--ui-scale));
+  height: calc(40px * var(--ui-scale));
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .canvas-stage:hover {
+    transform: scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-stage:hover {
+    transform: none;
+  }
+}
+
 .physics-dynamics {
   display: flex;
   flex-direction: column;
@@ -1580,6 +1614,15 @@ button.pill.smash-btn.is-on::after {
 
 .segment.is-3 .pill {
   padding-inline: var(--space-0);
+}
+
+.segment.is-4 {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.segment.is-4 .pill {
+  padding-inline: calc(2px * var(--ui-scale));
+  letter-spacing: 0.02em;
 }
 
 .bg-swatch {
@@ -1696,6 +1739,8 @@ button.pill.smash-btn.is-on::after {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
   margin-bottom: var(--space-3);
 }
 
@@ -1861,6 +1906,8 @@ button.pill.smash-btn.is-on::after {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -2131,6 +2178,22 @@ select {
   font-feature-settings: "ss01";
 }
 
+/* Day: white control on gray slot card so closed + open lists stay readable. */
+html[data-theme="day"] select {
+  background: var(--canvas);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+html[data-theme="day"] select:focus {
+  background: var(--canvas);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+option {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
 input[type="number"] {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum", "ss01";
@@ -2398,10 +2461,112 @@ input[type="range"]:disabled {
 }
 
 input[type="file"] {
+  display: block;
   width: 100%;
-  color: var(--ink-secondary);
-  font-size: calc(14px * var(--ui-scale));
-  font-weight: 400;
+  max-width: 100%;
+  color: transparent;
+  font-size: 0;
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button {
+  margin: 0;
+  width: 100%;
+  min-height: calc(40px * var(--ui-scale));
+  padding: var(--space-0) var(--space-1);
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-feature-settings: "ss01";
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--field-hover);
+}
+
+html[data-theme="day"] input[type="file"]::file-selector-button {
+  background: var(--canvas);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+html[data-theme="day"] input[type="file"]::file-selector-button:hover {
+  background: var(--canvas);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+.file-replace {
+  position: relative;
+}
+
+.file-replace__btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(88px * var(--ui-scale));
+  overflow: hidden;
+  border-radius: calc(12px * var(--ui-scale));
+  background-color: var(--field);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.file-replace__btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, #000 28%, transparent);
+  pointer-events: none;
+}
+
+.file-replace__text {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-feature-settings: "ss01";
+  text-shadow:
+    0 1px 2px rgb(0 0 0 / 0.9),
+    0 0 14px rgb(0 0 0 / 0.65);
+  pointer-events: none;
+}
+
+.file-replace__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  white-space: nowrap;
+}
+
+.file-replace__input::file-selector-button {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .file-replace:hover .file-replace__btn::before {
+    background: color-mix(in srgb, #000 40%, transparent);
+  }
 }
 
 button {
@@ -2601,6 +2766,8 @@ button.slot-add {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .slot-stack:empty {
@@ -2615,9 +2782,13 @@ button.slot-add {
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .slot-card {
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-0) var(--space-1);
   margin-bottom: var(--space-1);
   border: none;
@@ -2625,10 +2796,11 @@ button.slot-add {
   background: var(--canvas-soft);
   box-shadow: none;
   touch-action: pan-y;
+  overflow: hidden;
 }
 
 .slot-card.is-open {
-  padding-bottom: var(--space-1);
+  padding-bottom: calc(20px * var(--ui-scale));
 }
 
 .slot-card.is-picked {
@@ -2723,6 +2895,8 @@ body.is-reordering * {
 .slot-fold {
   display: grid;
   grid-template-rows: 0fr;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .slot-card.is-open .slot-fold {
@@ -2730,6 +2904,8 @@ body.is-reordering * {
 }
 
 .slot-fold-clip {
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -2748,6 +2924,8 @@ body.is-reordering * {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
   padding-top: var(--space-1);
 }
 
@@ -2773,6 +2951,8 @@ body.is-reordering * {
   display: flex;
   align-items: center;
   gap: var(--space-0);
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   user-select: none;
 }
@@ -2781,7 +2961,7 @@ body.is-reordering * {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   min-height: calc(40px * var(--ui-scale));
   padding: 0;
@@ -2800,10 +2980,12 @@ body.is-reordering * {
   display: flex;
   align-items: center;
   gap: var(--space-0);
+  flex: 1 1 0;
   min-width: 0;
 }
 
 .slot-title {
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3204,6 +3386,8 @@ input.slot-live:focus {
   display: flex;
   align-items: center;
   gap: var(--space-0);
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   padding: var(--space-0) var(--space-1);
   border: none;
@@ -3213,6 +3397,15 @@ input.slot-live:focus {
   font-size: calc(14px * var(--ui-scale));
   font-weight: 400;
   letter-spacing: -0.39px;
+  overflow: hidden;
+}
+
+.pick-now__label {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pick-now b {
@@ -3221,6 +3414,7 @@ input.slot-live:focus {
 }
 
 .pick-now .field-reset {
+  flex: none;
   margin-left: auto;
 }
 
@@ -3229,6 +3423,7 @@ input.slot-live:focus {
 }
 
 .pick-glyph {
+  flex: none;
   width: calc(22px * var(--ui-scale));
   height: calc(22px * var(--ui-scale));
   display: grid;
@@ -3726,7 +3921,7 @@ input.slot-live:focus {
   background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: calc(18.75px * var(--ui-scale));
+  font-size: calc(15px * var(--ui-scale));
   font-weight: 300;
   line-height: 1.4;
   text-align: left;
@@ -4300,9 +4495,7 @@ html[data-theme="day"] .settings-modal__scrim {
 .unsplash-modal__scrim {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, #080808 55%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: transparent;
 }
 
 .unsplash-modal__card {
@@ -4495,16 +4688,5 @@ html[data-theme="day"] .settings-modal__scrim {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-html[data-theme="day"] .unsplash-modal__scrim {
-  background: color-mix(in srgb, #ffffff 45%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .unsplash-modal__scrim {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
 }
 

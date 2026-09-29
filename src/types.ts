@@ -44,6 +44,8 @@ export type TextSlot = {
   /** Index into the theme, then black, then white. Unset follows the shape. */
   textColorIndex?: number;
   textColor?: string;
+  /** How this layer mixes with layers behind it. Layout mode only. */
+  blend?: BlendMode;
   scale: number;
 };
 
@@ -81,8 +83,10 @@ export type ImageSlot = {
   inverted?: boolean;
   /** Recolor an uploaded SVG with theme ink. Off keeps the file’s original colors. */
   tint?: boolean;
-  /** Preset collider for an upload. Unset uses a box. An SVG is matched when the file is picked. */
+  /** Upload hitbox: `block` (default) or `sphere`. Unset uses a box. */
   collider?: string;
+  /** How this layer mixes with layers behind it. Layout mode only. */
+  blend?: BlendMode;
 };
 
 export type Slot = TextSlot | ImageSlot;
@@ -203,8 +207,8 @@ export type GradientStop = {
   at: number;
 };
 
-/** Base fits 16×9 (or 9×16) perfect squares; fine is half that cell size. */
-export type GridDensity = "base" | "fine";
+/** Base fits 16×9 (or 9×16) perfect squares; fine / finest halve the cell each step. */
+export type GridDensity = "base" | "fine" | "finest";
 
 export type BackgroundSettings = {
   kind: BackgroundKind;
@@ -255,7 +259,7 @@ export function normalizeBackground(raw: Partial<BackgroundSettings> | null | un
     ...raw,
     stops: Array.isArray(raw.stops) && raw.stops.length >= 2 ? raw.stops : base.stops,
     grid: Boolean(raw.grid),
-    gridDensity: raw.gridDensity === "fine" ? "fine" : "base",
+    gridDensity: raw.gridDensity === "finest" || raw.gridDensity === "fine" ? raw.gridDensity : "base",
     gridColor: typeof raw.gridColor === "string" && raw.gridColor ? raw.gridColor : base.gridColor,
     gridOpacity: typeof raw.gridOpacity === "number" ? Math.min(100, Math.max(0, raw.gridOpacity)) : base.gridOpacity,
   };

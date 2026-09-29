@@ -47,6 +47,14 @@ export function frameSize(
   }
   const shortSide = SHORT_SIDE[preset];
   if (stageWidth < 2 || stageHeight < 2) return { width: even(shortSide), height: even(shortSide) };
+  if (Math.abs(stageWidth / stageHeight - 1) < 0.02) {
+    const side = even(shortSide);
+    return { width: side, height: side };
+  }
+  if (stageHeight > stageWidth && Math.abs(stageWidth / stageHeight - 3 / 4) < 0.02) {
+    const width = even(shortSide);
+    return { width, height: even((width * 4) / 3) };
+  }
   if (stageHeight > stageWidth && Math.abs(stageWidth / stageHeight - 9 / 16) < 0.02) {
     const width = even(shortSide);
     return { width, height: even((width * 16) / 9) };

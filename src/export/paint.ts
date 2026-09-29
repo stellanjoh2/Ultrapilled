@@ -4,7 +4,7 @@ import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
 import { measureTextInk, paintTextInk } from "../measure";
 import { peekTrim } from "../trim";
-import { canvasBlend, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
+import { blendMode, canvasBlend, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 import { isColorMask, isSvgSource, type ChipDraw } from "../world";
 
 const GRAIN_URL =
@@ -334,23 +334,33 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
   const isolate = blend !== "source-over";
   const pile = isolate ? buffer(chipBuffer, scene.width, scene.height) : ctx;
 
+  const paintPile = (ctx: CanvasRenderingContext2D, bloomPass: boolean) => {
+    for (const chip of draws) {
+      ctx.save();
+      // Bloom is a silhouette pass — keep source-over so blur stays clean.
+      if (!bloomPass) ctx.globalCompositeOperation = canvasBlend(blendMode(chip.slot.blend));
+      drawChip(ctx, chip, scale, bloomPass, ready, scene.theme, timeMs);
+      ctx.restore();
+    }
+  };
+
   const saturate = scene.post.saturate / 100;
   if (saturate !== 1) {
     const layer = buffer(bloomBuffer, scene.width, scene.height);
-    for (const chip of draws) drawChip(layer, chip, scale, false, ready, scene.theme, timeMs);
+    paintPile(layer, false);
     pile.save();
     pile.filter = `saturate(${saturate})`;
     pile.drawImage(bloomBuffer, 0, 0);
     pile.restore();
   } else {
-    for (const chip of draws) drawChip(pile, chip, scale, false, ready, scene.theme, timeMs);
+    paintPile(pile, false);
   }
 
   const bloom = scene.post.bloom / 100;
   const bloomOpacity = (scene.post.bloomOpacity / 100) * bloom;
   if (bloom > 0 && bloomOpacity > 0) {
     const layer = buffer(bloomBuffer, scene.width, scene.height);
-    for (const chip of draws) drawChip(layer, chip, scale, true, ready, scene.theme, timeMs);
+    paintPile(layer, true);
     if (logo && logoFile && isSvgLogo(logoFile.name, logoFile.src)) {
       paintLogo(layer, scene.width, scene.height, scene.background, scene.theme, logo);
     }
