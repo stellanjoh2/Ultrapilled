@@ -70,6 +70,7 @@ export function onPrefsChange(listener: () => void): () => void {
 }
 
 export function setPrefs(patch: Partial<AppPrefs>) {
+  const prevTheme = prefs.theme;
   prefs = {
     ...prefs,
     ...patch,
@@ -78,14 +79,32 @@ export function setPrefs(patch: Partial<AppPrefs>) {
     theme: patch.theme === "day" || patch.theme === "night" ? patch.theme : prefs.theme,
   };
   persist();
-  applyChromeTheme(prefs.theme);
+  const themeChanged = patch.theme != null && patch.theme !== prevTheme;
+  applyChromeTheme(prefs.theme, { animate: themeChanged });
   notify();
 }
 
+const THEME_ANIM_MS = 320;
+let themeAnimTimer = 0;
+
 /** Applies night/day chrome before first paint and after changes. */
-export function applyChromeTheme(theme: ChromeTheme = prefs.theme) {
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme === "day" ? "light" : "dark";
+export function applyChromeTheme(theme: ChromeTheme = prefs.theme, options?: { animate?: boolean }) {
+  const root = document.documentElement;
+  const reduce =
+    typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const animate = Boolean(options?.animate) && !reduce;
+
+  if (animate) {
+    root.classList.add("theme-animating");
+    window.clearTimeout(themeAnimTimer);
+    themeAnimTimer = window.setTimeout(() => {
+      root.classList.remove("theme-animating");
+      themeAnimTimer = 0;
+    }, THEME_ANIM_MS);
+  }
+
+  root.dataset.theme = theme;
+  root.style.colorScheme = theme === "day" ? "light" : "dark";
 }
 
 applyChromeTheme();

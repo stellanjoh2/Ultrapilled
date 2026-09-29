@@ -99,6 +99,24 @@ html[data-theme="day"] {
   --panel-rule: rgba(0, 0, 0, 0.1);
 }
 
+/* Brief night↔day crossfade — only while .theme-animating is set from prefs. */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-animating,
+  html.theme-animating *,
+  html.theme-animating *::before,
+  html.theme-animating *::after {
+    transition:
+      background-color 0.32s ease,
+      background 0.32s ease,
+      color 0.32s ease,
+      border-color 0.32s ease,
+      box-shadow 0.32s ease,
+      fill 0.32s ease,
+      stroke 0.32s ease,
+      outline-color 0.32s ease !important;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -3486,8 +3504,7 @@ input.slot-live:focus {
   margin-top: var(--space-2);
 }
 
-.panel-credit__author,
-.panel-credit__source {
+.panel-credit__author {
   appearance: none;
   border: none;
   padding: 0;
@@ -3503,8 +3520,7 @@ input.slot-live:focus {
   text-underline-offset: 3px;
 }
 
-.panel-credit__author:hover,
-.panel-credit__source:hover {
+.panel-credit__author:hover {
   text-decoration-color: var(--ink);
 }
 
@@ -4233,9 +4249,7 @@ input.slot-live:focus {
 .reconnect__scrim {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, #080808 72%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: transparent;
 }
 
 .reconnect__card {
@@ -4356,17 +4370,6 @@ input.slot-live:focus {
     color 0.18s ease;
 }
 
-html[data-theme="day"] .reconnect__scrim {
-  background: color-mix(in srgb, #ffffff 55%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .reconnect__scrim {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
-
 .settings-modal {
   position: fixed;
   inset: 0;
@@ -4377,9 +4380,7 @@ html[data-theme="day"] .reconnect__scrim {
 .settings-modal__scrim {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, #080808 55%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: transparent;
 }
 
 .settings-modal__sheet {
@@ -4446,17 +4447,6 @@ html[data-theme="day"] .reconnect__scrim {
 
 .settings-modal__done {
   width: 100%;
-}
-
-html[data-theme="day"] .settings-modal__scrim {
-  background: color-mix(in srgb, #ffffff 45%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .settings-modal__scrim {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
 }
 
 .about-modal__bio,

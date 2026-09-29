@@ -16,6 +16,10 @@ npm run dev
 3. Tune gravity, speed, and bounciness.
 4. Hit **Trigger Physics** — everything drops from above.
 
+## Shapes
+
+Shapes provided by [shapes.gallery](https://www.shapes.gallery/).
+
 ## Sounds
 
 **UI** — [SND01 "sine"](https://snd.dev/) by [Ayako Taniguchi](https://ayakotaniguchi.jp/) (`public/sounds/`). Free for personal and commercial use under [snd.dev Terms of Use](https://snd.dev/); do not redistribute the unprocessed assets alone or use them as an unprocessed sound logo / trademark.

@@ -1521,10 +1521,6 @@ function renderPanel() {
         Ultrapilled is created by<br />
         <button type="button" class="panel-credit__author" id="open-about">Stellan Johansson</button>
       </p>
-      <p>
-        Shapes provided by
-        <a class="panel-credit__source" href="https://www.shapes.gallery/" target="_blank" rel="noopener noreferrer">shapes.gallery</a>
-      </p>
       <p class="panel-credit__social">
         <a href="https://x.com/johstell" target="_blank" rel="noopener noreferrer" aria-label="X">
           <span class="panel-credit__icon panel-credit__icon--x" aria-hidden="true"></span>
