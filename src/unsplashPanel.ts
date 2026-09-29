@@ -286,7 +286,11 @@ export function openUnsplashImport(opts: { onPick: (file: File) => void }): void
 
   if (!unsplashConfigured()) {
     input.disabled = true;
-    setStatus("Add VITE_UNSPLASH_ACCESS_KEY to .env and restart the dev server.");
+    setStatus(
+      import.meta.env.DEV
+        ? "Add VITE_UNSPLASH_ACCESS_KEY to .env and restart the dev server."
+        : "Unsplash search isn’t configured for this build.",
+    );
   } else {
     setStatus("");
     input.focus({ preventScroll: true });
