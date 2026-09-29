@@ -1143,6 +1143,12 @@ const settingsController = {
       scheduleDraft();
     }
   },
+  layoutMode() {
+    return state.physics.layoutMode;
+  },
+  setLayoutMode(next: boolean) {
+    return setLayoutMode(next);
+  },
 };
 
 function paintPanelTabs() {
@@ -5132,6 +5138,25 @@ function removeSlot(id: string) {
   live();
 }
 
+/** Delete every selected piece in one undo step. */
+function removePickedSlots() {
+  const ids = [...pickedSlotIds];
+  if (ids.length === 0) return;
+  const editing = world.editingId();
+  if (editing && ids.includes(editing)) endChipEdit(false);
+  closeSlotMenu();
+  remember();
+  for (const id of ids) openSlots.delete(id);
+  pickedSlotId = null;
+  pickedSlotIds.clear();
+  world.setPicked(null);
+  const drop = new Set(ids);
+  state.slots = state.slots.filter((slot) => !drop.has(slot.id));
+  playRemove();
+  renderPanel();
+  live();
+}
+
 function reflectGlobalWeight() {
   globalWeightPick?.reflect(sharedFamily() ?? "", sharedWeight());
 }
@@ -6310,14 +6335,43 @@ window.addEventListener("keydown", (event) => {
       redo();
       return;
     }
+    if (key === "d") {
+      if (!pickedSlotId) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      duplicateSlot(pickedSlotId);
+      return;
+    }
   }
   if (typingInField(event.target)) return;
   if (isSettingsOpen() || isAboutOpen() || isUnsplashOpen()) return;
+  if (document.querySelector(".reconnect[aria-modal='true']")) return;
   if (event.code === "Space") {
     event.preventDefault();
     if (event.repeat) return;
     playClick();
     togglePause();
+    return;
+  }
+  if (event.key === "Escape") {
+    if (pickedSlotIds.size === 0 && !world.editingId()) return;
+    event.preventDefault();
+    dismissPick();
+    return;
+  }
+  if (event.key === "Enter") {
+    if (event.repeat || !pickedSlotId) return;
+    const slot = state.slots.find((item) => item.id === pickedSlotId);
+    if (!slot || slot.kind !== "text") return;
+    event.preventDefault();
+    editChipText(pickedSlotId, false);
+    return;
+  }
+  if (event.key === "Backspace" || event.key === "Delete") {
+    if (pickedSlotIds.size === 0) return;
+    event.preventDefault();
+    if (event.repeat) return;
+    removePickedSlots();
     return;
   }
   if (event.key === "h" || event.key === "H") {
@@ -6330,6 +6384,25 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "d" || event.key === "D") {
     if (event.repeat) return;
     setPhysDebug(!physDebugOn);
+    return;
+  }
+  if (event.key === "g" || event.key === "G") {
+    if (event.repeat) return;
+    remember();
+    state.background.grid = !state.background.grid;
+    applyBackground();
+    if (panelTab === "background") renderPanel();
+    playClick();
+    return;
+  }
+  if (event.key === "l" || event.key === "L") {
+    if (event.repeat) return;
+    void setLayoutMode(!state.physics.layoutMode);
+    return;
+  }
+  if (event.key === "i" || event.key === "I") {
+    if (event.repeat || !pickedSlotId) return;
+    invertSlot(pickedSlotId);
   }
 });
 

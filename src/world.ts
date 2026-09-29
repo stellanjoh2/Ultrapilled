@@ -936,7 +936,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   } | null = null;
   /**
    * Combined scale+rotate: radial drag scales, angular drag rotates (like the gradient wheel).
-   * Shift locks rotation so the gesture is scale-only (works with multi-select).
+   * Shift locks rotation (scale-only). Shift+Alt also snaps that lock to 45° steps.
    */
   let xformDrag: {
     chip: DroppedChip;
@@ -3276,12 +3276,15 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         scaleMaxFor(xformDrag.chip.look?.slot),
       );
       const pointerAngle = Math.atan2(dy, dx);
-      // Shift = scale only. Re-anchor while held so releasing Shift doesn't jump-rotate.
+      // Shift = scale only. Shift+Alt also snaps to 45°. Re-anchor so releasing doesn't jump.
       let nextAngle: number;
       if (event.shiftKey) {
-        nextAngle = xformDrag.lastAngle;
+        const step = Math.PI / 4;
+        nextAngle = event.altKey
+          ? Math.round(xformDrag.lastAngle / step) * step
+          : xformDrag.lastAngle;
         xformDrag.startPointerAngle = pointerAngle;
-        xformDrag.startBodyAngle = xformDrag.lastAngle;
+        xformDrag.startBodyAngle = nextAngle;
       } else {
         nextAngle = xformDrag.startBodyAngle + (pointerAngle - xformDrag.startPointerAngle);
       }

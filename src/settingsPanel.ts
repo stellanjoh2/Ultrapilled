@@ -1,5 +1,8 @@
 import gsap from "gsap";
+import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
+import keyboardIcon from "@phosphor-icons/core/assets/regular/keyboard.svg?raw";
 import moonIcon from "@phosphor-icons/core/assets/regular/moon.svg?raw";
+import smileyIcon from "@phosphor-icons/core/assets/regular/smiley.svg?raw";
 import sunIcon from "@phosphor-icons/core/assets/regular/sun.svg?raw";
 import { getPrefs, setPrefs, type AppPrefs, type ChromeTheme } from "./prefs";
 import {
@@ -15,6 +18,8 @@ export type SettingsController = {
   saveProject(): void;
   loadProject(file: File): Promise<void>;
   prefsChanged(): void;
+  layoutMode(): boolean;
+  setLayoutMode(next: boolean): void | Promise<void>;
 };
 
 let panelEl: HTMLElement | null = null;
@@ -23,9 +28,84 @@ let closing = false;
 let status = "";
 let fileInput: HTMLInputElement | null = null;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
+let shortcutsOpen = true;
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function modKeyLabel(): string {
+  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform) ||
+    /Mac/.test(navigator.userAgent)
+    ? "⌘"
+    : "Ctrl";
+}
+
+function altKeyLabel(): string {
+  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform) ||
+    /Mac/.test(navigator.userAgent)
+    ? "⌥"
+    : "Alt";
+}
+
+function keycap(label: string): string {
+  return `<kbd class="keycap">${label}</kbd>`;
+}
+
+function shortcutRow(label: string, keys: string, note?: string): string {
+  const noteHtml = note ? `<span class="shortcut-list__note">${note}</span>` : "";
+  return `
+    <li class="shortcut-list__row">
+      <div class="shortcut-list__copy">
+        <span class="shortcut-list__label">${label}</span>
+        ${noteHtml}
+      </div>
+      <div class="shortcut-list__keys">${keys}</div>
+    </li>
+  `;
+}
+
+function shortcutsMarkup(): string {
+  const mod = modKeyLabel();
+  const rows = [
+    shortcutRow("Play / pause", keycap("Space")),
+    shortcutRow("Hide UI", keycap("H")),
+    shortcutRow("Toggle grid", keycap("G")),
+    shortcutRow("Toggle Layout Mode", keycap("L")),
+    shortcutRow("Invert selection", keycap("I"), "Selected piece"),
+    shortcutRow("Delete selection", `${keycap("⌫")}${keycap("Del")}`),
+    shortcutRow("Duplicate", `${keycap(mod)}${keycap("D")}`),
+    shortcutRow("Undo", `${keycap(mod)}${keycap("Z")}`),
+    shortcutRow("Redo", `${keycap(mod)}${keycap("⇧")}${keycap("Z")}`, `Also ${mod}+Y`),
+    shortcutRow("Deselect / exit edit", keycap("Esc")),
+    shortcutRow("Edit selected text", keycap("Enter")),
+    shortcutRow("Scale only while transforming", keycap("⇧"), "Hold during scale drag"),
+    shortcutRow(
+      "Scale only, snap angle",
+      `${keycap("⇧")}${keycap(altKeyLabel())}`,
+      "45° steps while scale-dragging",
+    ),
+    shortcutRow("Add to selection", `${keycap("⇧")}${keycap("Click")}`),
+    shortcutRow("Physics debug outlines", keycap("D")),
+  ].join("");
+  return `
+    <section class="section shortcuts-section${shortcutsOpen ? " is-open" : ""}" data-shortcuts-fold>
+      <div class="section-head">
+        <button type="button" class="section-toggle" aria-expanded="${shortcutsOpen}">
+          <span class="shortcuts-title">
+            <span class="shortcuts-title__icon" aria-hidden="true">${keyboardIcon}</span>
+            Keyboard Shortcuts
+          </span>
+        </button>
+        <span class="section-chevron" aria-hidden="true"></span>
+      </div>
+      <div class="section-fold"${shortcutsOpen ? "" : " inert"} aria-hidden="${shortcutsOpen ? "false" : "true"}">
+        <div class="section-fold-clip">
+          <ul class="shortcut-list">${rows}</ul>
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 function setStatus(message: string) {
@@ -51,7 +131,7 @@ function paintVolume() {
   if (caption) caption.textContent = `Volume ${prefs.soundVolume}`;
 }
 
-function paintToggles() {
+function paintToggles(controller?: SettingsController) {
   const prefs = getPrefs();
   panelEl?.querySelectorAll<HTMLInputElement>("#settings-sound, #settings-tips, #settings-tooltips, #settings-remember, #settings-performance").forEach((input) => {
     if (input.id === "settings-sound") input.checked = prefs.soundOn;
@@ -65,16 +145,35 @@ function paintToggles() {
     button.classList.toggle("is-on", on);
     button.setAttribute("aria-pressed", String(on));
   });
+  if (controller) paintDesignMode(controller);
   paintVolume();
 }
 
-function panelHtml(prefs: AppPrefs): string {
+function paintDesignMode(controller: SettingsController) {
+  const layout = controller.layoutMode();
+  panelEl?.querySelectorAll<HTMLButtonElement>("[data-design-mode]").forEach((button) => {
+    const on =
+      (button.dataset.designMode === "layout" && layout) ||
+      (button.dataset.designMode === "physics" && !layout);
+    button.classList.toggle("is-on", on);
+    button.setAttribute("aria-pressed", String(on));
+  });
+}
+
+function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
   return `
     <section class="section">
       <h2 data-tip="Editor chrome colors">UI theme</h2>
       <div class="segment" role="group" aria-label="UI theme">
         <button type="button" class="pill${prefs.theme === "night" ? " is-on" : ""}" data-theme-chrome="night" aria-pressed="${prefs.theme === "night"}" data-tip="Dark editor chrome"><span class="theme-chrome__icon" aria-hidden="true">${moonIcon}</span>Night</button>
         <button type="button" class="pill${prefs.theme === "day" ? " is-on" : ""}" data-theme-chrome="day" aria-pressed="${prefs.theme === "day"}" data-tip="Light editor chrome"><span class="theme-chrome__icon" aria-hidden="true">${sunIcon}</span>Day</button>
+      </div>
+    </section>
+    <section class="section">
+      <h2 data-tip="Physics fall or free Layout placement — shortcut L">Design Mode</h2>
+      <div class="segment" role="group" aria-label="Design Mode">
+        <button type="button" class="pill${!layoutMode ? " is-on" : ""}" data-design-mode="physics" aria-pressed="${!layoutMode}" data-tip="Pieces fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${smileyIcon}</span>Physics</button>
+        <button type="button" class="pill${layoutMode ? " is-on" : ""}" data-design-mode="layout" aria-pressed="${layoutMode}" data-tip="Place freely like Figma — no physics, pieces can overlap"><span class="theme-chrome__icon" aria-hidden="true">${gridFourIcon}</span>Layout</button>
       </div>
     </section>
     <section class="section">
@@ -104,6 +203,7 @@ function panelHtml(prefs: AppPrefs): string {
         </label>
       </div>
     </section>
+    ${shortcutsMarkup()}
     <section class="section">
       <h2 data-tip="Lighter live bloom so piles stay smoother; exports stay full quality">Performance</h2>
       <div class="check-row">
@@ -138,15 +238,38 @@ function bindCheck(panel: HTMLElement, id: string, key: keyof AppPrefs, controll
     const input = event.currentTarget as HTMLInputElement;
     setPrefs({ [key]: input.checked } as Partial<AppPrefs>);
     playSwitch(input.checked);
-    paintToggles();
+    paintToggles(controller);
     controller.prefsChanged();
+  });
+}
+
+function bindShortcutsFold(panel: HTMLElement) {
+  const section = panel.querySelector<HTMLElement>("[data-shortcuts-fold]");
+  if (!section) return;
+  const toggle = section.querySelector<HTMLButtonElement>(".section-toggle");
+  const fold = section.querySelector<HTMLElement>(".section-fold");
+  const setOpen = (open: boolean) => {
+    shortcutsOpen = open;
+    section.classList.toggle("is-open", open);
+    toggle?.setAttribute("aria-expanded", String(open));
+    if (fold) {
+      fold.toggleAttribute("inert", !open);
+      fold.setAttribute("aria-hidden", open ? "false" : "true");
+    }
+  };
+  const onToggle = () => setOpen(!section.classList.contains("is-open"));
+  toggle?.addEventListener("click", onToggle);
+  section.querySelector(".section-head")?.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest(".section-toggle")) return;
+    onToggle();
   });
 }
 
 function mountSettingsBody(panel: HTMLElement, controller: SettingsController) {
   panelEl = panel;
-  panel.innerHTML = panelHtml(getPrefs());
-  paintToggles();
+  panel.innerHTML = panelHtml(getPrefs(), controller.layoutMode());
+  paintToggles(controller);
+  bindShortcutsFold(panel);
 
   bindCheck(panel, "settings-sound", "soundOn", controller);
   bindCheck(panel, "settings-tips", "tipsOn", controller);
@@ -166,8 +289,18 @@ function mountSettingsBody(panel: HTMLElement, controller: SettingsController) {
       if (getPrefs().theme === theme) return;
       setPrefs({ theme });
       playSwitch(theme === "day");
-      paintToggles();
+      paintToggles(controller);
       controller.prefsChanged();
+    });
+  });
+
+  panel.querySelectorAll<HTMLButtonElement>("[data-design-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const next = button.dataset.designMode === "layout";
+      if (next === controller.layoutMode()) return;
+      void Promise.resolve(controller.setLayoutMode(next)).then(() => {
+        paintDesignMode(controller);
+      });
     });
   });
 

@@ -290,7 +290,7 @@ function mountGrid(panel: HTMLElement, controller: BackgroundController) {
   const section = document.createElement("section");
   section.className = "section";
   section.innerHTML = `
-    <h2 data-tip="Optional guide overlay locked to the canvas ratio">Grid</h2>
+    <h2 data-tip="Optional guide overlay locked to the canvas ratio — shortcut G">Grid</h2>
     <div class="segment" role="group" aria-label="Grid">
       <button type="button" class="pill${!on ? " is-on" : ""}" data-grid="off" aria-pressed="${!on}">Off</button>
       <button type="button" class="pill${on ? " is-on" : ""}" data-grid="on" aria-pressed="${on}">On</button>

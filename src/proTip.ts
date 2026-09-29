@@ -20,12 +20,16 @@ const BLANK_FIRST: Hint = {
 
 const HINTS: Hint[] = [
   { text: "Hit", key: "Space", after: "to play" },
-  { text: "Do you hate bouncy stuff? Try Layout Mode in the Physics section" },
+  { text: "Do you hate bouncy stuff? Try Layout Mode — or hit", key: "L" },
   { text: "Need ideas? Explore the templates in the Create tab" },
   { text: "Hide the UI for a clean canvas", key: "H" },
+  { text: "Toggle the guide grid", key: "G" },
+  { text: "Delete a selected piece with Backspace" },
+  { text: "Duplicate a selection with ⌘D or Ctrl+D" },
+  { text: "Invert the selected piece", key: "I" },
   { text: "Click a piece to edit it" },
   { text: "Double-click one shape in a group to edit it alone" },
-  { text: "Double-click text to type on the canvas" },
+  { text: "Double-click text to type on the canvas — or hit Enter" },
   { text: "Right-click a piece to recolor, edit, duplicate, invert, or remove it" },
   { text: "The more stuff you add the slower the app becomes" },
   { text: "Want to use bloom but it feels laggy? Try Performance mode in Settings" },
