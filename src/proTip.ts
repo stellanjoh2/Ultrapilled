@@ -20,6 +20,7 @@ const BLANK_FIRST: Hint = {
 
 const HINTS: Hint[] = [
   { text: "Hit", key: "Space", after: "to play" },
+  { text: "Do you hate bouncy stuff? Try Layout Mode in the Physics section" },
   { text: "Need ideas? Explore the templates in the Create tab" },
   { text: "Hide the UI for a clean canvas", key: "H" },
   { text: "Click a piece to edit it" },
