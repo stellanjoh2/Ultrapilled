@@ -2360,7 +2360,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         syncXformHandleSide(chip, chipCssMul(chip));
       } else {
         chip.el.classList.remove("is-picked");
-        chip.el.querySelector(":scope > .chip-xform-handle")?.classList.remove("chip-xform-handle--ne");
+        clearXformHandleCorner(chip.el.querySelector(":scope > .chip-xform-handle"));
+        if (xformHover?.bodyId === chip.body.id) xformHover = null;
         releaseGradWheel(chip.el);
       }
     }
@@ -2451,9 +2452,62 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     el.append(handle);
   }
 
+  type XformCorner = "se" | "ne" | "nw" | "sw";
+
+  const XFORM_CORNERS: { id: XformCorner; sx: 1 | -1; sy: 1 | -1 }[] = [
+    { id: "se", sx: 1, sy: 1 },
+    { id: "ne", sx: 1, sy: -1 },
+    { id: "nw", sx: -1, sy: -1 },
+    { id: "sw", sx: -1, sy: 1 },
+  ];
+
+  const XFORM_CORNER_CLASS: Record<Exclude<XformCorner, "se">, string> = {
+    ne: "chip-xform-handle--ne",
+    nw: "chip-xform-handle--nw",
+    sw: "chip-xform-handle--sw",
+  };
+
+  /** Solo handle follows the nearest hovered corner; null → SE (with clip flip). */
+  let xformHover: { bodyId: number; corner: XformCorner } | null = null;
+
+  function clearXformHandleCorner(handle: Element | null) {
+    if (!(handle instanceof HTMLElement)) return;
+    handle.classList.remove("chip-xform-handle--ne", "chip-xform-handle--nw", "chip-xform-handle--sw");
+  }
+
+  function readXformHandleCorner(handle: HTMLElement): XformCorner {
+    if (handle.classList.contains("chip-xform-handle--nw")) return "nw";
+    if (handle.classList.contains("chip-xform-handle--ne")) return "ne";
+    if (handle.classList.contains("chip-xform-handle--sw")) return "sw";
+    return "se";
+  }
+
+  function setXformHandleCorner(handle: HTMLElement, corner: XformCorner) {
+    clearXformHandleCorner(handle);
+    if (corner !== "se") handle.classList.add(XFORM_CORNER_CLASS[corner]);
+  }
+
+  /** Frame-corner world position (pad inset), scaled by live CSS mul. */
+  function xformCornerWorld(chip: DroppedChip, corner: XformCorner, mul: number, pad = 12) {
+    const entry = XFORM_CORNERS.find((item) => item.id === corner)!;
+    const cos = Math.cos(chip.body.angle);
+    const sin = Math.sin(chip.body.angle);
+    const vx = (chip.width / 2 + pad) * mul * entry.sx;
+    const vy = (chip.height / 2 + pad) * mul * entry.sy;
+    return {
+      x: chip.body.position.x + vx * cos - vy * sin,
+      y: chip.body.position.y + vx * sin + vy * cos,
+    };
+  }
+
+  /** Handle tip past the frame corner: pad (12) + size (76) + translate gap (6). */
+  function xformHandleTipWorld(chip: DroppedChip, corner: XformCorner, mul: number) {
+    return xformCornerWorld(chip, corner, mul, 94);
+  }
+
   /**
-   * Prefer SE; flip to NE when the SE handle would stick past the stage edge.
-   * Hysteresis avoids flicker at the boundary. Locked during an active xform drag.
+   * Prefer hovered corner; else SE, flipping to NE when SE would clip the stage.
+   * Hysteresis on the SE↔NE clip path. Locked during an active xform drag.
    */
   function syncXformHandleSide(chip: DroppedChip, mul = 1) {
     if (!isPickPainted(chip) || bounds.height < 8) return;
@@ -2461,20 +2515,112 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const handle = chip.el.querySelector(":scope > .chip-xform-handle");
     if (!(handle instanceof HTMLElement)) return;
 
-    // Chip-local overhang past the SE corner: pad (12) + size (76) + translate gap (6).
-    const overhang = 94;
-    const angle = chip.body.angle;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const vx = (chip.width / 2 + overhang) * mul;
-    const vy = (chip.height / 2 + overhang) * mul;
-    const wx = chip.body.position.x + vx * cos - vy * sin;
-    const wy = chip.body.position.y + vx * sin + vy * cos;
-    const clipped = wy > bounds.height - 1 || wx > bounds.width - 1;
-    const clear = wy < bounds.height - 28 && wx < bounds.width - 28;
-    const ne = handle.classList.contains("chip-xform-handle--ne");
-    if (!ne && clipped) handle.classList.add("chip-xform-handle--ne");
-    else if (ne && clear) handle.classList.remove("chip-xform-handle--ne");
+    const hover =
+      xformHover && xformHover.bodyId === chip.body.id ? xformHover.corner : null;
+    if (hover) {
+      setXformHandleCorner(handle, hover);
+      return;
+    }
+
+    // Default home: SE, with NE escape when SE sticks past the stage edge.
+    const current = readXformHandleCorner(handle);
+    const seTip = xformHandleTipWorld(chip, "se", mul);
+    const seClipped = seTip.y > bounds.height - 1 || seTip.x > bounds.width - 1;
+    const seClear = seTip.y < bounds.height - 28 && seTip.x < bounds.width - 28;
+    if (current !== "ne" && current !== "se") {
+      setXformHandleCorner(handle, seClipped ? "ne" : "se");
+      return;
+    }
+    if (current === "se" && seClipped) setXformHandleCorner(handle, "ne");
+    else if (current === "ne" && seClear) setXformHandleCorner(handle, "se");
+  }
+
+  /** Enter / stick radii (stage px) from the selection-frame corner. */
+  const CORNER_HOVER_ENTER = 100;
+  const CORNER_HOVER_STICK = 140;
+
+  function hoverCornerNear(
+    chip: DroppedChip,
+    point: { x: number; y: number },
+    current: XformCorner | null,
+  ): XformCorner | null {
+    const mul = chipCssMul(chip);
+    let best: XformCorner | null = null;
+    let bestDist = Infinity;
+    for (const { id } of XFORM_CORNERS) {
+      const at = xformCornerWorld(chip, id, mul);
+      const dist = Math.hypot(point.x - at.x, point.y - at.y);
+      const limit = id === current ? CORNER_HOVER_STICK : CORNER_HOVER_ENTER;
+      if (dist <= limit && dist < bestDist) {
+        bestDist = dist;
+        best = id;
+      }
+    }
+    return best;
+  }
+
+  function updateXformHandleHover(event: PointerEvent) {
+    if (xformDrag || drag || gradAngleDrag || editingId) return;
+    if (pickedIds.size === 0) {
+      xformHover = null;
+      return;
+    }
+    const point = stagePoint(event);
+    const overHandle = (event.target as Element | null)?.closest?.(".chip-xform-handle");
+    if (overHandle instanceof HTMLElement) {
+      const el = overHandle.closest(".chip");
+      const chip = chips.find((item) => item.el === el);
+      if (chip && isPickPainted(chip)) {
+        const corner = readXformHandleCorner(overHandle);
+        const changed =
+          xformHover?.bodyId !== chip.body.id || xformHover?.corner !== corner;
+        xformHover = { bodyId: chip.body.id, corner };
+        if (changed) {
+          for (const item of chips) {
+            if (!isPickPainted(item)) continue;
+            syncXformHandleSide(item, chipCssMul(item));
+          }
+        }
+        return;
+      }
+    }
+    let bestChip: DroppedChip | null = null;
+    let bestCorner: XformCorner | null = null;
+    let bestDist = Infinity;
+    for (const chip of chips) {
+      if (!isPickPainted(chip)) continue;
+      const handle = chip.el.querySelector(":scope > .chip-xform-handle");
+      const current =
+        xformHover?.bodyId === chip.body.id
+          ? xformHover.corner
+          : handle instanceof HTMLElement
+            ? readXformHandleCorner(handle)
+            : null;
+      const corner = hoverCornerNear(chip, point, current);
+      if (!corner) continue;
+      const mul = chipCssMul(chip);
+      const at = xformCornerWorld(chip, corner, mul);
+      const dist = Math.hypot(point.x - at.x, point.y - at.y);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestChip = chip;
+        bestCorner = corner;
+      }
+    }
+    const prevBody = xformHover?.bodyId ?? null;
+    const prevCorner = xformHover?.corner ?? null;
+    xformHover =
+      bestChip && bestCorner ? { bodyId: bestChip.body.id, corner: bestCorner } : null;
+    if (
+      (xformHover?.bodyId ?? null) === prevBody &&
+      (xformHover?.corner ?? null) === prevCorner
+    ) {
+      return;
+    }
+    for (const chip of chips) {
+      if (!isPickPainted(chip)) continue;
+      syncXformHandleSide(chip, chipCssMul(chip));
+    }
   }
 
   /** CSS degrees: 0 up, 90 right — matches linear-gradient / gradientLine. */
@@ -3185,6 +3331,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const dy = event.clientY - pending.originY;
       if (dx * dx + dy * dy > CLICK_SLOP * CLICK_SLOP) beginDrag();
     }
+    if (!drag) updateXformHandleHover(event);
     if (!drag || event.pointerId !== drag.pointerId) return;
     const point = stagePoint(event);
     drag.x = point.x;

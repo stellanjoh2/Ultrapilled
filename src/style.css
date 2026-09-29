@@ -734,11 +734,13 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 }
 
 /* Transform grab (SE by default): polar drag — radial = scale, angular = rotate.
-   Flips to NE (--ne) when the SE corner would clip outside the stage. */
+   Hover near a corner swaps the solo handle there; SE→NE when SE would clip the stage. */
 .chip-xform-handle {
   --xform-pop: 0.92;
   position: absolute;
   z-index: 5;
+  left: auto;
+  top: auto;
   right: calc(-1 * var(--xform-pad, 12px));
   bottom: calc(-1 * var(--xform-pad, 12px));
   width: 76px;
@@ -770,9 +772,27 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 }
 
 .chip-xform-handle.chip-xform-handle--ne {
+  left: auto;
+  right: calc(-1 * var(--xform-pad, 12px));
   bottom: auto;
   top: calc(-1 * var(--xform-pad, 12px));
   transform: translate(calc(100% + 6px), calc(-100% - 6px)) scale(var(--xform-pop));
+}
+
+.chip-xform-handle.chip-xform-handle--nw {
+  right: auto;
+  bottom: auto;
+  left: calc(-1 * var(--xform-pad, 12px));
+  top: calc(-1 * var(--xform-pad, 12px));
+  transform: translate(calc(-100% - 6px), calc(-100% - 6px)) scale(var(--xform-pop));
+}
+
+.chip-xform-handle.chip-xform-handle--sw {
+  right: auto;
+  top: auto;
+  left: calc(-1 * var(--xform-pad, 12px));
+  bottom: calc(-1 * var(--xform-pad, 12px));
+  transform: translate(calc(-100% - 6px), calc(100% + 6px)) scale(var(--xform-pop));
 }
 
 html[data-theme="day"] .chip-xform-handle {
@@ -814,6 +834,14 @@ html[data-theme="day"] .chip-xform-handle {
   transform: scale(-1);
 }
 
+.chip-xform-handle--nw svg {
+  transform: scaleX(-1);
+}
+
+.chip-xform-handle--sw svg {
+  transform: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .chip.is-picked > .chip-xform-handle:hover {
     --xform-pop: 1.08;
@@ -847,6 +875,16 @@ html[data-theme="day"] .chip-xform-handle {
 
 .chip.is-scaling > .chip-xform-handle--ne {
   transform: translate(calc(100% + 6px), calc(-100% - 6px))
+    scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
+}
+
+.chip.is-scaling > .chip-xform-handle--nw {
+  transform: translate(calc(-100% - 6px), calc(-100% - 6px))
+    scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
+}
+
+.chip.is-scaling > .chip-xform-handle--sw {
+  transform: translate(calc(-100% - 6px), calc(100% + 6px))
     scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
 }
 

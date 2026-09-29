@@ -1340,7 +1340,7 @@ function renderPanel() {
         <input type="range" id="pillPad" min="0" max="100" step="1" value="${state.pillPad}" />
       </label>
       <label class="field" data-tip="Letter spacing for text"><span data-range-label="textTracking">Tracking ${state.textTracking}</span>
-        <input type="range" id="textTracking" min="-200" max="500" step="1" value="${state.textTracking}" />
+        <input type="range" id="textTracking" min="-400" max="500" step="1" value="${state.textTracking}" />
       </label>
       <label class="field" data-tip="How many pieces drop into the frame"><span data-range-label="shapeAmount">Amount of shapes ${state.shapeAmount}</span>
         <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${state.shapeAmount}" />
@@ -2124,7 +2124,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
       </label>
       <label class="field">${settingLabel(slot, "Tracking", "tracking", String(trackingOf(slot, state.textTracking)))}
-        <input type="range" data-key="tracking" min="-200" max="500" step="1" value="${trackingOf(slot, state.textTracking)}" />
+        <input type="range" data-key="tracking" min="-400" max="500" step="1" value="${trackingOf(slot, state.textTracking)}" />
       </label>
       ${
         slot.shape !== "none"
