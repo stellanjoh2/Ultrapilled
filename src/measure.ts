@@ -35,10 +35,24 @@ export function textShiftEm(slider: number): number {
   return ((50 - slider) / 50) * 0.35;
 }
 
+/**
+ * Bleed outside actualBoundingBox* so antialiased glyph edges aren't clipped by
+ * the ink canvas / physics box (visible on round bottoms and final stems).
+ */
+export const TEXT_INK_PAD = 2;
+
 /** Tight letterform bounds for free-standing type (no holding shape). */
 export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
-  const fallback = Math.max(8, Math.ceil(slot.fontSize));
-  if (!measureCtx) return { width: fallback, height: fallback, originX: 0, baseline: fallback * 0.8, advance: fallback };
+  const fallback = Math.max(8, Math.ceil(slot.fontSize) + TEXT_INK_PAD * 2);
+  if (!measureCtx) {
+    return {
+      width: fallback,
+      height: fallback,
+      originX: TEXT_INK_PAD,
+      baseline: fallback * 0.8,
+      advance: fallback,
+    };
+  }
 
   measureCtx.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
   // Measure unspaced — Chromium's measureText ignores canvas letterSpacing for both
@@ -63,14 +77,14 @@ export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
   const inkW = left + right + trackPx;
   const advance = (metrics.width || slot.fontSize) + trackPx;
   // Prefer ink for tight physics nesting; fall back to advance when ink is missing.
-  const width = Math.max(1, Math.ceil(inkW > 0 ? inkW : advance));
-  const height = Math.max(1, Math.ceil(ascent + descent));
+  const width = Math.max(1, Math.ceil((inkW > 0 ? inkW : advance) + TEXT_INK_PAD * 2));
+  const height = Math.max(1, Math.ceil(ascent + descent + TEXT_INK_PAD * 2));
 
   return {
     width,
     height,
-    originX: left,
-    baseline: ascent,
+    originX: left + TEXT_INK_PAD,
+    baseline: ascent + TEXT_INK_PAD,
     advance: Math.max(1, Math.ceil(advance)),
   };
 }

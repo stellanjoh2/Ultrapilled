@@ -130,7 +130,7 @@ function panelHtml(): string {
       </label>
       <p class="hint" id="image-size-meta"></p>
       <div class="export-list">
-        <button type="button" class="pill export-primary" data-export="png" data-tip="Save the current frame as a PNG">PNG</button>
+        <button type="button" class="pill" data-export="png" data-tip="Save the current frame as a PNG">PNG</button>
         <button type="button" class="pill" data-export="png-alpha" data-tip="Save the current frame with a transparent background">Transparent PNG</button>
         <button type="button" class="pill" data-export="png-seq" data-tip="Save every frame of a new loop as PNGs">PNG sequence</button>
         <button type="button" class="pill" data-export="jpg" data-tip="Save the current frame as a JPG">JPG</button>
@@ -144,8 +144,8 @@ function panelHtml(): string {
       </label>
       <p class="hint" id="video-size-meta"></p>
       <div class="export-list">
-        <button type="button" class="pill export-primary" data-export="mp4" data-tip="Render a new loop to an MP4 file">MP4</button>
-        <button type="button" class="pill" data-export="mov" data-tip="Render a new loop to a MOV file">MOV</button>
+        <button type="button" class="pill" data-export="mp4" data-tip="Render a new loop to an MP4 file (includes bounce sounds when Sound is on)">MP4</button>
+        <button type="button" class="pill" data-export="mov" data-tip="Render a new loop to a MOV file (includes bounce sounds when Sound is on)">MOV</button>
         <button type="button" class="pill" data-export="mov-alpha" data-tip="Render a MOV with a transparent background">Transparent MOV</button>
       </div>
       <h2 data-tip="Animated GIF of a loop">GIF</h2>
@@ -155,7 +155,7 @@ function panelHtml(): string {
       <p class="hint" id="gif-size-meta"></p>
       <p class="hint">Same frame rate. If the loop is long, the GIF stops before it gets too large.</p>
       <div class="export-list">
-        <button type="button" class="pill export-primary" data-export="gif" data-tip="Render a new loop to a GIF">GIF</button>
+        <button type="button" class="pill" data-export="gif" data-tip="Render a new loop to a GIF">GIF</button>
       </div>
     </section>
     <p class="hint" id="export-status" role="status"></p>

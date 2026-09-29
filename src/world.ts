@@ -156,6 +156,14 @@ type ChipLook = {
   shiftEm: number;
 };
 
+/** Bounce SFX event for offline export muxing. `timeMs` is sim clock since `play()`. */
+export type ImpactHit = {
+  slotId: string;
+  bounceIndex: number;
+  speedFactor: number;
+  timeMs: number;
+};
+
 export type WorldHandle = {
   play: (
     slots: Slot[],
@@ -258,6 +266,8 @@ export type WorldHandle = {
   flipChips: (slotId: string, axis: "x" | "y") => void;
   /** Snap chips for a slot (or current xform targets) to angle 0. */
   alignChipsStraight: (slotId: string) => void;
+  /** Offline export: record bounce hits (skips live speaker playback while set). */
+  setImpactListener: (fn: ((hit: ImpactHit) => void) | null) => void;
   /** Convex hulls of each solid collider part, in stage pixels. */
   wireframes: () => { x: number; y: number }[][];
   step: (delta?: number) => void;
@@ -546,6 +556,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   const prevVel = new Map<number, { x: number; y: number }>();
   const bounceCount = new Map<number, number>();
   let lastImpactAt = 0;
+  /** Advances only via `step()` — used for impact cooldown + export timestamps. */
+  let simClockMs = 0;
+  let impactListener: ((hit: ImpactHit) => void) | null = null;
+
+  function setImpactListener(fn: ((hit: ImpactHit) => void) | null) {
+    impactListener = fn;
+  }
 
   function setRunning(on: boolean) {
     if (on && !running) {
@@ -852,6 +869,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     bounceCount.clear();
     prevVel.clear();
     maxSpan = 0;
+    simClockMs = 0;
+    lastImpactAt = Number.NEGATIVE_INFINITY;
   }
 
   function applyPhysics(physics: PhysicsSettings) {
@@ -1148,13 +1167,22 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (best < IMPACT_SPEED || !bestBody || bestBody.isStatic) return;
     const chip = chips.find((item) => item.body === bestBody || item.body.id === bestBody.id);
     if (!chip) return;
-    const now = performance.now();
+    // Live runner uses wall clock; offline `step()` uses sim clock so export cooldowns match the fall.
+    const now = running ? performance.now() : simClockMs;
     if (now - lastImpactAt < IMPACT_COOLDOWN_MS) return;
     lastImpactAt = now;
     const bounceIndex = bounceCount.get(chip.body.id) ?? 0;
     bounceCount.set(chip.body.id, bounceIndex + 1);
     const speedFactor = Math.min(1, best / IMPACT_FULL_SPEED);
-    playImpact(chip.slotId, bounceIndex, speedFactor);
+    if (impactListener) {
+      try {
+        impactListener({ slotId: chip.slotId, bounceIndex, speedFactor, timeMs: simClockMs });
+      } catch {
+        // Export recorders must never break the Matter step.
+      }
+    } else {
+      playImpact(chip.slotId, bounceIndex, speedFactor);
+    }
   });
 
   Events.on(engine, "afterUpdate", () => {
@@ -3507,6 +3535,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function step(delta = FRAME_MS) {
     const slice = delta / contactSteps;
     for (let i = 0; i < contactSteps; i++) Engine.update(engine, slice);
+    simClockMs += delta;
   }
 
   function sync() {
@@ -3555,6 +3584,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     restore,
     flipChips,
     alignChipsStraight,
+    setImpactListener,
     wireframes,
     step,
     destroy,

@@ -104,6 +104,17 @@ function impactUriForSlot(slotId: string): string {
   return uri;
 }
 
+/** Resolve the sticky drop sample + live volume for a bounce (shared by speaker + export). */
+export function resolveImpact(
+  slotId: string,
+  bounceIndex: number,
+  speedFactor: number,
+): { uri: string; volume: number } {
+  const bounceVol = bounceIndex <= 0 ? 1 : bounceIndex === 1 ? 0.5 : 0.25;
+  const volume = Math.max(0.15, Math.min(1, bounceVol * speedFactor));
+  return { uri: impactUriForSlot(slotId), volume };
+}
+
 /** Light UI press (random tap). */
 export function playClick() {
   requestPlay(pick(TAP_URLS));
@@ -121,9 +132,8 @@ export function playCreate() {
 
 /** Impact for a slot’s assigned drop sound. `bounceIndex` 0 = first hit. */
 export function playImpact(slotId: string, bounceIndex: number, speedFactor: number) {
-  const bounceVol = bounceIndex <= 0 ? 1 : bounceIndex === 1 ? 0.5 : 0.25;
-  const volume = Math.max(0.15, Math.min(1, bounceVol * speedFactor));
-  requestPlay(impactUriForSlot(slotId), volume, bounceAudible);
+  const { uri, volume } = resolveImpact(slotId, bounceIndex, speedFactor);
+  requestPlay(uri, volume, bounceAudible);
 }
 
 /** Remove / dismiss / deselect. */

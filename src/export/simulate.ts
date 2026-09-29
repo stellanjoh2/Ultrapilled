@@ -1,7 +1,7 @@
 import { canvasFrame } from "../canvas";
 import type { AppState } from "../types";
 import { paintFrame } from "./paint";
-import { createWorld } from "../world";
+import { createWorld, type ImpactHit } from "../world";
 
 const STEP_MS = 1000 / 60;
 const MIN_CYCLE_MS = 1200;
@@ -35,7 +35,7 @@ export async function renderLoop(options: {
   onFrame: (canvas: HTMLCanvasElement, index: number) => Promise<void | false> | void | false;
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
-}): Promise<{ frames: number; limited: boolean }> {
+}): Promise<{ frames: number; limited: boolean; impacts: ImpactHit[] }> {
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
   host.style.cssText = `position:fixed;left:-16000px;top:0;width:${options.stageWidth}px;height:${options.stageHeight}px;overflow:hidden;pointer-events:none;opacity:0`;
@@ -57,6 +57,7 @@ export async function renderLoop(options: {
   let frames = 0;
   let limited = false;
   let timeMs = 0;
+  const impacts: ImpactHit[] = [];
 
   try {
     const stageWidth = host.clientWidth || options.stageWidth;
@@ -78,6 +79,10 @@ export async function renderLoop(options: {
 
     for (let loop = 0; loop < options.loops; loop++) {
       if (options.shouldStop?.()) throw new ExportCancelled();
+      const loopStartMs = timeMs;
+      sim.setImpactListener((hit) => {
+        impacts.push({ ...hit, timeMs: loopStartMs + hit.timeMs });
+      });
       sim.play(
         options.state.slots,
         options.state.physics,
@@ -91,7 +96,7 @@ export async function renderLoop(options: {
 
       if (sim.chipCount() === 0) {
         await paintFrame(canvas, sim.draws(), scene, timeMs);
-        if ((await options.onFrame(canvas, frames)) === false) return { frames, limited };
+        if ((await options.onFrame(canvas, frames)) === false) return { frames, limited, impacts };
         frames += 1;
         timeMs += frameMs;
         options.onProgress?.(`Rendering frame ${frames}`);
@@ -107,13 +112,13 @@ export async function renderLoop(options: {
         if (options.shouldStop?.()) throw new ExportCancelled();
         if (frames >= MAX_FRAMES) {
           limited = true;
-          return { frames, limited };
+          return { frames, limited, impacts };
         }
 
         for (let step = 0; step < stepsPerFrame; step++) sim.step(STEP_MS);
         sim.purgeFallen(stageHeight);
         await paintFrame(canvas, sim.draws(), scene, timeMs);
-        if ((await options.onFrame(canvas, frames)) === false) return { frames, limited };
+        if ((await options.onFrame(canvas, frames)) === false) return { frames, limited, impacts };
         frames += 1;
         timeMs += frameMs;
         options.onProgress?.(`Rendering frame ${frames}`);
@@ -139,8 +144,9 @@ export async function renderLoop(options: {
         await yieldToUi();
       }
     }
-    return { frames, limited };
+    return { frames, limited, impacts };
   } finally {
+    sim.setImpactListener(null);
     sim.destroy();
     host.remove();
   }

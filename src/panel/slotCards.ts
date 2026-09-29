@@ -302,19 +302,19 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
   editor.innerHTML = `
     <div class="slot-group">
       <p class="slot-label">Text</p>
-      <div class="field">${H.settingLabel(slot, "Typeface", "fontFamily")}
-        <div class="font-pick" data-font-pick></div>
-      </div>
       <div class="row">
+        <div class="field">${H.settingLabel(slot, "Typeface", "fontFamily")}
+          <div class="font-pick" data-font-pick></div>
+        </div>
         <div class="field">${H.settingLabel(slot, "Weight", "fontWeight")}
           <div class="font-pick" data-weight-pick></div>
         </div>
-        <label class="field">${H.settingLabel(slot, "Size", "fontSize")}
-          <input type="number" data-key="fontSize" min="12" max="96" value="${slot.fontSize}" />
-        </label>
       </div>
       <label class="field">${H.settingLabel(slot, "Text scale", "scale", slot.scale.toFixed(2))}
         <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+      </label>
+      <label class="field">${H.settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
+        <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
       </label>
       <label class="field">${H.settingLabel(slot, "Tracking", "tracking", String(trackingOf(slot, H.state.textTracking)))}
         <input type="range" data-key="tracking" min="-400" max="500" step="1" value="${trackingOf(slot, H.state.textTracking)}" />

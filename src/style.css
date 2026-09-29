@@ -1921,16 +1921,6 @@ button.pill.smash-btn.is-on::after {
   grid-template-columns: 1fr;
 }
 
-.export-list .pill.export-primary {
-  background: var(--play-face);
-  color: var(--play-ink);
-  border-color: transparent;
-}
-
-.export-list .pill.export-primary:hover {
-  filter: brightness(1.04);
-}
-
 .segment .pill,
 .export-list .pill,
 #export-cancel {

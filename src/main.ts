@@ -2976,6 +2976,14 @@ function openCanvasMenu(x: number, y: number) {
         });
       },
     },
+    {
+      label: shell.classList.contains("ui-hidden") ? "Show UI" : "Hide UI",
+      run: () => {
+        shell.classList.toggle("ui-hidden");
+        playTransition(!shell.classList.contains("ui-hidden"));
+        resize();
+      },
+    },
     { label: "Clear canvas", clear: true, run: () => clearCanvas() },
   ];
 

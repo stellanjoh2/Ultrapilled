@@ -1,8 +1,10 @@
 import { zipSync } from "fflate";
 import type { ChipDraw } from "../chipKinds";
+import { getPrefs } from "../prefs";
 import type { AppState } from "../types";
+import { AAC_PACKET_SAMPLES, mixBounceTrack } from "./bounceAudio";
 import { paintFrame } from "./paint";
-import { renderLoop, yieldToUi } from "./simulate";
+import { ExportCancelled, renderLoop, yieldToUi } from "./simulate";
 import {
   frameSize,
   type FrameRate,
@@ -102,7 +104,7 @@ export async function exportStill(options: {
   );
 }
 
-async function runLoop(options: LoopRequest): Promise<{ frames: number; limited: boolean }> {
+async function runLoop(options: LoopRequest) {
   return renderLoop(options);
 }
 
@@ -159,6 +161,43 @@ async function exportVideo(options: {
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
 }): Promise<LoopResult> {
+  const prefs = getPrefs();
+  const {
+    canEncodeAudio,
+    Quality,
+  } = await import("mediabunny");
+  const audioQuality = new Quality("high");
+  const canAudio =
+    prefs.soundOn &&
+    prefs.bounceSounds &&
+    prefs.soundVolume > 0 &&
+    (await canEncodeAudio("aac", { numberOfChannels: 2, sampleRate: 44100, quality: audioQuality }));
+
+  // Prefer audio+video; if the mux comes out short (players freeze on frame 0), retry video-only.
+  if (canAudio) {
+    try {
+      return await encodeVideoFile({ ...options, withAudio: true });
+    } catch (error) {
+      if (error instanceof ExportCancelled) throw error;
+      options.onProgress?.("Audio mux failed — exporting video only…");
+    }
+  }
+  return encodeVideoFile({ ...options, withAudio: false });
+}
+
+async function encodeVideoFile(options: {
+  state: AppState;
+  stageWidth: number;
+  stageHeight: number;
+  preset: VideoSizePreset;
+  fps: FrameRate;
+  loops: LoopCount;
+  transparent: boolean;
+  format: "mp4" | "mov";
+  withAudio: boolean;
+  shouldStop?: () => boolean;
+  onProgress?: (message: string) => void;
+}): Promise<LoopResult> {
   const { width, height } = frameSize(options.stageWidth, options.stageHeight, options.preset);
   const {
     Output,
@@ -166,15 +205,20 @@ async function exportVideo(options: {
     MovOutputFormat,
     BufferTarget,
     CanvasSource,
+    AudioBufferSource,
     Quality,
     canEncodeVideo,
+    Input,
+    ALL_FORMATS,
+    BlobSource,
   } = await import("mediabunny");
 
-  const quality = new Quality("high");
+  const videoQuality = new Quality("high");
+  const audioQuality = new Quality("high");
   const codec = options.transparent
     ? await (async () => {
         for (const next of ["prores", "hevc", "vp9"] as const) {
-          if (await canEncodeVideo(next, { alpha: "keep", quality, width, height })) return next;
+          if (await canEncodeVideo(next, { alpha: "keep", quality: videoQuality, width, height })) return next;
         }
         throw new Error("Transparent MOV needs a browser codec with alpha (ProRes, HEVC, or VP9)");
       })()
@@ -191,16 +235,23 @@ async function exportVideo(options: {
   canvas.width = width;
   canvas.height = height;
   const output = new Output({
-    format: options.format === "mp4" ? new Mp4OutputFormat() : new MovOutputFormat(),
+    format:
+      options.format === "mp4"
+        ? new Mp4OutputFormat({ fastStart: "in-memory" })
+        : new MovOutputFormat(),
     target: new BufferTarget(),
   });
   const video = new CanvasSource(canvas, {
     codec,
-    quality,
+    quality: videoQuality,
     keyFrameInterval: 1 / options.fps,
     ...(options.transparent ? { alpha: "keep" as const } : {}),
   });
   output.addVideoTrack(video, { frameRate: options.fps });
+  const audio = options.withAudio
+    ? new AudioBufferSource({ codec: "aac", quality: audioQuality }, { startTimestamp: 0 })
+    : null;
+  if (audio) output.addAudioTrack(audio);
   await output.start();
 
   try {
@@ -222,14 +273,42 @@ async function exportVideo(options: {
       },
     });
     if (result.frames === 0) throw new Error("Export failed");
+    const contentDurationSec = result.frames / options.fps;
+    if (audio) {
+      // Hold the last painted frame long enough to cover AAC packet padding so
+      // players don't flash a black frame past the video track (breaks loops).
+      const padFrames = Math.max(1, Math.ceil((AAC_PACKET_SAMPLES / 44100) * options.fps));
+      for (let i = 0; i < padFrames; i++) {
+        await video.add((result.frames + i) * frameDuration, frameDuration);
+      }
+      options.onProgress?.("Mixing bounce audio…");
+      const mixed = await mixBounceTrack(result.impacts, contentDurationSec);
+      if (mixed.duration > contentDurationSec + 1e-3) {
+        throw new Error("Bounce audio bed longer than video");
+      }
+      await audio.add(mixed);
+    }
     options.onProgress?.("Packaging…");
     await output.finalize();
     const buffer = output.target.buffer;
     if (!buffer) throw new Error("Export failed");
+
+    // Short AAC tracks make players stop on frame 0 — looks like a frozen export.
+    if (audio) {
+      const input = new Input({
+        formats: ALL_FORMATS,
+        source: new BlobSource(new Blob([buffer], { type: "video/mp4" })),
+      });
+      const outDuration = await input.computeDuration();
+      if (outDuration < contentDurationSec * 0.5) {
+        throw new Error("Export duration too short after audio mux");
+      }
+    }
+
     const filename = options.transparent ? "falldown-transparent.mov" : `falldown.${options.format}`;
     const mime = options.format === "mp4" ? "video/mp4" : "video/quicktime";
     downloadBlob(new Blob([buffer], { type: mime }), filename);
-    return { ...result, truncated: false };
+    return { frames: result.frames, limited: result.limited, truncated: false };
   } catch (error) {
     await output.cancel().catch(() => undefined);
     throw error;

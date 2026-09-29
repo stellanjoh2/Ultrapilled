@@ -6,6 +6,7 @@ import { measureTextInk, paintTextInk } from "../measure";
 import { peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
 import { rasterRing, textLookFlags } from "../chipLook";
+import { textAnimCharPose, textAnimTravel } from "../textAnim";
 import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 
 const GRAIN_URL =
@@ -188,6 +189,47 @@ function drawGradient(
   ctx.restore();
 }
 
+/** Per-letter rolling text — same cycle as live GSAP, clipped like overflow:hidden. */
+function paintRollingText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  fontSize: number,
+  fontWeight: number,
+  fontFamily: string,
+  tracking: number,
+  fill: string | CanvasGradient,
+  originX: number,
+  baselineY: number,
+  travel: number,
+  timeMs: number,
+  speed: number | undefined,
+  align: "left" | "center",
+  baseline: CanvasTextBaseline,
+) {
+  if (!text) return;
+  ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+  ctx.letterSpacing = "0px";
+  ctx.textAlign = "left";
+  ctx.textBaseline = baseline;
+  ctx.fillStyle = fill;
+
+  const chars = [...text];
+  const widths = chars.map((ch) => ctx.measureText(ch === " " ? "\u00a0" : ch).width);
+  const total = widths.reduce((sum, w) => sum + w, 0) + fontSize * tracking * Math.max(0, chars.length - 1);
+  let x = align === "center" ? originX - total / 2 : originX;
+  const n = chars.length;
+  for (let i = 0; i < n; i++) {
+    const pose = textAnimCharPose(timeMs, speed, i, n, travel);
+    if (pose.alpha > 0.001) {
+      ctx.save();
+      ctx.globalAlpha *= pose.alpha;
+      ctx.fillText(chars[i] === " " ? "\u00a0" : chars[i]!, x, baselineY + pose.y);
+      ctx.restore();
+    }
+    x += widths[i]! + fontSize * tracking;
+  }
+}
+
 function drawText(
   ctx: CanvasRenderingContext2D,
   chip: ChipDraw,
@@ -220,8 +262,13 @@ function drawText(
     ctx.restore();
   }
   if (bloom && !bare) return;
+
+  const fontSize = slot.fontSize * scale;
+  const rolling = Boolean(slot.textAnim);
+  const travel = rolling ? textAnimTravel(height, fontSize) : 0;
+
   if (bare) {
-    const drawSlot = scale === 1 ? slot : { ...slot, fontSize: slot.fontSize * scale };
+    const drawSlot = scale === 1 ? slot : { ...slot, fontSize };
     const ink = measureTextInk(drawSlot, chip.tracking);
     const fill =
       slot.gradient && !slot.stroked
@@ -236,15 +283,64 @@ function drawText(
             slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined,
           )
         : chip.ink;
+    if (rolling) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, width, height);
+      ctx.clip();
+      paintRollingText(
+        ctx,
+        slot.text || "",
+        fontSize,
+        slot.fontWeight,
+        slot.fontFamily,
+        chip.tracking,
+        fill,
+        ink.originX,
+        ink.baseline + chip.shiftEm * fontSize,
+        travel,
+        timeMs,
+        slot.textAnimSpeed,
+        "left",
+        "alphabetic",
+      );
+      ctx.restore();
+      return;
+    }
     paintTextInk(ctx, drawSlot, chip.tracking, fill, chip.shiftEm, ink);
     return;
   }
-  ctx.font = `${slot.fontWeight} ${slot.fontSize * scale}px "${slot.fontFamily}", sans-serif`;
+
+  if (rolling) {
+    ctx.save();
+    round(ctx, width, height, radius);
+    ctx.clip();
+    paintRollingText(
+      ctx,
+      slot.text || "",
+      fontSize,
+      slot.fontWeight,
+      slot.fontFamily,
+      chip.tracking,
+      chip.ink,
+      width / 2,
+      height / 2 + chip.shiftEm * fontSize,
+      travel,
+      timeMs,
+      slot.textAnimSpeed,
+      "center",
+      "middle",
+    );
+    ctx.restore();
+    return;
+  }
+
+  ctx.font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
   ctx.fillStyle = chip.ink;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.letterSpacing = `${chip.tracking}em`;
-  ctx.fillText(slot.text || "", width / 2, height / 2 + chip.shiftEm * slot.fontSize * scale);
+  ctx.fillText(slot.text || "", width / 2, height / 2 + chip.shiftEm * fontSize);
 }
 
 function drawChip(

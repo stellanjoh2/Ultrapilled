@@ -52,11 +52,55 @@ function pace(speed: number | undefined) {
 }
 
 /** How far letters travel so they clear the pill edge (clip happens on the chip). */
-function travelPx(label: HTMLElement, fontSize: number): number {
-  const host = label.parentElement;
-  const pillH = host?.clientHeight ?? 0;
-  if (pillH > 0) return Math.ceil(pillH / 2 + fontSize * 0.15);
+export function textAnimTravel(chipHeight: number, fontSize: number): number {
+  if (chipHeight > 0) return Math.ceil(chipHeight / 2 + fontSize * 0.15);
   return Math.ceil(fontSize * 1.2);
+}
+
+function travelPx(label: HTMLElement, fontSize: number): number {
+  return textAnimTravel(label.parentElement?.clientHeight ?? 0, fontSize);
+}
+
+function easePower2Out(t: number): number {
+  return 1 - (1 - t) * (1 - t);
+}
+
+function easePower2In(t: number): number {
+  return t * t;
+}
+
+/** Sample one letter of the live GSAP cycle (phrase mode) at export time. */
+export function textAnimCharPose(
+  timeMs: number,
+  speed: number | undefined,
+  charIndex: number,
+  charCount: number,
+  travel: number,
+): { y: number; alpha: number } {
+  if (charCount < 1) return { y: 0, alpha: 1 };
+  const { letter, stagger, pause } = pace(speed);
+  const wave = letter + Math.max(0, charCount - 1) * stagger;
+  const cycle = 2 * wave + pause;
+  if (cycle <= 0) return { y: 0, alpha: 1 };
+  let t = (timeMs / 1000) % cycle;
+  if (t < 0) t += cycle;
+
+  const enterStart = charIndex * stagger;
+  const enterEnd = enterStart + letter;
+  const exitStart = wave + pause + charIndex * stagger;
+  const exitEnd = exitStart + letter;
+
+  if (t < enterStart) return { y: travel, alpha: 0 };
+  if (t < enterEnd) {
+    const p = easePower2Out((t - enterStart) / letter);
+    return { y: travel * (1 - p), alpha: p };
+  }
+  if (t < exitStart) return { y: 0, alpha: 1 };
+  if (t < exitEnd) {
+    const p = easePower2In((t - exitStart) / letter);
+    return { y: -travel * p, alpha: 1 - p };
+  }
+  return { y: -travel, alpha: 0 };
 }
 
 function splitChars(word: string): HTMLElement[] {
