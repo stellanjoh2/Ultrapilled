@@ -1,4 +1,5 @@
 import { playRemove } from "./uiSounds";
+import { uiScale } from "./uiScale";
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const RECENT_KEY = "falldown.recentColors";
@@ -102,8 +103,8 @@ export function mountColorPicker(options: {
     const anchorRect = anchor.getBoundingClientRect();
     const panelRect = root.getBoundingClientRect();
     const gap = 8;
-    const width = panelRect.width || 280;
-    const height = panelRect.height || 360;
+    const width = panelRect.width || 280 * uiScale();
+    const height = panelRect.height || 360 * uiScale();
     let left = anchorRect.left - width - gap;
     if (left < gap) left = Math.min(anchorRect.right + gap, window.innerWidth - width - gap);
     left = Math.max(gap, Math.min(left, window.innerWidth - width - gap));

@@ -74,6 +74,9 @@ import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
 import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?raw";
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
 import "./style.css";
+import { placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
+
+syncUiScale();
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (!appRoot) throw new Error("#app missing");
@@ -229,7 +232,27 @@ try {
 
 function paintWelcome() {
   const show = !welcomeDismissed && !running && !posePinned && world.chipCount() === 0;
-  canvasWelcome.hidden = !show;
+  gsap.killTweensOf(canvasWelcome);
+  if (show) {
+    canvasWelcome.hidden = false;
+    gsap.set(canvasWelcome, { autoAlpha: 1 });
+    return;
+  }
+  if (canvasWelcome.hidden) return;
+  if (reducedMotion()) {
+    canvasWelcome.hidden = true;
+    gsap.set(canvasWelcome, { clearProps: "opacity,visibility" });
+    return;
+  }
+  gsap.to(canvasWelcome, {
+    autoAlpha: 0,
+    duration: 0.35,
+    ease: "power1.in",
+    onComplete: () => {
+      canvasWelcome.hidden = true;
+      gsap.set(canvasWelcome, { clearProps: "opacity,visibility" });
+    },
+  });
 }
 
 function dismissWelcome() {
@@ -552,11 +575,12 @@ function openFontMenu(
       return;
     }
     const gap = 4;
+    const s = uiScale();
     const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
     const spaceAbove = rect.top - gap - 8;
-    const openUp = spaceBelow < 160 && spaceAbove > spaceBelow;
+    const openUp = spaceBelow < 160 * s && spaceAbove > spaceBelow;
     menu.style.width = `${rect.width}px`;
-    menu.style.maxHeight = `${Math.max(120, Math.min(280, openUp ? spaceAbove : spaceBelow))}px`;
+    menu.style.maxHeight = `${Math.max(120 * s, Math.min(280 * s, openUp ? spaceAbove : spaceBelow))}px`;
     menu.style.left = `${Math.max(8, rect.left)}px`;
     if (openUp) {
       menu.style.top = "auto";
@@ -777,11 +801,12 @@ function openChoiceMenu<T>(
       return;
     }
     const gap = 4;
+    const s = uiScale();
     const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
     const spaceAbove = rect.top - gap - 8;
-    const openUp = spaceBelow < 160 && spaceAbove > spaceBelow;
+    const openUp = spaceBelow < 160 * s && spaceAbove > spaceBelow;
     menu.style.width = `${rect.width}px`;
-    menu.style.maxHeight = `${Math.max(120, Math.min(280, openUp ? spaceAbove : spaceBelow))}px`;
+    menu.style.maxHeight = `${Math.max(120 * s, Math.min(280 * s, openUp ? spaceAbove : spaceBelow))}px`;
     menu.style.left = `${Math.max(8, rect.left)}px`;
     if (openUp) {
       menu.style.top = "auto";
@@ -2363,7 +2388,10 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
     btn.title = item.name;
     btn.className = slot.emoji === item.char ? "is-on" : "";
     btn.setAttribute("aria-pressed", String(slot.emoji === item.char));
-    btn.textContent = item.char;
+    const glyph = document.createElement("span");
+    glyph.className = "emoji-glyph";
+    glyph.textContent = item.char;
+    btn.append(glyph);
     btn.addEventListener("click", () => pickEmoji(item));
     featured.append(btn);
   }
@@ -2377,7 +2405,10 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
       btn.title = item.name;
       btn.className = slot.emoji === item.char ? "is-on" : "";
       btn.setAttribute("aria-pressed", String(slot.emoji === item.char));
-      btn.textContent = item.char;
+      const glyph = document.createElement("span");
+      glyph.className = "emoji-glyph";
+      glyph.textContent = item.char;
+      btn.append(glyph);
       btn.addEventListener("click", () => pickEmoji(item));
       results.append(btn);
     }
@@ -2655,6 +2686,7 @@ function armSlotPlace(id: string, at?: PlaceAt) {
 
 function addPillSlot(at?: PlaceAt) {
   remember();
+  dismissWelcome();
   const font: Partial<TextSlot> = {};
   if (appliedFont) {
     font.fontFamily = appliedFont;
@@ -2676,6 +2708,7 @@ function addPillSlot(at?: PlaceAt) {
 
 function addTypeSlot(at?: PlaceAt) {
   remember();
+  dismissWelcome();
   const font: Partial<TextSlot> = {};
   if (appliedFont) {
     font.fontFamily = appliedFont;
@@ -2697,6 +2730,7 @@ function addTypeSlot(at?: PlaceAt) {
 
 function addShapeSlot(at?: PlaceAt) {
   remember();
+  dismissWelcome();
   const preset = ICON_PRESETS[0]!;
   const slot = defaultImageSlot({
     colorIndex: state.slots.length % state.theme.length,
@@ -2715,6 +2749,7 @@ function addShapeSlot(at?: PlaceAt) {
 
 function addEmojiSlot(at?: PlaceAt) {
   remember();
+  dismissWelcome();
   const item = FEATURED_EMOJI[0]!;
   const slot = defaultImageSlot({
     colorIndex: state.slots.length % state.theme.length,
@@ -3631,11 +3666,7 @@ let chipEditAbort: AbortController | null = null;
 function placeSlotMenu(menu: HTMLElement, x: number, y: number) {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.body.append(menu);
-  const gap = 8;
-  const left = Math.max(gap, Math.min(x, window.innerWidth - menu.offsetWidth - gap));
-  const top = Math.max(gap, Math.min(y, window.innerHeight - menu.offsetHeight - gap));
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
+  placeZoomedFixed(menu, x, y, 8);
   if (reduceMotion) menu.classList.add("is-in");
   else requestAnimationFrame(() => menu.classList.add("is-in"));
 }
@@ -3769,11 +3800,7 @@ function openCanvasMenu(x: number, y: number) {
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.body.append(menu);
-  const gap = 8;
-  const left = Math.max(gap, Math.min(x, window.innerWidth - menu.offsetWidth - gap));
-  const top = Math.max(gap, Math.min(y, window.innerHeight - menu.offsetHeight - gap));
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
+  placeZoomedFixed(menu, x, y, 8);
 
   if (!reduceMotion) {
     gsap.fromTo(
@@ -5355,6 +5382,7 @@ function live() {
         posePinned = true;
         if (running) phase = "holding";
       }
+      paintWelcome();
     }
     if (state.physics.layoutMode) {
       world.syncLayerOrder(state.slots.map((slot) => slot.id));
@@ -6440,6 +6468,7 @@ world.attach(
 }
 
 const resize = () => {
+  syncUiScale();
   if (syncCanvas(world.chipCount() > 0) && world.chipCount() > 0) relayout();
 };
 const frameObserver = new ResizeObserver(() => resize());

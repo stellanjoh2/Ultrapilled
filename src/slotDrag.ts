@@ -133,16 +133,18 @@ function begin(
 
 function lift(current: Drag, event: PointerEvent) {
   const rect = current.card.getBoundingClientRect();
+  const designW = current.card.offsetWidth;
+  const designH = current.card.offsetHeight;
   const placeholder = document.createElement("div");
   placeholder.className = "slot-gap";
   placeholder.setAttribute("aria-hidden", "true");
-  placeholder.style.height = `${current.card.offsetHeight}px`;
+  placeholder.style.height = `${designH}px`;
   current.card.replaceWith(placeholder);
   document.body.append(current.card);
   current.placeholder = placeholder;
   current.phase = "dragging";
   current.originLeft = rect.left;
-  current.width = rect.width;
+  current.width = designW;
   current.grabY = event.clientY - rect.top;
   current.pointerX = event.clientX;
   current.pointerY = event.clientY;
@@ -189,12 +191,12 @@ function tick(current: Drag) {
 function place(current: Drag) {
   const grew = current.reduced ? 1 : Math.min(1, (performance.now() - current.liftedAt) / LIFT_MS);
   const eased = 1 - (1 - grew) ** 3;
-  const scale = current.reduced ? 1 : 1 + 0.04 * eased;
+  const pop = current.reduced ? 1 : 1 + 0.04 * eased;
   const tilt = current.reduced ? 0 : current.tilt;
   current.card.style.width = `${current.width}px`;
   current.card.style.left = `${current.originLeft}px`;
   current.card.style.top = `${current.pointerY - current.grabY}px`;
-  current.card.style.transform = `scale(${scale}) rotate(${tilt}deg)`;
+  current.card.style.transform = `scale(${pop}) rotate(${tilt}deg)`;
 }
 
 function moveGap(current: Drag) {
@@ -241,7 +243,12 @@ function settle(current: Drag, token: number) {
   const anim = current.card.animate(
     [
       { top: fromTop, left: fromLeft, transform: fromTransform, boxShadow: SHADOW },
-      { top: `${to.top}px`, left: `${to.left}px`, transform: "scale(1) rotate(0deg)", boxShadow: "0 0 0 rgba(0, 0, 0, 0)" },
+      {
+        top: `${to.top}px`,
+        left: `${to.left}px`,
+        transform: "scale(1) rotate(0deg)",
+        boxShadow: "0 0 0 rgba(0, 0, 0, 0)",
+      },
     ],
     { duration, easing: EASE, fill: "forwards" },
   );
