@@ -21,12 +21,15 @@ const impactBySlot = new Map<string, string>();
 
 let pendingUri: string | null = null;
 let pendingVolume = 1;
+let pendingGate: () => boolean = () => false;
 let flushQueued = false;
 let lockedUntil = 0;
 let unlockBound = false;
 /** Forced mute (e.g. audio-react mic). Overrides user sound prefs. */
 let forceMuted = false;
 let soundOn = getPrefs().soundOn;
+let bounceSounds = getPrefs().bounceSounds;
+let uiSounds = getPrefs().uiSounds;
 let soundVolume = getPrefs().soundVolume;
 let typeBound = false;
 let progressPlayback: SoundPlayback | null = null;
@@ -34,8 +37,10 @@ let progressPlayback: SoundPlayback | null = null;
 onPrefsChange(() => {
   const prefs = getPrefs();
   soundOn = prefs.soundOn;
+  bounceSounds = prefs.bounceSounds;
+  uiSounds = prefs.uiSounds;
   soundVolume = prefs.soundVolume;
-  if (!soundOn || soundVolume <= 0 || forceMuted) stopProgress();
+  if (!soundOn || !uiSounds || soundVolume <= 0 || forceMuted) stopProgress();
 });
 
 /** When true, all UI / impact SFX are skipped (e.g. audio-react mic is on). */
@@ -45,8 +50,16 @@ export function setUiSoundsMuted(next: boolean) {
   stopProgress();
 }
 
-function audible(): boolean {
+function masterAudible(): boolean {
   return !forceMuted && soundOn && soundVolume > 0;
+}
+
+function uiAudible(): boolean {
+  return masterAudible() && uiSounds;
+}
+
+function bounceAudible(): boolean {
+  return masterAudible() && bounceSounds;
 }
 
 function gain(volume: number): number {
@@ -57,15 +70,16 @@ function pick(urls: string[]): string {
   return urls[Math.floor(Math.random() * urls.length)]!;
 }
 
-function requestPlay(src: string, volume = 1) {
-  if (!audible()) return;
+function requestPlay(src: string, volume = 1, gate: () => boolean = uiAudible) {
+  if (!gate()) return;
   pendingUri = src;
   pendingVolume = volume;
+  pendingGate = gate;
   if (flushQueued) return;
   flushQueued = true;
   queueMicrotask(() => {
     flushQueued = false;
-    if (!audible()) {
+    if (!pendingGate()) {
       pendingUri = null;
       return;
     }
@@ -109,7 +123,7 @@ export function playCreate() {
 export function playImpact(slotId: string, bounceIndex: number, speedFactor: number) {
   const bounceVol = bounceIndex <= 0 ? 1 : bounceIndex === 1 ? 0.5 : 0.25;
   const volume = Math.max(0.15, Math.min(1, bounceVol * speedFactor));
-  requestPlay(impactUriForSlot(slotId), volume);
+  requestPlay(impactUriForSlot(slotId), volume, bounceAudible);
 }
 
 /** Remove / dismiss / deselect. */
@@ -154,16 +168,16 @@ export function playDisabled() {
 
 /** Random typewriter click; overlaps allowed so rapid typing still feels dense. */
 export function playType() {
-  if (!audible()) return;
+  if (!uiAudible()) return;
   void playSound(pick(TYPE_URLS), { volume: gain(0.7) });
 }
 
 /** Looping bed while a long export runs. */
 export function startProgress() {
-  if (!audible()) return;
+  if (!uiAudible()) return;
   stopProgress();
   void playSound(S("progress_loop"), { volume: gain(0.35), loop: true }).then((playback) => {
-    if (!audible()) {
+    if (!uiAudible()) {
       playback.stop();
       return;
     }

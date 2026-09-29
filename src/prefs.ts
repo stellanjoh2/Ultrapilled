@@ -2,6 +2,8 @@ export type ChromeTheme = "night" | "day";
 
 export type AppPrefs = {
   soundOn: boolean;
+  bounceSounds: boolean;
+  uiSounds: boolean;
   soundVolume: number;
   tipsOn: boolean;
   tooltipsOn: boolean;
@@ -14,6 +16,8 @@ const STORAGE_KEY = "falldown.prefs";
 
 const DEFAULTS: AppPrefs = {
   soundOn: true,
+  bounceSounds: true,
+  uiSounds: true,
   soundVolume: 80,
   tipsOn: true,
   tooltipsOn: true,
@@ -33,6 +37,8 @@ function read(): AppPrefs {
     const parsed = JSON.parse(raw) as Partial<AppPrefs>;
     return {
       soundOn: parsed.soundOn !== false,
+      bounceSounds: parsed.bounceSounds !== false,
+      uiSounds: parsed.uiSounds !== false,
       soundVolume: clampVolume(Number(parsed.soundVolume ?? DEFAULTS.soundVolume)),
       tipsOn: parsed.tipsOn !== false,
       tooltipsOn: parsed.tooltipsOn !== false,

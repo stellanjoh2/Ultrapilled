@@ -144,8 +144,16 @@ function paintVolume() {
 
 function paintToggles(controller?: SettingsController) {
   const prefs = getPrefs();
-  panelEl?.querySelectorAll<HTMLInputElement>("#settings-sound, #settings-tips, #settings-tooltips, #settings-remember, #settings-performance").forEach((input) => {
+  panelEl?.querySelectorAll<HTMLInputElement>("#settings-sound, #settings-bounce-sounds, #settings-ui-sounds, #settings-tips, #settings-tooltips, #settings-remember, #settings-performance").forEach((input) => {
     if (input.id === "settings-sound") input.checked = prefs.soundOn;
+    if (input.id === "settings-bounce-sounds") {
+      input.checked = prefs.soundOn && prefs.bounceSounds;
+      input.disabled = !prefs.soundOn;
+    }
+    if (input.id === "settings-ui-sounds") {
+      input.checked = prefs.soundOn && prefs.uiSounds;
+      input.disabled = !prefs.soundOn;
+    }
     if (input.id === "settings-tips") input.checked = prefs.tipsOn;
     if (input.id === "settings-tooltips") input.checked = prefs.tooltipsOn;
     if (input.id === "settings-remember") input.checked = prefs.rememberLast;
@@ -190,9 +198,21 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
     <section class="section">
       <h2 data-tip="UI and impact sound effects">${sectionTitleIcon(speakerHighIcon)}Sound</h2>
       <div class="check-row">
-        <label class="check" data-tip="Play UI taps and fall impacts">
+        <label class="check" data-tip="Master mute for all sound effects">
           ${checkInput(`id="settings-sound" ${prefs.soundOn ? "checked" : ""}`)}
           Sound
+        </label>
+      </div>
+      <div class="check-row">
+        <label class="check" data-tip="Piece fall and collision impacts">
+          ${checkInput(`id="settings-bounce-sounds" ${prefs.soundOn && prefs.bounceSounds ? "checked" : ""} ${prefs.soundOn ? "" : "disabled"}`)}
+          Bounce Sounds
+        </label>
+      </div>
+      <div class="check-row">
+        <label class="check" data-tip="Clicks, toggles, typing, and other UI feedback">
+          ${checkInput(`id="settings-ui-sounds" ${prefs.soundOn && prefs.uiSounds ? "checked" : ""} ${prefs.soundOn ? "" : "disabled"}`)}
+          UI Sounds
         </label>
       </div>
       <label class="field" data-tip="Master level for UI and impact sounds"><span data-range-label="settings-volume">Volume ${prefs.soundVolume}</span>
@@ -283,6 +303,8 @@ function mountSettingsBody(panel: HTMLElement, controller: SettingsController) {
   bindShortcutsFold(panel);
 
   bindCheck(panel, "settings-sound", "soundOn", controller);
+  bindCheck(panel, "settings-bounce-sounds", "bounceSounds", controller);
+  bindCheck(panel, "settings-ui-sounds", "uiSounds", controller);
   bindCheck(panel, "settings-tips", "tipsOn", controller);
   bindCheck(panel, "settings-tooltips", "tooltipsOn", controller);
   bindCheck(panel, "settings-remember", "rememberLast", controller);
