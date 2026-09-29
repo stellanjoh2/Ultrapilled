@@ -203,7 +203,6 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
         </label>
       </div>
     </section>
-    ${shortcutsMarkup()}
     <section class="section">
       <h2 data-tip="Lighter live bloom so piles stay smoother; exports stay full quality">Performance</h2>
       <div class="check-row">
@@ -222,6 +221,7 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
         </label>
       </div>
     </section>
+    ${shortcutsMarkup()}
     <section class="section">
       <h2 data-tip="Save or open slots, physics, look, background, and placements">Project</h2>
       <div class="export-list">

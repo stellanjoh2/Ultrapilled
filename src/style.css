@@ -4495,7 +4495,7 @@ input.slot-live:focus {
   display: inline-flex;
   align-items: center;
   gap: calc(10px * var(--ui-scale));
-  color: var(--loop-stroke-a);
+  color: var(--ink);
   font-family: var(--font-section);
   font-size: calc(20px * var(--ui-scale));
   font-weight: 400;
