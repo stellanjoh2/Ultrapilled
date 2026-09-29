@@ -22,7 +22,7 @@ import { peekTrim } from "./trim";
 import { blendMode, physicsComplexity, shapeHasFill, type ImageSlot, type PhysicsComplexity, type PhysicsSettings, type Slot, type TextSlot } from "./types";
 import { playImpact } from "./uiSounds";
 
-const { Engine, Runner, Bodies, Composite, Body, Constraint, Sleeping, Events, Collision } = Matter;
+const { Engine, Runner, Bodies, Composite, Body, Constraint, Sleeping, Events, Collision, Query } = Matter;
 
 const WALL = 120;
 /** Shapes stop this far inside the canvas so the border never clips them. */
@@ -2438,6 +2438,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return chips.find((item) => item.el === el || item.chrome === el);
   }
 
+  /**
+   * Front-most chip whose physics body contains the stage point.
+   * Prefer this over DOM hit-testing — layout mix-blend-mode + the selection
+   * overlay often make `event.target` miss the chip you clicked.
+   */
+  function topChipAtStagePoint(x: number, y: number): DroppedChip | undefined {
+    const point = { x, y };
+    for (let i = chips.length - 1; i >= 0; i--) {
+      const chip = chips[i]!;
+      if (Query.point([chip.body], point).length > 0) return chip;
+    }
+    return undefined;
+  }
+
   /** Keep overlay host locked to the chip's live box + transform. */
   function syncChromeSeat(
     chip: DroppedChip,
@@ -3192,7 +3206,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
   }
 
-  function stagePoint(event: PointerEvent) {
+  function stagePoint(event: { clientX: number; clientY: number }) {
     const rect = (layer?.parentElement ?? stageEl)?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -3323,19 +3337,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       return;
     }
 
-    const el = target?.closest?.(".chip");
-    if (!(el instanceof HTMLElement) || el.closest(".bloom-layer")) {
+    // Resolve the chip from stage coords — not event.target. Layout blend modes and
+    // the selection overlay regularly make DOM hit-testing miss the piece under the pointer.
+    const point = stagePoint(event);
+    const chip = topChipAtStagePoint(point.x, point.y);
+    if (!chip) {
       clickChip = null;
       if (event.currentTarget === stageEl) blank = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
       return;
     }
-    const chip = chips.find((item) => item.el === el);
-    if (!chip) return;
     if (chip.slotId === editingId) return;
     blank = null;
     clickChip = null;
-    el.setPointerCapture(event.pointerId);
-    const point = stagePoint(event);
+    chip.el.setPointerCapture(event.pointerId);
     cancelPending();
     dropPin();
     pending = {
@@ -3347,7 +3361,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       originY: event.clientY,
     };
     // Already selected → grab right away so drag isn't fighting click-to-dismiss.
-    if (pickedIds.has(chip.slotId)) {
+    // Layout: same for any piece — click-without-move still selects via !drag.moved.
+    if (layoutMode || pickedIds.has(chip.slotId)) {
       beginDrag();
       return;
     }
@@ -3355,14 +3370,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function onContextMenu(event: MouseEvent) {
-    const el = (event.target as HTMLElement | null)?.closest?.(".chip");
-    if (el instanceof HTMLElement && !el.closest(".bloom-layer")) {
-      const chip = chips.find((item) => item.el === el);
-      if (chip) {
-        event.preventDefault();
-        onMenu?.(chip.slotId, event.clientX, event.clientY);
-        return;
-      }
+    const point = stagePoint(event);
+    const chip = topChipAtStagePoint(point.x, point.y);
+    if (chip) {
+      event.preventDefault();
+      onMenu?.(chip.slotId, event.clientX, event.clientY);
+      return;
     }
     event.preventDefault();
     onMenu?.(null, event.clientX, event.clientY);
