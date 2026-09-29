@@ -663,9 +663,12 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   cursor: grabbing;
 }
 
-.chip-layer .chip.is-picked {
+.chip-layer .chip.is-picked,
+.chip-layer .chip.is-grad-angling {
   --xform-pad: 12px;
   outline: none;
+  /* Keep selection chrome (xform handle + gradient wheel) above sibling chips. */
+  z-index: 3;
 }
 
 /* Bounding-box selection — Loop-style spinning gradient stroke.
@@ -1206,6 +1209,14 @@ html[data-theme="day"] .chip-grad-wheel__hub {
     background-size: 200% 200%;
     animation: pill-gradient-preview var(--sweep-duration, 3s) linear infinite;
   }
+}
+
+html.is-asset-anims-frozen .chip-fill-band,
+html.is-asset-anims-frozen .slot-chip.is-gradient-animated,
+html.is-asset-anims-frozen .shape-swatch.is-gradient-animated,
+html.is-asset-anims-frozen .chip-label.is-text-gradient.is-gradient-animated,
+html.is-asset-anims-frozen .chip-edit.is-text-gradient.is-gradient-animated {
+  animation-play-state: paused;
 }
 
 /* One tile along the band axis = one from→to→from period at any --grad-angle. */
@@ -2010,6 +2021,10 @@ button.pill.smash-btn.is-on::after {
 
 .section-reset:hover {
   background: var(--field);
+  color: var(--ink);
+}
+
+.section-reset.is-on {
   color: var(--ink);
 }
 
@@ -3008,10 +3023,22 @@ body.is-reordering * {
   margin: 0;
 }
 
-.slot-group > .slot-label {
+.slot-group > .slot-label,
+.slot-group-head > .slot-label {
   color: var(--ink);
   font-size: calc(15px * var(--ui-scale));
   font-weight: 300;
+}
+
+.slot-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-0);
+}
+
+.slot-group-head .slot-label {
+  margin: 0;
 }
 
 .slot-group + .slot-group {
@@ -4483,8 +4510,14 @@ input.slot-live:focus {
   margin-bottom: 0;
 }
 
-.settings-modal__body .section h2 {
+.settings-modal__body .section h2,
+.settings-modal__body .shortcuts-title {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10px * var(--ui-scale));
   font-size: calc(20px * var(--ui-scale));
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .settings-modal__body .shortcuts-section {
@@ -4492,18 +4525,12 @@ input.slot-live:focus {
 }
 
 .settings-modal__body .shortcuts-title {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(10px * var(--ui-scale));
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: calc(20px * var(--ui-scale));
   font-weight: 400;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
 }
 
-.settings-modal__body .shortcuts-title__icon {
+.settings-modal__body .section-title__icon {
   display: grid;
   place-items: center;
   flex: none;
@@ -4512,7 +4539,7 @@ input.slot-live:focus {
   color: inherit;
 }
 
-.settings-modal__body .shortcuts-title__icon svg {
+.settings-modal__body .section-title__icon svg {
   width: 100%;
   height: 100%;
   display: block;

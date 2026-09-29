@@ -1,8 +1,15 @@
 import gsap from "gsap";
+import circleHalfIcon from "@phosphor-icons/core/assets/regular/circle-half.svg?raw";
+import clockCounterClockwiseIcon from "@phosphor-icons/core/assets/regular/clock-counter-clockwise.svg?raw";
+import folderSimpleIcon from "@phosphor-icons/core/assets/regular/folder-simple.svg?raw";
+import gaugeIcon from "@phosphor-icons/core/assets/regular/gauge.svg?raw";
 import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
 import keyboardIcon from "@phosphor-icons/core/assets/regular/keyboard.svg?raw";
+import layoutIcon from "@phosphor-icons/core/assets/regular/layout.svg?raw";
+import lightbulbIcon from "@phosphor-icons/core/assets/regular/lightbulb.svg?raw";
 import moonIcon from "@phosphor-icons/core/assets/regular/moon.svg?raw";
 import smileyIcon from "@phosphor-icons/core/assets/regular/smiley.svg?raw";
+import speakerHighIcon from "@phosphor-icons/core/assets/regular/speaker-high.svg?raw";
 import sunIcon from "@phosphor-icons/core/assets/regular/sun.svg?raw";
 import { getPrefs, setPrefs, type AppPrefs, type ChromeTheme } from "./prefs";
 import {
@@ -52,6 +59,10 @@ function keycap(label: string): string {
   return `<kbd class="keycap">${label}</kbd>`;
 }
 
+function sectionTitleIcon(svg: string): string {
+  return `<span class="section-title__icon" aria-hidden="true">${svg}</span>`;
+}
+
 function shortcutRow(label: string, keys: string, note?: string): string {
   const noteHtml = note ? `<span class="shortcut-list__note">${note}</span>` : "";
   return `
@@ -93,7 +104,7 @@ function shortcutsMarkup(): string {
       <div class="section-head">
         <button type="button" class="section-toggle" aria-expanded="${shortcutsOpen}">
           <span class="shortcuts-title">
-            <span class="shortcuts-title__icon" aria-hidden="true">${keyboardIcon}</span>
+            ${sectionTitleIcon(keyboardIcon)}
             Keyboard Shortcuts
           </span>
         </button>
@@ -163,21 +174,21 @@ function paintDesignMode(controller: SettingsController) {
 function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
   return `
     <section class="section">
-      <h2 data-tip="Editor chrome colors">UI theme</h2>
+      <h2 data-tip="Editor chrome colors">${sectionTitleIcon(circleHalfIcon)}UI theme</h2>
       <div class="segment" role="group" aria-label="UI theme">
         <button type="button" class="pill${prefs.theme === "night" ? " is-on" : ""}" data-theme-chrome="night" aria-pressed="${prefs.theme === "night"}" data-tip="Dark editor chrome"><span class="theme-chrome__icon" aria-hidden="true">${moonIcon}</span>Night</button>
         <button type="button" class="pill${prefs.theme === "day" ? " is-on" : ""}" data-theme-chrome="day" aria-pressed="${prefs.theme === "day"}" data-tip="Light editor chrome"><span class="theme-chrome__icon" aria-hidden="true">${sunIcon}</span>Day</button>
       </div>
     </section>
     <section class="section">
-      <h2 data-tip="Physics fall or free Layout placement — shortcut L">Design Mode</h2>
+      <h2 data-tip="Physics fall or free Layout placement — shortcut L">${sectionTitleIcon(layoutIcon)}Design Mode</h2>
       <div class="segment" role="group" aria-label="Design Mode">
         <button type="button" class="pill${!layoutMode ? " is-on" : ""}" data-design-mode="physics" aria-pressed="${!layoutMode}" data-tip="Pieces fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${smileyIcon}</span>Physics</button>
         <button type="button" class="pill${layoutMode ? " is-on" : ""}" data-design-mode="layout" aria-pressed="${layoutMode}" data-tip="Place freely like Figma — no physics, pieces can overlap"><span class="theme-chrome__icon" aria-hidden="true">${gridFourIcon}</span>Layout</button>
       </div>
     </section>
     <section class="section">
-      <h2 data-tip="UI and impact sound effects">Sound</h2>
+      <h2 data-tip="UI and impact sound effects">${sectionTitleIcon(speakerHighIcon)}Sound</h2>
       <div class="check-row">
         <label class="check" data-tip="Play UI taps and fall impacts">
           ${checkInput(`id="settings-sound" ${prefs.soundOn ? "checked" : ""}`)}
@@ -189,7 +200,7 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
       </label>
     </section>
     <section class="section">
-      <h2 data-tip="Helpful hints and hover labels">Guidance</h2>
+      <h2 data-tip="Helpful hints and hover labels">${sectionTitleIcon(lightbulbIcon)}Guidance</h2>
       <div class="check-row">
         <label class="check" data-tip="Rotating Pro Tip cards in the corner">
           ${checkInput(`id="settings-tips" ${prefs.tipsOn ? "checked" : ""}`)}
@@ -204,7 +215,7 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
       </div>
     </section>
     <section class="section">
-      <h2 data-tip="Lighter live bloom so piles stay smoother; exports stay full quality">Performance</h2>
+      <h2 data-tip="Lighter live bloom so piles stay smoother; exports stay full quality">${sectionTitleIcon(gaugeIcon)}Performance</h2>
       <div class="check-row">
         <label class="check" data-tip="Softens live bloom for smoother playback; exports stay full quality">
           ${checkInput(`id="settings-performance" ${prefs.performance ? "checked" : ""}`)}
@@ -213,7 +224,7 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
       </div>
     </section>
     <section class="section">
-      <h2 data-tip="Reopen your last unsaved session after a refresh">Session</h2>
+      <h2 data-tip="Reopen your last unsaved session after a refresh">${sectionTitleIcon(clockCounterClockwiseIcon)}Session</h2>
       <div class="check-row">
         <label class="check" data-tip="Keep a draft and offer to reconnect after a refresh">
           ${checkInput(`id="settings-remember" ${prefs.rememberLast ? "checked" : ""}`)}
@@ -223,7 +234,7 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
     </section>
     ${shortcutsMarkup()}
     <section class="section">
-      <h2 data-tip="Save or open slots, physics, look, background, and placements">Project</h2>
+      <h2 data-tip="Save or open slots, physics, look, background, and placements">${sectionTitleIcon(folderSimpleIcon)}Project</h2>
       <div class="export-list">
         <button type="button" class="pill" id="settings-save" data-tip="Download the scene as a .pill file">Save .pill</button>
         <button type="button" class="pill" id="settings-load" data-tip="Open a .pill scene file">Load .pill</button>

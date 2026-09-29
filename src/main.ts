@@ -31,7 +31,7 @@ import { closeBackgroundUi, mountBackgroundPanel } from "./backgroundPanel";
 import { backgroundImage, backgroundPaint, gridDivisions, logoFill, logoSize, isSvgLogo } from "./background";
 import { mountColorPicker } from "./colorPicker";
 import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
-import { applyRollingText, stopTextAnim, textAnimSpeedOf } from "./textAnim";
+import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
 import { pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import { mountProTip, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
@@ -46,6 +46,8 @@ import {
   saveCustomTemplate,
 } from "./customTemplates";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
+import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
+import playIcon from "@phosphor-icons/core/assets/regular/play.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
 import { openAbout, isAboutOpen } from "./aboutPanel";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
@@ -87,6 +89,8 @@ let panelTab: "physics" | "background" | "export" = "physics";
 const openSlots = new Set<string>();
 /** Create-tab sections open by default: composition, color, typeface, what falls. */
 const openSections = new Set(["composition", "color", "typeface", "what-falls"]);
+/** Freeze all live text / gradient animations without clearing per-asset settings. */
+let assetAnimsFrozen = false;
 let pickedSlotId: string | null = null;
 const pickedSlotIds = new Set<string>();
 let focusSlotId: string | null = null;
@@ -2201,7 +2205,10 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       ${blendField(slot)}
     </div>
     <div class="slot-group">
-      <p class="slot-label">Animation</p>
+      <div class="slot-group-head">
+        <p class="slot-label">Animation</p>
+        <button type="button" class="section-reset${assetAnimsFrozen ? " is-on" : ""}" data-freeze-anims aria-pressed="${assetAnimsFrozen}" aria-label="${assetAnimsFrozen ? "Resume animations" : "Pause animations"}" data-tip="${assetAnimsFrozen ? "Resume text and gradient animations" : "Freeze text and gradient animations on all assets"}">${assetAnimsFrozen ? playIcon : pauseIcon}</button>
+      </div>
       <div class="check-row">
         <label class="check">
           ${checkInput(`data-key="textAnim" ${slot.textAnim ? "checked" : ""}`)}
@@ -2263,6 +2270,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
   }
   bindSlotInputs(editor, slot);
   bindTint(editor, slot);
+  bindFreezeAnims(editor);
   return wrap;
 }
 
@@ -3525,6 +3533,35 @@ function recallGradient(slot: TextSlot) {
   if (slot.gradientFromIndex == null && !slot.gradientFrom) return;
   if (slot.gradientFromIndex != null) slot.colorIndex = slot.gradientFromIndex;
   slot.color = slot.gradientFrom;
+}
+
+function paintFreezeAnimsButton(button: HTMLButtonElement) {
+  button.classList.toggle("is-on", assetAnimsFrozen);
+  button.setAttribute("aria-pressed", String(assetAnimsFrozen));
+  button.setAttribute("aria-label", assetAnimsFrozen ? "Resume animations" : "Pause animations");
+  button.dataset.tip = assetAnimsFrozen
+    ? "Resume text and gradient animations"
+    : "Freeze text and gradient animations on all assets";
+  button.innerHTML = assetAnimsFrozen ? playIcon : pauseIcon;
+}
+
+function applyAssetAnimsFreeze() {
+  document.documentElement.classList.toggle("is-asset-anims-frozen", assetAnimsFrozen);
+  setTextAnimsPaused(assetAnimsFrozen);
+  panel.querySelectorAll<HTMLButtonElement>("[data-freeze-anims]").forEach(paintFreezeAnimsButton);
+}
+
+function bindFreezeAnims(root: HTMLElement) {
+  root.querySelectorAll<HTMLButtonElement>("[data-freeze-anims]").forEach((button) => {
+    paintFreezeAnimsButton(button);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      assetAnimsFrozen = !assetAnimsFrozen;
+      applyAssetAnimsFreeze();
+      playSwitch(!assetAnimsFrozen);
+    });
+  });
 }
 
 function bindSlotInputs(root: HTMLElement, slot: Slot) {

@@ -6,6 +6,17 @@ export const DEFAULT_TEXT_ANIM_SPEED = 50;
 type Running = { sig: string; kill: () => void };
 
 const running = new WeakMap<HTMLElement, Running>();
+const timelines = new Set<gsap.core.Timeline>();
+let textAnimsPaused = false;
+
+/** Pause or resume all live text letter timelines (settings stay on). */
+export function setTextAnimsPaused(paused: boolean) {
+  textAnimsPaused = paused;
+  for (const tl of timelines) {
+    if (paused) tl.pause();
+    else tl.resume();
+  }
+}
 
 export type RollingTextOpts = {
   speed?: number;
@@ -152,9 +163,13 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
     tl.set(row, { autoAlpha: 0 });
   }
 
+  timelines.add(tl);
+  if (textAnimsPaused) tl.pause();
+
   running.set(label, {
     sig,
     kill: () => {
+      timelines.delete(tl);
       tl.kill();
       clearInline(label);
     },
