@@ -6226,6 +6226,21 @@ window.addEventListener("pointercancel", () => {
   pointerHeld = false;
   endGesture();
 }, true);
+// Kill the native browser menu everywhere except editable fields.
+// Capture so it still wins when right-clicking fast / mid-gesture.
+window.addEventListener(
+  "contextmenu",
+  (event) => {
+    if (
+      event.target instanceof HTMLElement &&
+      event.target.closest("input, textarea, select, [contenteditable='true']")
+    ) {
+      return;
+    }
+    event.preventDefault();
+  },
+  true,
+);
 
 playBtn.addEventListener("click", triggerPhysics);
 loopBtn.addEventListener("click", toggleRepeat);
