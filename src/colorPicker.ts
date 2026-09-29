@@ -1,4 +1,5 @@
 import { playRemove } from "./uiSounds";
+import { beginScrub, endScrub } from "./scrub";
 import { uiScale } from "./uiScale";
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -243,6 +244,7 @@ export function mountColorPicker(options: {
   const close = () => {
     if (closed) return;
     closed = true;
+    endScrub();
     pushRecentColor(hsvToHex(hsv.h, hsv.s, hsv.v));
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
@@ -311,6 +313,7 @@ export function mountColorPicker(options: {
   mountFields();
   paint();
   place();
+  beginScrub();
 
   return { close };
 }

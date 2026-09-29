@@ -1,5 +1,5 @@
+import type { ChipDraw } from "../chipKinds";
 import type { AppState } from "../types";
-import type { ChipDraw } from "../world";
 import { exportGif, exportMov, exportMp4, exportSequence, exportStill, type LoopResult } from "./exportMedia";
 import { ExportCancelled } from "./simulate";
 import {
@@ -14,6 +14,7 @@ import {
   type LoopCount,
   type VideoSizePreset,
 } from "./size";
+import { defaultPillFileName, isPillFile } from "../project/pillFormat";
 import { playCaution, playCelebrate, playNotify, startProgress, stopProgress } from "../uiSounds";
 
 export type ExportController = {
@@ -21,6 +22,8 @@ export type ExportController = {
   stageSize(): { width: number; height: number; scale: number };
   draws(): ChipDraw[];
   state(): AppState;
+  saveProject(): void;
+  loadProject(file: File): Promise<void>;
 };
 
 type ExportKind = "png" | "png-alpha" | "png-seq" | "jpg" | "jpg-seq" | "mp4" | "gif" | "mov" | "mov-alpha";
@@ -35,6 +38,7 @@ let cancelRequested = false;
 let lastStatus = "";
 let panelEl: HTMLElement | null = null;
 let mountAbort = new AbortController();
+let fileInput: HTMLInputElement | null = null;
 
 function setStatus(message: string) {
   lastStatus = message;
@@ -43,7 +47,7 @@ function setStatus(message: string) {
 }
 
 function applyBusy() {
-  panelEl?.querySelectorAll<HTMLButtonElement>("[data-export], [data-fps], [data-loops]").forEach((button) => {
+  panelEl?.querySelectorAll<HTMLButtonElement>("[data-export], [data-fps], [data-loops], #export-save-pill, #export-load-pill").forEach((button) => {
     button.disabled = busy;
   });
   panelEl?.querySelectorAll<HTMLSelectElement>("select").forEach((select) => {
@@ -100,6 +104,13 @@ function optionsHtml(presets: readonly string[], selected: string): string {
 function panelHtml(): string {
   return `
     <section class="section">
+      <h2 data-tip="Save or open the full scene as a .pill project">Project</h2>
+      <div class="export-list">
+        <button type="button" class="pill" id="export-save-pill" data-tip="Download the scene as a .pill file">Save .pill</button>
+        <button type="button" class="pill" id="export-load-pill" data-tip="Open a .pill scene file">Load .pill</button>
+      </div>
+    </section>
+    <section class="section">
       <h2 data-tip="Frames per second for sequences and video">Frame rate</h2>
       <div class="segment" role="group" aria-label="Frame rate">
         <button type="button" class="pill${frameRate === 30 ? " is-on" : ""}" data-fps="30" aria-pressed="${frameRate === 30}" data-tip="Smaller files, fine for most uses">30 fps</button>
@@ -119,11 +130,11 @@ function panelHtml(): string {
       </label>
       <p class="hint" id="image-size-meta"></p>
       <div class="export-list">
-        <button type="button" class="pill" data-export="png" data-tip="Save the current frame as a PNG">Export PNG frame</button>
-        <button type="button" class="pill" data-export="png-alpha" data-tip="Save the current frame with a transparent background">Export transparent PNG</button>
-        <button type="button" class="pill" data-export="png-seq" data-tip="Save every frame of a new loop as PNGs">Export PNG sequence</button>
-        <button type="button" class="pill" data-export="jpg" data-tip="Save the current frame as a JPG">Export JPG frame</button>
-        <button type="button" class="pill" data-export="jpg-seq" data-tip="Save every frame of a new loop as JPGs">Export JPG sequence</button>
+        <button type="button" class="pill export-primary" data-export="png" data-tip="Save the current frame as a PNG">PNG</button>
+        <button type="button" class="pill" data-export="png-alpha" data-tip="Save the current frame with a transparent background">Transparent PNG</button>
+        <button type="button" class="pill" data-export="png-seq" data-tip="Save every frame of a new loop as PNGs">PNG sequence</button>
+        <button type="button" class="pill" data-export="jpg" data-tip="Save the current frame as a JPG">JPG</button>
+        <button type="button" class="pill" data-export="jpg-seq" data-tip="Save every frame of a new loop as JPGs">JPG sequence</button>
       </div>
     </section>
     <section class="section">
@@ -133,9 +144,9 @@ function panelHtml(): string {
       </label>
       <p class="hint" id="video-size-meta"></p>
       <div class="export-list">
-        <button type="button" class="pill" data-export="mp4" data-tip="Render a new loop to an MP4 file">Export MP4</button>
-        <button type="button" class="pill" data-export="mov" data-tip="Render a new loop to a MOV file">Export MOV</button>
-        <button type="button" class="pill" data-export="mov-alpha" data-tip="Render a MOV with a transparent background">Export transparent MOV</button>
+        <button type="button" class="pill export-primary" data-export="mp4" data-tip="Render a new loop to an MP4 file">MP4</button>
+        <button type="button" class="pill" data-export="mov" data-tip="Render a new loop to a MOV file">MOV</button>
+        <button type="button" class="pill" data-export="mov-alpha" data-tip="Render a MOV with a transparent background">Transparent MOV</button>
       </div>
       <h2 data-tip="Animated GIF of a loop">GIF</h2>
       <label class="field" data-tip="GIF pixel size. Long loops may stop early to stay small.">Resolution
@@ -144,7 +155,7 @@ function panelHtml(): string {
       <p class="hint" id="gif-size-meta"></p>
       <p class="hint">Same frame rate. If the loop is long, the GIF stops before it gets too large.</p>
       <div class="export-list">
-        <button type="button" class="pill" data-export="gif" data-tip="Render a new loop to a GIF">Export GIF</button>
+        <button type="button" class="pill export-primary" data-export="gif" data-tip="Render a new loop to a GIF">GIF</button>
       </div>
     </section>
     <p class="hint" id="export-status" role="status"></p>
@@ -196,6 +207,49 @@ export function mountExportPanel(panel: HTMLElement, controller: ExportControlle
   panel.querySelector("#export-cancel")?.addEventListener("click", () => {
     cancelRequested = true;
     setStatus("Cancelling…");
+  }, { signal });
+  panel.querySelector("#export-save-pill")?.addEventListener("click", () => {
+    if (busy) return;
+    try {
+      controller.saveProject();
+      setStatus(`Saved ${defaultPillFileName()}`);
+      playNotify();
+    } catch {
+      setStatus("Could not save the project.");
+      playCaution();
+    }
+  }, { signal });
+  if (!fileInput) {
+    fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".pill,application/x-ultrapilled-project";
+    fileInput.className = "bg-file";
+    fileInput.hidden = true;
+    document.body.append(fileInput);
+  }
+  fileInput.onchange = () => {
+    const file = fileInput?.files?.[0];
+    if (fileInput) fileInput.value = "";
+    if (!file || busy) return;
+    if (!isPillFile(file)) {
+      setStatus("Only .pill files can be loaded.");
+      playCaution();
+      return;
+    }
+    void (async () => {
+      try {
+        await controller.loadProject(file);
+        setStatus(`Loaded ${file.name}`);
+        playNotify();
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Could not load this .pill file.");
+        playCaution();
+      }
+    })();
+  };
+  panel.querySelector("#export-load-pill")?.addEventListener("click", () => {
+    if (busy) return;
+    fileInput?.click();
   }, { signal });
   panel.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("[data-export]");

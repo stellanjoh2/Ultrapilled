@@ -41,7 +41,9 @@ export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
   if (!measureCtx) return { width: fallback, height: fallback, originX: 0, baseline: fallback * 0.8, advance: fallback };
 
   measureCtx.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
-  measureCtx.letterSpacing = `${tracking}em`;
+  // Measure unspaced — Chromium's measureText ignores canvas letterSpacing for both
+  // width and actualBoundingBox*. Apply tracking the same way as measureLineWidth.
+  measureCtx.letterSpacing = "0px";
   const text = slot.text || " ";
   const metrics = measureCtx.measureText(text);
   const left = metrics.actualBoundingBoxLeft ?? 0;
@@ -56,8 +58,10 @@ export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
     metrics.actualBoundingBoxDescent ??
     metrics.fontBoundingBoxDescent ??
     slot.fontSize * 0.2;
-  const inkW = left + right;
-  const advance = metrics.width || slot.fontSize;
+  const gaps = Math.max(0, text.length - 1);
+  const trackPx = slot.fontSize * tracking * gaps;
+  const inkW = left + right + trackPx;
+  const advance = (metrics.width || slot.fontSize) + trackPx;
   // Prefer ink for tight physics nesting; fall back to advance when ink is missing.
   const width = Math.max(1, Math.ceil(inkW > 0 ? inkW : advance));
   const height = Math.max(1, Math.ceil(ascent + descent));

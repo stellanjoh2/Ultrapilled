@@ -77,26 +77,27 @@ html[data-theme="day"] {
   --primary: #111111;
   --primary-deep: #000000;
   --primary-press: #2a2a2a;
-  --primary-soft: #d4d4d4;
-  --primary-bg: #ebebeb;
+  --primary-soft: #c4c4c4;
+  --primary-bg: #ffffff;
   --ink: #111111;
-  --ink-secondary: #3a3a3a;
-  --ink-mute: #6f6f6f;
+  --ink-secondary: #2e2e2e;
+  --ink-mute: #555555;
   --on-primary: #ffffff;
   /* Black sphere, Orby Lime mark */
   --check-on: #080808;
   --check-mark: #c4ff00;
-  --loop-face: #ebebeb;
-  --loop-edge: #c4c4c4;
+  --loop-face: #ffffff;
+  --loop-edge: #c8c8c8;
   --loop-ink: #111111;
-  --loop-glow: rgb(0 0 0 / 0.12);
-  --canvas: #ffffff;
-  --canvas-soft: #e8e8e8;
-  --field: #ebebeb;
-  --field-hover: #e0e0e0;
-  --shadow-1: rgba(0, 0, 0, 0.08) 0 1px 3px;
-  --shadow-2: rgba(0, 0, 0, 0.14) 0 16px 40px;
-  --panel-rule: rgba(0, 0, 0, 0.1);
+  --loop-glow: rgb(0 0 0 / 0.14);
+  /* Soft chrome so solid-white fields / icon tiles read clearly */
+  --canvas: #f0f0f0;
+  --canvas-soft: #e2e2e2;
+  --field: #ffffff;
+  --field-hover: #f7f7f7;
+  --shadow-1: rgba(0, 0, 0, 0.1) 0 1px 3px;
+  --shadow-2: rgba(0, 0, 0, 0.16) 0 16px 40px;
+  --panel-rule: rgba(0, 0, 0, 0.14);
 }
 
 /* Brief night↔day crossfade — only while .theme-animating is set from prefs. */
@@ -504,6 +505,23 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 .stage.has-sat .chip-layer .chip {
   filter: saturate(var(--post-sat));
+}
+
+/* Layout-only drop shadow — never on the chip root (would catch xform chrome).
+   Alpha looks filter their content; shaped pills use box-shadow on the chip box. */
+.chip-layer .chip.is-drop-shadow-box {
+  box-shadow: 0 var(--drop-y, 8px) var(--drop-blur, 16px) var(--drop-color, rgb(0 0 0 / 0.4));
+}
+
+.chip-layer .chip.is-drop-shadow > canvas,
+.chip-layer .chip.is-drop-shadow > .chip-face,
+.chip-layer .chip.is-drop-shadow > .chip-label,
+.chip-layer .chip.is-drop-shadow > .chip-edit {
+  filter: drop-shadow(0 var(--drop-y, 8px) var(--drop-blur, 16px) var(--drop-color, rgb(0 0 0 / 0.4)));
+}
+
+.chip-layer .chip.is-drop-shadow.chip-emoji {
+  text-shadow: 0 var(--drop-y, 8px) var(--drop-blur, 16px) var(--drop-color, rgb(0 0 0 / 0.4));
 }
 
 .bloom-layer .chip {
@@ -1117,14 +1135,16 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 }
 
 .chip-label.is-text-anim,
-.smash-btn__text.is-text-anim {
+.smash-btn__text.is-text-anim,
+.loop-chip__text.is-text-anim {
   display: block;
   line-height: 1;
 }
 
 /* Clip letters to the pill’s rounded box — not a tight line box mid-air. */
 .chip.is-text-anim-host,
-.smash-btn__label.is-text-anim-host {
+.smash-btn__label.is-text-anim-host,
+.panel-util.is-text-anim-host {
   overflow: hidden;
 }
 
@@ -1134,7 +1154,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 }
 
 .chip-label .text-anim-clip,
-.smash-btn__text .text-anim-clip {
+.smash-btn__text .text-anim-clip,
+.loop-chip__text .text-anim-clip {
   position: relative;
   display: block;
   height: 1em;
@@ -1142,7 +1163,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 }
 
 .chip-label .text-anim-word,
-.smash-btn__text .text-anim-word {
+.smash-btn__text .text-anim-word,
+.loop-chip__text .text-anim-word {
   position: absolute;
   inset: 0;
   display: flex;
@@ -1153,7 +1175,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 }
 
 .chip-label .char,
-.smash-btn__text .char {
+.smash-btn__text .char,
+.loop-chip__text .char {
   display: inline-block;
   will-change: transform, opacity;
 }
@@ -1285,6 +1308,61 @@ html.is-asset-anims-frozen .chip-edit.is-text-gradient.is-gradient-animated {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
+  filter: invert(0);
+}
+
+/* Match chip chrome fade (0.15s) — color / invert / fill look changes.
+   Disabled while scrubbing sliders/pickers so 60Hz updates aren't mid-tween. */
+@media (prefers-reduced-motion: no-preference) {
+  .chip {
+    transition:
+      background-color 0.15s ease,
+      background 0.15s ease,
+      color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .chip-face,
+  .chip-fill {
+    transition:
+      background-color 0.15s ease,
+      background 0.15s ease;
+  }
+
+  .chip-image img {
+    transition: filter 0.15s ease;
+  }
+
+  .chip-ring {
+    transition: box-shadow 0.15s ease;
+  }
+
+  .chip-label,
+  .chip-edit {
+    transition: color 0.15s ease;
+  }
+
+  .stage.is-scrubbing .chip,
+  .stage.is-scrubbing .chip-face,
+  .stage.is-scrubbing .chip-fill,
+  .stage.is-scrubbing .chip-image img,
+  .stage.is-scrubbing .chip-ring,
+  .stage.is-scrubbing .chip-label,
+  .stage.is-scrubbing .chip-edit {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .chip-face,
+  .chip-fill,
+  .chip-image img,
+  .chip-ring,
+  .chip-label,
+  .chip-edit {
+    transition: none;
+  }
 }
 
 .panel {
@@ -1321,20 +1399,72 @@ html.is-asset-anims-frozen .chip-edit.is-text-gradient.is-gradient-animated {
 }
 
 .panel-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-1);
   flex-shrink: 0;
   padding: var(--panel-pad);
+  padding-bottom: calc(var(--panel-pad) * 0.65);
 }
 
 .panel-actions .pill {
   width: 100%;
 }
 
-.panel-actions #play,
-.panel-actions #loop {
+.panel-actions #play {
+  width: 100%;
+}
+
+.panel-actions__bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-1);
+  align-items: stretch;
+}
+
+.panel-actions #copy-settings {
   grid-column: 1 / -1;
+}
+
+button.pill.panel-util {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(36px * var(--ui-scale));
+  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  background: transparent;
+  color: var(--ink-mute);
+  font-size: calc(12px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: none;
+  isolation: isolate;
+}
+
+button.pill.panel-util:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+  filter: none;
+}
+
+button.pill.panel-util.is-on,
+button.pill.panel-util.is-on:hover,
+button.pill.panel-util.is-on:active {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+button.pill.panel-util.is-on:hover {
+  background: var(--primary-deep);
+}
+
+.panel-util .loop-chip__text {
+  position: relative;
+  z-index: 1;
 }
 
 /* Uiverse Yaseen549/wise-elephant-58 — 3D smash, Orby Lime */
@@ -1496,11 +1626,6 @@ html[data-theme="day"] button.pill.smash-btn.is-on:focus-visible {
   height: calc(22px * var(--ui-scale));
 }
 
-#loop .smash-btn__icon {
-  width: calc(18px * var(--ui-scale));
-  height: calc(18px * var(--ui-scale));
-}
-
 /* Spinning conic disc (transform = true constant speed). Face cover leaves 1.5px stroke. */
 button.pill.smash-btn.is-on::before {
   content: "";
@@ -1596,7 +1721,7 @@ button.pill.smash-btn.is-on::after {
   color: var(--ink-mute);
   font: inherit;
   font-size: calc(13px * var(--ui-scale));
-  font-weight: 400;
+  font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1;
   text-transform: uppercase;
@@ -1794,6 +1919,16 @@ button.pill.smash-btn.is-on::after {
 
 .export-list {
   grid-template-columns: 1fr;
+}
+
+.export-list .pill.export-primary {
+  background: var(--play-face);
+  color: var(--play-ink);
+  border-color: transparent;
+}
+
+.export-list .pill.export-primary:hover {
+  filter: brightness(1.04);
 }
 
 .segment .pill,
@@ -2056,6 +2191,26 @@ button.pill.smash-btn.is-on::after {
   min-height: calc(18px * var(--ui-scale));
 }
 
+.field-label-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0);
+  margin-left: auto;
+}
+
+.shadow-swatch {
+  flex-shrink: 0;
+  width: calc(40px * var(--ui-scale));
+  height: calc(24px * var(--ui-scale));
+  padding: 0;
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
+  cursor: pointer;
+}
+
 .field-reset {
   display: grid;
   place-items: center;
@@ -2111,6 +2266,11 @@ button.pill.smash-btn.is-on::after {
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum", "ss01";
+}
+
+.field.is-muted {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .field label {
@@ -2272,6 +2432,28 @@ select {
   font-feature-settings: "ss01";
 }
 
+/* Day: white controls on soft chrome — hairline so they stay edged on gray cards. */
+html[data-theme="day"] input[type="text"],
+html[data-theme="day"] input[type="number"],
+html[data-theme="day"] input[type="search"],
+html[data-theme="day"] .font-pick-trigger,
+html[data-theme="day"] button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
+html[data-theme="day"] button.icon-btn,
+html[data-theme="day"] .icon-grid button,
+html[data-theme="day"] .emoji-grid button,
+html[data-theme="day"] .slot-add__icon,
+html[data-theme="day"] .pick-now {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+html[data-theme="day"] input[type="text"]:focus,
+html[data-theme="day"] input[type="number"]:focus,
+html[data-theme="day"] input[type="search"]:focus,
+html[data-theme="day"] .font-pick-trigger:focus-visible {
+  background-color: var(--field-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
 /* Match .font-pick-chevron (filled 8×5 triangle, ink-mute, inset by space-1). */
 select {
   -webkit-appearance: none;
@@ -2286,13 +2468,13 @@ select {
 
 /* Day: white control on gray slot card so closed + open lists stay readable. */
 html[data-theme="day"] select {
-  background-color: var(--canvas);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%236f6f6f' d='M0 0h8L4 5z'/%3E%3C/svg%3E");
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
+  background-color: var(--field);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%23555555' d='M0 0h8L4 5z'/%3E%3C/svg%3E");
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
 html[data-theme="day"] select:focus {
-  background-color: var(--canvas);
+  background-color: var(--field-hover);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
@@ -2601,12 +2783,12 @@ input[type="file"]::file-selector-button:hover {
 }
 
 html[data-theme="day"] input[type="file"]::file-selector-button {
-  background: var(--canvas);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
 html[data-theme="day"] input[type="file"]::file-selector-button:hover {
-  background: var(--canvas);
+  background: var(--field-hover);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
@@ -2796,7 +2978,7 @@ button:focus-visible,
   gap: var(--space-1);
 }
 
-button.slot-add {
+button.pill.slot-add {
   position: relative;
   display: flex;
   align-items: center;
@@ -2804,7 +2986,22 @@ button.slot-add {
   width: 100%;
   min-height: calc(40px * var(--ui-scale));
   padding: var(--space-0) var(--space-1);
+  border: 1px dashed color-mix(in srgb, var(--ink) 22%, transparent);
+  background: transparent;
+  color: var(--ink-mute);
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   white-space: nowrap;
+  box-shadow: none;
+}
+
+button.pill.slot-add:hover {
+  border-color: color-mix(in srgb, var(--ink) 40%, transparent);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+  filter: none;
 }
 
 .slot-add__icon {
@@ -2831,7 +3028,7 @@ button.slot-add {
   height: calc(16px * var(--ui-scale));
 }
 
-/* Empty-canvas right-click: same pills as the panel, ~half width. */
+/* Empty-canvas right-click: solid pills only, no plate. */
 .canvas-add-menu {
   position: fixed;
   z-index: 90;
@@ -2846,25 +3043,38 @@ button.slot-add {
   pointer-events: none;
 }
 
-.canvas-add-menu > .slot-add {
+.canvas-add-menu > button.pill.slot-add {
   width: 100%;
   justify-content: flex-start;
   padding-left: calc(44px * var(--ui-scale));
   padding-right: var(--space-2);
+  border: none;
+  background: var(--field);
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   pointer-events: auto;
   box-shadow: var(--shadow-1);
 }
 
-.canvas-add-menu > .slot-add.is-clear .slot-add__icon svg {
+.canvas-add-menu > button.pill.slot-add:hover {
+  border-color: transparent;
+  background: var(--field-hover);
+  color: var(--ink);
+  filter: none;
+}
+
+.canvas-add-menu > button.pill.slot-add.is-clear .slot-add__icon svg {
   transform: rotate(45deg);
 }
 
-.canvas-add-menu > .slot-add.is-clear:hover {
+.canvas-add-menu > button.pill.slot-add.is-clear:hover {
   background: #c62828;
   color: #fff;
 }
 
-.canvas-add-menu > .slot-add.is-clear:hover .slot-add__icon {
+.canvas-add-menu > button.pill.slot-add.is-clear:hover .slot-add__icon {
   background: color-mix(in srgb, #fff 22%, #c62828);
   color: #fff;
 }
@@ -3462,6 +3672,28 @@ input.slot-live:focus {
 .emoji-grid button.is-on {
   background: var(--field);
   box-shadow: inset 0 0 0 2px #fff;
+}
+
+/* Day: soft tiles + glyph edge so white/pale masks don't vanish on --field. */
+html[data-theme="day"] .icon-grid button,
+html[data-theme="day"] .icon-grid button.is-on {
+  background: var(--canvas-soft);
+}
+
+html[data-theme="day"] .icon-grid button.is-on,
+html[data-theme="day"] .emoji-grid button.is-on {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+html[data-theme="day"] .shape-swatch {
+  filter: drop-shadow(0 0 0.6px rgb(0 0 0 / 0.45));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html[data-theme="day"] .icon-grid button:hover:not(.is-on),
+  html[data-theme="day"] .emoji-grid button:hover:not(.is-on) {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ink) 28%, transparent);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

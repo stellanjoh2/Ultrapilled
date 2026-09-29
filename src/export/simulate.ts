@@ -73,6 +73,7 @@ export async function renderLoop(options: {
       theme: options.state.theme,
       post: options.state.post,
       transparent: options.transparent,
+      layoutMode: Boolean(options.state.physics.layoutMode),
     };
 
     for (let loop = 0; loop < options.loops; loop++) {

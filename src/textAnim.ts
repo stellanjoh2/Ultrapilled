@@ -96,7 +96,9 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
     opts.fontSize ?? (Number.parseFloat(getComputedStyle(label).fontSize) || 14);
   const travel = travelPx(label, fontSize);
   const asPhrase = Boolean(opts.asPhrase);
-  const sig = `cycle|${speed}|${text}|${travel}|${asPhrase ? "phrase" : "words"}`;
+  // Omit travel from the signature — pill height changes every tracking/scale tick and
+  // would otherwise tear down + rebuild the GSAP cycle (hard on/off flicker).
+  const sig = `cycle|${speed}|${text}|${asPhrase ? "phrase" : "words"}`;
   const prev = running.get(label);
   if (prev?.sig === sig) return true;
 

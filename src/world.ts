@@ -1,26 +1,34 @@
 import Matter from "matter-js";
 import arrowsOutSimple from "@phosphor-icons/core/assets/regular/arrows-out-simple.svg?raw";
-import { EMOJI_FONT } from "./emojis";
 import { imageColliderId } from "./icons";
+import { isColorMask, isSvgSource, type ChipDraw, type ChipPose } from "./chipKinds";
+import {
+  applyVisual,
+  paintBareText,
+  paintBareTextCss,
+  paintDropShadow,
+  paintFill,
+  paintSweepBand,
+} from "./chipDomPaint";
 import { createColliderBody, presetIdForSrc, simpleColliderKind } from "./iconMesh";
 import {
   cornerRadius,
   measureSlot,
   measureTextEditSize,
-  measureTextInk,
-  paintTextInk,
   pillPadOf,
   scaleSlot,
   textShiftEm,
   trackingEm,
   trackingOf,
 } from "./measure";
-import { fillSample, gradientAngleOf, gradientEnd, gradientPeriodMs, gradientScaleOf, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
-import { applyTextAnim, stopTextAnim, stopTextAnimIn } from "./textAnim";
-import { inkOn, pickTheme, resolveTextColor, type ColorTheme } from "./theme";
-import { peekTrim } from "./trim";
-import { blendMode, physicsComplexity, shapeHasFill, type ImageSlot, type PhysicsComplexity, type PhysicsSettings, type Slot, type TextSlot } from "./types";
+import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
+import { stopTextAnimIn } from "./textAnim";
+import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
+import { blendMode, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
 import { playImpact } from "./uiSounds";
+import { beginScrub, endScrub } from "./scrub";
+
+export type { ChipDraw, ChipPose } from "./chipKinds";
 
 const { Engine, Runner, Bodies, Composite, Body, Constraint, Sleeping, Events, Collision, Query } = Matter;
 
@@ -139,38 +147,6 @@ type DroppedChip = {
   popping: boolean;
 };
 
-export type ChipDraw = {
-  x: number;
-  y: number;
-  angle: number;
-  width: number;
-  height: number;
-  anchorX: number;
-  anchorY: number;
-  flipX?: boolean;
-  flipY?: boolean;
-  slot: Slot;
-  radius: number;
-  fill: string;
-  ink: string;
-  tracking: number;
-  shiftEm: number;
-};
-
-/** Saved body pose for .pill / draft restore. */
-export type ChipPose = {
-  slotId: string;
-  seqIndex: number;
-  sizeUnit: number;
-  /** Extra size from solo canvas scale (1 = default). */
-  scaleMul?: number;
-  flipX?: boolean;
-  flipY?: boolean;
-  x: number;
-  y: number;
-  angle: number;
-};
-
 type ChipLook = {
   slot: Slot;
   radius: number;
@@ -181,7 +157,6 @@ type ChipLook = {
 };
 
 export type WorldHandle = {
-  engine: Matter.Engine;
   play: (
     slots: Slot[],
     physics: PhysicsSettings,
@@ -395,398 +370,6 @@ function chipBody(
   return { body, anchor };
 }
 
-function paintSweepBand(
-  host: HTMLElement,
-  from: string,
-  to: string,
-  width: number,
-  height: number,
-  radius: number,
-  angle?: number,
-  scale?: number,
-) {
-  const { coverPx, tilePx } = sweepBandMetrics(width, height, angle, scale);
-  host.style.clipPath = `inset(0 round ${Math.max(0, radius)}px)`;
-  const found = host.querySelector(":scope > .chip-fill-band");
-  const band = found instanceof HTMLElement ? found : document.createElement("div");
-  if (band.parentElement !== host) {
-    band.className = "chip-fill-band";
-    host.replaceChildren(band);
-  }
-  band.style.width = `${coverPx}px`;
-  band.style.height = `${coverPx}px`;
-  band.style.setProperty("--sweep-tile", `${tilePx}px`);
-  band.style.backgroundImage = pillSweepBand(from, to);
-}
-
-function setSweepDuration(el: HTMLElement, speed?: number) {
-  const next = `${gradientPeriodMs(speed) / 1000}s`;
-  // Re-setting duration restarts the CSS animation — only touch it when it changes.
-  if (el.style.getPropertyValue("--sweep-duration") !== next) {
-    el.style.setProperty("--sweep-duration", next);
-  }
-}
-
-function paintFill(
-  el: HTMLElement,
-  on: boolean,
-  from: string,
-  to: string,
-  width: number,
-  height: number,
-  radius: number,
-  angle?: number,
-  scale?: number,
-  animated = false,
-  speed?: number,
-) {
-  const existing = el.querySelector(":scope > .chip-fill");
-  if (!on) {
-    existing?.remove();
-    return;
-  }
-  const fill = existing instanceof HTMLElement ? existing : document.createElement("div");
-  if (fill.parentElement !== el) {
-    fill.className = "chip-fill";
-    fill.setAttribute("aria-hidden", "true");
-    el.prepend(fill);
-  }
-  if (animated) {
-    fill.classList.add("is-gradient-animated");
-    fill.style.background = "transparent";
-    setSweepDuration(fill, speed);
-    fill.style.setProperty("--grad-angle", String(gradientAngleOf(angle)));
-    // Reuse the band node so other pills keep rolling when this chip is repainted.
-    paintSweepBand(fill, from, to, width, height, radius, angle, scale);
-  } else {
-    fill.replaceChildren();
-    fill.classList.remove("is-gradient-animated");
-    fill.style.removeProperty("--sweep-duration");
-    fill.style.removeProperty("--grad-angle");
-    fill.style.clipPath = "";
-    fill.style.background = pillGradient(from, to, angle, scale);
-  }
-}
-
-function paintStroke(el: HTMLElement, ring: boolean, gradient: boolean, stroke: number, fill: string, label: HTMLElement) {
-  const existing = el.querySelector(":scope > .chip-ring");
-  if (!ring || !gradient) {
-    existing?.remove();
-    el.style.boxShadow = ring ? `inset 0 0 0 ${Math.max(1, stroke)}px ${fill}` : "none";
-    return;
-  }
-  el.style.boxShadow = "none";
-  const ringEl = existing instanceof HTMLElement ? existing : document.createElement("div");
-  if (ringEl.parentElement !== el) {
-    ringEl.className = "chip-ring";
-    ringEl.setAttribute("aria-hidden", "true");
-    el.insertBefore(ringEl, label);
-  }
-  ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, stroke)}px ${fill}`;
-}
-
-function paintBareText(
-  el: HTMLElement,
-  slot: TextSlot,
-  width: number,
-  height: number,
-  tracking: number,
-  color: string,
-  shiftEm: number,
-  gradientTo = "",
-) {
-  const found = el.querySelector(":scope > canvas");
-  const canvas = found instanceof HTMLCanvasElement ? found : document.createElement("canvas");
-  if (canvas.parentElement !== el) el.replaceChildren(canvas);
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const w = Math.max(1, Math.ceil(width * dpr));
-  const h = Math.max(1, Math.ceil(height * dpr));
-  if (canvas.width !== w) canvas.width = w;
-  if (canvas.height !== h) canvas.height = h;
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
-  canvas.style.display = "block";
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, width, height);
-  const ink = measureTextInk(slot, tracking);
-  const fill =
-    slot.gradient && gradientTo
-      ? textGradientFill(ctx, width, height, color, gradientTo, slot.gradientAngle, slot.gradientScale)
-      : color;
-  paintTextInk(ctx, slot, tracking, fill, shiftEm, ink);
-}
-
-function clearBareTextCss(el: HTMLElement) {
-  el.classList.remove("is-text-gradient", "is-gradient-animated");
-  el.style.removeProperty("background");
-  el.style.removeProperty("background-image");
-  el.style.removeProperty("background-color");
-  el.style.removeProperty("background-size");
-  el.style.removeProperty("-webkit-background-clip");
-  el.style.removeProperty("background-clip");
-  el.style.removeProperty("color");
-  el.style.removeProperty("-webkit-text-fill-color");
-  el.style.removeProperty("--sweep-duration");
-  el.style.removeProperty("--grad-angle");
-}
-
-function styleBareTextCss(
-  el: HTMLElement,
-  from: string,
-  to: string,
-  angle?: number,
-  scale?: number,
-  animated = false,
-  speed?: number,
-) {
-  el.classList.add("is-text-gradient");
-  if (animated) {
-    el.classList.add("is-gradient-animated");
-    el.style.backgroundImage = pillSweepGradient(from, to, angle, scale);
-    setSweepDuration(el, speed);
-    el.style.setProperty("--grad-angle", String(gradientAngleOf(angle)));
-  } else {
-    el.classList.remove("is-gradient-animated");
-    el.style.backgroundImage = pillGradient(from, to, angle, scale);
-    el.style.removeProperty("--sweep-duration");
-    el.style.removeProperty("--grad-angle");
-  }
-  el.style.backgroundColor = "transparent";
-  el.style.webkitBackgroundClip = "text";
-  el.style.backgroundClip = "text";
-  el.style.color = "transparent";
-  el.style.webkitTextFillColor = "transparent";
-}
-
-/** CSS text fill for bare type that can't use the ink canvas (edit / text anim / animated gradient). */
-function paintBareTextCss(
-  label: HTMLElement,
-  from: string,
-  to: string,
-  angle?: number,
-  scale?: number,
-  animated = false,
-  speed?: number,
-) {
-  const words = [...label.querySelectorAll<HTMLElement>(".text-anim-word")];
-  if (!to) {
-    clearBareTextCss(label);
-    for (const word of words) clearBareTextCss(word);
-    return;
-  }
-  // Keep the host marked so .char inherits transparent fill; paint each word for clip.
-  if (words.length > 0) {
-    label.classList.add("is-text-gradient");
-    if (animated) label.classList.add("is-gradient-animated");
-    else label.classList.remove("is-gradient-animated");
-    for (const word of words) styleBareTextCss(word, from, to, angle, scale, animated, speed);
-    return;
-  }
-  styleBareTextCss(label, from, to, angle, scale, animated, speed);
-}
-
-function textLabel(el: HTMLElement, editing: boolean): HTMLElement {
-  const found = el.querySelector(":scope > .chip-label, :scope > .chip-edit");
-  const label = found instanceof HTMLElement ? found : document.createElement("span");
-  label.className = editing ? "chip-edit" : "chip-label";
-  if (editing) {
-    label.setAttribute("contenteditable", "plaintext-only");
-    if (label.contentEditable !== "plaintext-only") label.contentEditable = "true";
-    label.setAttribute("role", "textbox");
-    label.setAttribute("aria-label", "Edit text");
-    label.spellcheck = false;
-  } else if (label.isContentEditable) {
-    label.removeAttribute("contenteditable");
-    label.removeAttribute("role");
-    label.removeAttribute("aria-label");
-    label.contentEditable = "inherit";
-  }
-  return label;
-}
-
-function applyVisual(
-  el: HTMLElement,
-  slot: Slot,
-  width: number,
-  height: number,
-  radius: number,
-  fill: string,
-  ink: string,
-  tracking = 0.02,
-  bloom = false,
-  shiftEm = 0,
-  gradientTo = "",
-  editing = false,
-) {
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  el.style.borderRadius = `${radius}px`;
-  el.style.maskImage = "";
-  el.style.webkitMaskImage = "";
-
-  if (slot.kind === "text") {
-    const ring = slot.stroked && slot.shape !== "none";
-    const bare = slot.shape === "none";
-    const shapeGradient = Boolean(slot.gradient) && !bare && !ring;
-    const textGradient = Boolean(slot.gradient) && bare && Boolean(gradientTo);
-    const hideText = bloom && !bare;
-    const liveEdit = editing && !bloom;
-    // Ink canvas can't host GSAP letter motion or CSS animated gradients.
-    const bareCss =
-      Boolean(slot.textAnim) ||
-      (textGradient && (liveEdit || Boolean(slot.animatedGradient)));
-    el.classList.remove("chip-image", "chip-emoji");
-    el.classList.toggle("chip-bare", bare || ring);
-    el.classList.toggle("is-editing", liveEdit);
-    el.style.background = bare || ring || shapeGradient ? "transparent" : fill;
-    el.style.color = hideText ? fill : ink;
-    el.style.border = "none";
-    el.style.fontFamily = `"${slot.fontFamily}", sans-serif`;
-    el.style.fontWeight = String(slot.fontWeight);
-    el.style.fontSize = `${slot.fontSize}px`;
-    el.style.letterSpacing = `${tracking}em`;
-
-    // Live edit / text anim need a DOM label — never the ink canvas.
-    if (bare && !bareCss && !liveEdit) {
-      // Solid or static-gradient ink canvas (tight AABB).
-      paintBareText(el, slot, width, height, tracking, textGradient ? fill : ink, shiftEm, textGradient ? gradientTo : "");
-      return;
-    }
-
-    if (liveEdit || bareCss) el.querySelector(":scope > canvas")?.remove();
-
-    const label = textLabel(el, liveEdit);
-    if (label.parentElement !== el) {
-      el.replaceChildren(label);
-    } else {
-      for (const child of [...el.children]) {
-        if (
-          child === label ||
-          child.classList.contains("chip-fill") ||
-          child.classList.contains("chip-ring") ||
-          child.classList.contains("chip-xform-handle") ||
-          child.classList.contains("chip-xform-frame") ||
-          child.classList.contains("chip-grad-wheel")
-        ) {
-          continue;
-        }
-        child.remove();
-      }
-    }
-
-    if (bare) {
-      el.querySelector(":scope > .chip-fill")?.remove();
-      el.querySelector(":scope > .chip-ring")?.remove();
-      el.style.boxShadow = "none";
-    } else {
-      paintFill(el, shapeGradient, fill, gradientTo || fill, width, height, radius, slot.gradientAngle, slot.gradientScale, Boolean(slot.animatedGradient), slot.gradientSpeed);
-      paintStroke(el, ring, shapeGradient, slot.stroke, fill, label);
-    }
-    // While editing, the caret owns the text — don't clobber it from slot.
-    if (!liveEdit) {
-      if (hideText) {
-        stopTextAnim(label);
-        label.textContent = "";
-      } else if (!applyTextAnim(label, slot)) {
-        label.textContent = slot.text;
-      }
-    } else if (label.classList.contains("is-text-anim")) {
-      stopTextAnim(label);
-      label.textContent = slot.text;
-    }
-    // Gradient clip hides the native caret — use solid ink while typing.
-    if (textGradient && !liveEdit) {
-      paintBareTextCss(label, fill, gradientTo, slot.gradientAngle, slot.gradientScale, Boolean(slot.animatedGradient), slot.gradientSpeed);
-      el.style.color = "transparent";
-    } else {
-      paintBareTextCss(label, "", "");
-      if (liveEdit && textGradient) el.style.color = fill;
-    }
-    // Caret must read on any surface: match ink on bare type; contrast the pill fill otherwise.
-    if (liveEdit) {
-      label.style.caretColor = bare || ring ? (textGradient ? fill : ink) : inkOn(fill);
-    } else {
-      label.style.removeProperty("caret-color");
-    }
-    label.style.transform = `translateY(${shiftEm}em)`;
-    return;
-  }
-
-  el.classList.remove("is-editing");
-
-  el.replaceChildren();
-  el.style.border = "none";
-  el.style.boxShadow = "none";
-  el.style.color = "";
-  el.style.fontFamily = "";
-  el.style.fontWeight = "";
-  el.style.fontSize = "";
-  el.style.letterSpacing = "";
-
-  if (slot.emoji) {
-    el.classList.add("chip-emoji");
-    el.classList.remove("chip-image", "chip-bare");
-    el.style.background = "transparent";
-    el.style.webkitMaskImage = "";
-    el.style.maskImage = "";
-    el.style.fontFamily = EMOJI_FONT;
-    el.style.fontSize = `${Math.round(slot.size)}px`;
-    el.textContent = slot.emoji;
-    return;
-  }
-
-  const src = peekTrim(slot.src)?.displaySrc ?? slot.src;
-  el.classList.add("chip-image");
-  el.classList.remove("chip-bare", "chip-emoji");
-
-  if (!isColorMask(slot)) {
-    el.style.background = "transparent";
-    const img = document.createElement("img");
-    img.src = src;
-    img.alt = "";
-    img.draggable = false;
-    // Keep radius on the img so xform handles outside the chip stay visible.
-    img.style.borderRadius = `${radius}px`;
-    img.style.filter = slot.inverted ? "invert(1)" : "";
-    el.append(img);
-    // Raster inner stroke sits in a ring overlay so the img doesn't cover it.
-    if (Boolean(slot.stroked) && !isSvgSource(slot)) {
-      const ringEl = document.createElement("div");
-      ringEl.className = "chip-ring";
-      ringEl.setAttribute("aria-hidden", "true");
-      ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, slot.stroke ?? 4)}px ${fill}`;
-      el.append(ringEl);
-    }
-    return;
-  }
-
-  el.style.background = "transparent";
-  const face = document.createElement("div");
-  face.className = "chip-face";
-  const sweep = Boolean(slot.gradient && gradientTo && slot.animatedGradient);
-  if (slot.gradient && gradientTo && sweep) {
-    face.classList.add("is-gradient-animated");
-    face.style.background = "transparent";
-    face.style.setProperty("--sweep-duration", `${gradientPeriodMs(slot.gradientSpeed) / 1000}s`);
-    face.style.setProperty("--grad-angle", String(gradientAngleOf(slot.gradientAngle)));
-    paintSweepBand(face, fill, gradientTo, width, height, radius, slot.gradientAngle, slot.gradientScale);
-  } else {
-    face.style.clipPath = "";
-    face.style.background = slot.gradient && gradientTo ? pillGradient(fill, gradientTo, slot.gradientAngle, slot.gradientScale) : fill;
-  }
-  const mask = `url("${src}")`;
-  face.style.webkitMaskImage = mask;
-  face.style.maskImage = mask;
-  face.style.webkitMaskSize = "contain";
-  face.style.maskSize = "contain";
-  face.style.webkitMaskRepeat = "no-repeat";
-  face.style.maskRepeat = "no-repeat";
-  face.style.webkitMaskPosition = "center";
-  face.style.maskPosition = "center";
-  el.append(face);
-}
 
 function readySlots(slots: Slot[]): Slot[] {
   return slots.filter((slot) => slot.kind === "text" || Boolean(slot.src || slot.emoji));
@@ -817,22 +400,6 @@ function slotFill(theme: ColorTheme, slot: Slot): string {
 function slotInk(theme: ColorTheme, slot: Slot): string {
   if (slot.kind !== "text") return slotFill(theme, slot);
   return resolveTextColor(theme, fillSample(theme, slot), shapeHasFill(slot), slot.textColorIndex, slot.textColor);
-}
-
-/** Built-in shapes are silhouettes. Uploaded SVGs keep their ink until tint is on. */
-export function isSvgSource(slot: ImageSlot): boolean {
-  if (/\.svg$/i.test(slot.name)) return true;
-  return (
-    slot.src.startsWith("data:image/svg") ||
-    slot.src.includes("image/svg+xml") ||
-    /\.svg(\?|$)/i.test(slot.src)
-  );
-}
-
-export function isColorMask(slot: ImageSlot): boolean {
-  if (presetIdForSrc(slot.src)) return true;
-  if (!isSvgSource(slot)) return false;
-  return Boolean(slot.tint);
 }
 
 function sizeJitter(unit: number, amount: number): number {
@@ -2966,6 +2533,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const value = { angle: nextAngle, scale: nextScale };
     if (!gradAngleDrag.rotating) {
       gradAngleDrag.rotating = true;
+      beginScrub();
       onGradientWheel?.(gradAngleDrag.slotId, value, "start");
     }
     onGradientWheel?.(gradAngleDrag.slotId, value, "move");
@@ -2980,6 +2548,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (!gradAngleDrag) return;
     const { lastAngle, lastScale, slotId, stop, stopEl, moved, rotating } = gradAngleDrag;
     gradAngleDrag = null;
+    if (rotating) endScrub();
     for (const item of xformTargets(slotId)) {
       item.el.classList.remove("is-grad-angling");
       if (item.slotId !== editingId && item.body.isStatic) Body.setStatic(item.body, false);
@@ -3016,6 +2585,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const solo = soloBodyId != null && soloBodyId === chip.body.id;
     const factor = lastScale / startScale;
     xformDrag = null;
+    endScrub();
     for (const item of xformTargets(slotId)) {
       item.el.classList.remove("is-scaling", "is-rotating");
       item.el.style.removeProperty("--scale-preview");
@@ -3134,6 +2704,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     lockHandle(chip.slotId, "xforming");
     handle.setPointerCapture(event.pointerId);
     // One undo snapshot for the combined gesture (scale key covers rotate too).
+    beginScrub();
     onScale?.(chip.slotId, startScale, "start");
   }
 
@@ -3720,6 +3291,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       chip.el.style.mixBlendMode = mix;
       chip.glow.style.mixBlendMode = mix;
     }
+    // Drop shadow is layout-only — physics keeps chips filter-free while tumbling.
+    paintDropShadow(chip.el, slot, layoutMode);
+    paintDropShadow(chip.glow, slot, false);
     for (const mirror of chip.mirrors) {
       copyLook(chip.el, mirror.face);
       copyLook(chip.glow, mirror.glow);
@@ -3729,6 +3303,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       ensureXformHandle(chip.el);
       syncGradWheel(chip);
       syncChromeSeat(chip);
+      // Selection chrome tracks the painted box immediately; body remesh may follow.
+      if (chip.chrome && chip.chrome !== chip.el) {
+        chip.chrome.style.width = `${size.width}px`;
+        chip.chrome.style.height = `${size.height}px`;
+      }
     }
   }
 
@@ -3942,7 +3521,6 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   return {
-    engine,
     play,
     refresh,
     clear,

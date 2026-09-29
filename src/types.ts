@@ -46,6 +46,16 @@ export type TextSlot = {
   textColor?: string;
   /** How this layer mixes with layers behind it. Layout mode only. */
   blend?: BlendMode;
+  /** Soft drop shadow. Live + export only in layout mode. */
+  dropShadow?: boolean;
+  /** Blur radius in px. Unset keeps the default. */
+  dropShadowRadius?: number;
+  /** Offset distance in px. Unset keeps the default. */
+  dropShadowDistance?: number;
+  /** 0–100. Unset keeps the default. */
+  dropShadowOpacity?: number;
+  /** Shadow ink. Unset keeps black. */
+  dropShadowColor?: string;
   scale: number;
 };
 
@@ -87,11 +97,52 @@ export type ImageSlot = {
   collider?: string;
   /** How this layer mixes with layers behind it. Layout mode only. */
   blend?: BlendMode;
+  /** Soft drop shadow. Live + export only in layout mode. */
+  dropShadow?: boolean;
+  /** Blur radius in px. Unset keeps the default. */
+  dropShadowRadius?: number;
+  /** Offset distance in px. Unset keeps the default. */
+  dropShadowDistance?: number;
+  /** 0–100. Unset keeps the default. */
+  dropShadowOpacity?: number;
+  /** Shadow ink. Unset keeps black. */
+  dropShadowColor?: string;
 };
 
 export type Slot = TextSlot | ImageSlot;
 
 export type PhysicsComplexity = "simple" | "normal" | "ultra";
+
+export const DEFAULT_DROP_SHADOW_RADIUS = 16;
+export const DEFAULT_DROP_SHADOW_DISTANCE = 8;
+export const DEFAULT_DROP_SHADOW_OPACITY = 40;
+export const DEFAULT_DROP_SHADOW_COLOR = "#000000";
+
+export function dropShadowRadiusOf(value: number | undefined): number {
+  return Math.max(0, Math.min(64, Math.round(value ?? DEFAULT_DROP_SHADOW_RADIUS)));
+}
+
+export function dropShadowDistanceOf(value: number | undefined): number {
+  return Math.max(0, Math.min(64, Math.round(value ?? DEFAULT_DROP_SHADOW_DISTANCE)));
+}
+
+export function dropShadowOpacityOf(value: number | undefined): number {
+  return Math.max(0, Math.min(100, Math.round(value ?? DEFAULT_DROP_SHADOW_OPACITY)));
+}
+
+export function dropShadowColorOf(value: string | undefined): string {
+  return value && /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : DEFAULT_DROP_SHADOW_COLOR;
+}
+
+/** Resolved rgba() for CSS / canvas shadow painting. */
+export function dropShadowCssColor(color: string | undefined, opacity: number | undefined): string {
+  const hex = dropShadowColorOf(color);
+  const alpha = dropShadowOpacityOf(opacity) / 100;
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 export const PHYSICS_COMPLEXITY = [
   { id: "simple", label: "Simple" },

@@ -1,6 +1,6 @@
 import { zipSync } from "fflate";
+import type { ChipDraw } from "../chipKinds";
 import type { AppState } from "../types";
-import type { ChipDraw } from "../world";
 import { paintFrame } from "./paint";
 import { renderLoop, yieldToUi } from "./simulate";
 import {
@@ -72,6 +72,7 @@ function sceneOf(
     theme: state.theme,
     post: state.post,
     transparent,
+    layoutMode: Boolean(state.physics.layoutMode),
   };
 }
 

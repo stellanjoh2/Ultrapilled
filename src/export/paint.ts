@@ -4,8 +4,9 @@ import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
 import { measureTextInk, paintTextInk } from "../measure";
 import { peekTrim } from "../trim";
-import { blendMode, canvasBlend, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
-import { isColorMask, isSvgSource, type ChipDraw } from "../world";
+import { isColorMask, type ChipDraw } from "../chipKinds";
+import { rasterRing, textLookFlags } from "../chipLook";
+import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 
 const GRAIN_URL =
   "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix type='saturate' values='0' in='t' result='m'/%3E%3CfeComponentTransfer in='m'%3E%3CfeFuncR type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncG type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncB type='linear' slope='2.2' intercept='-0.6'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
@@ -27,6 +28,8 @@ export type PaintScene = {
   theme: string[];
   post: PostSettings;
   transparent: boolean;
+  /** Soft per-layer shadows only when layout mode is on. */
+  layoutMode: boolean;
 };
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
@@ -88,6 +91,30 @@ function withChip(ctx: CanvasRenderingContext2D, chip: ChipDraw, scale: number, 
   ctx.rotate(chip.angle);
   if (sx !== 1 || sy !== 1) ctx.scale(sx, sy);
   ctx.translate(-originX, -originY);
+  draw();
+  ctx.restore();
+}
+
+function withDropShadow(
+  ctx: CanvasRenderingContext2D,
+  chip: ChipDraw,
+  scale: number,
+  layoutMode: boolean,
+  bloom: boolean,
+  draw: () => void,
+) {
+  const slot = chip.slot;
+  if (bloom || !layoutMode || !slot.dropShadow) {
+    draw();
+    return;
+  }
+  const blur = dropShadowRadiusOf(slot.dropShadowRadius) * scale;
+  const y = dropShadowDistanceOf(slot.dropShadowDistance) * scale;
+  ctx.save();
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = y;
+  ctx.shadowBlur = blur;
+  ctx.shadowColor = dropShadowCssColor(slot.dropShadowColor, slot.dropShadowOpacity);
   draw();
   ctx.restore();
 }
@@ -173,9 +200,7 @@ function drawText(
   timeMs = 0,
 ) {
   const radius = chip.radius * scale;
-  const ring = slot.stroked && slot.shape !== "none";
-  const bare = slot.shape === "none";
-  const gradient = Boolean(slot.gradient) && !bare && !ring;
+  const { ring, bare, shapeGradient: gradient } = textLookFlags(slot);
   if (gradient) {
     const phase = slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined;
     drawGradient(ctx, width, height, radius, chip.fill, gradientEnd(theme, slot), slot.gradientAngle, phase, slot.gradientScale);
@@ -230,55 +255,58 @@ function drawChip(
   ready: Map<string, HTMLImageElement>,
   theme: string[],
   timeMs = 0,
+  layoutMode = false,
 ) {
   const width = chip.width * scale;
   const height = chip.height * scale;
   if (width < 1 || height < 1) return;
   withChip(ctx, chip, scale, () => {
-    const slot = chip.slot;
-    if (slot.kind === "text") {
-      drawText(ctx, chip, slot, width, height, scale, bloom, theme, timeMs);
-      return;
-    }
-    if (slot.emoji) {
-      ctx.font = `${slot.size * scale}px ${EMOJI_FONT}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(slot.emoji, width / 2, height / 2);
-      return;
-    }
-    const img = ready.get(imageSrc(slot));
-    if (!img) return;
-    if (isColorMask(slot)) {
-      const phase = slot.gradient && slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined;
-      drawMask(ctx, img, chip.fill, width, height, slot.gradient ? gradientEnd(theme, slot) : "", slot.gradientAngle, phase, slot.gradientScale);
-    } else {
-      const radius = chip.radius * scale;
-      const invert = Boolean(slot.inverted);
-      const ring = Boolean(slot.stroked) && !isSvgSource(slot);
-      if (radius > 0 || ring) {
-        ctx.save();
-        round(ctx, width, height, radius);
-        ctx.clip();
-        if (invert) ctx.filter = "invert(1)";
-        drawContain(ctx, img, width, height);
-        if (invert) ctx.filter = "none";
-        if (ring) {
-          round(ctx, width, height, radius);
-          ctx.lineWidth = Math.max(1, slot.stroke ?? 4) * scale * 2;
-          ctx.strokeStyle = chip.fill;
-          ctx.stroke();
-        }
-        ctx.restore();
-      } else if (invert) {
-        ctx.save();
-        ctx.filter = "invert(1)";
-        drawContain(ctx, img, width, height);
-        ctx.restore();
-      } else {
-        drawContain(ctx, img, width, height);
+    withDropShadow(ctx, chip, scale, layoutMode, bloom, () => {
+      const slot = chip.slot;
+      if (slot.kind === "text") {
+        drawText(ctx, chip, slot, width, height, scale, bloom, theme, timeMs);
+        return;
       }
-    }
+      if (slot.emoji) {
+        ctx.font = `${slot.size * scale}px ${EMOJI_FONT}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(slot.emoji, width / 2, height / 2);
+        return;
+      }
+      const img = ready.get(imageSrc(slot));
+      if (!img) return;
+      if (isColorMask(slot)) {
+        const phase = slot.gradient && slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined;
+        drawMask(ctx, img, chip.fill, width, height, slot.gradient ? gradientEnd(theme, slot) : "", slot.gradientAngle, phase, slot.gradientScale);
+      } else {
+        const radius = chip.radius * scale;
+        const invert = Boolean(slot.inverted);
+        const ring = rasterRing(slot);
+        if (radius > 0 || ring) {
+          ctx.save();
+          round(ctx, width, height, radius);
+          ctx.clip();
+          if (invert) ctx.filter = "invert(1)";
+          drawContain(ctx, img, width, height);
+          if (invert) ctx.filter = "none";
+          if (ring) {
+            round(ctx, width, height, radius);
+            ctx.lineWidth = Math.max(1, slot.stroke ?? 4) * scale * 2;
+            ctx.strokeStyle = chip.fill;
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else if (invert) {
+          ctx.save();
+          ctx.filter = "invert(1)";
+          drawContain(ctx, img, width, height);
+          ctx.restore();
+        } else {
+          drawContain(ctx, img, width, height);
+        }
+      }
+    });
   });
 }
 
@@ -339,7 +367,7 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
       ctx.save();
       // Bloom is a silhouette pass — keep source-over so blur stays clean.
       if (!bloomPass) ctx.globalCompositeOperation = canvasBlend(blendMode(chip.slot.blend));
-      drawChip(ctx, chip, scale, bloomPass, ready, scene.theme, timeMs);
+      drawChip(ctx, chip, scale, bloomPass, ready, scene.theme, timeMs, scene.layoutMode);
       ctx.restore();
     }
   };

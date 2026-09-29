@@ -1,6 +1,6 @@
-import { canvasFrame, isCanvasRatio, parseCanvasRatio, type CanvasFrame, type CanvasRatio } from "./canvas";
-import { FEATURED_EMOJI, searchEmoji, type EmojiItem } from "./emojis";
-import { ICON_PRESETS, IMAGE_COLLIDERS, imageColliderId } from "./icons";
+import { canvasFrame, parseCanvasRatio, type CanvasFrame, type CanvasRatio } from "./canvas";
+import { FEATURED_EMOJI } from "./emojis";
+import { ICON_PRESETS, imageColliderId } from "./icons";
 import { matchCollider, presetIdForSrc, simpleColliderKind } from "./iconMesh";
 import {
   bundledWeights,
@@ -8,7 +8,10 @@ import {
   blendMode,
   DEFAULT_AUDIO_REACT,
   DEFAULT_PHYSICS,
-  PHYSICS_COMPLEXITY,
+  dropShadowOpacityOf,
+  dropShadowRadiusOf,
+  dropShadowDistanceOf,
+  dropShadowColorOf,
   physicsComplexity,
   normalizeBackground,
   defaultImageSlot,
@@ -36,23 +39,21 @@ import { pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import { mountProTip, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
-import { blankPrefabText, blankState, TEMPLATES, templateLabel } from "./templates";
+import { blankPrefabText, blankState, templateLabel } from "./templates";
 import {
   customTemplateLabel,
   deleteCustomTemplate,
   embedSlotImages,
-  listCustomTemplates,
   loadCustomTemplate,
   saveCustomTemplate,
 } from "./customTemplates";
-import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
 import playIcon from "@phosphor-icons/core/assets/regular/play.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
-import { openAbout, isAboutOpen } from "./aboutPanel";
+import { isAboutOpen } from "./aboutPanel";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
 import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
-import { checkInput, wrapCheckInput } from "./checkBox";
+import { checkInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
@@ -67,16 +68,26 @@ import {
   type PillProject,
 } from "./project/pillFormat";
 import { ensureTrim, ensureTrims, peekTrim } from "./trim";
-import { pillPadOf, trackingOf } from "./measure";
-import { createWorld, isColorMask, isSvgSource } from "./world";
-import { bindSlotDrag, cancelSlotDrag } from "./slotDrag";
+import { isColorMask, isSvgSource } from "./chipKinds";
+import { createWorld } from "./world";
+import { cancelSlotDrag } from "./slotDrag";
 import { bindUiClickSounds, bindUiTypeSounds, playButton, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
 import gsap from "gsap";
-import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
-import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?raw";
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
 import "./style.css";
 import { placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
+import { beginScrub, endScrub } from "./scrub";
+import { mountCreatePanel, RESET_ICON, setSectionOpen, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
+import { closeOtherSlots, setSlotOpen } from "./panel/slotCards";
+import {
+  assignCloseSlotMenu,
+  closeSlotMenu,
+  openSlotMenu,
+  peekCloseSlotMenu,
+  type LayerMove,
+  type SlotMenuHost,
+} from "./panel/slotMenu";
+import { createPlaySession, type PlaySession } from "./playSession";
 
 syncUiScale();
 
@@ -98,21 +109,14 @@ let revealSlotId: string | null = null;
 let revealTheme = false;
 /** Keep restored chip poses on canvas until Trigger Physics / new drop. */
 let posePinned = false;
+/** Play/physics session; assigned once helpers below exist. */
+let session!: PlaySession;
 let draftTimer = 0;
 let lastDraftJson = "";
 let draftReady = false;
 
-type InsertMotion = {
-  id: string;
-  scroll: number;
-  /** First row that should slide down. Null when the copy is the last row. */
-  anchorId: string | null;
-  anchorTop: number;
-};
-
 let insertMotion: InsertMotion | null = null;
 
-const DUPLICATE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="4" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="4" y="9" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>`;
 let tintPicker: { anchor: HTMLElement; close: () => void } | null = null;
 
 const world = createWorld();
@@ -191,16 +195,13 @@ app.innerHTML = `
             <span class="play-btn__text">Trigger Physics</span>
           </span>
         </button>
-        <button type="button" class="pill smash-btn" id="loop" aria-pressed="false" data-tip="Keep the floor opening so the fall never ends">
-          <span class="smash-btn__label">
-            <svg class="smash-btn__icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"></path>
-            </svg>
-            <span class="smash-btn__text">Loop sequence</span>
-          </span>
-        </button>
-        <button type="button" class="pill" id="reset-defaults" data-tip="Restore default sliders and options">Reset all</button>
-        <button type="button" class="pill" id="open-settings" data-tip="Sound, theme, and project files">Settings</button>
+        <div class="panel-actions__bar">
+          <button type="button" class="pill panel-util" id="loop" aria-pressed="false" data-tip="Keep the floor opening so the fall never ends">
+            <span class="loop-chip__text">Loop</span>
+          </button>
+          <button type="button" class="pill panel-util" id="reset-defaults" data-tip="Restore default sliders and options">Reset</button>
+          <button type="button" class="pill panel-util" id="open-settings" data-tip="Sound, theme, and preferences">Settings</button>
+        </div>
         <button type="button" class="pill" id="copy-settings" hidden data-tip="Copy the current settings as text">Copy settings</button>
       </div>
       <div class="panel-tabs" role="tablist" aria-label="Panel">
@@ -972,67 +973,6 @@ function applyPost() {
   stage.classList.toggle("has-hue", hueDeg % 360 !== 0);
 }
 
-const RESET_ICON =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 3v5h5"/></svg>';
-
-function sectionMarkup(
-  id: string,
-  title: string,
-  tip: string,
-  body: string,
-  options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string },
-): string {
-  const open = openSections.has(id);
-  const reset =
-    options?.resetId && options.resetLabel && options.resetTip
-      ? `<button type="button" class="section-reset" id="${options.resetId}" aria-label="${options.resetLabel}" data-tip="${options.resetTip}">${RESET_ICON}</button>`
-      : "";
-  const domId = options?.sectionId ? ` id="${options.sectionId}"` : "";
-  return `
-    <section class="section${open ? " is-open" : ""}" data-section="${id}"${domId}>
-      <div class="section-head">
-        <button type="button" class="section-toggle" aria-expanded="${open}">
-          <span class="section-toggle__label" data-tip="${tip}">${title}</span>
-        </button>
-        ${reset}
-        <span class="section-chevron" aria-hidden="true"></span>
-      </div>
-      <div class="section-fold"${open ? "" : " inert"} aria-hidden="${open ? "false" : "true"}">
-        <div class="section-fold-clip">
-          ${body}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function setSectionOpen(id: string, open: boolean) {
-  if (open) openSections.add(id);
-  else openSections.delete(id);
-  const section = panel.querySelector<HTMLElement>(`[data-section="${id}"]`);
-  if (!section) return;
-  section.classList.toggle("is-open", open);
-  section.querySelector(".section-toggle")?.setAttribute("aria-expanded", String(open));
-  const fold = section.querySelector<HTMLElement>(".section-fold");
-  if (fold) {
-    fold.inert = !open;
-    fold.setAttribute("aria-hidden", String(!open));
-  }
-}
-
-function bindSectionFolds(root: HTMLElement) {
-  root.querySelectorAll<HTMLElement>("[data-section]").forEach((section) => {
-    const id = section.dataset.section;
-    if (!id) return;
-    section.querySelector(".section-head")?.addEventListener("click", (event) => {
-      if ((event.target as Element).closest(".section-reset")) return;
-      const open = !openSections.has(id);
-      setSectionOpen(id, open);
-      playTransition(open);
-    });
-  });
-}
-
 const exportController = {
   prepare: async () => {
     await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
@@ -1043,6 +983,19 @@ const exportController = {
   },
   draws: () => world.draws(),
   state: () => state,
+  saveProject() {
+    const json = serializePillProject(currentPillProject());
+    downloadPillJson(json, defaultPillFileName());
+    lastDraftJson = json;
+    void clearDraft().catch(() => {});
+  },
+  async loadProject(file: File) {
+    const project = await readPillFile(file);
+    remember();
+    await applyPillProject(project);
+    lastDraftJson = serializePillProject(project);
+    void clearDraft().catch(() => {});
+  },
 };
 
 function currentPillProject(): PillProject {
@@ -1092,10 +1045,10 @@ async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolea
     posePinned = true;
     running = true;
     paused = false;
-    phase = "holding";
-    holdStarted = performance.now();
-    droppedAt = performance.now();
-    settledSince = 0;
+    session.phase = "holding";
+    session.holdStarted = performance.now();
+    session.droppedAt = performance.now();
+    session.settledSince = 0;
     world.restore(
       state.slots,
       state.physics,
@@ -1114,7 +1067,7 @@ async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolea
     paintTransport();
   } else {
     posePinned = false;
-    setRunning(false);
+    session.setRunning(false);
   }
   renderPanel();
   live();
@@ -1122,19 +1075,6 @@ async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolea
 }
 
 const settingsController = {
-  saveProject() {
-    const json = serializePillProject(currentPillProject());
-    downloadPillJson(json, defaultPillFileName());
-    lastDraftJson = json;
-    void clearDraft().catch(() => {});
-  },
-  async loadProject(file: File) {
-    const project = await readPillFile(file);
-    remember();
-    await applyPillProject(project);
-    lastDraftJson = serializePillProject(project);
-    void clearDraft().catch(() => {});
-  },
   prefsChanged() {
     const prefs = getPrefs();
     setProTipsEnabled(prefs.tipsOn);
@@ -1284,6 +1224,186 @@ function scaleFallingAmounts(total: number) {
   paintImageAmounts();
 }
 
+function slotMenuHost(): SlotMenuHost {
+  return {
+    state,
+    panel,
+    world,
+    remember,
+    live,
+    endGesture,
+    renderPanel,
+    liveChip,
+    pickSlot,
+    get gesture() {
+      return gesture;
+    },
+    get tintPicker() {
+      return tintPicker;
+    },
+    setTintPicker(value) {
+      tintPicker = value;
+    },
+    bindSlotMenuDismiss,
+    uploadedShape,
+    isRasterUpload,
+    iconCanGradient,
+    storeGradient,
+    recallGradient,
+    pickImageFiles,
+    assignImageFile,
+    editChipText,
+    duplicateSlot,
+    removeSlot,
+    invertSlot,
+    flipSlot,
+    alignSlotStraight,
+    copySlotStyle,
+    pasteSlotStyle,
+    canPasteSlotStyle,
+    canMoveSlotLayer,
+    moveSlotLayer,
+  };
+}
+
+function createPanelHost(): CreatePanelHost {
+  return {
+    state,
+    panel,
+    openSlots,
+    pickedSlotIds,
+    openSections,
+    remember,
+    live,
+    endGesture,
+    renderPanel,
+    openSlotMenu(x, y, id) {
+      openSlotMenu(x, y, id, slotMenuHost());
+    },
+    get focusSlotId() {
+      return focusSlotId;
+    },
+    get pointerHeld() {
+      return pointerHeld;
+    },
+    get gesture() {
+      return gesture;
+    },
+    get assetAnimsFrozen() {
+      return assetAnimsFrozen;
+    },
+    showPick,
+    pickSlot,
+    releasePick,
+    duplicateSlot,
+    removeSlot,
+    chipPreview,
+    uploadedShape,
+    iconSrc,
+    iconPreviewFill,
+    shapeSwatch,
+    settingLabel,
+    resetControl,
+    fieldDirty,
+    textTintRow,
+    tintRow,
+    gradientTintRow,
+    blendField,
+    dropShadowField,
+    chosenWeight,
+    mountFontPick,
+    mountWeightPick,
+    reflectGlobalWeight,
+    paintFieldReset,
+    settleFont,
+    liveChip,
+    bindSlotInputs,
+    bindTint,
+    bindFreezeAnims,
+    iconCanGradient,
+    isRasterUpload,
+    colliderOf,
+    isImageFile,
+    assignImageFile,
+    slotScaleSliderMax,
+    escapeAttr,
+    IMAGE_FILE_ACCEPT,
+    AMOUNT_SOFT_CAP,
+    shapeAmountRange,
+    activeTemplateLabel,
+    get machineFont() {
+      return machineFont;
+    },
+    setMachineFont(value) {
+      machineFont = value;
+    },
+    get localFamilies() {
+      return localFamilies;
+    },
+    SHAPE_PERF_WARN,
+    selectCanvas,
+    openCanvasStagePicker,
+    loadTemplate,
+    saveCurrentAsTemplate,
+    closeFontMenu,
+    removeCustomTemplate,
+    openChoiceMenu,
+    loadSavedTemplate,
+    applySlotOrder,
+    addPillSlot,
+    addTypeSlot,
+    addShapeSlot,
+    addEmojiSlot,
+    pickImageFiles,
+    addImagesFromFiles,
+    bindRange,
+    paintPerfHints,
+    syncInheritedPillPads,
+    syncInheritedTracking,
+    scaleFallingAmounts,
+    paintRange,
+    getAppliedFont() {
+      return appliedFont;
+    },
+    setAppliedFont(value) {
+      appliedFont = value;
+    },
+    applyFontEverywhere,
+    sharedFamily,
+    sharedWeight,
+    setGlobalWeightPick(pick) {
+      globalWeightPick = pick;
+    },
+    applyWeightEverywhere,
+    loadLocalFonts,
+    setLayoutMode,
+    setAudioReactEnabled,
+    openThemes() {
+      themeShelf.open();
+    },
+    openThemeSwatch,
+    consumeRevealTheme() {
+      if (!revealTheme) return false;
+      revealTheme = false;
+      return true;
+    },
+    consumeRevealSlotId() {
+      const id = revealSlotId;
+      revealSlotId = null;
+      return id;
+    },
+    scrollPanelTo,
+    growInsertedSlot,
+    setFocusSlotId(id) {
+      focusSlotId = id;
+    },
+    paintMicTextAnim,
+    pinPageScroll,
+    applyPost,
+    demoState,
+  };
+}
+
 function renderPanel() {
   const inserted = insertMotion;
   insertMotion = null;
@@ -1310,533 +1430,7 @@ function renderPanel() {
     }, scroll);
     return;
   }
-  const shapes = shapeAmountRange();
-  panel.innerHTML = `
-    <section class="section">
-      <h2 data-tip="Widescreen or vertical frame">Canvas</h2>
-      <div class="canvas-controls">
-        <div class="segment is-4" role="group" aria-label="Canvas">
-          <button type="button" class="pill${state.canvas === "16:9" ? " is-on" : ""}" data-canvas="16:9" aria-pressed="${state.canvas === "16:9"}" data-tip="Landscape frame">16:9</button>
-          <button type="button" class="pill${state.canvas === "1:1" ? " is-on" : ""}" data-canvas="1:1" aria-pressed="${state.canvas === "1:1"}" data-tip="Square frame">1:1</button>
-          <button type="button" class="pill${state.canvas === "3:4" ? " is-on" : ""}" data-canvas="3:4" aria-pressed="${state.canvas === "3:4"}" data-tip="Photo portrait frame">3:4</button>
-          <button type="button" class="pill${state.canvas === "9:16" ? " is-on" : ""}" data-canvas="9:16" aria-pressed="${state.canvas === "9:16"}" data-tip="Tall portrait frame">9:16</button>
-        </div>
-        <button type="button" class="canvas-stage" id="canvas-stage" style="background:${state.stageColor}" aria-label="Stage color" data-tip="Canvas background color"></button>
-      </div>
-    </section>
-    <section class="section">
-      <div class="templates-head">
-        <h2 data-tip="Start empty or from a ready-made scene">Templates</h2>
-        <button type="button" class="section-reset" id="save-template" aria-label="Save theme" data-tip="Save the current scene as a custom template">${floppyDisk}</button>
-      </div>
-      <div class="segment" role="group" aria-label="Templates">
-        <button type="button" class="pill${state.template === "blank" ? " is-on" : ""}" id="template-blank" aria-pressed="${state.template === "blank"}" data-tip="Start from an empty canvas">Blank</button>
-        <button type="button" class="pill template-pick${activeTemplateLabel(state.template) ? " is-on" : ""}" id="template-pick" aria-haspopup="listbox" aria-expanded="false" data-tip="Load a ready-made scene">
-          <span class="font-pick-value">${activeTemplateLabel(state.template) ?? "Template"}</span>
-          <span class="font-pick-chevron" aria-hidden="true"></span>
-        </button>
-      </div>
-    </section>
-    ${sectionMarkup(
-      "composition",
-      "Composition",
-      "Overall size and spacing of pieces",
-      `<label class="field" data-tip="Overall size of every piece"><span data-range-label="masterScale">Scale ${(state.masterScale * 10).toFixed(0)}</span>
-        <input type="range" id="masterScale" min="4" max="100" step="1" value="${state.masterScale * 10}" />
-      </label>
-      <label class="field" data-tip="How much piece sizes vary"><span data-range-label="sizeRandom">Size random ${state.sizeRandom}</span>
-        <input type="range" id="sizeRandom" min="0" max="100" step="1" value="${state.sizeRandom}" />
-      </label>
-      <label class="field" data-tip="Space inside text holding shapes"><span data-range-label="pillPad">Shape padding ${state.pillPad}</span>
-        <input type="range" id="pillPad" min="0" max="100" step="1" value="${state.pillPad}" />
-      </label>
-      <label class="field" data-tip="Letter spacing for text"><span data-range-label="textTracking">Tracking ${state.textTracking}</span>
-        <input type="range" id="textTracking" min="-400" max="500" step="1" value="${state.textTracking}" />
-      </label>
-      <label class="field" data-tip="How many pieces drop into the frame"><span data-range-label="shapeAmount">Amount of shapes ${state.shapeAmount}</span>
-        <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${state.shapeAmount}" />
-      </label>
-      <p class="hint" id="amount-perf-hint"${state.shapeAmount >= SHAPE_PERF_WARN ? "" : " hidden"}>Many shapes can drop below 60 fps.</p>`,
-      { resetId: "reset-master", resetLabel: "Reset composition", resetTip: "Reset composition sliders" },
-    )}
-    ${sectionMarkup(
-      "color",
-      "Color theme",
-      "Colors used by pills and shapes",
-      `<div class="theme-row" style="--theme-count:${state.theme.length}">
-        ${state.theme
-          .map(
-            (color, i) =>
-              `<button type="button" class="theme-swatch" data-theme="${i}" style="background:${color}; --i:${i}" aria-label="Theme color ${i + 1}" data-tip="Edit theme color ${i + 1}"></button>`,
-          )
-          .join("")}
-      </div>
-      <button type="button" class="pill theme-launch" id="view-themes" data-tip="Browse ready-made color palettes">View Themes</button>`,
-    )}
-    ${sectionMarkup(
-      "typeface",
-      "Typeface",
-      "Fonts for all text pills",
-      `<div class="field" data-tip="Apply one font to every text piece">All text
-        <div class="font-pick" id="global-font"></div>
-      </div>
-      <div class="field" data-tip="Default weight for all text">Weight
-        <div class="font-pick" id="global-weight"></div>
-      </div>
-      <div class="row">
-        <div class="field" data-tip="Type a font name installed on this computer">Font from this computer
-          <input type="text" id="machine-font" list="local-font-list" placeholder="e.g. Helvetica Neue" value="${escapeAttr(machineFont)}" />
-        </div>
-      </div>
-      <datalist id="local-font-list">
-        ${localFamilies.map((name) => `<option value="${escapeAttr(name)}"></option>`).join("")}
-      </datalist>
-      <button type="button" class="pill" id="load-local-fonts" data-tip="Let the browser list fonts installed on this computer">Load local fonts</button>`,
-    )}
-    ${sectionMarkup(
-      "what-falls",
-      "What falls down",
-      "The pieces that drop into the frame. In Layout mode, list order is layer order — top sits in front",
-      `<div class="slot-stack" id="slots"></div>
-      <div class="slot-adds">
-        <button type="button" class="pill slot-add" id="add-text" data-tip="Add a text label inside a rounded pill">
-          <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-          Add pill
-        </button>
-        <button type="button" class="pill slot-add" id="add-type" data-tip="Add bare text without a pill shape">
-          <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-          Add Text
-        </button>
-        <button type="button" class="pill slot-add" id="add-shape" data-tip="Add a built-in shape from the library">
-          <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-          Add shape
-        </button>
-        <button type="button" class="pill slot-add" id="add-emoji" data-tip="Add an emoji">
-          <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-          Add emoji
-        </button>
-        <button type="button" class="pill slot-add" id="add-photo" data-tip="Add an SVG, PNG, JPG, or GIF">
-          <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-          Upload image
-        </button>
-      </div>`,
-      { sectionId: "shape-create" },
-    )}
-    ${sectionMarkup(
-      "physics",
-      "Physics",
-      "How pieces fall, bounce, and settle — or place them freely",
-      `<div class="segment" role="group" aria-label="Placement mode">
-        <button type="button" class="pill${!state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!state.physics.layoutMode}" data-tip="Pieces fall, bounce, and stack">Activated</button>
-        <button type="button" class="pill${state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${state.physics.layoutMode}" data-tip="Place freely like Figma — no physics, no throws, pieces can overlap">Layout Mode</button>
-      </div>
-      <div class="physics-dynamics"${state.physics.layoutMode ? " inert" : ""}>
-      <label class="field" data-tip="Simple = boxes, Normal = circle/box, Ultra = traced icon shapes. Higher is heavier on the CPU.">Physics complexity
-        <select id="physics-complexity"${state.physics.layoutMode ? " disabled" : ""}>
-          ${PHYSICS_COMPLEXITY.map((tier) => `<option value="${tier.id}"${state.physics.complexity === tier.id ? " selected" : ""}>${tier.label}</option>`).join("")}
-        </select>
-      </label>
-      <div class="row">
-        <label class="field" data-tip="How hard pieces pull downward"><span data-range-label="gravity">Gravity ${state.physics.gravity.toFixed(2)}</span>
-          <input type="range" id="gravity" min="0" max="3" step="0.05" value="${state.physics.gravity}"${state.physics.layoutMode ? " disabled" : ""} />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field" data-tip="How fast the simulation runs"><span data-range-label="speed">Speed ${state.physics.speed.toFixed(2)}</span>
-          <input type="range" id="speed" min="0.2" max="2" step="0.05" value="${state.physics.speed}"${state.physics.layoutMode ? " disabled" : ""} />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field" data-tip="How springy collisions are (above 1 = super-bouncy)"><span data-range-label="bounce">Bounciness ${state.physics.bounce.toFixed(2)}</span>
-          <input type="range" id="bounce" min="0" max="2" step="0.05" value="${state.physics.bounce}"${state.physics.layoutMode ? " disabled" : ""} />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field" data-tip="Slide resistance when pieces touch"><span data-range-label="friction">Friction ${state.physics.friction.toFixed(2)}</span>
-          <input type="range" id="friction" min="0" max="1" step="0.05" value="${state.physics.friction}"${state.physics.layoutMode ? " disabled" : ""} />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field" data-tip="How much pieces stick while sliding"><span data-range-label="grip">Grip ${state.physics.grip.toFixed(2)}</span>
-          <input type="range" id="grip" min="0" max="1" step="0.05" value="${state.physics.grip}"${state.physics.layoutMode ? " disabled" : ""} />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field" data-tip="How quickly spinning slows down"><span data-range-label="spin">Spin drag ${state.physics.spin.toFixed(2)}</span>
-          <input type="range" id="spin" min="0" max="0.12" step="0.01" value="${state.physics.spin}"${state.physics.layoutMode ? " disabled" : ""} />
-        </label>
-      </div>
-      <label class="field" data-tip="How long the floor stays closed before opening"><span data-range-label="hold">Floor pause ${state.physics.hold.toFixed(2)}s</span>
-        <input type="range" id="hold" min="0.2" max="4" step="0.05" value="${state.physics.hold}"${state.physics.layoutMode ? " disabled" : ""} />
-      </label>
-      </div>`,
-      { resetId: "reset-physics", resetLabel: "Reset physics", resetTip: "Reset physics sliders" },
-    )}
-    ${sectionMarkup(
-      "look",
-      "Look",
-      "Post-process color and glow on the whole frame",
-      `<label class="field" data-tip="Shift all colors around the wheel"><span data-range-label="hue">Hue ${state.post.hue}°</span>
-        <input type="range" id="hue" min="0" max="360" step="1" value="${state.post.hue}" />
-      </label>
-      <label class="field" data-tip="Soft glow around bright areas"><span data-range-label="bloom">Bloom ${state.post.bloom}</span>
-        <input type="range" id="bloom" min="0" max="100" step="1" value="${state.post.bloom}" />
-      </label>
-      <label class="field" data-tip="Strength of the glow"><span data-range-label="bloomOpacity">Bloom opacity ${state.post.bloomOpacity}</span>
-        <input type="range" id="bloomOpacity" min="0" max="100" step="1" value="${state.post.bloomOpacity}" />
-      </label>
-      <label class="field" data-tip="Film-grain texture over the frame"><span data-range-label="grain">Grain ${state.post.grain}</span>
-        <input type="range" id="grain" min="0" max="200" step="1" value="${state.post.grain}" />
-      </label>
-      <label class="field" data-tip="Darken the edges of the frame"><span data-range-label="vignette">Vignette ${state.post.vignette}</span>
-        <input type="range" id="vignette" min="0" max="100" step="1" value="${state.post.vignette}" />
-      </label>
-      <label class="field" data-tip="Color intensity"><span data-range-label="saturate">Saturate ${state.post.saturate}</span>
-        <input type="range" id="saturate" min="40" max="180" step="1" value="${state.post.saturate}" />
-      </label>
-      <label class="field" data-tip="How overlapping pieces mix colors">Blending mode
-        <select id="blend">
-          ${BLEND_MODES.map((mode) => `<option value="${mode.id}"${state.post.blend === mode.id ? " selected" : ""}>${mode.label}</option>`).join("")}
-        </select>
-      </label>`,
-    )}
-    ${sectionMarkup(
-      "audio-react",
-      "Audio react",
-      "Bass hops everything and swells pills; sharp hits make icons hop",
-      `<button type="button" class="pill smash-btn${state.audioReact.enabled ? " is-on" : ""}" id="audio-mic" aria-pressed="${state.audioReact.enabled}" data-tip="Ask for mic access and drive scale from live audio">
-        <span class="smash-btn__label">
-          <svg class="smash-btn__icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3z"></path>
-          </svg>
-          <span class="smash-btn__text">${state.audioReact.enabled ? "Listening" : "Microphone"}</span>
-        </span>
-      </button>
-      <label class="field" data-tip="How easily quiet sounds trigger a reaction"><span data-range-label="audioSensitivity">Sensitivity ${Math.round(state.audioReact.sensitivity)}</span>
-        <input type="range" id="audioSensitivity" min="0" max="100" step="1" value="${state.audioReact.sensitivity}" />
-      </label>
-      <label class="field" data-tip="How hard pieces hop on a hit"><span data-range-label="audioBounce">Bounce intensity ${state.audioReact.bounce.toFixed(1)}×</span>
-        <input type="range" id="audioBounce" min="1" max="4" step="0.1" value="${state.audioReact.bounce}" />
-      </label>
-      <label class="field" data-tip="How much text pills swell on bass hits"><span data-range-label="audioBassBoost">Bass boost +${Math.round(state.audioReact.bassBoost)}%</span>
-        <input type="range" id="audioBassBoost" min="5" max="20" step="1" value="${state.audioReact.bassBoost}" />
-      </label>
-      <label class="field" data-tip="Small color-wheel kick on sharp hits that snaps back"><span data-range-label="audioHueNudge">Hue nudge ${Math.round(state.audioReact.hueNudge)}°</span>
-        <input type="range" id="audioHueNudge" min="0" max="30" step="1" value="${state.audioReact.hueNudge}" />
-      </label>`,
-      { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react" },
-    )}
-    <footer class="panel-credit">
-      <span class="panel-credit__s" aria-hidden="true"></span>
-      <p>
-        Ultrapilled is created by<br />
-        <button type="button" class="panel-credit__author" id="open-about">Stellan Johansson</button>
-      </p>
-      <p class="panel-credit__social">
-        <a href="https://x.com/johstell" target="_blank" rel="noopener noreferrer" aria-label="X">
-          <span class="panel-credit__icon panel-credit__icon--x" aria-hidden="true"></span>
-        </a>
-        <a href="https://github.com/stellanjoh2/Ultrapilled" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
-          <svg viewBox="0 0 98 96" aria-hidden="true">
-            <path fill="currentColor" d="M41.4395 69.3848C28.8066 67.8535 19.9062 58.7617 19.9062 46.9902C19.9062 42.2051 21.6289 37.0371 24.5 33.5918C23.2559 30.4336 23.4473 23.7344 24.8828 20.959C28.7109 20.4805 33.8789 22.4902 36.9414 25.2656C40.5781 24.1172 44.4062 23.543 49.0957 23.543C53.7852 23.543 57.6133 24.1172 61.0586 25.1699C64.0254 22.4902 69.2891 20.4805 73.1172 20.959C74.457 23.543 74.6484 30.2422 73.4043 33.4961C76.4668 37.1328 78.0937 42.0137 78.0937 46.9902C78.0937 58.7617 69.1934 67.6621 56.3691 69.2891C59.623 71.3945 61.8242 75.9883 61.8242 81.252L61.8242 91.2051C61.8242 94.0762 64.2168 95.7031 67.0879 94.5547C84.4102 87.9512 98 70.6289 98 49.1914C98 22.1074 75.9883 6.69539e-07 48.9043 4.309e-07C21.8203 1.92261e-07 -1.9479e-07 22.1074 -4.3343e-07 49.1914C-6.20631e-07 70.4375 13.4941 88.0469 31.6777 94.6504C34.2617 95.6074 36.75 93.8848 36.75 91.3008L36.75 83.6445C35.4102 84.2188 33.6875 84.6016 32.1562 84.6016C25.8398 84.6016 22.1074 81.1563 19.4277 74.7441C18.375 72.1602 17.2266 70.6289 15.0254 70.3418C13.877 70.2461 13.4941 69.7676 13.4941 69.1934C13.4941 68.0449 15.4082 67.1836 17.3223 67.1836C20.0977 67.1836 22.4902 68.9063 24.9785 72.4473C26.8926 75.2227 28.9023 76.4668 31.2949 76.4668C33.6875 76.4668 35.2187 75.6055 37.4199 73.4043C39.0469 71.7773 40.291 70.3418 41.4395 69.3848Z" />
-          </svg>
-        </a>
-      </p>
-    </footer>
-  `;
-
-  bindSectionFolds(panel);
-
-  panel.querySelector("#open-about")?.addEventListener("click", () => {
-    openAbout();
-  });
-
-  panel.querySelectorAll<HTMLButtonElement>("[data-canvas]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const next = button.dataset.canvas;
-      if (isCanvasRatio(next)) selectCanvas(next);
-    });
-  });
-
-  panel.querySelector<HTMLButtonElement>("#canvas-stage")?.addEventListener("click", (event) => {
-    openCanvasStagePicker(event.currentTarget as HTMLButtonElement);
-  });
-
-  panel.querySelector("#template-blank")?.addEventListener("click", () => {
-    loadTemplate(blankState());
-  });
-  panel.querySelector("#save-template")?.addEventListener("click", () => {
-    void saveCurrentAsTemplate();
-  });
-  const templatePick = panel.querySelector<HTMLButtonElement>("#template-pick");
-  templatePick?.addEventListener("click", () => {
-    if (templatePick.getAttribute("aria-expanded") === "true") {
-      closeFontMenu();
-      return;
-    }
-    const choices: Choice<string>[] = [
-      ...TEMPLATES.map((template) => ({ value: template.id as string, label: template.label })),
-      ...listCustomTemplates().map((template) => ({
-        value: template.id,
-        label: template.label,
-        onRemove: () => {
-          void removeCustomTemplate(template.id);
-        },
-      })),
-    ];
-    openChoiceMenu(templatePick, choices, state.template ?? "", (id) => {
-      const builtIn = TEMPLATES.find((item) => item.id === id);
-      if (builtIn) {
-        loadTemplate(builtIn.build());
-        return;
-      }
-      void loadSavedTemplate(id);
-    });
-  });
-
-  const slotStack = panel.querySelector<HTMLElement>("#slots")!;
-  // Front of the pile at the top of the list (last slot in state = front on canvas).
-  for (const slot of state.slots.slice().reverse()) slotStack.append(renderSlotCard(slot));
-  bindSlotDrag(slotStack, panel, applySlotOrder);
-
-  panel.querySelector("#add-text")?.addEventListener("click", () => addPillSlot());
-  panel.querySelector("#add-type")?.addEventListener("click", () => addTypeSlot());
-  panel.querySelector("#add-shape")?.addEventListener("click", () => addShapeSlot());
-  panel.querySelector("#add-emoji")?.addEventListener("click", () => addEmojiSlot());
-  panel.querySelector("#add-photo")?.addEventListener("click", () => {
-    void pickImageFiles(true).then((files) => {
-      if (!files.length) return;
-      addImagesFromFiles(files);
-    });
-  });
-
-  bindRange("masterScale", "Scale", (v) => {
-    state.masterScale = v / 10;
-    paintPerfHints();
-    live();
-  }, (v) => `${v.toFixed(0)}`);
-  bindRange("sizeRandom", "Size random", (v) => {
-    state.sizeRandom = Math.round(v);
-    live();
-  }, (v) => `${Math.round(v)}`);
-  bindRange("pillPad", "Shape padding", (v) => {
-    state.pillPad = Math.round(v);
-    syncInheritedPillPads();
-    live();
-  }, (v) => `${Math.round(v)}`);
-  bindRange("textTracking", "Tracking", (v) => {
-    state.textTracking = Math.round(v);
-    syncInheritedTracking();
-    live();
-  }, (v) => `${Math.round(v)}`);
-  bindRange("shapeAmount", "Amount of shapes", (v) => {
-    scaleFallingAmounts(Math.round(v));
-    const input = panel.querySelector<HTMLInputElement>("#shapeAmount");
-    if (input && Number(input.value) !== state.shapeAmount) {
-      input.value = String(state.shapeAmount);
-      paintRange(input);
-    }
-    paintPerfHints();
-    live();
-  }, () => `${state.shapeAmount}`);
-  panel.querySelector("#reset-master")?.addEventListener("click", () => {
-    remember();
-    const next = demoState();
-    state.masterScale = next.masterScale;
-    state.sizeRandom = next.sizeRandom;
-    state.pillPad = next.pillPad;
-    state.textTracking = next.textTracking;
-    scaleFallingAmounts(next.shapeAmount);
-    live();
-    renderPanel();
-  });
-
-  const globalFont = panel.querySelector<HTMLElement>("#global-font");
-  if (globalFont) {
-    mountFontPick(globalFont, appliedFont, (family) => {
-      if (family) void applyFontEverywhere(family);
-      else appliedFont = "";
-    }, "Keep per-slot fonts");
-  }
-  const globalWeight = panel.querySelector<HTMLElement>("#global-weight");
-  const family = sharedFamily() ?? "";
-  const weight = sharedWeight();
-  globalWeightPick = globalWeight
-    ? mountWeightPick(
-        globalWeight,
-        family,
-        weight ?? 700,
-        (next) => {
-          void applyWeightEverywhere(next);
-        },
-        !family || weight == null,
-      )
-    : null;
-  panel.querySelector<HTMLInputElement>("#machine-font")?.addEventListener("change", (e) => {
-    const family = (e.target as HTMLInputElement).value.trim();
-    if (!family) {
-      machineFont = "";
-      return;
-    }
-    void applyFontEverywhere(family);
-  });
-  panel.querySelector("#load-local-fonts")?.addEventListener("click", () => {
-    void loadLocalFonts();
-  });
-  bindRange("gravity", "Gravity", (v) => {
-    state.physics.gravity = v;
-    live();
-  });
-  bindRange("speed", "Speed", (v) => {
-    state.physics.speed = v;
-    live();
-  });
-  bindRange("bounce", "Bounciness", (v) => {
-    state.physics.bounce = v;
-    live();
-  });
-  bindRange("friction", "Friction", (v) => {
-    state.physics.friction = v;
-    live();
-  });
-  bindRange("grip", "Grip", (v) => {
-    state.physics.grip = v;
-    live();
-  });
-  bindRange("spin", "Spin drag", (v) => {
-    state.physics.spin = v;
-    live();
-  });
-  bindRange("hold", "Floor pause", (v) => {
-    state.physics.hold = v;
-  }, (v) => `${v.toFixed(2)}s`);
-  panel.querySelector("#reset-physics")?.addEventListener("click", () => {
-    remember();
-    state.physics = { ...DEFAULT_PHYSICS };
-    live();
-    renderPanel();
-  });
-  panel.querySelectorAll<HTMLButtonElement>("[data-layout-mode]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const next = btn.dataset.layoutMode === "layout";
-      if (next === state.physics.layoutMode) return;
-      void setLayoutMode(next);
-    });
-  });
-  panel.querySelector<HTMLSelectElement>("#physics-complexity")?.addEventListener("change", (e) => {
-    remember();
-    state.physics.complexity = physicsComplexity((e.target as HTMLSelectElement).value);
-    playClick();
-    live();
-  });
-  panel.querySelector<HTMLButtonElement>("#audio-mic")?.addEventListener("click", () => {
-    const on = !state.audioReact.enabled;
-    remember();
-    playSwitch(on);
-    // Defer mute so the toggle click above can flush first.
-    if (on) queueMicrotask(() => { void setAudioReactEnabled(true); });
-    else void setAudioReactEnabled(false);
-  });
-  bindRange("audioSensitivity", "Sensitivity", (v) => {
-    state.audioReact.sensitivity = Math.round(v);
-  }, (v) => `${Math.round(v)}`);
-  bindRange("audioBounce", "Bounce intensity", (v) => {
-    state.audioReact.bounce = Math.round(v * 10) / 10;
-  }, (v) => `${(Math.round(v * 10) / 10).toFixed(1)}×`);
-  bindRange("audioBassBoost", "Bass boost", (v) => {
-    state.audioReact.bassBoost = Math.round(v);
-  }, (v) => `+${Math.round(v)}%`);
-  bindRange("audioHueNudge", "Hue nudge", (v) => {
-    state.audioReact.hueNudge = Math.round(v);
-  }, (v) => `${Math.round(v)}°`);
-  panel.querySelector("#reset-audio-react")?.addEventListener("click", () => {
-    remember();
-    void setAudioReactEnabled(false).then(() => {
-      state.audioReact = { ...DEFAULT_AUDIO_REACT };
-      renderPanel();
-    });
-  });
-  bindRange("bloom", "Bloom", (v) => {
-    state.post.bloom = Math.round(v);
-    applyPost();
-  }, (v) => `${Math.round(v)}`);
-  bindRange("bloomOpacity", "Bloom opacity", (v) => {
-    state.post.bloomOpacity = Math.round(v);
-    applyPost();
-  }, (v) => `${Math.round(v)}`);
-  panel.querySelector<HTMLSelectElement>("#blend")?.addEventListener("change", (e) => {
-    remember();
-    state.post.blend = blendMode((e.target as HTMLSelectElement).value);
-    playClick();
-    applyPost();
-  });
-  bindRange("grain", "Grain", (v) => {
-    state.post.grain = Math.round(v);
-    applyPost();
-  }, (v) => `${Math.round(v)}`);
-  bindRange("vignette", "Vignette", (v) => {
-    state.post.vignette = Math.round(v);
-    applyPost();
-  }, (v) => `${Math.round(v)}`);
-  bindRange("saturate", "Saturate", (v) => {
-    state.post.saturate = Math.round(v);
-    applyPost();
-  }, (v) => `${Math.round(v)}`);
-  bindRange("hue", "Hue", (v) => {
-    state.post.hue = Math.round(v);
-    applyPost();
-  }, (v) => `${Math.round(v)}°`);
-
-  panel.querySelector<HTMLButtonElement>("#view-themes")?.addEventListener("click", () => themeShelf.open());
-  panel.querySelectorAll<HTMLButtonElement>("[data-theme]").forEach((swatch) => {
-    swatch.addEventListener("click", () => openThemeSwatch(swatch));
-  });
-  if (revealTheme) {
-    revealTheme = false;
-    const row = panel.querySelector<HTMLElement>(".theme-row");
-    const swatches = [...panel.querySelectorAll<HTMLButtonElement>("[data-theme]")];
-    if (row && swatches.length && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const total = 0.5;
-      const dur = swatches.length === 1 ? total : total * 0.64;
-      const stagger = swatches.length > 1 ? (total - dur) / (swatches.length - 1) : 0;
-      row.style.setProperty("--reveal-dur", `${dur}s`);
-      row.style.setProperty("--reveal-stagger", `${stagger}s`);
-      swatches.forEach((swatch) => swatch.classList.add("is-reveal"));
-      const last = swatches[swatches.length - 1]!;
-      const clear = (event: AnimationEvent) => {
-        if (event.animationName !== "theme-swatch-reveal") return;
-        swatches.forEach((swatch) => swatch.classList.remove("is-reveal"));
-        row.style.removeProperty("--reveal-dur");
-        row.style.removeProperty("--reveal-stagger");
-        last.removeEventListener("animationend", clear);
-      };
-      last.addEventListener("animationend", clear);
-    }
-  }
-  panel.scrollTop = scroll;
-  if (revealSlotId) {
-    const card = panel.querySelector<HTMLElement>(`[data-id="${revealSlotId}"]`);
-    if (!inserted && card) {
-      // scrollIntoView can shift the whole document (looks like the screen slid off).
-      // Keep the scroll inside #panel — especially after Listening / Audio was scrolled into view.
-      const adds = !card.nextElementSibling ? card.parentElement?.nextElementSibling : null;
-      scrollPanelTo(adds instanceof HTMLElement ? adds : card);
-    }
-    if (card && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      card.classList.add("is-new");
-      const clearNew = (event: AnimationEvent) => {
-        if (event.animationName !== "slot-born") return;
-        card.classList.remove("is-new");
-        card.removeEventListener("animationend", clearNew);
-      };
-      card.addEventListener("animationend", clearNew);
-    }
-    revealSlotId = null;
-  }
-  if (inserted) growInsertedSlot(inserted);
-  focusSlotId = null;
-  paintMicTextAnim();
-  pinPageScroll();
+  mountCreatePanel(panel, createPanelHost(), scroll, inserted);
 }
 
 function syncInheritedPillPads() {
@@ -1879,7 +1473,22 @@ function bindRange(
   const input = panel.querySelector<HTMLInputElement>(`#${id}`);
   const caption = panel.querySelector(`[data-range-label="${id}"]`);
   if (input) paintRange(input);
+  let scrubbing = false;
+  const startScrub = () => {
+    if (scrubbing) return;
+    scrubbing = true;
+    beginScrub();
+  };
+  const stopScrub = () => {
+    if (!scrubbing) return;
+    scrubbing = false;
+    endScrub();
+  };
+  input?.addEventListener("pointerdown", startScrub);
+  input?.addEventListener("pointerup", stopScrub);
+  input?.addEventListener("pointercancel", stopScrub);
   input?.addEventListener("input", () => {
+    startScrub();
     remember(`range:${id}`);
     const value = Number(input.value);
     paintRange(input);
@@ -1887,122 +1496,16 @@ function bindRange(
     if (caption) caption.textContent = `${label} ${format(value)}`;
   });
   const finish = () => {
+    stopScrub();
     if (pointerHeld || gesture !== `range:${id}`) return;
     endGesture();
   };
   input?.addEventListener("change", finish);
   input?.addEventListener("blur", () => {
+    stopScrub();
     if (pointerHeld) return;
     finish();
   });
-}
-
-function renderSlotCard(slot: Slot): HTMLElement {
-  const card = document.createElement("article");
-  const open = openSlots.has(slot.id);
-  card.className = `slot-card${open ? " is-open" : ""}${pickedSlotIds.has(slot.id) ? " is-picked" : ""}`;
-  card.dataset.id = slot.id;
-  card.addEventListener("contextmenu", (event) => {
-    if (
-      event.target instanceof HTMLElement &&
-      event.target.closest("input, textarea, select, [contenteditable='true']")
-    ) {
-      return;
-    }
-    event.preventDefault();
-    openSlotMenu(event.clientX, event.clientY, slot.id);
-  });
-
-  if (slot.kind === "text") {
-    card.append(textFields(slot, open));
-  } else if (uploadedShape(slot)) {
-    card.append(photoFields(slot, open));
-  } else {
-    card.append(imageFields(slot, open));
-  }
-
-  return card;
-}
-
-function textColorChip(slot: TextSlot): HTMLElement {
-  const mark = document.createElement("span");
-  mark.className = "slot-mark";
-  mark.setAttribute("aria-hidden", "true");
-  const chip = document.createElement("span");
-  chip.className = "slot-chip";
-  chip.style.background = chipPreview(slot);
-  if (slot.gradient && slot.animatedGradient && !slot.stroked) {
-    chip.classList.add("is-gradient-animated");
-    chip.style.setProperty("--sweep-duration", `${gradientPeriodMs(slot.gradientSpeed) / 1000}s`);
-    chip.style.setProperty("--grad-angle", String(gradientAngleOf(slot.gradientAngle)));
-  }
-  mark.append(chip);
-  return mark;
-}
-
-function paintTextHeadline(toggle: HTMLElement, slot: TextSlot, open: boolean, focus: boolean) {
-  toggle.replaceChildren();
-  const chip = textColorChip(slot);
-  if (!open) {
-    const name = document.createElement("span");
-    name.className = "slot-name";
-    const title = document.createElement("span");
-    title.className = "slot-title";
-    const word = slot.text.trim();
-    title.textContent = word || "Empty";
-    if (!word) title.classList.add("is-empty");
-    const pen = document.createElement("span");
-    pen.className = "slot-pen";
-    pen.setAttribute("aria-hidden", "true");
-    pen.innerHTML = pencilSimple;
-    name.append(title, pen);
-    toggle.append(chip, name);
-    return;
-  }
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "slot-live";
-  input.value = slot.text;
-  input.setAttribute("aria-label", "Text");
-  input.addEventListener("click", (event) => event.stopPropagation());
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setSlotOpen(toggle, slot, false, false);
-    }
-  });
-  input.addEventListener("input", () => {
-    remember(`text:${slot.id}`);
-    slot.text = input.value;
-    live();
-  });
-  input.addEventListener("blur", () => {
-    if (pointerHeld) return;
-    if (gesture === `text:${slot.id}`) endGesture();
-  });
-  toggle.append(chip, input);
-  if (focus) {
-    queueMicrotask(() => {
-      input.focus();
-      const end = input.value.length;
-      input.setSelectionRange(end, end);
-    });
-  }
-}
-
-function closeOtherSlots(id: string) {
-  for (const otherId of [...openSlots]) {
-    if (otherId === id) continue;
-    const card = panel.querySelector<HTMLElement>(`[data-id="${otherId}"]`);
-    card?.classList.remove("is-picked");
-    const other = state.slots.find((item) => item.id === otherId);
-    const toggle = card?.querySelector<HTMLElement>(".slot-toggle");
-    if (other && toggle) setSlotOpen(toggle, other, false, false);
-    else {
-      openSlots.delete(otherId);
-      releasePick(otherId);
-    }
-  }
 }
 
 function openOnly(id: string) {
@@ -2012,551 +1515,6 @@ function openOnly(id: string) {
   pickedSlotIds.clear();
   pickedSlotIds.add(id);
   world.setPicked(id);
-}
-
-function setSlotOpen(toggle: HTMLElement, slot: Slot, open: boolean, focus: boolean) {
-  if (open) {
-    openSlots.add(slot.id);
-    closeOtherSlots(slot.id);
-  } else {
-    openSlots.delete(slot.id);
-    releasePick(slot.id);
-  }
-  const card = toggle.closest(".slot-card");
-  card?.classList.toggle("is-open", open);
-  const fold = toggle.parentElement?.parentElement?.querySelector<HTMLElement>(".slot-fold");
-  if (fold) {
-    fold.inert = !open;
-    fold.setAttribute("aria-hidden", String(!open));
-  }
-  toggle.tabIndex = open ? -1 : 0;
-  toggle.setAttribute("role", open ? "presentation" : "button");
-  toggle.setAttribute("aria-expanded", String(open));
-  if (slot.kind === "text") paintTextHeadline(toggle, slot, open, focus);
-}
-
-function slotHead(slot: Slot, open: boolean): HTMLElement {
-  const head = document.createElement("div");
-  head.className = "slot-head";
-  const toggle = document.createElement("div");
-  toggle.className = "slot-toggle";
-  toggle.tabIndex = open ? -1 : 0;
-  toggle.setAttribute("role", open ? "presentation" : "button");
-  toggle.setAttribute("aria-expanded", String(open));
-
-  if (slot.kind === "text") {
-    paintTextHeadline(toggle, slot, open, focusSlotId === slot.id);
-  } else {
-    const mark = document.createElement("span");
-    mark.className = "slot-mark";
-    if (slot.emoji) {
-      mark.textContent = slot.emoji;
-    } else if (uploadedShape(slot)) {
-      mark.classList.add("slot-mark--image");
-      mark.innerHTML = imageIcon;
-    } else if (slot.src) {
-      mark.append(shapeSwatch(iconSrc(slot), iconPreviewFill(slot)));
-    }
-    const title = document.createElement("span");
-    title.className = "slot-title";
-    const named = Boolean(slot.emoji || slot.src);
-    title.textContent = named ? slot.name : "Empty";
-    if (!named) title.classList.add("is-empty");
-    else title.dataset.tip = slot.name;
-    toggle.append(mark, title);
-  }
-
-  const toggleOpen = (focus: boolean) => {
-    const open = !openSlots.has(slot.id);
-    setSlotOpen(toggle, slot, open, focus);
-    playTransition(open);
-    if (open) showPick(slot.id);
-  };
-  toggle.addEventListener("click", (event) => {
-    if (event.target instanceof HTMLInputElement) return;
-    if (event.shiftKey) {
-      pickSlot(slot.id, { additive: true, force: true });
-      return;
-    }
-    toggleOpen(true);
-  });
-  toggle.addEventListener("keydown", (event) => {
-    if (event.target instanceof HTMLInputElement) return;
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    toggleOpen(true);
-  });
-
-  const duplicate = document.createElement("button");
-  duplicate.type = "button";
-  duplicate.className = "ghost icon-btn";
-  duplicate.setAttribute("aria-label", "Duplicate");
-  duplicate.dataset.tip = "Duplicate this piece";
-  duplicate.innerHTML = DUPLICATE_ICON;
-  duplicate.addEventListener("click", () => duplicateSlot(slot.id));
-
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "ghost icon-btn";
-  remove.dataset.remove = "";
-  remove.setAttribute("aria-label", "Remove");
-  remove.dataset.tip = "Remove this piece";
-  remove.textContent = "✕";
-  remove.addEventListener("click", () => removeSlot(slot.id));
-  head.append(toggle, duplicate, remove);
-  return head;
-}
-
-function textFields(slot: TextSlot, open: boolean): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "slot-body";
-  wrap.append(slotHead(slot, open));
-  const editor = document.createElement("div");
-  editor.className = "slot-editor";
-  slot.fontWeight = chosenWeight(slot.fontFamily, slot.fontWeight);
-  editor.innerHTML = `
-    <div class="slot-group">
-      <p class="slot-label">Text</p>
-      <div class="field">${settingLabel(slot, "Typeface", "fontFamily")}
-        <div class="font-pick" data-font-pick></div>
-      </div>
-      <div class="row">
-        <div class="field">${settingLabel(slot, "Weight", "fontWeight")}
-          <div class="font-pick" data-weight-pick></div>
-        </div>
-        <label class="field">${settingLabel(slot, "Size", "fontSize")}
-          <input type="number" data-key="fontSize" min="12" max="96" value="${slot.fontSize}" />
-        </label>
-      </div>
-      <label class="field">${settingLabel(slot, "Text scale", "scale", slot.scale.toFixed(2))}
-        <input type="range" data-key="scale" min="0.25" max="${slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
-      </label>
-      <label class="field">${settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
-        <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
-      </label>
-      <label class="field">${settingLabel(slot, "Tracking", "tracking", String(trackingOf(slot, state.textTracking)))}
-        <input type="range" data-key="tracking" min="-400" max="500" step="1" value="${trackingOf(slot, state.textTracking)}" />
-      </label>
-      ${
-        slot.shape !== "none"
-          ? `<div class="field">${settingLabel(slot, "Text color", "textColor")}
-        ${textTintRow(slot)}
-      </div>`
-          : ""
-      }
-    </div>
-    <div class="slot-group">
-      <p class="slot-label">Shape</p>
-      ${
-        slot.shape !== "none"
-          ? `<label class="field">${settingLabel(slot, "Shape padding", "pillPad", String(pillPadOf(slot, state.pillPad)))}
-        <input type="range" data-key="pillPad" min="0" max="100" step="1" value="${pillPadOf(slot, state.pillPad)}" />
-      </label>`
-          : ""
-      }
-      <div class="row">
-        <label class="field">${settingLabel(slot, "Holding shape", "shape")}
-          <select data-key="shape">
-            <option value="none" ${slot.shape === "none" ? "selected" : ""}>None</option>
-            <option value="pill" ${slot.shape === "pill" ? "selected" : ""}>Pill</option>
-            <option value="box" ${slot.shape === "box" ? "selected" : ""}>Box</option>
-          </select>
-        </label>
-        <label class="field">${settingLabel(slot, "Radius", "radius")}
-          <input type="range" data-key="radius" min="0" max="40" value="${slot.radius}" ${slot.shape !== "box" ? "disabled" : ""} />
-        </label>
-      </div>
-      ${
-        slot.shape !== "none"
-          ? `<div class="check-row">
-        <label class="check">
-          ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
-          Stroked
-        </label>
-        ${resetControl("Stroked", "stroked", fieldDirty(slot, "stroked"))}
-      </div>
-      ${slot.stroked ? `<label class="field">${settingLabel(slot, "Stroke", "stroke", String(slot.stroke))}
-        <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke}" />
-      </label>` : ""}`
-          : ""
-      }
-      <div class="check-row">
-        <label class="check">
-          ${checkInput(`data-key="gradient" ${slot.gradient ? "checked" : ""}`)}
-          Gradient
-        </label>
-        ${resetControl("Gradient", "gradient", fieldDirty(slot, "gradient"))}
-      </div>
-      <div class="field">${settingLabel(slot, slot.gradient ? "Start color" : slot.shape === "none" ? "Color" : "Shape color", "color")}
-        ${tintRow(slot, slot.shape === "none" ? "Color" : "Shape color")}
-      </div>
-      ${
-        slot.gradient
-          ? `<div class="field">${settingLabel(slot, "End color", "gradientColor")}
-        ${gradientTintRow(slot)}
-      </div>
-      <label class="field">${settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
-        <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
-      </label>
-      <label class="field">${settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
-        <input type="range" data-key="gradientScale" min="1" max="100" step="1" value="${gradientScaleOf(slot.gradientScale)}" />
-      </label>`
-          : ""
-      }
-      ${blendField(slot)}
-    </div>
-    <div class="slot-group">
-      <div class="slot-group-head">
-        <p class="slot-label">Animation</p>
-        <button type="button" class="section-reset${assetAnimsFrozen ? " is-on" : ""}" data-freeze-anims aria-pressed="${assetAnimsFrozen}" aria-label="${assetAnimsFrozen ? "Resume animations" : "Pause animations"}" data-tip="${assetAnimsFrozen ? "Resume text and gradient animations" : "Freeze text and gradient animations on all assets"}">${assetAnimsFrozen ? playIcon : pauseIcon}</button>
-      </div>
-      <div class="check-row">
-        <label class="check">
-          ${checkInput(`data-key="textAnim" ${slot.textAnim ? "checked" : ""}`)}
-          Text animation
-        </label>
-        ${resetControl("Text animation", "textAnim", fieldDirty(slot, "textAnim"))}
-      </div>
-      ${
-        slot.textAnim
-          ? `<label class="field">${settingLabel(slot, "Text anim speed", "textAnimSpeed", String(textAnimSpeedOf(slot.textAnimSpeed)))}
-        <input type="range" data-key="textAnimSpeed" min="1" max="100" step="1" value="${textAnimSpeedOf(slot.textAnimSpeed)}" />
-      </label>`
-          : ""
-      }
-      ${
-        slot.gradient
-          ? `<div class="check-row">
-        <label class="check">
-          ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""}`)}
-          Animated Gradient
-        </label>
-        ${resetControl("Animated Gradient", "animatedGradient", fieldDirty(slot, "animatedGradient"))}
-      </div>
-      ${
-        slot.animatedGradient
-          ? `<label class="field">${settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
-        <input type="range" data-key="gradientSpeed" min="1" max="100" step="1" value="${gradientSpeedOf(slot.gradientSpeed)}" />
-      </label>`
-          : ""
-      }`
-          : ""
-      }
-    </div>
-  `;
-  placeFold(wrap, editor, open);
-
-  const weightHost = editor.querySelector<HTMLElement>("[data-weight-pick]");
-  const weightPick = weightHost
-    ? mountWeightPick(weightHost, slot.fontFamily, slot.fontWeight, (weight) => {
-        remember();
-        slot.fontWeight = weight;
-        reflectGlobalWeight();
-        paintFieldReset(editor, slot, "fontWeight");
-        void settleFont(slot.fontFamily, weight).then(() => liveChip(slot.id));
-      })
-    : null;
-
-  const fontPick = editor.querySelector<HTMLElement>("[data-font-pick]");
-  if (fontPick) {
-    mountFontPick(fontPick, slot.fontFamily, (family) => {
-      remember();
-      slot.fontFamily = family;
-      if (weightPick) slot.fontWeight = weightPick.setFamily(family);
-      reflectGlobalWeight();
-      paintFieldReset(editor, slot, "fontFamily");
-      paintFieldReset(editor, slot, "fontWeight");
-      void settleFont(family, slot.fontWeight).then(() => liveChip(slot.id));
-    });
-  }
-  bindSlotInputs(editor, slot);
-  bindTint(editor, slot);
-  bindFreezeAnims(editor);
-  return wrap;
-}
-
-function imageFields(slot: ImageSlot, open: boolean): HTMLElement {
-  return slot.emoji ? emojiFields(slot, open) : shapeFields(slot, open);
-}
-
-function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "slot-body";
-  wrap.append(slotHead(slot, open));
-  const editor = document.createElement("div");
-  editor.className = "slot-editor";
-  editor.innerHTML = `
-    <div class="pick-now">${pickPreview(slot)}${resetControl("Shape", "icon", fieldDirty(slot, "icon"))}</div>
-    <div class="field">${settingLabel(slot, slot.gradient && iconCanGradient(slot) ? "Start color" : "Color", "color")}
-      ${tintRow(slot)}
-    </div>
-    ${
-      iconCanGradient(slot)
-        ? `<div class="check-row">
-      <label class="check">
-        ${checkInput(`data-key="gradient" ${slot.gradient ? "checked" : ""}`)}
-        Gradient
-      </label>
-      ${resetControl("Gradient", "gradient", fieldDirty(slot, "gradient"))}
-    </div>
-    ${
-      slot.gradient
-        ? `<div class="field">${settingLabel(slot, "End color", "gradientColor")}
-      ${gradientTintRow(slot)}
-    </div>
-    <label class="field">${settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
-      <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
-    </label>
-    <label class="field">${settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
-      <input type="range" data-key="gradientScale" min="1" max="100" step="1" value="${gradientScaleOf(slot.gradientScale)}" />
-    </label>
-    <div class="check-row">
-      <label class="check">
-        ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""}`)}
-        Animated Gradient
-      </label>
-      ${resetControl("Animated Gradient", "animatedGradient", fieldDirty(slot, "animatedGradient"))}
-    </div>
-    ${
-      slot.animatedGradient
-        ? `<label class="field">${settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
-      <input type="range" data-key="gradientSpeed" min="1" max="100" step="1" value="${gradientSpeedOf(slot.gradientSpeed)}" />
-    </label>`
-        : ""
-    }`
-        : ""
-    }`
-        : ""
-    }
-    ${blendField(slot)}
-    <p class="slot-label">Shapes</p>
-    <div class="icon-grid" data-presets></div>
-    <label class="field">${settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="${slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
-    </label>
-    <label class="field">${settingLabel(slot, "Amount", "amount", String(slot.amount))}
-      <input type="range" data-key="amount" min="1" max="${AMOUNT_SOFT_CAP}" value="${slot.amount}" />
-    </label>
-  `;
-  placeFold(wrap, editor, open);
-
-  const grid = editor.querySelector("[data-presets]")!;
-  const swatchColor = iconPreviewFill(slot);
-  for (const icon of ICON_PRESETS) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.title = icon.label;
-    btn.className = slot.src === icon.src ? "is-on" : "";
-    btn.setAttribute("aria-pressed", String(slot.src === icon.src));
-    btn.append(shapeSwatch(icon.src, swatchColor));
-    btn.addEventListener("click", () => {
-      remember();
-      slot.src = icon.src;
-      slot.name = icon.label;
-      slot.emoji = undefined;
-      slot.collider = undefined;
-      slot.radius = 0;
-      renderPanel();
-      live();
-    });
-    grid.append(btn);
-  }
-
-  bindTint(editor, slot);
-  bindSlotInputs(editor, slot);
-  return wrap;
-}
-
-function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "slot-body";
-  wrap.append(slotHead(slot, open));
-  const editor = document.createElement("div");
-  editor.className = "slot-editor";
-  editor.innerHTML = `
-    <div class="pick-now">${pickPreview(slot)}${resetControl("Emoji", "icon", fieldDirty(slot, "icon"))}</div>
-    ${blendField(slot)}
-    <p class="slot-label">Emoji</p>
-    <div class="emoji-grid" data-emoji-featured></div>
-    <label class="field">Search emoji
-      <input type="search" data-emoji-search placeholder="heart, fire, cat…" />
-    </label>
-    <div class="emoji-grid" data-emoji-results></div>
-    <label class="field">${settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="${slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
-    </label>
-    <label class="field">${settingLabel(slot, "Amount", "amount", String(slot.amount))}
-      <input type="range" data-key="amount" min="1" max="${AMOUNT_SOFT_CAP}" value="${slot.amount}" />
-    </label>
-  `;
-  placeFold(wrap, editor, open);
-
-  const pickEmoji = (item: EmojiItem) => {
-    remember();
-    slot.emoji = item.char;
-    slot.name = item.name;
-    slot.src = "";
-    slot.collider = undefined;
-    slot.radius = 0;
-    renderPanel();
-    live();
-  };
-
-  const featured = wrap.querySelector("[data-emoji-featured]")!;
-  for (const item of FEATURED_EMOJI) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.title = item.name;
-    btn.className = slot.emoji === item.char ? "is-on" : "";
-    btn.setAttribute("aria-pressed", String(slot.emoji === item.char));
-    const glyph = document.createElement("span");
-    glyph.className = "emoji-glyph";
-    glyph.textContent = item.char;
-    btn.append(glyph);
-    btn.addEventListener("click", () => pickEmoji(item));
-    featured.append(btn);
-  }
-
-  const results = wrap.querySelector("[data-emoji-results]")!;
-  const paintResults = (items: EmojiItem[]) => {
-    results.replaceChildren();
-    for (const item of items) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.title = item.name;
-      btn.className = slot.emoji === item.char ? "is-on" : "";
-      btn.setAttribute("aria-pressed", String(slot.emoji === item.char));
-      const glyph = document.createElement("span");
-      glyph.className = "emoji-glyph";
-      glyph.textContent = item.char;
-      btn.append(glyph);
-      btn.addEventListener("click", () => pickEmoji(item));
-      results.append(btn);
-    }
-  };
-
-  wrap.querySelector<HTMLInputElement>("[data-emoji-search]")?.addEventListener("input", (e) => {
-    paintResults(searchEmoji((e.target as HTMLInputElement).value));
-  });
-
-  bindSlotInputs(editor, slot);
-  return wrap;
-}
-
-function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "slot-body";
-  wrap.append(slotHead(slot, open));
-  const editor = document.createElement("div");
-  editor.className = "slot-editor";
-  const svgUpload = isSvgSource(slot);
-  const canTint = iconCanGradient(slot);
-  editor.innerHTML = `
-    ${
-      svgUpload
-        ? `<div class="check-row">
-      <label class="check">
-        ${checkInput(`data-key="tint" ${slot.tint ? "checked" : ""}`)}
-        Recolor
-      </label>
-      ${resetControl("Recolor", "tint", fieldDirty(slot, "tint"))}
-    </div>`
-        : ""
-    }
-    ${
-      canTint
-        ? `<div class="field">${settingLabel(slot, slot.gradient ? "Start color" : "Color", "color")}
-      ${tintRow(slot)}
-    </div>
-    <div class="check-row">
-      <label class="check">
-        ${checkInput(`data-key="gradient" ${slot.gradient ? "checked" : ""}`)}
-        Gradient
-      </label>
-      ${resetControl("Gradient", "gradient", fieldDirty(slot, "gradient"))}
-    </div>
-    ${
-      slot.gradient
-        ? `<div class="field">${settingLabel(slot, "End color", "gradientColor")}
-      ${gradientTintRow(slot)}
-    </div>
-    <label class="field">${settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
-      <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
-    </label>
-    <label class="field">${settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
-      <input type="range" data-key="gradientScale" min="1" max="100" step="1" value="${gradientScaleOf(slot.gradientScale)}" />
-    </label>
-    <div class="check-row">
-      <label class="check">
-        ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""}`)}
-        Animated Gradient
-      </label>
-      ${resetControl("Animated Gradient", "animatedGradient", fieldDirty(slot, "animatedGradient"))}
-    </div>
-    ${
-      slot.animatedGradient
-        ? `<label class="field">${settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
-      <input type="range" data-key="gradientSpeed" min="1" max="100" step="1" value="${gradientSpeedOf(slot.gradientSpeed)}" />
-    </label>`
-        : ""
-    }`
-        : ""
-    }`
-        : ""
-    }
-    ${blendField(slot)}
-    ${photoReplaceControl(slot)}
-    <label class="field">${settingLabel(slot, "Collision", "collider")}
-      <select data-key="collider">
-        ${IMAGE_COLLIDERS.map((icon) => `<option value="${icon.id}"${colliderOf(slot) === icon.id ? " selected" : ""}>${icon.label}</option>`).join("")}
-      </select>
-    </label>
-    ${
-      isRasterUpload(slot)
-        ? `<div class="check-row">
-      <label class="check">
-        ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
-        Stroked
-      </label>
-      ${resetControl("Stroked", "stroked", fieldDirty(slot, "stroked"))}
-    </div>
-    ${
-      slot.stroked
-        ? `<label class="field">${settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
-      <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke ?? 4}" />
-    </label>
-    <div class="field">${settingLabel(slot, "Stroke color", "color")}
-      ${tintRow(slot, "Stroke color")}
-    </div>`
-        : ""
-    }
-    <label class="field">${settingLabel(slot, "Radius", "radius", String(Math.round(slot.radius ?? 0)))}
-      <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
-    </label>`
-        : ""
-    }
-    <label class="field">${settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="${slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
-    </label>
-    <label class="field">${settingLabel(slot, "Amount", "amount", String(slot.amount))}
-      <input type="range" data-key="amount" min="1" max="${AMOUNT_SOFT_CAP}" value="${slot.amount}" />
-    </label>
-  `;
-  placeFold(wrap, editor, open);
-
-  if (canTint || (isRasterUpload(slot) && slot.stroked)) bindTint(editor, slot);
-  editor.querySelector<HTMLInputElement>("[data-file]")?.addEventListener("change", (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file || !isImageFile(file)) return;
-    remember();
-    playCreate();
-    void assignImageFile(slot, file).then(() => {
-      renderPanel();
-      live();
-    });
-  });
-  bindSlotInputs(editor, slot);
-  return wrap;
 }
 
 function isSvgFile(file: File): boolean {
@@ -2668,6 +1626,7 @@ function addImagesFromFiles(files: Iterable<File>, at?: { clientX: number; clien
   const last = slots[slots.length - 1]!;
   openOnly(last.id);
   revealSlotId = last.id;
+  if (slots.length === 1) armAppendInsert(last.id);
   playCreate();
   const ids = slots.map((slot) => slot.id);
   void Promise.all(slots.map((slot, i) => assignImageFile(slot, images[i]!))).then(() => {
@@ -2700,6 +1659,17 @@ function playfieldPoint(clientX: number, clientY: number) {
 
 type PlaceAt = { clientX: number; clientY: number };
 
+/** Grow-in + hold the add-row steady (same motion as duplicate). */
+function armAppendInsert(id: string) {
+  const anchor = panel.querySelector<HTMLElement>(".slot-adds");
+  insertMotion = {
+    id,
+    scroll: panel.scrollTop,
+    anchorId: null,
+    anchorTop: anchor?.getBoundingClientRect().top ?? 0,
+  };
+}
+
 function armSlotPlace(id: string, at?: PlaceAt) {
   if (!at) return;
   const { x, y } = playfieldPoint(at.clientX, at.clientY);
@@ -2722,6 +1692,7 @@ function addPillSlot(at?: PlaceAt) {
   openOnly(slot.id);
   focusSlotId = slot.id;
   revealSlotId = slot.id;
+  armAppendInsert(slot.id);
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -2744,6 +1715,7 @@ function addTypeSlot(at?: PlaceAt) {
   openOnly(slot.id);
   focusSlotId = slot.id;
   revealSlotId = slot.id;
+  armAppendInsert(slot.id);
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -2763,6 +1735,7 @@ function addShapeSlot(at?: PlaceAt) {
   state.slots.push(slot);
   openOnly(slot.id);
   revealSlotId = slot.id;
+  armAppendInsert(slot.id);
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -2784,24 +1757,11 @@ function addEmojiSlot(at?: PlaceAt) {
   state.slots.push(slot);
   openOnly(slot.id);
   revealSlotId = slot.id;
+  armAppendInsert(slot.id);
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
   live();
-}
-
-function placeFold(wrap: HTMLElement, editor: HTMLElement, open: boolean) {
-  const fold = document.createElement("div");
-  fold.className = "slot-fold";
-  if (!open) {
-    fold.inert = true;
-    fold.setAttribute("aria-hidden", "true");
-  }
-  const clip = document.createElement("div");
-  clip.className = "slot-fold-clip";
-  clip.append(editor);
-  fold.append(clip);
-  wrap.append(fold);
 }
 
 function slotColor(slot: Slot): string {
@@ -2885,34 +1845,6 @@ function shapeSwatch(src: string, color: string): HTMLElement {
   glyph.style.maskImage = mask;
   glyph.style.webkitMaskImage = mask;
   return glyph;
-}
-
-function pickPreview(slot: ImageSlot): string {
-  const label = (body: string) =>
-    `<span class="pick-now__label" data-tip="${escapeAttr(slot.name)}">${body}</span>`;
-  if (slot.emoji) {
-    return `<span class="pick-glyph">${slot.emoji}</span>${label(`Selected <b>${escapeAttr(slot.name)}</b>`)}`;
-  }
-  if (slot.src && isColorMask(slot)) {
-    const color = iconPreviewFill(slot);
-    const src = iconSrc(slot);
-    return `<span class="pick-glyph shape-swatch" style="background:${color};-webkit-mask-image:url(&quot;${src}&quot;);mask-image:url(&quot;${src}&quot;)"></span>${label(`Selected <b>${escapeAttr(slot.name)}</b>`)}`;
-  }
-  if (slot.src) {
-    return `<img class="pick-glyph" src="${iconSrc(slot)}" alt="" />${label(`Selected <b>${escapeAttr(slot.name)}</b>`)}`;
-  }
-  return `<span class="pick-empty">Nothing selected</span>`;
-}
-
-function photoReplaceControl(slot: ImageSlot): string {
-  const src = iconSrc(slot);
-  return `<label class="field file-replace">
-    <span class="field-label"><span>Replace image</span>${resetControl("Image", "icon", fieldDirty(slot, "icon"))}</span>
-    <span class="file-replace__btn" style="background-image:url(&quot;${escapeAttr(src)}&quot;)" data-tip="${escapeAttr(slot.name)}">
-      <span class="file-replace__text">Replace</span>
-    </span>
-    <input type="file" class="file-replace__input" accept="${IMAGE_FILE_ACCEPT}" data-file />
-  </label>`;
 }
 
 function tintRow(slot: Slot, legend = "Color"): string {
@@ -3015,6 +1947,31 @@ function openCanvasStagePicker(btn: HTMLButtonElement) {
     },
     onClose() {
       if (gesture === "canvas-stage") endGesture();
+      if (tintPicker?.anchor === btn) tintPicker = null;
+    },
+  });
+  tintPicker = { anchor: btn, close: picker.close };
+}
+
+function openDropShadowColorPicker(btn: HTMLButtonElement, slot: Slot) {
+  if (tintPicker?.anchor === btn) {
+    tintPicker.close();
+    return;
+  }
+  tintPicker?.close();
+  const gestureKey = `slot:${slot.id}:dropShadowColor`;
+  const picker = mountColorPicker({
+    anchor: btn,
+    value: dropShadowColorOf(slot.dropShadowColor),
+    onChange(hex) {
+      remember(gestureKey);
+      slot.dropShadowColor = dropShadowColorOf(hex);
+      btn.style.background = slot.dropShadowColor;
+      paintFieldReset(btn.closest(".field") ?? btn.parentElement ?? btn, slot, "dropShadowColor");
+      liveChip(slot.id);
+    },
+    onClose() {
+      if (gesture === gestureKey) endGesture();
       if (tintPicker?.anchor === btn) tintPicker = null;
     },
   });
@@ -3162,6 +2119,11 @@ type TextBaseline = Pick<
   | "textColorIndex"
   | "textColor"
   | "blend"
+  | "dropShadow"
+  | "dropShadowRadius"
+  | "dropShadowDistance"
+  | "dropShadowOpacity"
+  | "dropShadowColor"
   | "scale"
 >;
 
@@ -3187,6 +2149,11 @@ type ImageBaseline = Pick<
   | "tint"
   | "collider"
   | "blend"
+  | "dropShadow"
+  | "dropShadowRadius"
+  | "dropShadowDistance"
+  | "dropShadowOpacity"
+  | "dropShadowColor"
 >;
 
 const textBaselines = new Map<string, TextBaseline>();
@@ -3228,6 +2195,11 @@ function captureBaseline(slot: Slot) {
       textColorIndex: slot.textColorIndex,
       textColor: slot.textColor,
       blend: slot.blend,
+      dropShadow: slot.dropShadow,
+      dropShadowRadius: slot.dropShadowRadius,
+      dropShadowDistance: slot.dropShadowDistance,
+      dropShadowOpacity: slot.dropShadowOpacity,
+      dropShadowColor: slot.dropShadowColor,
       scale: slot.scale,
     });
     return;
@@ -3254,6 +2226,11 @@ function captureBaseline(slot: Slot) {
     tint: slot.tint,
     collider: slot.collider,
     blend: slot.blend,
+    dropShadow: slot.dropShadow,
+    dropShadowRadius: slot.dropShadowRadius,
+    dropShadowDistance: slot.dropShadowDistance,
+    dropShadowOpacity: slot.dropShadowOpacity,
+    dropShadowColor: slot.dropShadowColor,
   });
 }
 
@@ -3286,6 +2263,11 @@ function textBaseline(slot: TextSlot): TextBaseline {
     textColorIndex: seed.textColorIndex,
     textColor: seed.textColor,
     blend: seed.blend,
+    dropShadow: seed.dropShadow,
+    dropShadowRadius: seed.dropShadowRadius,
+    dropShadowDistance: seed.dropShadowDistance,
+    dropShadowOpacity: seed.dropShadowOpacity,
+    dropShadowColor: seed.dropShadowColor,
     scale: seed.scale,
   };
   textBaselines.set(slot.id, base);
@@ -3317,6 +2299,11 @@ function imageBaseline(slot: ImageSlot): ImageBaseline {
     tint: seed.tint,
     collider: seed.collider,
     blend: seed.blend,
+    dropShadow: seed.dropShadow,
+    dropShadowRadius: seed.dropShadowRadius,
+    dropShadowDistance: seed.dropShadowDistance,
+    dropShadowOpacity: seed.dropShadowOpacity,
+    dropShadowColor: seed.dropShadowColor,
   };
   imageBaselines.set(slot.id, base);
   return base;
@@ -3379,6 +2366,16 @@ function fieldDirty(slot: Slot, key: string): boolean {
         return slot.textColorIndex !== base.textColorIndex || (slot.textColor ?? "") !== (base.textColor ?? "");
       case "blend":
         return blendMode(slot.blend) !== blendMode(base.blend);
+      case "dropShadow":
+        return Boolean(slot.dropShadow) !== Boolean(base.dropShadow);
+      case "dropShadowRadius":
+        return dropShadowRadiusOf(slot.dropShadowRadius) !== dropShadowRadiusOf(base.dropShadowRadius);
+      case "dropShadowDistance":
+        return dropShadowDistanceOf(slot.dropShadowDistance) !== dropShadowDistanceOf(base.dropShadowDistance);
+      case "dropShadowOpacity":
+        return dropShadowOpacityOf(slot.dropShadowOpacity) !== dropShadowOpacityOf(base.dropShadowOpacity);
+      case "dropShadowColor":
+        return dropShadowColorOf(slot.dropShadowColor) !== dropShadowColorOf(base.dropShadowColor);
       default:
         return false;
     }
@@ -3417,6 +2414,16 @@ function fieldDirty(slot: Slot, key: string): boolean {
       return colliderOf(slot) !== imageColliderId(base.collider);
     case "blend":
       return blendMode(slot.blend) !== blendMode(base.blend);
+    case "dropShadow":
+      return Boolean(slot.dropShadow) !== Boolean(base.dropShadow);
+    case "dropShadowRadius":
+      return dropShadowRadiusOf(slot.dropShadowRadius) !== dropShadowRadiusOf(base.dropShadowRadius);
+    case "dropShadowDistance":
+      return dropShadowDistanceOf(slot.dropShadowDistance) !== dropShadowDistanceOf(base.dropShadowDistance);
+    case "dropShadowOpacity":
+      return dropShadowOpacityOf(slot.dropShadowOpacity) !== dropShadowOpacityOf(base.dropShadowOpacity);
+    case "dropShadowColor":
+      return dropShadowColorOf(slot.dropShadowColor) !== dropShadowColorOf(base.dropShadowColor);
     default:
       return false;
   }
@@ -3446,6 +2453,42 @@ function blendField(slot: Slot): string {
       ${BLEND_MODES.map((mode) => `<option value="${mode.id}"${current === mode.id ? " selected" : ""}>${mode.label}</option>`).join("")}
     </select>
   </label>`;
+}
+
+/** Soft shadow — layout mode only so physics tumbles stay cheap. */
+function dropShadowField(slot: Slot): string {
+  if (!state.physics.layoutMode) return "";
+  const on = Boolean(slot.dropShadow);
+  const radius = dropShadowRadiusOf(slot.dropShadowRadius);
+  const distance = dropShadowDistanceOf(slot.dropShadowDistance);
+  const opacity = dropShadowOpacityOf(slot.dropShadowOpacity);
+  const color = dropShadowColorOf(slot.dropShadowColor);
+  return `<div class="check-row" data-tip="Soft shadow under this layer (layout mode only)">
+    <label class="check">
+      ${checkInput(`data-key="dropShadow" ${on ? "checked" : ""}`)}
+      Drop shadow
+    </label>
+    ${resetControl("Drop shadow", "dropShadow", fieldDirty(slot, "dropShadow"))}
+  </div>
+  ${
+    on
+      ? `<label class="field">${settingLabel(slot, "Shadow distance", "dropShadowDistance", String(distance))}
+    <input type="range" data-key="dropShadowDistance" min="0" max="64" step="1" value="${distance}" />
+  </label>
+  <label class="field">${settingLabel(slot, "Shadow radius", "dropShadowRadius", String(radius))}
+    <input type="range" data-key="dropShadowRadius" min="0" max="64" step="1" value="${radius}" />
+  </label>
+  <label class="field">${settingLabel(slot, "Shadow opacity", "dropShadowOpacity", String(opacity))}
+    <input type="range" data-key="dropShadowOpacity" min="0" max="100" step="1" value="${opacity}" />
+  </label>
+  <div class="field"><span class="field-label"><span>Shadow color</span>
+    <span class="field-label-end">
+      ${resetControl("Shadow color", "dropShadowColor", fieldDirty(slot, "dropShadowColor"))}
+      <button type="button" class="shadow-swatch" data-shadow-color style="background:${color}" aria-label="Shadow color"></button>
+    </span>
+  </span></div>`
+      : ""
+  }`;
 }
 
 function applyFieldReset(slot: Slot, key: string) {
@@ -3482,6 +2525,11 @@ function applyFieldReset(slot: Slot, key: string) {
       slot.textColorIndex = base.textColorIndex;
       slot.textColor = base.textColor;
     } else if (key === "blend") slot.blend = base.blend;
+    else if (key === "dropShadow") slot.dropShadow = base.dropShadow;
+    else if (key === "dropShadowRadius") slot.dropShadowRadius = base.dropShadowRadius;
+    else if (key === "dropShadowDistance") slot.dropShadowDistance = base.dropShadowDistance;
+    else if (key === "dropShadowOpacity") slot.dropShadowOpacity = base.dropShadowOpacity;
+    else if (key === "dropShadowColor") slot.dropShadowColor = base.dropShadowColor;
     if (key === "fontFamily" || key === "fontWeight") {
       reflectGlobalWeight();
       void settleFont(slot.fontFamily, slot.fontWeight).then(() => liveChip(slot.id));
@@ -3518,6 +2566,11 @@ function applyFieldReset(slot: Slot, key: string) {
     else if (key === "gradientSpeed") slot.gradientSpeed = base.gradientSpeed;
     else if (key === "collider") slot.collider = base.collider;
     else if (key === "blend") slot.blend = base.blend;
+    else if (key === "dropShadow") slot.dropShadow = base.dropShadow;
+    else if (key === "dropShadowRadius") slot.dropShadowRadius = base.dropShadowRadius;
+    else if (key === "dropShadowDistance") slot.dropShadowDistance = base.dropShadowDistance;
+    else if (key === "dropShadowOpacity") slot.dropShadowOpacity = base.dropShadowOpacity;
+    else if (key === "dropShadowColor") slot.dropShadowColor = base.dropShadowColor;
   }
   if (slot.kind === "image" && key === "amount") live();
   else liveChip(slot.id);
@@ -3575,13 +2628,33 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       applyFieldReset(slot, key);
     });
   });
+  root.querySelectorAll<HTMLButtonElement>("[data-shadow-color]").forEach((btn) => {
+    btn.addEventListener("click", () => openDropShadowColorPicker(btn, slot));
+  });
   root.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-key]").forEach((input) => {
     const key = input.dataset.key;
     if (!key) return;
     if (input instanceof HTMLInputElement && input.type === "range") paintRange(input);
     const gestureKey = `slot:${slot.id}:${key}`;
     const continuous = input instanceof HTMLInputElement && (input.type === "range" || input.type === "number");
+    let scrubbing = false;
+    const startScrub = () => {
+      if (!continuous || scrubbing) return;
+      scrubbing = true;
+      beginScrub();
+    };
+    const stopScrub = () => {
+      if (!scrubbing) return;
+      scrubbing = false;
+      endScrub();
+    };
+    if (continuous) {
+      input.addEventListener("pointerdown", startScrub);
+      input.addEventListener("pointerup", stopScrub);
+      input.addEventListener("pointercancel", stopScrub);
+    }
     input.addEventListener("input", () => {
+      startScrub();
       if (continuous) remember(gestureKey);
       else remember();
       if (input instanceof HTMLInputElement && input.type === "range") paintRange(input);
@@ -3598,6 +2671,18 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         const mode = blendMode(String(value));
         slot.blend = mode === "normal" ? undefined : mode;
       }
+      if (key === "dropShadow") {
+        slot.dropShadow = Boolean(value) || undefined;
+        if (!slot.dropShadow) {
+          slot.dropShadowRadius = undefined;
+          slot.dropShadowDistance = undefined;
+          slot.dropShadowOpacity = undefined;
+          slot.dropShadowColor = undefined;
+        }
+      }
+      if (key === "dropShadowRadius") slot.dropShadowRadius = dropShadowRadiusOf(Number(value));
+      if (key === "dropShadowDistance") slot.dropShadowDistance = dropShadowDistanceOf(Number(value));
+      if (key === "dropShadowOpacity") slot.dropShadowOpacity = dropShadowOpacityOf(Number(value));
       if (slot.kind === "image" && key === "amount") {
         slot.amount = Math.max(1, Math.min(AMOUNT_SOFT_CAP, Math.round(Number(value))));
         recountShapes();
@@ -3660,7 +2745,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) caption.textContent = `Text anim speed ${Math.round(Number(input.value))}`;
       }
-      if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius") {
+      if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius" || key === "dropShadowRadius" || key === "dropShadowDistance" || key === "dropShadowOpacity") {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
           const name =
@@ -3674,7 +2759,13 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
                     ? "Tracking"
                     : key === "radius"
                       ? "Radius"
-                      : "Amount";
+                      : key === "dropShadowRadius"
+                        ? "Shadow radius"
+                        : key === "dropShadowDistance"
+                          ? "Shadow distance"
+                          : key === "dropShadowOpacity"
+                            ? "Shadow opacity"
+                            : "Amount";
           caption.textContent = `${name} ${Math.round(Number(input.value))}`;
         }
       }
@@ -3694,7 +2785,8 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         key === "tint" ||
         key === "gradient" ||
         key === "animatedGradient" ||
-        key === "textAnim"
+        key === "textAnim" ||
+        key === "dropShadow"
       ) {
         renderPanel();
       }
@@ -3709,6 +2801,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
     });
     if (continuous) {
       const finish = () => {
+        stopScrub();
         if (pointerHeld || gesture !== gestureKey) return;
         endGesture();
       };
@@ -3735,8 +2828,6 @@ function applySlotOrder(visualIds: string[]) {
   if (state.physics.layoutMode) world.syncLayerOrder(ids);
   playClick();
 }
-
-type LayerMove = "front" | "forward" | "backward" | "back";
 
 function canMoveSlotLayer(id: string, where: LayerMove): boolean {
   const index = state.slots.findIndex((slot) => slot.id === id);
@@ -3774,16 +2865,7 @@ function syncSlotCardOrder() {
   }
 }
 
-let closeSlotMenu = () => {};
 let chipEditAbort: AbortController | null = null;
-
-function placeSlotMenu(menu: HTMLElement, x: number, y: number) {
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  document.body.append(menu);
-  placeZoomedFixed(menu, x, y, 8);
-  if (reduceMotion) menu.classList.add("is-in");
-  else requestAnimationFrame(() => menu.classList.add("is-in"));
-}
 
 function bindSlotMenuDismiss(
   menu: HTMLElement,
@@ -3836,14 +2918,14 @@ function clearCanvas() {
   scheduleDraft();
 
   if (world.chipCount() > 0 && !state.physics.layoutMode) {
-    clearingDump = true;
+    session.clearingDump = true;
     posePinned = false;
-    dropTicket++;
+    session.dropTicket++;
     world.setFloorOpen(true);
     running = true;
     paused = false;
     world.setRunning(true);
-    phase = "dumping";
+    session.phase = "dumping";
     paintTransport();
     return;
   }
@@ -3853,13 +2935,13 @@ function clearCanvas() {
     running = false;
     paused = false;
     posePinned = false;
-    dropTicket++;
-    phase = "idle";
+    session.dropTicket++;
+    session.phase = "idle";
     world.setRunning(false);
     world.setFloorOpen(false);
     paintTransport();
   }
-  clearingDump = false;
+  session.clearingDump = false;
   world.discardAll();
   paintWelcome();
 }
@@ -3927,10 +3009,10 @@ function openCanvasMenu(x: number, y: number) {
   const closeCurrent = () => {
     abort.abort();
     gsap.killTweensOf(buttons);
-    if (closeSlotMenu === closeCurrent) closeSlotMenu = () => {};
+    if (peekCloseSlotMenu() === closeCurrent) assignCloseSlotMenu(() => {});
     menu.remove();
   };
-  closeSlotMenu = closeCurrent;
+  assignCloseSlotMenu(closeCurrent);
   bindSlotMenuDismiss(menu, abort, closeCurrent);
 }
 
@@ -4304,651 +3386,6 @@ function alignSlotStraight(id: string) {
   playSwitch(true);
 }
 
-function openMenuDotPicker(btn: HTMLButtonElement, value: string, onChange: (hex: string) => void) {
-  if (tintPicker?.anchor === btn) return;
-  tintPicker?.close();
-  const gestureKey = "menu-dot";
-  const picker = mountColorPicker({
-    anchor: btn,
-    value,
-    onChange(hex) {
-      remember(gestureKey);
-      onChange(hex);
-      btn.style.background = hex;
-    },
-    onClose() {
-      if (gesture === gestureKey) endGesture();
-      if (tintPicker?.anchor === btn) tintPicker = null;
-    },
-  });
-  tintPicker = { anchor: btn, close: picker.close };
-}
-
-function menuColorRow(
-  label: string,
-  selectedIndex: number | null,
-  onPick: (index: number) => void,
-  onCustom?: (index: number, hex: string) => void,
-  custom?: string,
-): HTMLElement {
-  const row = document.createElement("div");
-  row.className = "slot-menu__colors";
-  row.setAttribute("role", "group");
-  row.setAttribute("aria-label", label);
-
-  const title = document.createElement("p");
-  title.className = "slot-menu__label";
-  title.textContent = label;
-  row.append(title);
-
-  const dots = document.createElement("div");
-  dots.className = "slot-menu__dots";
-  let onBtn: HTMLButtonElement | null = null;
-  state.theme.forEach((color, index) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "slot-menu__dot";
-    const selected = selectedIndex === index;
-    btn.style.background = selected && custom ? custom : color;
-    btn.setAttribute("aria-label", `${label} ${index + 1}`);
-    btn.setAttribute("aria-pressed", String(selected));
-    if (selected) {
-      btn.classList.add("is-on");
-      onBtn = btn;
-    }
-    btn.addEventListener("click", () => {
-      playClick();
-      if (onBtn === btn && onCustom) {
-        openMenuDotPicker(btn, custom ?? color, (hex) => {
-          custom = hex;
-          onCustom(index, hex);
-        });
-        return;
-      }
-      onPick(index);
-      custom = undefined;
-      if (onBtn && onBtn !== btn) {
-        const prev = state.theme[Number(onBtn.dataset.themeIndex)];
-        if (prev) onBtn.style.background = prev;
-        onBtn.classList.remove("is-on");
-        onBtn.setAttribute("aria-pressed", "false");
-      }
-      btn.style.background = color;
-      btn.classList.add("is-on");
-      btn.setAttribute("aria-pressed", "true");
-      onBtn = btn;
-    });
-    btn.dataset.themeIndex = String(index);
-    dots.append(btn);
-  });
-  row.append(dots);
-  return row;
-}
-
-function menuCheckRow(label: string, checked: boolean, onToggle: (next: boolean) => void): HTMLElement {
-  const row = document.createElement("label");
-  row.className = "slot-menu__check";
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.checked = checked;
-  input.addEventListener("change", () => {
-    playSwitch(input.checked);
-    onToggle(input.checked);
-  });
-  row.append(input, document.createTextNode(label));
-  wrapCheckInput(input);
-  return row;
-}
-
-/** Mark menu chrome so gradient/color blocks can be rebuilt in place. */
-function markMenuInk(el: HTMLElement): HTMLElement {
-  el.dataset.menuInk = "";
-  return el;
-}
-
-function clearMenuInk(menu: HTMLElement) {
-  menu.querySelectorAll("[data-menu-ink]").forEach((el) => el.remove());
-}
-
-function insertMenuInk(menu: HTMLElement, nodes: HTMLElement[]) {
-  const frag = document.createDocumentFragment();
-  for (const node of nodes) frag.append(markMenuInk(node));
-  const anchor = menu.querySelector(".slot-menu__item");
-  if (anchor) menu.insertBefore(frag, anchor);
-  else menu.append(frag);
-}
-
-function openSlotMenu(x: number, y: number, id: string) {
-  closeSlotMenu();
-  // Select first (panel jump) before the menu listens for scroll-to-close.
-  pickSlot(id, { force: true });
-  const slot = state.slots.find((item) => item.id === id);
-  const abort = new AbortController();
-  const menu = document.createElement("div");
-  menu.className = "slot-menu";
-  menu.setAttribute("role", "menu");
-  // Panel scroll closes the menu; ignore scrolls caused by in-menu updates.
-  let ignoreScroll = 0;
-  const holdScrollClose = (fn: () => void) => {
-    ignoreScroll += 1;
-    try {
-      fn();
-    } finally {
-      requestAnimationFrame(() => {
-        ignoreScroll -= 1;
-      });
-    }
-  };
-
-  // Solid select stroke while the menu is open; clear chip outline on option/close.
-  let menuStroke = true;
-  const paintMenuStroke = () => {
-    if (!menuStroke) return;
-    world.setPicked(id);
-    world.chipEl(id)?.classList.add("is-menu-picked");
-  };
-  const clearMenuStroke = () => {
-    if (!menuStroke) return;
-    menuStroke = false;
-    world.chipEl(id)?.classList.remove("is-menu-picked");
-    world.setPicked(null);
-  };
-  paintMenuStroke();
-
-  let revealImageInk: (() => void) | null = null;
-  /** Panel refresh deferred until the menu closes — renderPanel() would orphan dismiss listeners. */
-  let panelNeedsSync = false;
-
-  if (slot?.kind === "image") {
-    const paintShapeColor = (index: number) => {
-      remember();
-      slot.colorIndex = index;
-      slot.color = undefined;
-      clearMenuStroke();
-      holdScrollClose(() => liveChip(slot.id));
-    };
-    const paintShapeCustom = (index: number, hex: string) => {
-      slot.colorIndex = index;
-      slot.color = hex;
-      clearMenuStroke();
-      holdScrollClose(() => liveChip(slot.id));
-    };
-    const paintGradColor = (index: number) => {
-      remember();
-      slot.gradientColorIndex = index;
-      slot.gradientColor = undefined;
-      clearMenuStroke();
-      holdScrollClose(() => liveChip(slot.id));
-    };
-    const paintGradCustom = (index: number, hex: string) => {
-      slot.gradientColorIndex = index;
-      slot.gradientColor = hex;
-      clearMenuStroke();
-      holdScrollClose(() => liveChip(slot.id));
-    };
-    const mountImageInk = () => {
-      clearMenuInk(menu);
-      const nodes: HTMLElement[] = [];
-      if (isRasterUpload(slot)) {
-        if (slot.stroked) {
-          nodes.push(
-            menuColorRow("Stroke Color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),
-          );
-        }
-        nodes.push(
-          menuCheckRow("Stroked", Boolean(slot.stroked), (next) => {
-            remember();
-            slot.stroked = next;
-            if (next && slot.stroke == null) slot.stroke = 4;
-            panelNeedsSync = true;
-            clearMenuStroke();
-            holdScrollClose(() => liveChip(slot.id));
-            mountImageInk();
-            placeSlotMenu(menu, x, y);
-          }),
-        );
-      } else if (iconCanGradient(slot)) {
-        if (slot.gradient) {
-          nodes.push(
-            menuColorRow("Start color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),
-            menuColorRow(
-              "End color:",
-              gradientEndIndex(state.theme, slot),
-              paintGradColor,
-              paintGradCustom,
-              slot.gradientColor,
-            ),
-          );
-        } else {
-          nodes.push(
-            menuColorRow("Color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),
-          );
-        }
-        nodes.push(
-          menuCheckRow("Gradient", Boolean(slot.gradient), (next) => {
-            remember();
-            slot.gradient = next || undefined;
-            if (!next) slot.animatedGradient = undefined;
-            else if (slot.gradientColorIndex == null && !slot.gradientColor) {
-              slot.gradientColorIndex = gradientEndIndex(state.theme, slot);
-            }
-            panelNeedsSync = true;
-            clearMenuStroke();
-            holdScrollClose(() => liveChip(slot.id));
-            mountImageInk();
-            placeSlotMenu(menu, x, y);
-          }),
-        );
-      }
-      if (nodes.length) insertMenuInk(menu, nodes);
-    };
-    revealImageInk = mountImageInk;
-    if (iconCanGradient(slot) || isRasterUpload(slot)) mountImageInk();
-  } else if (slot?.kind === "text" && slot.shape === "none") {
-    const mountBareInk = () => {
-      clearMenuInk(menu);
-      const paintColor = (index: number) => {
-        remember();
-        slot.colorIndex = index;
-        slot.color = undefined;
-        slot.textColorIndex = undefined;
-        slot.textColor = undefined;
-        clearMenuStroke();
-        holdScrollClose(() => liveChip(slot.id));
-      };
-      const paintCustom = (index: number, hex: string) => {
-        slot.colorIndex = index;
-        slot.color = hex;
-        slot.textColorIndex = undefined;
-        slot.textColor = undefined;
-        clearMenuStroke();
-        holdScrollClose(() => liveChip(slot.id));
-      };
-      const paintGradColor = (index: number) => {
-        remember();
-        slot.gradientColorIndex = index;
-        slot.gradientColor = undefined;
-        clearMenuStroke();
-        holdScrollClose(() => liveChip(slot.id));
-      };
-      const paintGradCustom = (index: number, hex: string) => {
-        slot.gradientColorIndex = index;
-        slot.gradientColor = hex;
-        clearMenuStroke();
-        holdScrollClose(() => liveChip(slot.id));
-      };
-      const nodes: HTMLElement[] = [];
-      if (slot.gradient) {
-        nodes.push(
-          menuColorRow("Start color:", slot.colorIndex ?? 0, paintColor, paintCustom, slot.color),
-          menuColorRow(
-            "End color:",
-            gradientEndIndex(state.theme, slot),
-            paintGradColor,
-            paintGradCustom,
-            slot.gradientColor,
-          ),
-        );
-      } else {
-        nodes.push(menuColorRow("Color:", slot.colorIndex ?? 0, paintColor, paintCustom, slot.color));
-      }
-      nodes.push(
-        menuCheckRow("Gradient", Boolean(slot.gradient), (next) => {
-          remember();
-          if (next) {
-            recallGradient(slot);
-            slot.gradient = true;
-            if (slot.gradientColorIndex == null && !slot.gradientColor) {
-              slot.gradientColorIndex = gradientEndIndex(state.theme, slot);
-            }
-          } else {
-            storeGradient(slot);
-            slot.gradient = false;
-            slot.animatedGradient = undefined;
-          }
-          panelNeedsSync = true;
-          clearMenuStroke();
-          holdScrollClose(() => liveChip(slot.id));
-          mountBareInk();
-          placeSlotMenu(menu, x, y);
-        }),
-      );
-      insertMenuInk(menu, nodes);
-    };
-    mountBareInk();
-  } else if (slot?.kind === "text") {
-    const mountTextInk = () => {
-      clearMenuInk(menu);
-      const textSelected =
-        slot.textColorIndex == null || slot.textColorIndex >= state.theme.length
-          ? null
-          : slot.textColorIndex;
-      const shapeSelected = slot.colorIndex ?? 0;
-      const nodes: HTMLElement[] = [
-        menuColorRow(
-          "Text Color:",
-          textSelected,
-          (index) => {
-            remember();
-            slot.textColorIndex = index;
-            slot.textColor = undefined;
-            clearMenuStroke();
-            holdScrollClose(() => liveChip(slot.id));
-          },
-          (index, hex) => {
-            slot.textColorIndex = index;
-            slot.textColor = hex;
-            clearMenuStroke();
-            holdScrollClose(() => liveChip(slot.id));
-          },
-          slot.textColor,
-        ),
-      ];
-      if (slot.gradient && !slot.stroked) {
-        nodes.push(
-          menuColorRow(
-            "Start color:",
-            shapeSelected,
-            (index) => {
-              remember();
-              slot.colorIndex = index;
-              slot.color = undefined;
-              clearMenuStroke();
-              holdScrollClose(() => liveChip(slot.id));
-            },
-            (index, hex) => {
-              slot.colorIndex = index;
-              slot.color = hex;
-              clearMenuStroke();
-              holdScrollClose(() => liveChip(slot.id));
-            },
-            slot.color,
-          ),
-          menuColorRow(
-            "End color:",
-            gradientEndIndex(state.theme, slot),
-            (index) => {
-              remember();
-              slot.gradientColorIndex = index;
-              slot.gradientColor = undefined;
-              clearMenuStroke();
-              holdScrollClose(() => liveChip(slot.id));
-            },
-            (index, hex) => {
-              slot.gradientColorIndex = index;
-              slot.gradientColor = hex;
-              clearMenuStroke();
-              holdScrollClose(() => liveChip(slot.id));
-            },
-            slot.gradientColor,
-          ),
-        );
-      } else {
-        nodes.push(
-          menuColorRow(
-            slot.stroked ? "Stroke Color:" : "Shape Color:",
-            shapeSelected,
-            (index) => {
-              remember();
-              slot.colorIndex = index;
-              slot.color = undefined;
-              clearMenuStroke();
-              holdScrollClose(() => liveChip(slot.id));
-            },
-            (index, hex) => {
-              slot.colorIndex = index;
-              slot.color = hex;
-              clearMenuStroke();
-              holdScrollClose(() => liveChip(slot.id));
-            },
-            slot.color,
-          ),
-        );
-      }
-      nodes.push(
-        menuCheckRow("Stroked", slot.stroked, (next) => {
-          remember();
-          slot.stroked = next;
-          if (next && slot.gradient) {
-            storeGradient(slot);
-            slot.gradient = false;
-          }
-          panelNeedsSync = true;
-          clearMenuStroke();
-          holdScrollClose(() => liveChip(slot.id));
-          mountTextInk();
-          placeSlotMenu(menu, x, y);
-        }),
-        menuCheckRow("Gradient", Boolean(slot.gradient) && !slot.stroked, (next) => {
-          remember();
-          if (next) {
-            slot.stroked = false;
-            recallGradient(slot);
-            slot.gradient = true;
-            if (slot.gradientColorIndex == null && !slot.gradientColor) {
-              slot.gradientColorIndex = gradientEndIndex(state.theme, slot);
-            }
-          } else {
-            storeGradient(slot);
-            slot.gradient = false;
-            slot.animatedGradient = undefined;
-          }
-          panelNeedsSync = true;
-          clearMenuStroke();
-          holdScrollClose(() => liveChip(slot.id));
-          mountTextInk();
-          placeSlotMenu(menu, x, y);
-        }),
-      );
-      insertMenuInk(menu, nodes);
-    };
-    mountTextInk();
-  }
-
-  const actions: {
-    label: string;
-    run: () => void;
-    stay?: boolean;
-    layer?: LayerMove;
-    disabled?: () => boolean;
-  }[] = [];
-  if (slot?.kind === "image" && uploadedShape(slot)) {
-    actions.push({
-      label: "Replace image",
-      run: () => {
-        void pickImageFiles(false).then((files) => {
-          const file = files[0];
-          if (!file) return;
-          remember();
-          playCreate();
-          void assignImageFile(slot, file).then(() => {
-            renderPanel();
-            live();
-          });
-        });
-      },
-    });
-  }
-  if (slot?.kind === "image" && uploadedShape(slot) && isSvgSource(slot) && !slot.tint) {
-    actions.push({
-      label: "Recolor",
-      stay: true,
-      run: () => {
-        remember();
-        slot.tint = true;
-        playSwitch(true);
-        panelNeedsSync = true;
-        revealImageInk?.();
-        clearMenuStroke();
-        holdScrollClose(() => liveChip(id));
-        placeSlotMenu(menu, x, y);
-      },
-    });
-  }
-  if (slot?.kind === "image" && uploadedShape(slot) && isSvgSource(slot) && slot.tint) {
-    actions.push({
-      label: "Original Color",
-      run: () => {
-        remember();
-        slot.tint = undefined;
-        slot.gradient = undefined;
-        slot.animatedGradient = undefined;
-        playSwitch(false);
-        liveChip(id);
-        renderPanel();
-      },
-    });
-  }
-  if (slot?.kind === "text") {
-    actions.push({ label: "Edit text", run: () => editChipText(id, false) });
-  }
-  // Invert: text/SVG/presets flip ink; rasters toggle pixel invert. Recolor is SVG-only.
-  actions.push({ label: "Duplicate", run: () => duplicateSlot(id) });
-  if (slot) {
-    actions.push({
-      label: "Copy style",
-      stay: true,
-      run: () => {
-        copySlotStyle(slot);
-        menu.querySelectorAll<HTMLButtonElement>(".slot-menu__item").forEach((btn) => {
-          if (btn.textContent === "Paste style") btn.disabled = !canPasteSlotStyle(slot);
-        });
-      },
-    });
-    actions.push({
-      label: "Paste style",
-      disabled: () => !canPasteSlotStyle(slot),
-      run: () => pasteSlotStyle(id),
-    });
-  }
-  if (slot?.kind === "text") {
-    actions.push({
-      label: slot.textAnim ? "Stop Animation" : "Animate",
-      run: () => {
-        remember();
-        slot.textAnim = !slot.textAnim;
-        renderPanel();
-        liveChip(slot.id);
-      },
-    });
-  }
-  if (state.physics.layoutMode && state.slots.length > 1) {
-    const layers: { label: string; where: LayerMove; stay?: boolean }[] = [
-      { label: "Bring to front", where: "front" },
-      { label: "Bring forward", where: "forward", stay: true },
-      { label: "Send backward", where: "backward", stay: true },
-      { label: "Send to back", where: "back" },
-    ];
-    for (const item of layers) {
-      actions.push({
-        label: item.label,
-        stay: item.stay,
-        layer: item.where,
-        disabled: () => !canMoveSlotLayer(id, item.where),
-        run: () => {
-          moveSlotLayer(id, item.where);
-        },
-      });
-    }
-  }
-  if (state.physics.layoutMode) {
-    actions.push({
-      label: "Align straight",
-      stay: true,
-      run: () => {
-        holdScrollClose(() => alignSlotStraight(id));
-      },
-    });
-  }
-  actions.push(
-    {
-      label: "Flip horizontal",
-      stay: true,
-      run: () => {
-        holdScrollClose(() => flipSlot(id, "x"));
-      },
-    },
-    {
-      label: "Flip vertical",
-      stay: true,
-      run: () => {
-        holdScrollClose(() => flipSlot(id, "y"));
-      },
-    },
-    {
-      label: "Invert",
-      stay: true,
-      disabled: () => Boolean(slot?.kind === "image" && slot.emoji),
-      run: () => {
-        const enableTint =
-          slot?.kind === "image" && uploadedShape(slot) && isSvgSource(slot) && !slot.tint;
-        holdScrollClose(() => invertSlot(id));
-        if (enableTint) {
-          panelNeedsSync = true;
-          revealImageInk?.();
-          menu.querySelectorAll(".slot-menu__item").forEach((item) => {
-            if (item.textContent === "Recolor") item.remove();
-          });
-          placeSlotMenu(menu, x, y);
-        }
-        menu.querySelectorAll<HTMLElement>(".slot-menu__colors").forEach((row) => {
-          const name = row.getAttribute("aria-label") || "";
-          if (/^Text /i.test(name)) return;
-          row.querySelectorAll(".slot-menu__dot.is-on").forEach((dot) => {
-            dot.classList.remove("is-on");
-            dot.setAttribute("aria-pressed", "false");
-          });
-        });
-      },
-    },
-    { label: "Remove", run: () => removeSlot(id) },
-  );
-  const refreshDisabled = () => {
-    menu.querySelectorAll<HTMLButtonElement>(".slot-menu__item[data-layer]").forEach((btn) => {
-      const where = btn.dataset.layer as LayerMove | undefined;
-      if (!where) return;
-      btn.disabled = !canMoveSlotLayer(id, where);
-    });
-  };
-  for (const action of actions) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "slot-menu__item";
-    btn.setAttribute("role", "menuitem");
-    btn.textContent = action.label;
-    if (action.layer) btn.dataset.layer = action.layer;
-    if (action.disabled) btn.disabled = action.disabled();
-    btn.addEventListener("click", () => {
-      if (btn.disabled) return;
-      clearMenuStroke();
-      if (!action.stay) closeSlotMenu();
-      action.run();
-      if (action.layer && action.stay) refreshDisabled();
-      if (action.label === "Recolor") {
-        btn.remove();
-        placeSlotMenu(menu, x, y);
-      }
-    });
-    menu.append(btn);
-  }
-
-  placeSlotMenu(menu, x, y);
-
-  const closeCurrent = () => {
-    abort.abort();
-    if (closeSlotMenu === closeCurrent) closeSlotMenu = () => {};
-    if (tintPicker && menu.contains(tintPicker.anchor)) tintPicker.close();
-    clearMenuStroke();
-    menu.remove();
-    if (panelNeedsSync) {
-      panelNeedsSync = false;
-      renderPanel();
-    }
-  };
-  closeSlotMenu = closeCurrent;
-  bindSlotMenuDismiss(menu, abort, closeCurrent, { keepOnScroll: () => ignoreScroll > 0 });
-}
-
 function duplicateSlot(id: string) {
   const index = state.slots.findIndex((slot) => slot.id === id);
   const source = state.slots[index];
@@ -5012,6 +3449,12 @@ function copySlotStyle(slot: Slot) {
         textAnimSpeed: slot.textAnimSpeed,
         textColorIndex: slot.textColorIndex,
         textColor: slot.textColor,
+        blend: slot.blend,
+        dropShadow: slot.dropShadow,
+        dropShadowRadius: slot.dropShadowRadius,
+        dropShadowDistance: slot.dropShadowDistance,
+        dropShadowOpacity: slot.dropShadowOpacity,
+        dropShadowColor: slot.dropShadowColor,
         scale: slot.scale,
       },
     };
@@ -5034,6 +3477,12 @@ function copySlotStyle(slot: Slot) {
         stroke: slot.stroke,
         inverted: slot.inverted,
         tint: slot.tint,
+        blend: slot.blend,
+        dropShadow: slot.dropShadow,
+        dropShadowRadius: slot.dropShadowRadius,
+        dropShadowDistance: slot.dropShadowDistance,
+        dropShadowOpacity: slot.dropShadowOpacity,
+        dropShadowColor: slot.dropShadowColor,
       },
     };
   }
@@ -5075,6 +3524,12 @@ function pasteSlotStyle(id: string) {
     slot.textAnimSpeed = style.textAnimSpeed;
     slot.textColorIndex = style.textColorIndex;
     slot.textColor = style.textColor;
+    slot.blend = style.blend;
+    slot.dropShadow = style.dropShadow;
+    slot.dropShadowRadius = style.dropShadowRadius;
+    slot.dropShadowDistance = style.dropShadowDistance;
+    slot.dropShadowOpacity = style.dropShadowOpacity;
+    slot.dropShadowColor = style.dropShadowColor;
     slot.scale = style.scale;
     playClick();
     void settleFont(slot.fontFamily, slot.fontWeight).then(() => {
@@ -5100,6 +3555,12 @@ function pasteSlotStyle(id: string) {
     slot.stroke = style.stroke;
     slot.inverted = style.inverted;
     slot.tint = style.tint;
+    slot.blend = style.blend;
+    slot.dropShadow = style.dropShadow;
+    slot.dropShadowRadius = style.dropShadowRadius;
+    slot.dropShadowDistance = style.dropShadowDistance;
+    slot.dropShadowOpacity = style.dropShadowOpacity;
+    slot.dropShadowColor = style.dropShadowColor;
     playClick();
     renderPanel();
     live();
@@ -5303,13 +3764,13 @@ function pushAudioGroup(group: "text" | "icon", mul: number) {
   audioAnimAt = performance.now();
   audioClearAt = performance.now() + AUDIO_HOLD_MS;
 
-  if (phase === "holding") {
+  if (session.phase === "holding") {
     posePinned = false;
-    phase = "falling";
-    settledSince = 0;
-    holdStarted = 0;
+    session.phase = "falling";
+    session.settledSince = 0;
+    session.holdStarted = 0;
   }
-  lastInteractAt = performance.now();
+  session.lastInteractAt = performance.now();
 
   const bounce = state.audioReact.bounce;
   if (group === "icon") {
@@ -5348,7 +3809,7 @@ function returnAudioTargets() {
   }
   audioReturning = true;
   audioAnimAt = performance.now();
-  lastInteractAt = performance.now();
+  session.lastInteractAt = performance.now();
 }
 
 function clearAudioScale() {
@@ -5519,17 +3980,17 @@ function live() {
     const disturbed = relayout();
     // Add/remove or remesh (Composition Scale etc.) should wake a held pile.
     if (disturbed || world.chipCount() !== before) {
-      lastInteractAt = performance.now();
-      if (phase === "holding" && !state.physics.layoutMode) {
+      session.lastInteractAt = performance.now();
+      if (session.phase === "holding" && !state.physics.layoutMode) {
         posePinned = false;
-        phase = "falling";
-        settledSince = 0;
-        holdStarted = 0;
+        session.phase = "falling";
+        session.settledSince = 0;
+        session.holdStarted = 0;
       } else if (state.physics.layoutMode && world.chipCount() > 0) {
         world.freezePile();
         world.sync();
         posePinned = true;
-        if (running) phase = "holding";
+        if (running) session.phase = "holding";
       }
       paintWelcome();
     }
@@ -5654,21 +4115,6 @@ for (const input of devPanel.querySelectorAll<HTMLInputElement>("[data-dev-radiu
 let running = false;
 let paused = false;
 let repeat = false;
-let droppedAt = 0;
-let settledSince = 0;
-let holdStarted = 0;
-let lastInteractAt = 0;
-let phase: "idle" | "preparing" | "falling" | "holding" | "dumping" = "idle";
-let dropTicket = 0;
-/** Floor-dump from Clear canvas — finish idle instead of looping a new drop. */
-let clearingDump = false;
-
-const MIN_CYCLE_MS = 1200;
-/** Extra ease time after motion is low before locking the hold pose. */
-const SETTLE_CONFIRM_MS = 1600;
-/** Force hold if the pile never fully sleeps (micro-motion / friction slides). */
-const MAX_FALL_MS = 7000;
-const PLAY_IDLE_MS = 3000;
 
 let shownScale = 1;
 let frameKey = "";
@@ -5765,56 +4211,22 @@ function selectCanvas(next: CanvasRatio) {
   if (running) {
     world.clear();
     syncCanvas(false);
-    void drop();
+    void session.drop();
   } else if (syncCanvas(world.chipCount() > 0) && world.chipCount() > 0) {
     relayout();
   }
   renderPanel();
 }
 
-async function drop() {
-  const ticket = ++dropTicket;
-  posePinned = false;
-  phase = "preparing";
-  await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
-  if (!running || ticket !== dropTicket) return;
-  syncCanvas(false);
-  world.setFloorOpen(false);
-  world.play(
-    state.slots,
-    state.physics,
-    stage,
-    fitScale(),
-    state.theme,
-    state.pillPad,
-    state.textTracking,
-    state.sizeRandom,
-  );
-  droppedAt = performance.now();
-  settledSince = 0;
-  holdStarted = 0;
-  lastInteractAt = 0;
-  if (state.physics.layoutMode) {
-    world.freezePile();
-    world.sync();
-    posePinned = true;
-    phase = "holding";
-    holdStarted = performance.now();
-  } else {
-    phase = "falling";
-  }
-  scheduleDraft();
-}
-
 function paintTransport() {
   loopBtn.classList.toggle("is-on", repeat);
   loopBtn.setAttribute("aria-pressed", String(repeat));
-  const label = loopBtn.querySelector<HTMLElement>(".smash-btn__text");
+  const label = loopBtn.querySelector<HTMLElement>(".loop-chip__text");
   if (!label) return;
-  if (repeat) applyRollingText(label, "Looping sequence", { asPhrase: true });
+  if (repeat) applyRollingText(label, "Looping", { asPhrase: true });
   else {
     stopTextAnim(label);
-    label.textContent = "Loop sequence";
+    label.textContent = "Loop";
   }
 }
 
@@ -5864,33 +4276,6 @@ function setPhysDebug(on: boolean) {
     const ctx = physDebugCanvas.getContext("2d");
     ctx?.clearRect(0, 0, physDebugCanvas.width, physDebugCanvas.height);
   }
-}
-
-function setRunning(on: boolean) {
-  running = on;
-  paused = false;
-  if (!on) posePinned = false;
-  world.setRunning(on);
-  paintTransport();
-  if (on) {
-    dismissWelcome();
-    void drop();
-    return;
-  }
-  dropTicket++;
-  phase = "idle";
-  world.setFloorOpen(false);
-  world.clear();
-  paintWelcome();
-}
-
-function finishRun() {
-  running = false;
-  paused = false;
-  phase = "idle";
-  world.setRunning(false);
-  paintTransport();
-  paintWelcome();
 }
 
 function reducedMotion(): boolean {
@@ -5988,28 +4373,48 @@ function nudgeEmptyScene() {
 
   showAddShapeNudge();
 
-  setSectionOpen("what-falls", true);
+  setSectionOpen(panel, openSections, "what-falls", true);
   const section = panel.querySelector<HTMLElement>("#shape-create");
   if (!section) return;
   scrollPanelTo(section);
   blinkShapeCreate(section);
 }
 
-async function triggerPhysics() {
-  if (!state.slots.length) {
-    nudgeEmptyScene();
-    return;
-  }
-  if (state.physics.layoutMode) {
-    await askNotice({
+session = createPlaySession({
+  world,
+  getState: () => state,
+  stage,
+  playfield,
+  fitScale,
+  syncCanvas,
+  ensureAssets: () => Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]),
+  scheduleDraft,
+  dismissWelcome,
+  paintWelcome,
+  paintTransport,
+  paintPhysDebug,
+  tickAudioReact,
+  nudgeEmptyScene,
+  notifyLayoutModeBlocksPhysics: () =>
+    askNotice({
       title: "Can't trigger physics",
       body: "Layout mode is on. Turn on Physics first.",
-    });
-    return;
-  }
-  playButton();
-  setRunning(true);
-}
+    }),
+  playButton,
+  getRunning: () => running,
+  setRunningFlag: (on) => {
+    running = on;
+  },
+  getPaused: () => paused,
+  setPaused: (on) => {
+    paused = on;
+  },
+  getRepeat: () => repeat,
+  getPosePinned: () => posePinned,
+  setPosePinned: (on) => {
+    posePinned = on;
+  },
+});
 
 async function setLayoutMode(next: boolean) {
   if (next === state.physics.layoutMode) return;
@@ -6037,9 +4442,9 @@ async function setLayoutMode(next: boolean) {
       world.sync();
       posePinned = true;
       if (running) {
-        phase = "holding";
-        holdStarted = performance.now();
-        settledSince = 0;
+        session.phase = "holding";
+        session.holdStarted = performance.now();
+        session.settledSince = 0;
       }
     } else {
       live();
@@ -6048,33 +4453,14 @@ async function setLayoutMode(next: boolean) {
     posePinned = false;
     live();
     if (running && world.chipCount() > 0) {
-      phase = "falling";
-      settledSince = 0;
-      holdStarted = 0;
-      lastInteractAt = performance.now();
+      session.phase = "falling";
+      session.settledSince = 0;
+      session.holdStarted = 0;
+      session.lastInteractAt = performance.now();
     }
   }
   renderPanel();
   scheduleDraft();
-}
-
-function togglePause() {
-  if (!running) {
-    if (!state.slots.length) {
-      nudgeEmptyScene();
-      return;
-    }
-    setRunning(true);
-    return;
-  }
-  paused = !paused;
-  world.setRunning(!paused);
-}
-
-function holdSequenceClock(dt: number) {
-  droppedAt += dt;
-  if (settledSince) settledSince += dt;
-  if (holdStarted) holdStarted += dt;
 }
 
 function toggleRepeat() {
@@ -6242,7 +4628,9 @@ window.addEventListener(
   true,
 );
 
-playBtn.addEventListener("click", triggerPhysics);
+playBtn.addEventListener("click", () => {
+  void session.triggerPhysics();
+});
 loopBtn.addEventListener("click", toggleRepeat);
 for (const id of ["physics", "background", "export"] as const) {
   app.querySelector(`#tab-${id}`)?.addEventListener("click", () => {
@@ -6260,7 +4648,7 @@ paintTransport();
 paintWelcome();
 app.querySelector("#reset-defaults")?.addEventListener("click", () => {
   remember();
-  setRunning(false);
+  session.setRunning(false);
   machineFont = "";
   appliedFont = "";
   pickedSlotId = null;
@@ -6329,7 +4717,7 @@ async function removeCustomTemplate(id: string) {
 function loadTemplate(next: AppState) {
   closeFontMenu();
   remember();
-  setRunning(false);
+  session.setRunning(false);
   machineFont = "";
   appliedFont = "";
   pickedSlotId = null;
@@ -6342,7 +4730,7 @@ function loadTemplate(next: AppState) {
   applyPost();
   syncCanvas(false);
   renderPanel();
-  if (state.slots.length) triggerPhysics();
+  if (state.slots.length) void session.triggerPhysics();
 }
 
 copyBtn.addEventListener("click", async () => {
@@ -6403,7 +4791,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     if (event.repeat) return;
     playClick();
-    togglePause();
+    session.togglePause();
     return;
   }
   if (event.key === "Escape") {
@@ -6635,7 +5023,7 @@ world.attach(
   pickSlot,
   (id, x, y) => {
     if (id == null) openCanvasMenu(x, y);
-    else openSlotMenu(x, y, id);
+    else openSlotMenu(x, y, id, slotMenuHost());
   },
   (id) => editChipText(id, true),
   (id) => state.slots.find((item) => item.id === id)?.scale ?? 1,
@@ -6699,111 +5087,7 @@ document.fonts.addEventListener("loadingdone", () => {
   relayout();
 });
 
-let prevFrame = 0;
-
-function frame(now: number) {
-  const dt = prevFrame ? now - prevFrame : 0;
-  prevFrame = now;
-  tickAudioReact(now);
-  if (paused) {
-    world.setRunning(false);
-    holdSequenceClock(dt);
-    if (lastInteractAt) lastInteractAt += dt;
-    requestAnimationFrame(frame);
-    return;
-  }
-
-  const busy =
-    world.isDragging() ||
-    phase === "falling" ||
-    phase === "holding" ||
-    phase === "dumping" ||
-    phase === "preparing" ||
-    !world.isQuiet();
-  if (busy) {
-    world.sync();
-    world.purgeFallen(playfield.clientHeight);
-  }
-  paintPhysDebug();
-
-  if (world.isDragging()) lastInteractAt = now;
-  const playing = lastInteractAt > 0 && now - lastInteractAt < PLAY_IDLE_MS;
-
-  if (running && playing) {
-    holdSequenceClock(dt);
-    if (state.physics.layoutMode) {
-      // Rigid layout: never leave leftover throw / coast after a grab.
-      if (!world.isDragging()) {
-        if (phase !== "holding" && phase !== "preparing") {
-          phase = "holding";
-          holdStarted = now;
-        }
-        world.freezePile();
-        world.sync();
-        posePinned = true;
-      }
-    } else if (phase === "holding") {
-      posePinned = false;
-      phase = "falling";
-      settledSince = 0;
-      holdStarted = 0;
-    }
-    return requestAnimationFrame(frame);
-  }
-
-  if (running && state.physics.layoutMode) {
-    if (phase !== "holding" && phase !== "preparing") {
-      phase = "holding";
-      holdStarted = now;
-      world.freezePile();
-      world.sync();
-      posePinned = true;
-    }
-    return requestAnimationFrame(frame);
-  }
-
-  if (running) {
-    if (phase === "falling") {
-      const elapsed = now - droppedAt;
-      // Clock starts when motion is low; freeze only once fully asleep so the last ease isn't cut.
-      const settledLongEnough =
-        elapsed >= MIN_CYCLE_MS &&
-        settledSince !== 0 &&
-        now - settledSince >= SETTLE_CONFIRM_MS &&
-        world.isQuiet();
-      if (settledLongEnough || elapsed >= MAX_FALL_MS) {
-        phase = "holding";
-        holdStarted = now;
-        world.freezePile();
-        world.sync();
-        scheduleDraft();
-      } else if (elapsed >= MIN_CYCLE_MS && world.isSettled()) {
-        if (!settledSince) settledSince = now;
-      } else {
-        // Any remaining slide (even "quiet" friction) restarts the settle clock.
-        settledSince = 0;
-      }
-    } else if (phase === "holding" && !posePinned && now - holdStarted >= state.physics.hold * 1000) {
-      if (!repeat) {
-        finishRun();
-      } else {
-        world.setFloorOpen(true);
-        phase = "dumping";
-        world.sync();
-      }
-    } else if (phase === "dumping" && world.chipCount() === 0) {
-      if (clearingDump) {
-        clearingDump = false;
-        world.setFloorOpen(false);
-        finishRun();
-      } else if (!repeat) finishRun();
-      else void drop();
-    }
-  }
-
-  requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);
+requestAnimationFrame(session.frame);
 
 window.addEventListener("pagehide", () => {
   window.clearTimeout(draftTimer);

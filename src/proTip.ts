@@ -34,7 +34,7 @@ const HINTS: Hint[] = [
   { text: "The more stuff you add the slower the app becomes" },
   { text: "Want to use bloom but it feels laggy? Try Performance mode in Settings" },
   { text: "Do you hate sound? You can turn that off in the Settings" },
-  { text: "Save your scene as a .pill file from Settings" },
+  { text: "Save your scene as a .pill file from the Export tab" },
 ];
 
 let isBlank: () => boolean = () => false;

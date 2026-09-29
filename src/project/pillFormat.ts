@@ -9,7 +9,7 @@ import {
   type AppState,
   type Slot,
 } from "../types";
-import type { ChipPose } from "../world";
+import type { ChipPose } from "../chipKinds";
 
 export const PILL_EXTENSION = ".pill";
 export const PILL_MIME = "application/x-ultrapilled-project";

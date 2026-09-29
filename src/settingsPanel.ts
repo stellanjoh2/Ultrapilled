@@ -1,7 +1,6 @@
 import gsap from "gsap";
 import circleHalfIcon from "@phosphor-icons/core/assets/regular/circle-half.svg?raw";
 import clockCounterClockwiseIcon from "@phosphor-icons/core/assets/regular/clock-counter-clockwise.svg?raw";
-import folderSimpleIcon from "@phosphor-icons/core/assets/regular/folder-simple.svg?raw";
 import gaugeIcon from "@phosphor-icons/core/assets/regular/gauge.svg?raw";
 import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
 import keyboardIcon from "@phosphor-icons/core/assets/regular/keyboard.svg?raw";
@@ -12,18 +11,10 @@ import smileyIcon from "@phosphor-icons/core/assets/regular/smiley.svg?raw";
 import speakerHighIcon from "@phosphor-icons/core/assets/regular/speaker-high.svg?raw";
 import sunIcon from "@phosphor-icons/core/assets/regular/sun.svg?raw";
 import { getPrefs, setPrefs, type AppPrefs, type ChromeTheme } from "./prefs";
-import {
-  defaultPillFileName,
-  downloadPillJson,
-  isPillFile,
-  readPillFile,
-} from "./project/pillFormat";
 import { checkInput } from "./checkBox";
-import { playCaution, playNotify, playRemove, playSwitch, playTransition } from "./uiSounds";
+import { playRemove, playSwitch, playTransition } from "./uiSounds";
 
 export type SettingsController = {
-  saveProject(): void;
-  loadProject(file: File): Promise<void>;
   prefsChanged(): void;
   layoutMode(): boolean;
   setLayoutMode(next: boolean): void | Promise<void>;
@@ -32,8 +23,6 @@ export type SettingsController = {
 let panelEl: HTMLElement | null = null;
 let modalRoot: HTMLElement | null = null;
 let closing = false;
-let status = "";
-let fileInput: HTMLInputElement | null = null;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
 let shortcutsOpen = true;
 
@@ -117,14 +106,6 @@ function shortcutsMarkup(): string {
       </div>
     </section>
   `;
-}
-
-function setStatus(message: string) {
-  status = message;
-  const node = panelEl?.querySelector<HTMLElement>("#settings-status");
-  if (!node) return;
-  node.textContent = message;
-  node.hidden = !message;
 }
 
 function paintVolume() {
@@ -253,14 +234,6 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
       </div>
     </section>
     ${shortcutsMarkup()}
-    <section class="section">
-      <h2 data-tip="Save or open slots, physics, look, background, and placements">${sectionTitleIcon(folderSimpleIcon)}Project</h2>
-      <div class="export-list">
-        <button type="button" class="pill" id="settings-save" data-tip="Download the scene as a .pill file">Save .pill</button>
-        <button type="button" class="pill" id="settings-load" data-tip="Open a .pill scene file">Load .pill</button>
-      </div>
-      <p class="hint" id="settings-status"${status ? "" : " hidden"}>${status}</p>
-    </section>
   `;
 }
 
@@ -335,51 +308,6 @@ function mountSettingsBody(panel: HTMLElement, controller: SettingsController) {
         paintDesignMode(controller);
       });
     });
-  });
-
-  panel.querySelector("#settings-save")?.addEventListener("click", () => {
-    try {
-      controller.saveProject();
-      setStatus(`Saved ${defaultPillFileName()}`);
-      playNotify();
-    } catch {
-      setStatus("Could not save the project.");
-      playCaution();
-    }
-  });
-
-  if (!fileInput) {
-    fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = ".pill,application/x-ultrapilled-project";
-    fileInput.className = "bg-file";
-    fileInput.hidden = true;
-    document.body.append(fileInput);
-  }
-
-  fileInput.onchange = () => {
-    const file = fileInput?.files?.[0];
-    if (fileInput) fileInput.value = "";
-    if (!file) return;
-    if (!isPillFile(file)) {
-      setStatus("Only .pill files can be loaded.");
-      playCaution();
-      return;
-    }
-    void (async () => {
-      try {
-        await controller.loadProject(file);
-        setStatus(`Loaded ${file.name}`);
-        playNotify();
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Could not load this .pill file.");
-        playCaution();
-      }
-    })();
-  };
-
-  panel.querySelector("#settings-load")?.addEventListener("click", () => {
-    fileInput?.click();
   });
 }
 
@@ -472,5 +400,3 @@ export function openSettings(controller: SettingsController): void {
   tl.to(scrim, { autoAlpha: 1, duration: 0.32 }, 0);
   tl.to(sheet, { autoAlpha: 1, x: 0, duration: 0.42 }, 0.04);
 }
-
-export { readPillFile, downloadPillJson, defaultPillFileName };
