@@ -1124,7 +1124,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 }
 
 .chip-label.is-text-gradient.is-gradient-animated,
-.chip-edit.is-text-gradient.is-gradient-animated {
+.chip-edit.is-text-gradient.is-gradient-animated,
+.mode-select__vibe.is-text-gradient.is-gradient-animated {
   background-size: 200% 200%;
 }
 
@@ -1248,7 +1249,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   .slot-chip.is-gradient-animated,
   .shape-swatch.is-gradient-animated,
   .chip-label.is-text-gradient.is-gradient-animated,
-  .chip-edit.is-text-gradient.is-gradient-animated {
+  .chip-edit.is-text-gradient.is-gradient-animated,
+  .mode-select__vibe.is-text-gradient.is-gradient-animated {
     background-size: 200% 200%;
     animation: pill-gradient-preview var(--sweep-duration, 3s) linear infinite;
   }
@@ -1258,7 +1260,8 @@ html.is-asset-anims-frozen .chip-fill-band,
 html.is-asset-anims-frozen .slot-chip.is-gradient-animated,
 html.is-asset-anims-frozen .shape-swatch.is-gradient-animated,
 html.is-asset-anims-frozen .chip-label.is-text-gradient.is-gradient-animated,
-html.is-asset-anims-frozen .chip-edit.is-text-gradient.is-gradient-animated {
+html.is-asset-anims-frozen .chip-edit.is-text-gradient.is-gradient-animated,
+html.is-asset-anims-frozen .mode-select__vibe.is-text-gradient.is-gradient-animated {
   animation-play-state: paused;
 }
 
@@ -5408,7 +5411,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: clamp(24px, 3vw, var(--space-3));
+  gap: clamp(96px, calc(6vw + 48px), calc(var(--space-3) * 2 + 48px));
   width: min(calc(720px * 2 + 48px), 100%);
   max-width: 100%;
 }
@@ -5417,11 +5420,15 @@ html[data-theme="day"] .settings-modal__body .keycap {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: clamp(28px, 4.6vw, 41px);
+  font-size: clamp(44px, 4.6vw, 64px);
   font-weight: 400;
-  line-height: 1.1;
+  line-height: 1.2;
   letter-spacing: -0.03em;
   text-align: left;
+}
+
+.mode-select__word {
+  display: inline-block;
 }
 
 .mode-select__row {
@@ -5432,6 +5439,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 .mode-select__card {
+  position: relative;
+  z-index: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -5446,6 +5455,16 @@ html[data-theme="day"] .settings-modal__body .keycap {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  /* Independent of GSAP’s transform (entrance fade-up), so hover isn’t overridden. */
+  scale: 1;
+  transform-origin: center top;
+  transition: scale 0.35s ease;
+}
+
+.mode-select__card:hover,
+.mode-select__card:focus-visible {
+  z-index: 1;
+  scale: 1.1;
 }
 
 .mode-select__card:focus {
@@ -5474,6 +5493,35 @@ html[data-theme="day"] .settings-modal__body .keycap {
   height: 100%;
   object-fit: cover;
   pointer-events: none;
+  scale: 1;
+  transition: scale 0.35s ease;
+}
+
+.mode-select__card:hover .mode-select__video,
+.mode-select__card:hover .mode-select__image,
+.mode-select__card:focus-visible .mode-select__video,
+.mode-select__card:focus-visible .mode-select__image {
+  scale: 1.05;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mode-select__card,
+  .mode-select__video,
+  .mode-select__image {
+    transition: none;
+  }
+
+  .mode-select__card:hover,
+  .mode-select__card:focus-visible {
+    scale: 1;
+  }
+
+  .mode-select__card:hover .mode-select__video,
+  .mode-select__card:hover .mode-select__image,
+  .mode-select__card:focus-visible .mode-select__video,
+  .mode-select__card:focus-visible .mode-select__image {
+    scale: 1;
+  }
 }
 
 /* Reconnect / “save available” spinning stroke — hover + keyboard focus. */
@@ -5532,7 +5580,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   margin: 48px 0 0;
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: clamp(22px, 2.6vw, calc(28px * var(--ui-scale)));
+  font-size: 36px;
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -5543,7 +5591,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   margin: calc(10px * var(--ui-scale)) 0 0;
   max-width: 28em;
   color: rgb(255 255 255 / 0.8);
-  font-size: clamp(13px, 1.5vw, calc(15px * var(--ui-scale)));
+  font-size: 18px;
   font-weight: 300;
   line-height: 1.4;
   letter-spacing: -0.01em;

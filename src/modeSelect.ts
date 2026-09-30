@@ -1,13 +1,44 @@
 import gsap from "gsap";
+import { styleBareTextCss } from "./chipDomPaint";
+import { DEFAULT_GRADIENT_ANGLE } from "./pillFill";
+import { DEFAULT_THEME } from "./theme";
 import { playClick, playNotify } from "./uiSounds";
 
 export type AppMode = "physics" | "layout";
 
 const PHYSICS_SRC = "/media/Mode-Select-Physics.mp4";
 const LAYOUT_SRC = "/media/Mode-Select-Static.webp";
+/** Orby Lime → White — same sweep as in-app animated text gradients. */
+const VIBE_FROM = DEFAULT_THEME[1];
+const VIBE_TO = DEFAULT_THEME[0];
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function appendWords(parent: HTMLElement, words: string[]) {
+  words.forEach((word, index) => {
+    const span = document.createElement("span");
+    span.className = "mode-select__word";
+    span.textContent = word;
+    parent.append(span);
+    if (index < words.length - 1) parent.append(document.createTextNode(" "));
+  });
+}
+
+/**
+ * Build the headline so "Choose your vibe." is one continuous gradient host,
+ * with the remaining copy still word-split for the fade-up stagger.
+ */
+function fillHeadline(el: HTMLElement) {
+  el.replaceChildren();
+  const vibe = document.createElement("span");
+  vibe.className = "mode-select__word mode-select__vibe";
+  vibe.textContent = "Choose your vibe.";
+  el.append(vibe, document.createTextNode(" "));
+  appendWords(el, ["Wild", "and"]);
+  el.append(document.createElement("br"));
+  appendWords(el, ["wobbly,", "or", "calm", "and", "composed."]);
 }
 
 /** First-run mode gate. Resolves with the chosen mode after the overlay exits. */
@@ -22,7 +53,7 @@ export function askModeSelect(): Promise<AppMode> {
       <p class="mode-select__mark logotype" aria-hidden="true">Ultrapilled</p>
       <div class="mode-select__upper" aria-hidden="true"></div>
       <div class="mode-select__inner">
-        <h1 class="mode-select__headline" id="mode-select-title">Mode Select</h1>
+        <h1 class="mode-select__headline" id="mode-select-title"></h1>
         <div class="mode-select__row">
           <button type="button" class="mode-select__card" data-mode="physics">
             <span class="mode-select__media">
@@ -63,6 +94,10 @@ export function askModeSelect(): Promise<AppMode> {
     `;
 
     const headline = root.querySelector<HTMLElement>(".mode-select__headline")!;
+    fillHeadline(headline);
+    const vibe = headline.querySelector<HTMLElement>(".mode-select__vibe")!;
+    styleBareTextCss(vibe, VIBE_FROM, VIBE_TO, DEFAULT_GRADIENT_ANGLE, undefined, true);
+    const words = [...headline.querySelectorAll<HTMLElement>(".mode-select__word")];
     const cards = [...root.querySelectorAll<HTMLButtonElement>(".mode-select__card")];
     const video = root.querySelector<HTMLVideoElement>(".mode-select__video");
 
@@ -128,22 +163,19 @@ export function askModeSelect(): Promise<AppMode> {
     void video?.play().catch(() => {});
 
     gsap.set(root, { autoAlpha: 0 });
-    gsap.set(headline, { autoAlpha: 0, y: 16 });
-    gsap.set(cards, { autoAlpha: 0, y: 20 });
+    gsap.set(words, { autoAlpha: 0, y: 22 });
+    gsap.set(cards, { autoAlpha: 0, y: 22 });
 
     if (reducedMotion()) {
-      gsap.set([root, headline, ...cards], { clearProps: "all", autoAlpha: 1 });
+      gsap.set([root, ...words, ...cards], { clearProps: "all", autoAlpha: 1, y: 0 });
       return;
     }
 
+    const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06 };
     const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
     tl.to(root, { autoAlpha: 1, duration: 0.35 }, 0);
-    tl.to(headline, { autoAlpha: 1, y: 0, duration: 0.4 }, 0.08);
-    tl.to(cards, {
-      autoAlpha: 1,
-      y: 0,
-      duration: 0.42,
-      stagger: 0.08,
-    }, 0.16);
+    tl.to(words, reveal, 0.08);
+    // Drop GSAP transform so CSS hover scale isn’t fighting an inline matrix.
+    tl.to(cards, { ...reveal, clearProps: "transform" }, ">");
   });
 }
