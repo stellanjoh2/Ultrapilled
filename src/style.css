@@ -148,8 +148,9 @@ body,
   z-index: 200;
   display: grid;
   place-items: center;
-  background: #000;
+  background: transparent;
   transition: opacity 0.35s ease;
+  pointer-events: none;
 }
 
 .app-intro.is-done {
@@ -5346,7 +5347,24 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 /* Mode Select — first-run gate before UI / stage reveal.
-   Always night chrome, even if day theme is saved in prefs. */
+   Always night chrome, even if day theme is saved in prefs.
+   Live physics sits in .mode-select-preview (z 190); this overlay is transparent. */
+.mode-select-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mode-select-preview__stage,
+.mode-select-preview__playfield {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .mode-select {
   position: fixed;
   inset: 0;
@@ -5355,7 +5373,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   flex-direction: column;
   align-items: center;
   padding: var(--space-2);
-  background: #000;
+  background: transparent;
   color: #f5f5f5;
   --ink: #f5f5f5;
   --ink-secondary: #d6d6d6;
@@ -5369,7 +5387,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   position: absolute;
   top: var(--panel-inset);
   left: var(--panel-inset);
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: center;
   height: calc(48px * var(--ui-scale));
@@ -5382,6 +5400,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
 
 .mode-select__upper,
 .mode-select__lower {
+  position: relative;
+  z-index: 2;
   flex: 1 1 0;
   width: 100%;
   min-height: 0;
@@ -5407,6 +5427,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 .mode-select__inner {
+  position: relative;
+  z-index: 2;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;

@@ -61,7 +61,7 @@ import {
 import { checkInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
-import { askModeSelect, type AppMode } from "./modeSelect";
+import { askModeSelect, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
@@ -4209,6 +4209,7 @@ function finishIntro() {
   resolveIntroAnim?.();
   resolveIntroAnim = null;
   void bootHold.then(() => {
+    stopModeSelectPreview();
     const intro = app.querySelector<HTMLElement>("#app-intro");
     shell.classList.remove("ui-hidden");
     resize();
@@ -4241,6 +4242,9 @@ async function startIntro() {
     window.setTimeout(finishIntro, 0);
     return;
   }
+
+  // Shapes fall behind the gif; mode select later fades on top of the same scene.
+  warmModeSelectPreview();
 
   const img = intro.querySelector<HTMLImageElement>(".app-intro__gif");
   try {

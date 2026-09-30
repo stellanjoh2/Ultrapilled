@@ -32,6 +32,8 @@ export type PlaySessionHost = {
   getRepeat: () => boolean;
   getPosePinned: () => boolean;
   setPosePinned: (on: boolean) => void;
+  /** When set, the frame loop stops scheduling once this returns false. */
+  shouldContinue?: () => boolean;
 };
 
 export type PlaySession = {
@@ -165,6 +167,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
       host.world.setRunning(false);
       holdSequenceClock(dt);
       if (lastInteractAt) lastInteractAt += dt;
+      if (host.shouldContinue?.() === false) return;
       requestAnimationFrame(frame);
       return;
     }
@@ -206,6 +209,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
         settledSince = 0;
         holdStarted = 0;
       }
+      if (host.shouldContinue?.() === false) return;
       return requestAnimationFrame(frame);
     }
 
@@ -217,6 +221,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
         host.world.sync();
         host.setPosePinned(true);
       }
+      if (host.shouldContinue?.() === false) return;
       return requestAnimationFrame(frame);
     }
 
@@ -260,6 +265,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
       }
     }
 
+    if (host.shouldContinue?.() === false) return;
     requestAnimationFrame(frame);
   }
 
