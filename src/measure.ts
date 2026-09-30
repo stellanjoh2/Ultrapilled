@@ -158,6 +158,25 @@ export function measureTextSlot(slot: TextSlot, pad = 1, tracking = 0.02): ChipS
 
 export function measureImageSlot(slot: ImageSlot): ChipSize {
   const size = Math.max(24, slot.size);
+  if (slot.youtube) {
+    const width = size;
+    const height = Math.max(8, Math.round((width * 9) / 16));
+    return { width, height };
+  }
+  if (slot.video) {
+    const vw = slot.video.width;
+    const vh = slot.video.height;
+    if (vw && vh) {
+      const fit = size / Math.max(vw, vh);
+      return {
+        width: Math.max(8, Math.round(vw * fit)),
+        height: Math.max(8, Math.round(vh * fit)),
+      };
+    }
+    const width = size;
+    const height = Math.max(8, Math.round((width * 9) / 16));
+    return { width, height };
+  }
   if (slot.emoji) return measureEmojiBox(slot.emoji, size);
   const trim = peekTrim(slot.src);
   if (!trim) return { width: size, height: size };

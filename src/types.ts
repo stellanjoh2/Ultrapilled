@@ -1,7 +1,9 @@
 import type { CanvasRatio } from "./canvas";
 import { DEFAULT_STAGE, DEFAULT_THEME } from "./theme";
+import type { YouTubeClip } from "./youtube";
 
 export type HoldingShape = "none" | "pill" | "box";
+export type { YouTubeClip };
 
 export type TextSlot = {
   id: string;
@@ -107,6 +109,22 @@ export type ImageSlot = {
   dropShadowOpacity?: number;
   /** Shadow ink. Unset keeps black. */
   dropShadowColor?: string;
+  /** Muted autoplay YouTube iframe loop. When set, `src` / emoji are unused. */
+  youtube?: YouTubeClip;
+  /** Local muted autoplay video (mp4). When set, `src` / emoji / youtube are unused. */
+  video?: LocalVideo;
+};
+
+/** Uploaded mp4 clip on the canvas. */
+export type LocalVideo = {
+  src: string;
+  /** False while the file is still buffering into the chip. */
+  ready: boolean;
+  /** Intrinsic pixel size once metadata is known. */
+  width?: number;
+  height?: number;
+  /** Still-frame data URL for panel thumbnails. */
+  poster?: string;
 };
 
 export type Slot = TextSlot | ImageSlot;

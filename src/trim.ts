@@ -40,6 +40,15 @@ export function ensureTrims(slots: Slot[]): Promise<void> {
   ).then(() => undefined);
 }
 
+function isGifSrc(src: string, name = ""): boolean {
+  return (
+    /\.gif$/i.test(name) ||
+    src.startsWith("data:image/gif") ||
+    src.includes("image/gif") ||
+    /\.gif(\?|$)/i.test(src)
+  );
+}
+
 function isSvgSrc(src: string, name = ""): boolean {
   return (
     /\.svg$/i.test(name) ||
@@ -130,6 +139,17 @@ async function computeTrim(src: string, name = ""): Promise<ImageTrim | null> {
     const naturalW = img.naturalWidth || img.width;
     const naturalH = img.naturalHeight || img.height;
     if (!naturalW || !naturalH) return null;
+
+    // Keep the original blob/data URL so animated GIFs don't freeze into a PNG crop.
+    if (isGifSrc(src, name)) {
+      return {
+        ratioW: naturalW,
+        ratioH: naturalH,
+        displaySrc: src,
+        nativeW: naturalW,
+        nativeH: naturalH,
+      };
+    }
 
     const probeScale = Math.min(1, 128 / Math.max(naturalW, naturalH));
     const w = Math.max(1, Math.round(naturalW * probeScale));

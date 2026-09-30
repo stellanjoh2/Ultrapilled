@@ -37,6 +37,8 @@ export type SlotMenuHost = {
   recallGradient(slot: TextSlot): void;
   pickImageFiles(multiple?: boolean): Promise<File[]>;
   assignImageFile(slot: ImageSlot, file: File): Promise<void>;
+  assignVideoFile(slot: ImageSlot, file: File): Promise<void>;
+  isVideoFile(file: File): boolean;
   editChipText(id: string, wipe: boolean): void;
   duplicateSlot(id: string): void;
   removeSlot(id: string): void;
@@ -272,7 +274,7 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     const mountImageInk = () => {
       clearMenuInk(menu);
       const nodes: HTMLElement[] = [];
-      if (H.isRasterUpload(slot)) {
+      if (H.isRasterUpload(slot) || slot.youtube || slot.video) {
         if (slot.stroked) {
           nodes.push(
             menuColorRow("Stroke Color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),
@@ -326,7 +328,7 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       if (nodes.length) insertMenuInk(menu, nodes);
     };
     revealImageInk = mountImageInk;
-    if (H.iconCanGradient(slot) || H.isRasterUpload(slot)) mountImageInk();
+    if (H.iconCanGradient(slot) || H.isRasterUpload(slot) || slot.youtube || slot.video) mountImageInk();
   } else if (slot?.kind === "text" && slot.shape === "none") {
     const mountBareInk = () => {
       clearMenuInk(menu);
@@ -544,7 +546,30 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
           if (!file) return;
           H.remember();
           playCreate();
-          void H.assignImageFile(slot, file).then(() => {
+          const job = H.isVideoFile(file) ? H.assignVideoFile(slot, file) : H.assignImageFile(slot, file);
+          void job.then(() => {
+            H.renderPanel();
+            H.live();
+          });
+        });
+      },
+    });
+  }
+  if (slot?.kind === "image" && slot.video) {
+    actions.push({
+      label: "Replace video",
+      run: () => {
+        void H.pickImageFiles(false).then((files) => {
+          const file = files[0];
+          if (!file) return;
+          H.remember();
+          playCreate();
+          if (H.isVideoFile(file) && slot.video) {
+            slot.video = { ...slot.video, ready: false };
+            H.live();
+          }
+          const job = H.isVideoFile(file) ? H.assignVideoFile(slot, file) : H.assignImageFile(slot, file);
+          void job.then(() => {
             H.renderPanel();
             H.live();
           });

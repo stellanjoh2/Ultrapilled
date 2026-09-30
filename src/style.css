@@ -2286,8 +2286,8 @@ button.pill.smash-btn.is-on::after {
 .check__box {
   position: relative;
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: calc(20px * var(--ui-scale));
+  height: calc(20px * var(--ui-scale));
 }
 
 .check__box input[type="checkbox"] {
@@ -2295,10 +2295,10 @@ button.pill.smash-btn.is-on::after {
   -webkit-appearance: none;
   position: absolute;
   inset: 0;
-  width: calc(20px * var(--ui-scale));
-  height: calc(20px * var(--ui-scale));
+  width: 100%;
+  height: 100%;
   margin: 0;
-  border: 2px solid var(--ink-mute);
+  border: calc(2px * var(--ui-scale)) solid var(--ink-mute);
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
@@ -2310,7 +2310,7 @@ button.pill.smash-btn.is-on::after {
 }
 
 .check__box input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: calc(2px * var(--ui-scale)) solid var(--primary);
   outline-offset: calc(2px * var(--ui-scale));
 }
 
@@ -2361,23 +2361,23 @@ button.pill.smash-btn.is-on::after {
   40% {
     background: var(--check-on);
     box-shadow:
-      0 -15px 0 -7px #c4ff00,
-      13px -7px 0 -7px #c4ff00,
-      13px 7px 0 -7px #c4ff00,
-      0 15px 0 -7px #c4ff00,
-      -13px 7px 0 -7px #c4ff00,
-      -13px -7px 0 -7px #c4ff00;
+      0 calc(-15px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
+      calc(13px * var(--ui-scale)) calc(-7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
+      calc(13px * var(--ui-scale)) calc(7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
+      0 calc(15px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
+      calc(-13px * var(--ui-scale)) calc(7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
+      calc(-13px * var(--ui-scale)) calc(-7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00;
   }
 
   100% {
     background: var(--check-on);
     box-shadow:
-      0 -30px 0 -8px transparent,
-      26px -13px 0 -8px transparent,
-      26px 13px 0 -8px transparent,
-      0 30px 0 -8px transparent,
-      -26px 13px 0 -8px transparent,
-      -26px -13px 0 -8px transparent;
+      0 calc(-30px * var(--ui-scale)) 0 calc(-8px * var(--ui-scale)) transparent,
+      calc(26px * var(--ui-scale)) calc(-13px * var(--ui-scale)) 0 calc(-8px * var(--ui-scale)) transparent,
+      calc(26px * var(--ui-scale)) calc(13px * var(--ui-scale)) 0 calc(-8px * var(--ui-scale)) transparent,
+      0 calc(30px * var(--ui-scale)) 0 calc(-8px * var(--ui-scale)) transparent,
+      calc(-26px * var(--ui-scale)) calc(13px * var(--ui-scale)) 0 calc(-8px * var(--ui-scale)) transparent,
+      calc(-26px * var(--ui-scale)) calc(-13px * var(--ui-scale)) 0 calc(-8px * var(--ui-scale)) transparent;
   }
 }
 
@@ -2407,6 +2407,7 @@ button.pill.smash-btn.is-on::after {
 input[type="text"],
 input[type="number"],
 input[type="search"],
+input[type="url"],
 select {
   width: 100%;
   min-height: calc(40px * var(--ui-scale));
@@ -2426,6 +2427,7 @@ select {
 html[data-theme="day"] input[type="text"],
 html[data-theme="day"] input[type="number"],
 html[data-theme="day"] input[type="search"],
+html[data-theme="day"] input[type="url"],
 html[data-theme="day"] .font-pick-trigger,
 html[data-theme="day"] button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
 html[data-theme="day"] button.icon-btn,
@@ -2439,6 +2441,7 @@ html[data-theme="day"] .pick-now {
 html[data-theme="day"] input[type="text"]:focus,
 html[data-theme="day"] input[type="number"]:focus,
 html[data-theme="day"] input[type="search"]:focus,
+html[data-theme="day"] input[type="url"]:focus,
 html[data-theme="day"] .font-pick-trigger:focus-visible {
   background-color: var(--field-hover);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
@@ -2487,6 +2490,7 @@ input::placeholder {
 input[type="text"]:focus,
 input[type="number"]:focus,
 input[type="search"]:focus,
+input[type="url"]:focus,
 select:focus {
   background-color: var(--field-hover);
   outline: none;
@@ -4723,7 +4727,7 @@ html[data-theme="day"] .shape-swatch {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  width: min(520px, calc(100% - (var(--space-2) * 2)));
+  width: min(calc(520px * var(--ui-scale)), calc(100% - (var(--space-2) * 2)));
   border-radius: var(--radius-settings);
   background: var(--canvas);
   box-shadow: var(--shadow-2);
@@ -4740,7 +4744,7 @@ html[data-theme="day"] .shape-swatch {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: clamp(32px, 4vw, 44px);
+  font-size: calc(44px * var(--ui-scale));
   font-weight: 400;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -4956,6 +4960,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
 
 .unsplash-modal__x {
   flex: none;
+  display: grid;
+  place-items: center;
   width: calc(40px * var(--ui-scale));
   height: calc(40px * var(--ui-scale));
   margin: 0;
@@ -4964,9 +4970,12 @@ html[data-theme="day"] .settings-modal__body .keycap {
   border-radius: calc(9999px * var(--ui-scale));
   background: var(--field);
   color: var(--ink);
-  font-size: calc(24px * var(--ui-scale));
-  line-height: 1;
   cursor: pointer;
+}
+
+.unsplash-modal__x svg {
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
 }
 
 .unsplash-modal__body {
@@ -5106,5 +5115,447 @@ html[data-theme="day"] .settings-modal__body .keycap {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.youtube-modal .unsplash-modal__card {
+  width: min(520px, calc(100% - (var(--space-2) * 2)));
+}
+
+.youtube-modal__row {
+  display: flex;
+  align-items: end;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.youtube-modal__url {
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.youtube-modal__url input,
+.youtube-modal__loop input {
+  min-height: calc(56px * var(--ui-scale));
+  padding-inline: var(--space-2);
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
+  font-size: calc(18px * var(--ui-scale));
+  outline: none;
+  box-shadow: none;
+}
+
+.youtube-modal__loop {
+  flex: none;
+  width: calc(96px * var(--ui-scale));
+  gap: var(--space-1);
+}
+
+.youtube-modal__loop input {
+  text-align: center;
+  padding-inline: var(--space-1);
+  /* Hide spinner so the compact field stays clean. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.youtube-modal__loop input::-webkit-outer-spin-button,
+.youtube-modal__loop input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.youtube-modal__actions {
+  flex: none;
+  display: flex;
+  justify-content: stretch;
+  padding-top: var(--space-1);
+}
+
+.youtube-modal__add {
+  width: 100%;
+  min-height: calc(54px * var(--ui-scale));
+  font-size: calc(15px * var(--ui-scale));
+}
+
+.chip-youtube {
+  overflow: visible;
+  background: #111;
+}
+
+.chip-youtube__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+  background: #111;
+}
+
+.chip-video {
+  overflow: visible;
+  background: #111;
+}
+
+.chip-video__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  background: #111;
+}
+
+.chip-media-loader {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  border-radius: inherit;
+  background: #111;
+}
+
+.chip-media-loader__inner {
+  position: relative;
+  width: 80px;
+  height: 50px;
+}
+
+.chip-media-loader__text {
+  position: absolute;
+  top: 0;
+  padding: 0;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  animation: chip-media-loader-text 3.5s ease both infinite;
+}
+
+.chip-media-loader__load {
+  position: absolute;
+  bottom: 0;
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50px;
+  background-color: var(--loop-stroke-b);
+  transform: translateX(64px);
+  animation: chip-media-loader-bar 3.5s ease both infinite;
+}
+
+.chip-media-loader__load::before {
+  position: absolute;
+  content: "";
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--play-face);
+  animation: chip-media-loader-fill 3.5s ease both infinite;
+}
+
+@keyframes chip-media-loader-text {
+  0% {
+    letter-spacing: 1px;
+    transform: translateX(0);
+  }
+  40% {
+    letter-spacing: 2px;
+    transform: translateX(26px);
+  }
+  80% {
+    letter-spacing: 1px;
+    transform: translateX(32px);
+  }
+  90% {
+    letter-spacing: 2px;
+    transform: translateX(0);
+  }
+  100% {
+    letter-spacing: 1px;
+    transform: translateX(0);
+  }
+}
+
+@keyframes chip-media-loader-bar {
+  0% {
+    width: 16px;
+    transform: translateX(0);
+  }
+  40% {
+    width: 100%;
+    transform: translateX(0);
+  }
+  80% {
+    width: 16px;
+    transform: translateX(64px);
+  }
+  90% {
+    width: 100%;
+    transform: translateX(0);
+  }
+  100% {
+    width: 16px;
+    transform: translateX(0);
+  }
+}
+
+@keyframes chip-media-loader-fill {
+  0% {
+    width: 16px;
+    transform: translateX(0);
+  }
+  40% {
+    width: 80%;
+    transform: translateX(0);
+  }
+  80% {
+    width: 100%;
+    transform: translateX(0);
+  }
+  90% {
+    width: 80%;
+    transform: translateX(15px);
+  }
+  100% {
+    width: 16px;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip-media-loader__text,
+  .chip-media-loader__load,
+  .chip-media-loader__load::before {
+    animation: none;
+  }
+
+  .chip-media-loader__load {
+    width: 100%;
+    transform: none;
+  }
+}
+
+.file-replace__btn--video {
+  background: var(--field);
+}
+
+/* Mode Select — first-run gate before UI / stage reveal.
+   Always night chrome, even if day theme is saved in prefs. */
+.mode-select {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-2);
+  background: #000;
+  color: #f5f5f5;
+  --ink: #f5f5f5;
+  --ink-secondary: #d6d6d6;
+  --ink-mute: #8f8f8f;
+  --canvas: #121212;
+  --shadow-1: rgba(0, 0, 0, 0.4) 0 1px 3px;
+  pointer-events: auto;
+}
+
+.mode-select__mark {
+  position: absolute;
+  top: var(--panel-inset);
+  left: var(--panel-inset);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: calc(48px * var(--ui-scale));
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-topbar);
+  background: var(--canvas);
+  box-shadow: var(--shadow-1);
+  pointer-events: none;
+}
+
+.mode-select__upper,
+.mode-select__lower {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+}
+
+.mode-select__lower {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: var(--panel-inset);
+}
+
+.mode-select__foot {
+  margin: 0;
+  max-width: min(72em, 100%);
+  color: #555;
+  font-size: calc(12px * var(--ui-scale));
+  font-weight: 300;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  text-align: center;
+  pointer-events: none;
+}
+
+.mode-select__inner {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(24px, 3vw, var(--space-3));
+  width: min(calc(720px * 2 + 48px), 100%);
+  max-width: 100%;
+}
+
+.mode-select__headline {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: clamp(28px, 4.6vw, 41px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  text-align: left;
+}
+
+.mode-select__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(16px, 3.2vw, 48px);
+  width: 100%;
+}
+
+.mode-select__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mode-select__card:focus {
+  outline: none;
+}
+
+.mode-select__card:focus-visible .mode-select__name {
+  outline: 2px solid var(--loop-stroke-a);
+  outline-offset: 4px;
+}
+
+.mode-select__media {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-reconnect);
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.mode-select__video,
+.mode-select__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* Reconnect / “save available” spinning stroke — hover + keyboard focus. */
+.mode-select__stroke {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: inherit;
+  box-sizing: border-box;
+  padding: 1.5px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.mode-select__stroke::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--loop-stroke-a) 0deg,
+    var(--loop-stroke-b) 90deg,
+    transparent 130deg,
+    transparent 230deg,
+    var(--loop-stroke-a) 360deg
+  );
+  pointer-events: none;
+}
+
+.mode-select__card:hover .mode-select__stroke,
+.mode-select__card:focus-visible .mode-select__stroke {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mode-select__stroke::before {
+    animation: smash-stroke-spin 2s linear infinite;
+  }
+}
+
+.mode-select__name {
+  margin: 48px 0 0;
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: clamp(22px, 2.6vw, calc(28px * var(--ui-scale)));
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  border-radius: 4px;
+}
+
+.mode-select__desc {
+  margin: calc(10px * var(--ui-scale)) 0 0;
+  max-width: 28em;
+  color: rgb(255 255 255 / 0.8);
+  font-size: clamp(13px, 1.5vw, calc(15px * var(--ui-scale)));
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 640px) {
+  .mode-select__row {
+    grid-template-columns: 1fr;
+  }
+
+  .mode-select__inner {
+    align-items: stretch;
+  }
 }
 

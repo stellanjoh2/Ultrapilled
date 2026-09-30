@@ -56,7 +56,15 @@ async function preload(draws: ChipDraw[], post: PostSettings): Promise<Map<strin
   const ready = new Map<string, HTMLImageElement>();
   const srcs = new Set<string>();
   for (const chip of draws) {
-    if (chip.slot.kind === "image" && !chip.slot.emoji) srcs.add(imageSrc(chip.slot));
+    if (
+      chip.slot.kind === "image" &&
+      !chip.slot.emoji &&
+      !chip.slot.youtube &&
+      !chip.slot.video &&
+      chip.slot.src
+    ) {
+      srcs.add(imageSrc(chip.slot));
+    }
   }
   await Promise.all(
     [...srcs].map(async (src) => {
@@ -361,6 +369,36 @@ function drawChip(
       const slot = chip.slot;
       if (slot.kind === "text") {
         drawText(ctx, chip, slot, width, height, scale, bloom, theme, timeMs);
+        return;
+      }
+      if (slot.youtube || slot.video) {
+        // YouTube iframe can't be captured; local video uses the same stand-in for now.
+        const radius = chip.radius * scale;
+        const ring = rasterRing(slot);
+        ctx.save();
+        if (radius > 0 || ring) {
+          round(ctx, width, height, radius);
+          ctx.clip();
+        }
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.beginPath();
+        const cx = width / 2;
+        const cy = height / 2;
+        const s = Math.min(width, height) * 0.18;
+        ctx.moveTo(cx - s * 0.55, cy - s);
+        ctx.lineTo(cx - s * 0.55, cy + s);
+        ctx.lineTo(cx + s * 0.85, cy);
+        ctx.closePath();
+        ctx.fill();
+        if (ring) {
+          round(ctx, width, height, radius);
+          ctx.lineWidth = Math.max(1, slot.stroke ?? 4) * scale * 2;
+          ctx.strokeStyle = chip.fill;
+          ctx.stroke();
+        }
+        ctx.restore();
         return;
       }
       if (slot.emoji) {

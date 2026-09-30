@@ -53,9 +53,15 @@ import { mountExportPanel } from "./export/exportPanel";
 import { isAboutOpen } from "./aboutPanel";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
 import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
+import { openYouTubeImport, isYouTubeOpen } from "./youtubePanel";
+import {
+  DEFAULT_YOUTUBE_SIZE,
+  type YouTubeClip,
+} from "./youtube";
 import { checkInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
+import { askModeSelect, type AppMode } from "./modeSelect";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
@@ -1252,6 +1258,8 @@ function slotMenuHost(): SlotMenuHost {
     recallGradient,
     pickImageFiles,
     assignImageFile,
+    assignVideoFile,
+    isVideoFile,
     editChipText,
     duplicateSlot,
     removeSlot,
@@ -1324,10 +1332,13 @@ function createPanelHost(): CreatePanelHost {
     isRasterUpload,
     colliderOf,
     isImageFile,
+    isMediaFile,
+    isVideoFile,
     assignImageFile,
+    assignVideoFile,
     slotScaleSliderMax,
     escapeAttr,
-    IMAGE_FILE_ACCEPT,
+    IMAGE_FILE_ACCEPT: MEDIA_FILE_ACCEPT,
     AMOUNT_SOFT_CAP,
     shapeAmountRange,
     activeTemplateLabel,
@@ -1531,15 +1542,27 @@ function isImageFile(file: File): boolean {
   return isSvgFile(file) || isRasterFile(file);
 }
 
+function isVideoFile(file: File): boolean {
+  if (/^video\/(mp4|quicktime)$/i.test(file.type)) return true;
+  return /\.(mp4|m4v)$/i.test(file.name);
+}
+
+function isMediaFile(file: File): boolean {
+  return isImageFile(file) || isVideoFile(file);
+}
+
 const IMAGE_FILE_ACCEPT =
   ".svg,.png,.jpg,.jpeg,.webp,.gif,image/svg+xml,image/png,image/jpeg,image/webp,image/gif";
 
-/** Open the OS file picker for image files. Resolves [] if cancelled. */
+const MEDIA_FILE_ACCEPT =
+  `${IMAGE_FILE_ACCEPT},.mp4,.m4v,video/mp4,video/quicktime`;
+
+/** Open the OS file picker for image / gif / mp4 files. Resolves [] if cancelled. */
 function pickImageFiles(multiple = false): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = IMAGE_FILE_ACCEPT;
+    input.accept = MEDIA_FILE_ACCEPT;
     input.multiple = multiple;
     input.hidden = true;
     const finish = (files: File[]) => {
@@ -1549,7 +1572,7 @@ function pickImageFiles(multiple = false): Promise<File[]> {
       resolve(files);
     };
     input.addEventListener("change", () => {
-      finish([...(input.files ?? [])].filter(isImageFile));
+      finish([...(input.files ?? [])].filter(isMediaFile));
     });
     input.addEventListener("cancel", () => finish([]));
     document.body.append(input);
@@ -1580,6 +1603,8 @@ function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
   slot.src = url;
   slot.name = file.name || "image";
   slot.emoji = undefined;
+  slot.youtube = undefined;
+  slot.video = undefined;
   slot.collider = undefined;
   slot.tint = undefined;
   slot.inverted = undefined;
@@ -1608,42 +1633,153 @@ function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
     });
 }
 
+/** Grab a compact JPEG still from a loaded video element (for panel thumbs). */
+function captureVideoPoster(video: HTMLVideoElement): string | undefined {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return undefined;
+  const max = 480;
+  const scale = Math.min(1, max / Math.max(vw, vh));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(vw * scale));
+  canvas.height = Math.max(1, Math.round(vh * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return undefined;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  try {
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Buffer an mp4 into a muted looping video chip. Shows the canvas loader until canplay. */
+function assignVideoFile(slot: ImageSlot, file: File): Promise<void> {
+  const url = URL.createObjectURL(file);
+  slot.src = "";
+  slot.name = file.name || "video";
+  slot.emoji = undefined;
+  slot.youtube = undefined;
+  slot.tint = undefined;
+  slot.inverted = undefined;
+  slot.collider = undefined;
+  if (slot.radius == null) slot.radius = 12;
+  slot.size = DEFAULT_YOUTUBE_SIZE;
+  slot.video = { src: url, ready: false };
+
+  return new Promise<void>((resolve) => {
+    const probe = document.createElement("video");
+    probe.preload = "auto";
+    probe.muted = true;
+    probe.playsInline = true;
+    probe.src = url;
+
+    let settled = false;
+    const finish = (width?: number, height?: number, poster?: string) => {
+      if (settled) return;
+      settled = true;
+      probe.removeAttribute("src");
+      probe.load();
+      if (slot.video?.src !== url) {
+        resolve();
+        return;
+      }
+      const w = Math.max(1, width ?? 16);
+      const h = Math.max(1, height ?? 9);
+      slot.size = importSlotSize(w, h);
+      slot.video = {
+        src: url,
+        ready: true,
+        width: w,
+        height: h,
+        poster: poster || undefined,
+      };
+      resolve();
+    };
+
+    const captureThenFinish = () => {
+      const poster = captureVideoPoster(probe);
+      finish(probe.videoWidth, probe.videoHeight, poster);
+    };
+
+    probe.addEventListener(
+      "canplay",
+      () => {
+        // Skip the often-black first frame; land a little into the clip.
+        const target = Math.min(0.35, Math.max(0, (Number.isFinite(probe.duration) ? probe.duration : 1) * 0.08));
+        if (target <= 0.02 || Math.abs(probe.currentTime - target) < 0.04) {
+          captureThenFinish();
+          return;
+        }
+        const onSeeked = () => {
+          probe.removeEventListener("seeked", onSeeked);
+          captureThenFinish();
+        };
+        probe.addEventListener("seeked", onSeeked);
+        try {
+          probe.currentTime = target;
+        } catch {
+          captureThenFinish();
+        }
+      },
+      { once: true },
+    );
+    probe.addEventListener(
+      "error",
+      () => {
+        if (slot.video?.src === url) slot.video = { src: url, ready: true, width: 16, height: 9 };
+        finish(16, 9);
+      },
+      { once: true },
+    );
+  });
+}
+
 function addImagesFromFiles(files: Iterable<File>, at?: { clientX: number; clientY: number }) {
-  const images = [...files].filter(isImageFile);
-  if (!images.length) return;
+  const media = [...files].filter(isMediaFile);
+  if (!media.length) return;
   remember();
   dismissWelcome();
   const slots: ImageSlot[] = [];
-  for (let i = 0; i < images.length; i++) {
+  const jobs: Promise<void>[] = [];
+  for (const file of media) {
     const slot = defaultImageSlot({
       colorIndex: state.slots.length % state.theme.length,
-      name: "image",
+      name: isVideoFile(file) ? "video" : "image",
+      amount: 1,
+      radius: isVideoFile(file) ? 12 : 0,
     });
     captureBaseline(slot);
     state.slots.push(slot);
     slots.push(slot);
+    jobs.push(isVideoFile(file) ? assignVideoFile(slot, file) : assignImageFile(slot, file));
   }
   const last = slots[slots.length - 1]!;
   openOnly(last.id);
   revealSlotId = last.id;
   if (slots.length === 1) armAppendInsert(last.id);
   playCreate();
+  // Paint loading chips immediately so heavy mp4s show the loader on canvas.
+  renderPanel();
+  if (at) {
+    const { x, y } = playfieldPoint(at.clientX, at.clientY);
+    world.armPlaceAt(
+      slots.map((slot) => slot.id),
+      x,
+      y,
+    );
+  }
+  live();
+
   const ids = slots.map((slot) => slot.id);
-  void Promise.all(slots.map((slot, i) => assignImageFile(slot, images[i]!))).then(() => {
-    // File-dialog focus / async trim can leave a collapsed frame — heal before place-at.
+  void Promise.all(jobs).then(() => {
     resize();
     renderPanel();
     if (at) {
       const { x, y } = playfieldPoint(at.clientX, at.clientY);
-      world.armPlaceAt(ids, x, y);
-      live();
-      // Remesh after trim settle can nudge size — keep the import on the click.
-      void ensureTrims(state.slots).then(() => {
-        world.placeSlotsAt(ids, x, y);
-      });
-    } else {
-      live();
+      world.placeSlotsAt(ids, x, y);
     }
+    live();
   });
 }
 
@@ -1764,6 +1900,29 @@ function addEmojiSlot(at?: PlaceAt) {
   live();
 }
 
+function addYouTubeSlot(clip: YouTubeClip, at?: PlaceAt) {
+  remember();
+  dismissWelcome();
+  const slot = defaultImageSlot({
+    colorIndex: state.slots.length % state.theme.length,
+    src: "",
+    name: "YouTube",
+    size: DEFAULT_YOUTUBE_SIZE,
+    amount: 1,
+    radius: 12,
+    youtube: clip,
+  });
+  captureBaseline(slot);
+  state.slots.push(slot);
+  openOnly(slot.id);
+  revealSlotId = slot.id;
+  armAppendInsert(slot.id);
+  armSlotPlace(slot.id, at);
+  playCreate();
+  renderPanel();
+  live();
+}
+
 function slotColor(slot: Slot): string {
   return slot.color ?? pickTheme(state.theme, slot.colorIndex ?? 0);
 }
@@ -1773,11 +1932,12 @@ function iconSrc(slot: ImageSlot): string {
 }
 
 function uploadedShape(slot: ImageSlot): boolean {
-  return Boolean(slot.src) && !slot.emoji && !presetIdForSrc(slot.src);
+  return Boolean(slot.src) && !slot.emoji && !slot.youtube && !slot.video && !presetIdForSrc(slot.src);
 }
 
 function scaleFieldName(slot: Slot): string {
   if (slot.kind === "text") return "Text scale";
+  if (slot.kind === "image" && (slot.youtube || slot.video)) return "Clip scale";
   if (slot.kind === "image" && uploadedShape(slot)) return "Image scale";
   return "Shape scale";
 }
@@ -2977,6 +3137,14 @@ function openCanvasMenu(x: number, y: number) {
       },
     },
     {
+      label: "Add from YouTube",
+      run: () => {
+        openYouTubeImport({
+          onPick: (clip) => addYouTubeSlot(clip, at),
+        });
+      },
+    },
+    {
       label: shell.classList.contains("ui-hidden") ? "Show UI" : "Hide UI",
       run: () => {
         shell.classList.toggle("ui-hidden");
@@ -3010,7 +3178,7 @@ function openCanvasMenu(x: number, y: number) {
     gsap.fromTo(
       buttons,
       { autoAlpha: 0, y: -10 },
-      { autoAlpha: 1, y: 0, duration: 0.22, stagger: 0.05, ease: "power2.out" },
+      { autoAlpha: 1, y: 0, duration: 0.11, stagger: 0.025, ease: "power2.out" },
     );
   }
 
@@ -4793,7 +4961,7 @@ window.addEventListener("keydown", (event) => {
     }
   }
   if (typingInField(event.target)) return;
-  if (isSettingsOpen() || isAboutOpen() || isUnsplashOpen()) return;
+  if (isSettingsOpen() || isAboutOpen() || isUnsplashOpen() || isYouTubeOpen()) return;
   if (document.querySelector(".reconnect[aria-modal='true']")) return;
   if (event.code === "Space") {
     event.preventDefault();
@@ -5102,6 +5270,21 @@ window.addEventListener("pagehide", () => {
   if (getPrefs().rememberLast) void writeDraftNow();
 });
 
+async function applyStartupMode(mode: AppMode) {
+  state.physics.layoutMode = mode === "layout";
+  renderPanel();
+  paintWelcome();
+}
+
+/** Fresh start: keep black overlay, pick mode, then release UI. */
+async function gateModeSelect() {
+  await introAnimDone;
+  const intro = app.querySelector<HTMLElement>("#app-intro");
+  intro?.querySelector(".app-intro__gif")?.remove();
+  const mode = await askModeSelect();
+  await applyStartupMode(mode);
+}
+
 void (async () => {
   const releaseBoot = () => {
     resolveBootHold?.();
@@ -5110,14 +5293,14 @@ void (async () => {
   try {
     if (!getPrefs().rememberLast) {
       draftReady = true;
-      paintWelcome();
+      await gateModeSelect();
       return;
     }
     const json = await readDraftJson();
     const project = json ? parsePillProject(json) : null;
     draftReady = true;
     if (!project) {
-      paintWelcome();
+      await gateModeSelect();
       return;
     }
     // Keep load overlay up; modal alone until the user chooses.
@@ -5125,11 +5308,11 @@ void (async () => {
     const intro = app.querySelector<HTMLElement>("#app-intro");
     intro?.querySelector(".app-intro__gif")?.remove();
     const ok = await askReconnect();
-    releaseBoot();
     if (!ok) {
       lastDraftJson = serializePillProject(currentPillProject());
       await clearDraft().catch(() => {});
-      paintWelcome();
+      const mode = await askModeSelect();
+      await applyStartupMode(mode);
       return;
     }
     await applyPillProject(project);
@@ -5137,7 +5320,11 @@ void (async () => {
     paintWelcome();
   } catch {
     draftReady = true;
-    paintWelcome();
+    try {
+      await gateModeSelect();
+    } catch {
+      paintWelcome();
+    }
   } finally {
     releaseBoot();
   }

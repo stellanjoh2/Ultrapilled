@@ -286,7 +286,7 @@ panel.innerHTML = `
         <span class="slot-add__icon" aria-hidden="true">${plus}</span>
         Add emoji
       </button>
-      <button type="button" class="pill slot-add" id="add-photo" data-tip="Add an SVG, PNG, JPG, or GIF">
+      <button type="button" class="pill slot-add" id="add-photo" data-tip="Add an SVG, PNG, JPG, GIF, or MP4">
         <span class="slot-add__icon" aria-hidden="true">${plus}</span>
         Upload image
       </button>

@@ -74,7 +74,9 @@ export function openUnsplashImport(opts: { onPick: (file: File) => void }): void
     <div class="unsplash-modal__card">
       <header class="unsplash-modal__head">
         <h2 class="unsplash-modal__title" id="unsplash-modal-title">Import from Unsplash</h2>
-        <button type="button" class="unsplash-modal__x" data-unsplash-close aria-label="Close">×</button>
+        <button type="button" class="unsplash-modal__x" data-unsplash-close aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.3 5.7 13 11l5.3 5.3-1.4 1.4L11.6 12.4 6.3 17.7 4.9 16.3 10.2 11 4.9 5.7 6.3 4.3l5.3 5.3 5.3-5.3z"/></svg>
+        </button>
       </header>
       <div class="unsplash-modal__body">
         <label class="field unsplash-modal__search">Search Unsplash

@@ -382,7 +382,10 @@ function chipBody(
 
 
 function readySlots(slots: Slot[]): Slot[] {
-  return slots.filter((slot) => slot.kind === "text" || Boolean(slot.src || slot.emoji));
+  return slots.filter(
+    (slot) =>
+      slot.kind === "text" || Boolean(slot.src || slot.emoji || slot.youtube || slot.video),
+  );
 }
 
 function shapeCopies(slot: Slot): number {
@@ -1439,7 +1442,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const grown: DroppedChip[] = [];
     chips = chips.filter((chip) => {
       const slot = byId.get(chip.slotId);
-      if (!slot || (slot.kind === "image" && !slot.src && !slot.emoji)) {
+      if (!slot || (slot.kind === "image" && !slot.src && !slot.emoji && !slot.youtube && !slot.video)) {
         discardChip(chip);
         removed += 1;
         return false;
@@ -1928,7 +1931,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
     saved.forEach((pose) => {
       const slot = byId.get(pose.slotId);
-      if (!slot || (slot.kind === "image" && !slot.src && !slot.emoji)) return;
+      if (!slot || (slot.kind === "image" && !slot.src && !slot.emoji && !slot.youtube && !slot.video)) return;
       spawnChip(
         slot,
         pose.x * sx,

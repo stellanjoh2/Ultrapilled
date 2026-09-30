@@ -7,6 +7,7 @@ import { applyTextAnim, stopTextAnim } from "./textAnim";
 import { inkOn } from "./theme";
 import { peekTrim } from "./trim";
 import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, type Slot, type TextSlot } from "./types";
+import { armYouTubeLoop, clearYouTubeLoop, youtubeEmbedKey, youtubeEmbedSrc } from "./youtube";
 
 export function paintSweepBand(
   host: HTMLElement,
@@ -278,6 +279,7 @@ export function isChipChrome(node: Element): boolean {
 export function stripLookChildren(el: HTMLElement, keep?: Element | null) {
   for (const child of [...el.children]) {
     if (child === keep || isChipChrome(child)) continue;
+    if (child instanceof HTMLIFrameElement) clearYouTubeLoop(child);
     child.remove();
   }
 }
@@ -287,6 +289,22 @@ export function mountLookChild(el: HTMLElement, node: HTMLElement) {
   const chrome = [...el.children].find(isChipChrome);
   if (chrome) el.insertBefore(node, chrome);
   else el.append(node);
+}
+
+function mountMediaLoader(el: HTMLElement) {
+  const found = el.querySelector(":scope > .chip-media-loader");
+  const loader = found instanceof HTMLElement ? found : document.createElement("div");
+  if (loader.parentElement !== el) {
+    loader.className = "chip-media-loader";
+    loader.setAttribute("aria-hidden", "true");
+    loader.innerHTML = `
+      <div class="chip-media-loader__inner">
+        <p class="chip-media-loader__text">Loading</p>
+        <span class="chip-media-loader__load"></span>
+      </div>
+    `;
+  }
+  mountLookChild(el, loader);
 }
 
 export function applyVisual(
@@ -318,7 +336,7 @@ export function applyVisual(
     const bareCss =
       Boolean(slot.textAnim) ||
       (textGradient && (liveEdit || Boolean(slot.animatedGradient)));
-    el.classList.remove("chip-image", "chip-emoji");
+    el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video");
     el.classList.toggle("chip-bare", bare || ring);
     el.classList.toggle("is-editing", liveEdit);
     if (bare || ring || shapeGradient) {
@@ -410,9 +428,112 @@ export function applyVisual(
   el.style.background = "transparent";
   el.style.backgroundColor = "transparent";
 
+  if (slot.kind === "image" && slot.youtube) {
+    el.classList.add("chip-image", "chip-youtube");
+    el.classList.remove("chip-bare", "chip-emoji", "chip-video");
+    el.style.webkitMaskImage = "";
+    el.style.maskImage = "";
+    for (const node of [...el.childNodes]) {
+      if (node.nodeType === Node.TEXT_NODE) node.remove();
+    }
+    // Bloom pass is a tinted duplicate — don't spawn a second YouTube player.
+    if (bloom) {
+      stripLookChildren(el);
+      el.style.backgroundColor = "#111";
+      return;
+    }
+    const found = el.querySelector(":scope > iframe.chip-youtube__frame");
+    const iframe = found instanceof HTMLIFrameElement ? found : document.createElement("iframe");
+    stripLookChildren(el, iframe);
+    const key = youtubeEmbedKey(slot.youtube);
+    if (iframe.dataset.embedKey !== key) {
+      iframe.dataset.embedKey = key;
+      clearYouTubeLoop(iframe);
+      iframe.src = youtubeEmbedSrc(slot.youtube);
+      armYouTubeLoop(iframe, slot.youtube);
+    }
+    iframe.className = "chip-youtube__frame";
+    iframe.title = slot.name || "YouTube clip";
+    iframe.loading = "lazy";
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.setAttribute("allowfullscreen", "false");
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+    iframe.style.borderRadius = `${radius}px`;
+    mountLookChild(el, iframe);
+    if (rasterRing(slot)) {
+      const foundRing = el.querySelector(":scope > .chip-ring");
+      const ringEl = foundRing instanceof HTMLElement ? foundRing : document.createElement("div");
+      if (ringEl.parentElement !== el) {
+        ringEl.className = "chip-ring";
+        ringEl.setAttribute("aria-hidden", "true");
+      }
+      ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, slot.stroke ?? 4)}px ${fill}`;
+      mountLookChild(el, ringEl);
+    }
+    return;
+  }
+
+  if (slot.kind === "image" && slot.video) {
+    el.classList.add("chip-image", "chip-video");
+    el.classList.remove("chip-bare", "chip-emoji", "chip-youtube");
+    el.style.webkitMaskImage = "";
+    el.style.maskImage = "";
+    for (const node of [...el.childNodes]) {
+      if (node.nodeType === Node.TEXT_NODE) node.remove();
+    }
+    if (bloom) {
+      stripLookChildren(el);
+      el.style.backgroundColor = "#111";
+      return;
+    }
+
+    const loading = !slot.video.ready;
+    const foundVid = el.querySelector(":scope > video.chip-video__frame");
+    const video = foundVid instanceof HTMLVideoElement ? foundVid : document.createElement("video");
+    stripLookChildren(el, loading ? null : video);
+
+    if (loading) {
+      el.style.backgroundColor = "#111";
+      mountMediaLoader(el);
+    } else {
+      el.style.backgroundColor = "transparent";
+      if (video.dataset.videoSrc !== slot.video.src) {
+        video.dataset.videoSrc = slot.video.src;
+        video.src = slot.video.src;
+      }
+      video.className = "chip-video__frame";
+      video.muted = true;
+      video.defaultMuted = true;
+      video.autoplay = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.disablePictureInPicture = true;
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+      video.controls = false;
+      video.style.borderRadius = `${radius}px`;
+      mountLookChild(el, video);
+      void video.play().catch(() => {
+        /* autoplay can fail until a gesture; muted usually ok */
+      });
+    }
+
+    if (rasterRing(slot)) {
+      const foundRing = el.querySelector(":scope > .chip-ring");
+      const ringEl = foundRing instanceof HTMLElement ? foundRing : document.createElement("div");
+      if (ringEl.parentElement !== el) {
+        ringEl.className = "chip-ring";
+        ringEl.setAttribute("aria-hidden", "true");
+      }
+      ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, slot.stroke ?? 4)}px ${fill}`;
+      mountLookChild(el, ringEl);
+    }
+    return;
+  }
+
   if (slot.emoji) {
     el.classList.add("chip-emoji");
-    el.classList.remove("chip-image", "chip-bare");
+    el.classList.remove("chip-image", "chip-bare", "chip-youtube", "chip-video");
     el.style.webkitMaskImage = "";
     el.style.maskImage = "";
     el.style.fontFamily = EMOJI_FONT;
@@ -430,7 +551,7 @@ export function applyVisual(
 
   const src = peekTrim(slot.src)?.displaySrc ?? slot.src;
   el.classList.add("chip-image");
-  el.classList.remove("chip-bare", "chip-emoji");
+  el.classList.remove("chip-bare", "chip-emoji", "chip-youtube", "chip-video");
   // Drop any leftover emoji text node.
   for (const node of [...el.childNodes]) {
     if (node.nodeType === Node.TEXT_NODE) node.remove();

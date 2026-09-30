@@ -16,6 +16,7 @@ import {
 import { textAnimSpeedOf } from "../textAnim";
 import { playCreate, playTransition } from "../uiSounds";
 import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
+import { YOUTUBE_LOOP_MAX, YOUTUBE_LOOP_MIN } from "../youtube";
 
 const DUPLICATE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="4" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="4" y="9" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>`;
 
@@ -76,7 +77,10 @@ export type SlotCardHost = {
   isRasterUpload(slot: ImageSlot): boolean;
   colliderOf(slot: ImageSlot): string;
   isImageFile(file: File): boolean;
+  isMediaFile(file: File): boolean;
+  isVideoFile(file: File): boolean;
   assignImageFile(slot: ImageSlot, file: File): Promise<void>;
+  assignVideoFile(slot: ImageSlot, file: File): Promise<void>;
   slotScaleSliderMax(slot: Slot): number;
   escapeAttr(value: string): string;
   IMAGE_FILE_ACCEPT: string;
@@ -108,6 +112,8 @@ export function renderSlotCard(slot: Slot, host?: SlotCardHost): HTMLElement {
 
   if (slot.kind === "text") {
     card.append(textFields(slot, open));
+  } else if (slot.youtube || slot.video) {
+    card.append(slot.youtube ? youtubeFields(slot, open) : videoFields(slot, open));
   } else if (H.uploadedShape(slot)) {
     card.append(photoFields(slot, open));
   } else {
@@ -234,7 +240,13 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
   } else {
     const mark = document.createElement("span");
     mark.className = "slot-mark";
-    if (slot.emoji) {
+    if (slot.youtube) {
+      mark.classList.add("slot-mark--image");
+      mark.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-5.8zM9.75 15.5v-7l6.5 3.5-6.5 3.5z"/></svg>`;
+    } else if (slot.video) {
+      mark.classList.add("slot-mark--image");
+      mark.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17 10.5V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3.5l4 4v-11l-4 4z"/></svg>`;
+    } else if (slot.emoji) {
       mark.textContent = slot.emoji;
     } else if (H.uploadedShape(slot)) {
       mark.classList.add("slot-mark--image");
@@ -244,7 +256,7 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
     }
     const title = document.createElement("span");
     title.className = "slot-title";
-    const named = Boolean(slot.emoji || slot.src);
+    const named = Boolean(slot.youtube || slot.video || slot.emoji || slot.src);
     title.textContent = named ? slot.name : "Empty";
     if (!named) title.classList.add("is-empty");
     else title.dataset.tip = slot.name;
@@ -628,6 +640,122 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
   return wrap;
 }
 
+function youtubeFields(slot: ImageSlot, open: boolean): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "slot-body";
+  wrap.append(slotHead(slot, open));
+  const editor = document.createElement("div");
+  editor.className = "slot-editor";
+  const loopSec = slot.youtube?.loopSec ?? 10;
+  editor.innerHTML = `
+    <label class="field">${H.settingLabel(slot, "Loop length", "loopSec", `${loopSec}s`)}
+      <input type="range" data-youtube-loop min="${YOUTUBE_LOOP_MIN}" max="${YOUTUBE_LOOP_MAX}" step="1" value="${loopSec}" />
+    </label>
+    <div class="check-row">
+      <label class="check">
+        ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
+        Stroked
+      </label>
+      ${H.resetControl("Stroked", "stroked", H.fieldDirty(slot, "stroked"))}
+    </div>
+    ${
+      slot.stroked
+        ? `<label class="field">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
+      <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke ?? 4}" />
+    </label>
+    <div class="field">${H.settingLabel(slot, "Stroke color", "color")}
+      ${H.tintRow(slot, "Stroke color")}
+    </div>`
+        : ""
+    }
+    <label class="field">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
+      <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
+    </label>
+    <label class="field">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
+      <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+    </label>
+  `;
+  placeFold(wrap, editor, open);
+
+  const loopInput = editor.querySelector<HTMLInputElement>("[data-youtube-loop]");
+  loopInput?.addEventListener("input", () => {
+    if (!slot.youtube || !loopInput) return;
+    H.remember(`slot:${slot.id}:loopSec`);
+    const next = Math.max(YOUTUBE_LOOP_MIN, Math.min(YOUTUBE_LOOP_MAX, Math.round(Number(loopInput.value))));
+    slot.youtube = { ...slot.youtube, loopSec: next };
+    const min = Number(loopInput.min) || 0;
+    const max = Number(loopInput.max) || 100;
+    loopInput.style.setProperty("--pct", `${((next - min) / (max - min || 1)) * 100}%`);
+    const caption = loopInput.closest("label")?.querySelector("[data-range-label]");
+    if (caption) caption.textContent = `Loop length ${next}s`;
+    H.live();
+  });
+  if (loopInput) {
+    const min = Number(loopInput.min) || 0;
+    const max = Number(loopInput.max) || 100;
+    loopInput.style.setProperty("--pct", `${((Number(loopInput.value) - min) / (max - min || 1)) * 100}%`);
+  }
+
+  if (slot.stroked) H.bindTint(editor, slot);
+  H.bindSlotInputs(editor, slot);
+  return wrap;
+}
+
+function videoFields(slot: ImageSlot, open: boolean): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "slot-body";
+  wrap.append(slotHead(slot, open));
+  const editor = document.createElement("div");
+  editor.className = "slot-editor";
+  editor.innerHTML = `
+    <div class="check-row">
+      <label class="check">
+        ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
+        Stroked
+      </label>
+      ${H.resetControl("Stroked", "stroked", H.fieldDirty(slot, "stroked"))}
+    </div>
+    ${
+      slot.stroked
+        ? `<label class="field">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
+      <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke ?? 4}" />
+    </label>
+    <div class="field">${H.settingLabel(slot, "Stroke color", "color")}
+      ${H.tintRow(slot, "Stroke color")}
+    </div>`
+        : ""
+    }
+    <label class="field">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
+      <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
+    </label>
+    <label class="field">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
+      <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+    </label>
+    ${videoReplaceControl(slot)}
+  `;
+  placeFold(wrap, editor, open);
+
+  if (slot.stroked) H.bindTint(editor, slot);
+  editor.querySelector<HTMLInputElement>("[data-file]")?.addEventListener("change", (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file || !H.isMediaFile(file)) return;
+    H.remember();
+    playCreate();
+    // Show loader on canvas while a heavy replacement buffers.
+    if (H.isVideoFile(file) && slot.video) {
+      slot.video = { ...slot.video, ready: false };
+      H.live();
+    }
+    const job = H.isVideoFile(file) ? H.assignVideoFile(slot, file) : H.assignImageFile(slot, file);
+    void job.then(() => {
+      H.renderPanel();
+      H.live();
+    });
+  });
+  H.bindSlotInputs(editor, slot);
+  return wrap;
+}
+
 function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "slot-body";
@@ -733,10 +861,11 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
   if (canTint || (H.isRasterUpload(slot) && slot.stroked)) H.bindTint(editor, slot);
   editor.querySelector<HTMLInputElement>("[data-file]")?.addEventListener("change", (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file || !H.isImageFile(file)) return;
+    if (!file || !H.isMediaFile(file)) return;
     H.remember();
     playCreate();
-    void H.assignImageFile(slot, file).then(() => {
+    const job = H.isVideoFile(file) ? H.assignVideoFile(slot, file) : H.assignImageFile(slot, file);
+    void job.then(() => {
       H.renderPanel();
       H.live();
     });
@@ -781,6 +910,20 @@ function photoReplaceControl(slot: ImageSlot): string {
   return `<label class="field file-replace">
     <span class="field-label"><span>Replace image</span>${H.resetControl("Image", "icon", H.fieldDirty(slot, "icon"))}</span>
     <span class="file-replace__btn" style="background-image:url(&quot;${H.escapeAttr(src)}&quot;)" data-tip="${H.escapeAttr(slot.name)}">
+      <span class="file-replace__text">Replace</span>
+    </span>
+    <input type="file" class="file-replace__input" accept="${H.IMAGE_FILE_ACCEPT}" data-file />
+  </label>`;
+}
+
+function videoReplaceControl(slot: ImageSlot): string {
+  const poster = slot.video?.poster;
+  const thumb = poster
+    ? ` style="background-image:url(&quot;${H.escapeAttr(poster)}&quot;)"`
+    : "";
+  return `<label class="field file-replace">
+    <span class="field-label"><span>Replace video</span></span>
+    <span class="file-replace__btn${poster ? "" : " file-replace__btn--video"}"${thumb} data-tip="${H.escapeAttr(slot.name)}">
       <span class="file-replace__text">Replace</span>
     </span>
     <input type="file" class="file-replace__input" accept="${H.IMAGE_FILE_ACCEPT}" data-file />
