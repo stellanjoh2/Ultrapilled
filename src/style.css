@@ -172,19 +172,19 @@ body,
 
 .app-intro.is-ready .app-intro__gif {
   animation:
-    app-intro-opacity 2.25s ease-out forwards,
-    app-intro-scale 2s ease-out forwards;
+    app-intro-opacity 2s ease-out forwards,
+    app-intro-scale 1.75s ease-out forwards;
 }
 
-/* Fade in 0.2s, hold through the gif, fade to black over the last 0.25s. */
+/* Fade in 0.2s, hold through the gif, fade out over the last 0.25s. */
 @keyframes app-intro-opacity {
   0% {
     opacity: 0;
   }
-  8.888% {
+  10% {
     opacity: 1;
   }
-  88.888% {
+  87.5% {
     opacity: 1;
   }
   100% {
@@ -199,6 +199,61 @@ body,
   to {
     transform: scale(0.5);
   }
+}
+
+/* Centered splash wordmark — 50vw ≈ 1280px on a 2560 display. */
+.app-intro__logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: 50vw;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.app-intro__logo-scale {
+  width: 100%;
+  transform-origin: center center;
+}
+
+.app-intro__logo-layer {
+  width: 100%;
+  line-height: 0;
+}
+
+.app-intro__logo-layer .logotype__mark {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.app-intro__logo-layer--white {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+}
+
+.app-intro__logo-layer--lime {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+}
+
+.app-intro__logo-layer--purple .logotype__glyph,
+.app-intro__logo-layer--purple .logotype__pill {
+  fill: #3b00ff;
+}
+
+.app-intro__logo-layer--lime .logotype__glyph,
+.app-intro__logo-layer--lime .logotype__pill {
+  fill: #c4ff00;
+}
+
+.app-intro__logo-layer--white .logotype__glyph,
+.app-intro__logo-layer--white .logotype__pill {
+  fill: #ffffff;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5496,7 +5551,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 .mode-select__vibe {
-  mix-blend-mode: normal;
+  mix-blend-mode: difference;
 }
 
 .mode-select__rest {
