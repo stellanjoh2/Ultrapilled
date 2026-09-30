@@ -12,13 +12,17 @@ const VISIBLE = "inset(0% 0% 0% 0%)";
 const HIDDEN_RIGHT = "inset(0% 0% 0% 100%)";
 
 /** Three stacked wordmarks for the purple → lime → white mask. */
-export function logotypeRevealMarkup(): string {
+export function logotypeRevealMarkup(opts: { glow?: boolean } = {}): string {
+  const glow = opts.glow
+    ? `<div class="logotype-reveal__glow" aria-hidden="true">${LOGOTYPE_MARK_SVG}</div>`
+    : "";
   return `
     <div class="logotype-reveal">
       <div class="logotype-reveal__scale">
         <div class="logotype-reveal__layer logotype-reveal__layer--purple">${LOGOTYPE_MARK_SVG}</div>
         <div class="logotype-reveal__layer logotype-reveal__layer--lime">${LOGOTYPE_MARK_SVG}</div>
         <div class="logotype-reveal__layer logotype-reveal__layer--white">${LOGOTYPE_MARK_SVG}</div>
+        ${glow}
       </div>
     </div>
   `;
@@ -42,6 +46,7 @@ export function playLogotypeReveal(root: HTMLElement, opts: LogotypeRevealOpts =
   const purple = root.querySelector<HTMLElement>(".logotype-reveal__layer--purple");
   const lime = root.querySelector<HTMLElement>(".logotype-reveal__layer--lime");
   const white = root.querySelector<HTMLElement>(".logotype-reveal__layer--white");
+  const glow = root.querySelector<HTMLElement>(".logotype-reveal__glow");
   if (!scaleEl || !purple || !lime || !white) return Promise.resolve();
 
   const layers = [purple, lime, white];
@@ -54,9 +59,11 @@ export function playLogotypeReveal(root: HTMLElement, opts: LogotypeRevealOpts =
   const totalS = maskOut
     ? revealS + holdS + LOGOTYPE_REVEAL_STAGGER_S * 2 + LOGOTYPE_REVEAL_MASK_S
     : revealS;
+  const whiteAt = LOGOTYPE_REVEAL_STAGGER_S * 2;
 
   return new Promise((resolve) => {
     gsap.set(layers, { clipPath: HIDDEN_LEFT });
+    if (glow) gsap.set(glow, { opacity: 0 });
     if (scaleFrom != null) gsap.set(scaleEl, { scale: scaleFrom });
 
     const tl = gsap.timeline({
@@ -64,6 +71,7 @@ export function playLogotypeReveal(root: HTMLElement, opts: LogotypeRevealOpts =
         if (maskOut) {
           gsap.set(scaleEl, { clearProps: "transform" });
           gsap.set(layers, { clearProps: "clipPath" });
+          if (glow) gsap.set(glow, { clearProps: "opacity" });
         }
         resolve();
       },
@@ -75,12 +83,19 @@ export function playLogotypeReveal(root: HTMLElement, opts: LogotypeRevealOpts =
 
     tl.to(purple, { clipPath: VISIBLE, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, 0);
     tl.to(lime, { clipPath: VISIBLE, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, LOGOTYPE_REVEAL_STAGGER_S);
-    tl.to(white, { clipPath: VISIBLE, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, LOGOTYPE_REVEAL_STAGGER_S * 2);
+    tl.to(white, { clipPath: VISIBLE, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, whiteAt);
+    // Unclipped glow sits above the wipe — fade with the white layer.
+    if (glow) {
+      tl.to(glow, { opacity: 0.5, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, whiteAt);
+    }
 
     if (!maskOut) return;
 
     const outAt = revealS + holdS;
     tl.to(white, { clipPath: HIDDEN_RIGHT, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, outAt);
+    if (glow) {
+      tl.to(glow, { opacity: 0, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, outAt);
+    }
     tl.to(lime, { clipPath: HIDDEN_RIGHT, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, outAt + LOGOTYPE_REVEAL_STAGGER_S);
     tl.to(purple, { clipPath: HIDDEN_RIGHT, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, outAt + LOGOTYPE_REVEAL_STAGGER_S * 2);
   });

@@ -134,7 +134,7 @@ app.innerHTML = `
     <div class="app-intro" id="app-intro" aria-hidden="true">
       <img class="app-intro__gif" alt="" width="300" height="300" />
       <div class="app-intro__logo" aria-hidden="true">
-        ${logotypeRevealMarkup()}
+        ${logotypeRevealMarkup({ glow: true })}
       </div>
     </div>
     <div class="stage" id="stage">
@@ -4204,12 +4204,13 @@ const INTRO_MS = 2000;
 const INTRO_PILL_SCALE_S = 1.75;
 const INTRO_PILL_SCALE_FROM = 1;
 const INTRO_PILL_SCALE_TO = 0.5;
+const INTRO_PILL_SCALE_EASE = "circ.out";
 const INTRO_SRC = "/images/intropill.gif";
 /** Left→right wipe timings live in logotypeReveal.ts — hold is intro-only. */
 const INTRO_LOGO_HOLD_S = 1;
-const INTRO_LOGO_SCALE_FROM = 1.4;
-const INTRO_LOGO_SCALE_TO = 0.95;
-const INTRO_LOGO_SCALE_EASE = "expo.out";
+const INTRO_LOGO_SCALE_FROM = 1.5;
+const INTRO_LOGO_SCALE_TO = 1;
+const INTRO_LOGO_SCALE_EASE = "circ.inOut";
 let introActive = true;
 /** Flips true when boot finishes and the main UI is revealed — logo stays white until then. */
 let logotypeLive = false;
@@ -4317,7 +4318,7 @@ async function startIntro() {
     gsap.fromTo(
       img,
       { scale: INTRO_PILL_SCALE_FROM },
-      { scale: INTRO_PILL_SCALE_TO, duration: INTRO_PILL_SCALE_S, ease: INTRO_LOGO_SCALE_EASE },
+      { scale: INTRO_PILL_SCALE_TO, duration: INTRO_PILL_SCALE_S, ease: INTRO_PILL_SCALE_EASE },
     );
   }
   await new Promise<void>((resolve) => {

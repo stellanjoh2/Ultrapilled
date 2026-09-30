@@ -11,7 +11,7 @@ export type AppMode = "physics" | "layout";
 
 const PHYSICS_SRC = "/media/Mode-Select-Physics.mp4";
 const LAYOUT_SRC = "/media/Mode-Select-Static.webp";
-/** Orby Lime accent on "Choose your vibe." */
+/** Orby Lime accent on "Choose your vibe:" */
 const VIBE_ACCENT = DEFAULT_THEME[1];
 
 function reducedMotion(): boolean {
@@ -29,14 +29,14 @@ function appendWords(parent: HTMLElement, words: string[]) {
 }
 
 /**
- * Build the headline so "Choose your vibe." is a solid Orby Lime accent,
+ * Build the headline so "Choose your vibe:" is a solid Orby Lime accent,
  * with the remaining copy still word-split for the fade-up stagger.
  */
 function fillHeadline(el: HTMLElement) {
   el.replaceChildren();
   const vibe = document.createElement("span");
   vibe.className = "mode-select__word mode-select__vibe";
-  vibe.textContent = "Choose your vibe.";
+  vibe.textContent = "Choose your vibe:";
   vibe.style.color = VIBE_ACCENT;
 
   const rest = document.createElement("span");
@@ -45,7 +45,7 @@ function fillHeadline(el: HTMLElement) {
   rest.append(document.createElement("br"));
   appendWords(rest, ["unusable", "but", "very", "fun,", "or", "calm"]);
   rest.append(document.createElement("br"));
-  appendWords(rest, ["and", "composed", "and", "fun:"]);
+  appendWords(rest, ["and", "composed", "and", "fun."]);
 
   el.append(vibe, document.createTextNode(" "), rest);
 }
@@ -347,9 +347,9 @@ export function askModeSelect(): Promise<AppMode> {
     mark.classList.add("is-revealing");
     void (async () => {
       await playLogotypeReveal(mark, {
-        scaleFrom: 1.7,
+        scaleFrom: 5,
         scaleTo: 1,
-        scaleEase: "expo.out",
+        scaleEase: "power3.out",
       });
       mark.classList.remove("is-revealing");
 

@@ -205,18 +205,21 @@ body,
 /* Shared purple → lime → white mask layers (intro + mode select). */
 .logotype-reveal {
   width: 100%;
+  overflow: visible;
 }
 
 .logotype-reveal__scale {
   position: relative;
   width: 100%;
   transform-origin: center center;
+  overflow: visible;
 }
 
 .logotype-reveal__layer {
   width: 100%;
   line-height: 0;
   clip-path: inset(0% 100% 0% 0%);
+  overflow: visible;
 }
 
 .logotype-reveal__layer .logotype__mark {
@@ -244,6 +247,47 @@ body,
 
 .logotype-reveal__layer--white .logotype__glyph,
 .logotype-reveal__layer--white .logotype__pill {
+  fill: #ffffff;
+}
+
+/* Glow lives outside the wipe clip — only used on the boot splash. */
+.logotype-reveal__glow {
+  display: none;
+}
+
+.app-intro__logo .logotype-reveal__glow {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  line-height: 0;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(24px);
+  overflow: visible;
+}
+
+.app-intro__logo .logotype-reveal__layer--purple,
+.app-intro__logo .logotype-reveal__layer--lime,
+.app-intro__logo .logotype-reveal__layer--white {
+  position: relative;
+  z-index: 1;
+}
+
+.app-intro__logo .logotype-reveal__layer--lime,
+.app-intro__logo .logotype-reveal__layer--white {
+  position: absolute;
+}
+
+.app-intro__logo .logotype-reveal__glow .logotype__mark {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.app-intro__logo .logotype-reveal__glow .logotype__glyph,
+.app-intro__logo .logotype-reveal__glow .logotype__pill {
   fill: #ffffff;
 }
 
@@ -5499,6 +5543,12 @@ html[data-theme="day"] .settings-modal__body .keycap {
 .mode-select__mark .logotype-reveal,
 .mode-select__mark .logotype-reveal__scale {
   position: relative;
+  overflow: visible;
+}
+
+/* Scale from the resting anchor so oversized starts grow into the viewport. */
+.mode-select__mark .logotype-reveal__scale {
+  transform-origin: left top;
 }
 
 .mode-select__upper,
@@ -5672,7 +5722,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-reconnect);
+  border-radius: var(--radius-panel);
   overflow: hidden;
   background: #1a1a1a;
   transform-origin: center top;
