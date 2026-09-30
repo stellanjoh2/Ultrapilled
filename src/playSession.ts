@@ -6,8 +6,6 @@ export type PlayPhase = "idle" | "preparing" | "falling" | "holding" | "dumping"
 const MIN_CYCLE_MS = 1200;
 /** Extra ease time after motion is low before locking the hold pose. */
 const SETTLE_CONFIRM_MS = 1600;
-/** Force hold if the pile never fully sleeps (micro-motion / friction slides). */
-const MAX_FALL_MS = 7000;
 const PLAY_IDLE_MS = 3000;
 
 export type PlaySessionHost = {
@@ -226,12 +224,13 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
       if (phase === "falling") {
         const elapsed = now - droppedAt;
         // Clock starts when motion is low; freeze only once fully asleep so the last ease isn't cut.
+        // Freeze only once Matter has actually slept the pile — never on a wall-clock cut.
         const settledLongEnough =
           elapsed >= MIN_CYCLE_MS &&
           settledSince !== 0 &&
           now - settledSince >= SETTLE_CONFIRM_MS &&
           host.world.isQuiet();
-        if (settledLongEnough || elapsed >= MAX_FALL_MS) {
+        if (settledLongEnough) {
           phase = "holding";
           holdStarted = now;
           host.world.freezePile();
