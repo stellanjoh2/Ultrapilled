@@ -14,6 +14,33 @@ const LAYOUT_SRC = "/media/Mode-Select-Static.webp";
 /** Orby Lime accent on "Choose your vibe:" */
 const VIBE_ACCENT = DEFAULT_THEME[1];
 
+/** Keep preloaded media alive so the browser doesn't drop the cache entry. */
+let modeSelectVideoWarm: HTMLVideoElement | null = null;
+let modeSelectImageWarm: HTMLImageElement | null = null;
+
+/** Start fetching Mode Select thumbs ASAP (idempotent). */
+export function preloadModeSelectMedia() {
+  if (modeSelectImageWarm && modeSelectVideoWarm) return;
+
+  if (!modeSelectImageWarm) {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = LAYOUT_SRC;
+    modeSelectImageWarm = img;
+  }
+
+  if (!modeSelectVideoWarm) {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    video.src = PHYSICS_SRC;
+    video.load();
+    modeSelectVideoWarm = video;
+  }
+}
+
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }

@@ -63,7 +63,7 @@ import {
 import { checkInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
-import { askModeSelect, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
+import { askModeSelect, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
@@ -98,6 +98,7 @@ import {
 import { createPlaySession, type PlaySession } from "./playSession";
 
 syncUiScale();
+preloadModeSelectMedia();
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (!appRoot) throw new Error("#app missing");
@@ -4287,6 +4288,9 @@ async function playIntroLogotype(intro: HTMLElement): Promise<void> {
 }
 
 async function startIntro() {
+  // Mode Select thumbs — start while the intro gif still has the screen.
+  preloadModeSelectMedia();
+
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const intro = app.querySelector<HTMLElement>("#app-intro");
   if (reduceMotion || !intro) {
