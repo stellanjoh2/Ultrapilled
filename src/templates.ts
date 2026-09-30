@@ -1,4 +1,5 @@
 import { ICON_PRESETS } from "./icons";
+import { modeSelectPreviewState, MODE_SELECT_THEME_ID } from "./modeSelectTheme";
 import { DEFAULT_THEME } from "./theme";
 import {
   DEFAULT_PHYSICS,
@@ -13,13 +14,14 @@ import {
   type TextSlot,
 } from "./types";
 
-export type TemplateId = "acid" | "new-york" | "miami" | "berlin";
+export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | typeof MODE_SELECT_THEME_ID;
 
 export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }[] = [
   { id: "acid", label: "London", build: acidState },
   { id: "new-york", label: "New York", build: newYorkState },
   { id: "miami", label: "Miami", build: miamiState },
   { id: "berlin", label: "Berlin", build: berlinState },
+  { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
 ];
 
 export function templateLabel(id: string | undefined): string | undefined {

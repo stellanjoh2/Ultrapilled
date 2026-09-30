@@ -1,9 +1,8 @@
 import gsap from "gsap";
 import { backgroundPaint } from "./background";
-import { styleBareTextCss } from "./chipDomPaint";
-import { DEFAULT_GRADIENT_ANGLE } from "./pillFill";
 import { createPlaySession } from "./playSession";
 import { modeSelectPreviewState } from "./modeSelectTheme";
+import { LOGOTYPE_MARK_SVG } from "./logotypeMark";
 import { DEFAULT_THEME } from "./theme";
 import { playClick, playNotify } from "./uiSounds";
 import { createWorld } from "./world";
@@ -12,9 +11,8 @@ export type AppMode = "physics" | "layout";
 
 const PHYSICS_SRC = "/media/Mode-Select-Physics.mp4";
 const LAYOUT_SRC = "/media/Mode-Select-Static.webp";
-/** Orby Lime → White — same sweep as in-app animated text gradients. */
-const VIBE_FROM = DEFAULT_THEME[1];
-const VIBE_TO = DEFAULT_THEME[0];
+/** Orby Lime accent on "Choose your vibe." */
+const VIBE_ACCENT = DEFAULT_THEME[1];
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -31,7 +29,7 @@ function appendWords(parent: HTMLElement, words: string[]) {
 }
 
 /**
- * Build the headline so "Choose your vibe." is one continuous gradient host,
+ * Build the headline so "Choose your vibe." is a solid Orby Lime accent,
  * with the remaining copy still word-split for the fade-up stagger.
  */
 function fillHeadline(el: HTMLElement) {
@@ -39,12 +37,17 @@ function fillHeadline(el: HTMLElement) {
   const vibe = document.createElement("span");
   vibe.className = "mode-select__word mode-select__vibe";
   vibe.textContent = "Choose your vibe.";
-  el.append(vibe, document.createTextNode(" "));
-  appendWords(el, ["Completely"]);
-  el.append(document.createElement("br"));
-  appendWords(el, ["unusable", "but", "very", "fun,", "or", "calm"]);
-  el.append(document.createElement("br"));
-  appendWords(el, ["and", "composed."]);
+  vibe.style.color = VIBE_ACCENT;
+
+  const rest = document.createElement("span");
+  rest.className = "mode-select__rest";
+  appendWords(rest, ["Completely"]);
+  rest.append(document.createElement("br"));
+  appendWords(rest, ["unusable", "but", "very", "fun,", "or", "calm"]);
+  rest.append(document.createElement("br"));
+  appendWords(rest, ["and", "composed", "and", "fun:"]);
+
+  el.append(vibe, document.createTextNode(" "), rest);
 }
 
 function paintPreviewBackdrop(stage: HTMLElement, playfield: HTMLElement, state: ReturnType<typeof modeSelectPreviewState>) {
@@ -57,12 +60,23 @@ function paintPreviewBackdrop(stage: HTMLElement, playfield: HTMLElement, state:
   playfield.style.backgroundRepeat = paint.repeat;
 }
 
+let hostEl: HTMLElement | null = null;
 let previewCleanup: (() => void) | null = null;
+
+function ensureHost(): HTMLElement {
+  if (hostEl) return hostEl;
+  const host = document.createElement("div");
+  host.className = "mode-select-host";
+  document.body.append(host);
+  hostEl = host;
+  return host;
+}
 
 /** Silent looping physics behind intro + mode gate. Idempotent. */
 export function warmModeSelectPreview() {
   if (previewCleanup || reducedMotion()) return;
 
+  const host = ensureHost();
   const wrap = document.createElement("div");
   wrap.className = "mode-select-preview";
   wrap.setAttribute("aria-hidden", "true");
@@ -81,7 +95,7 @@ export function warmModeSelectPreview() {
       </div>
     </div>
   `;
-  document.body.append(wrap);
+  host.prepend(wrap);
 
   const state = modeSelectPreviewState();
   const stage = wrap.querySelector<HTMLElement>(".mode-select-preview__stage")!;
@@ -162,7 +176,8 @@ export function warmModeSelectPreview() {
     window.removeEventListener("resize", onResize);
     session.setRunning(false);
     world.destroy();
-    wrap.remove();
+    hostEl?.remove();
+    hostEl = null;
     previewCleanup = null;
   };
 }
@@ -170,12 +185,18 @@ export function warmModeSelectPreview() {
 /** Tear down the early preview (call when revealing the real app UI). */
 export function stopModeSelectPreview() {
   previewCleanup?.();
+  if (hostEl) {
+    hostEl.remove();
+    hostEl = null;
+  }
 }
 
 /** First-run mode gate. Resolves with the chosen mode after the overlay exits. */
 export function askModeSelect(): Promise<AppMode> {
   return new Promise((resolve) => {
     warmModeSelectPreview();
+    const host = ensureHost();
+    host.classList.add("is-gate");
 
     const root = document.createElement("div");
     root.className = "mode-select";
@@ -183,7 +204,7 @@ export function askModeSelect(): Promise<AppMode> {
     root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-labelledby", "mode-select-title");
     root.innerHTML = `
-      <p class="mode-select__mark logotype" aria-hidden="true">Ultrapilled</p>
+      <div class="mode-select__mark logotype" aria-hidden="true">${LOGOTYPE_MARK_SVG}</div>
       <div class="mode-select__upper" aria-hidden="true"></div>
       <div class="mode-select__inner">
         <h1 class="mode-select__headline" id="mode-select-title"></h1>
@@ -226,13 +247,14 @@ export function askModeSelect(): Promise<AppMode> {
       </div>
     `;
 
+    const mark = root.querySelector<HTMLElement>(".mode-select__mark")!;
     const headline = root.querySelector<HTMLElement>(".mode-select__headline")!;
     fillHeadline(headline);
-    const vibe = headline.querySelector<HTMLElement>(".mode-select__vibe")!;
-    styleBareTextCss(vibe, VIBE_FROM, VIBE_TO, DEFAULT_GRADIENT_ANGLE, undefined, true);
     const words = [...headline.querySelectorAll<HTMLElement>(".mode-select__word")];
     const cards = [...root.querySelectorAll<HTMLButtonElement>(".mode-select__card")];
+    const foot = root.querySelector<HTMLElement>(".mode-select__foot")!;
     const video = root.querySelector<HTMLVideoElement>(".mode-select__video");
+    const ink = [mark, headline, ...root.querySelectorAll<HTMLElement>(".mode-select__name, .mode-select__desc")];
 
     let settled = false;
     const finish = (mode: AppMode) => {
@@ -244,6 +266,7 @@ export function askModeSelect(): Promise<AppMode> {
       const done = () => {
         video?.pause();
         root.remove();
+        host.classList.remove("is-gate");
         resolve(mode);
       };
 
@@ -252,15 +275,15 @@ export function askModeSelect(): Promise<AppMode> {
         return;
       }
 
+      // Fade UI only — never opacity on a parent shared with the preview (breaks difference).
       const tl = gsap.timeline({ onComplete: done });
-      tl.to([headline, ...cards], {
+      tl.to([mark, headline, ...cards, foot], {
         autoAlpha: 0,
         y: 10,
         duration: 0.22,
         stagger: 0.04,
         ease: "power2.in",
       }, 0);
-      tl.to(root, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0.06);
     };
 
     const onKey = (event: KeyboardEvent) => {
@@ -289,26 +312,30 @@ export function askModeSelect(): Promise<AppMode> {
       finish(card.dataset.mode as AppMode);
     });
 
-    document.body.append(root);
+    host.append(root);
     window.addEventListener("keydown", onKey);
     cards[0]?.focus({ preventScroll: true });
 
     void video?.play().catch(() => {});
 
-    gsap.set(root, { autoAlpha: 0 });
-    gsap.set(words, { autoAlpha: 0, y: 22 });
-    gsap.set(cards, { autoAlpha: 0, y: 22 });
+    // Animate pieces — clear opacity/transform after so mix-blend-mode can reach the preview.
+    const clearBlend = "opacity,visibility,transform";
+    gsap.set([mark, ...words, ...cards, foot], { autoAlpha: 0, y: 22 });
 
     if (reducedMotion()) {
-      gsap.set([root, ...words, ...cards], { clearProps: "all", autoAlpha: 1, y: 0 });
+      gsap.set([mark, ...words, ...cards, foot], { clearProps: "all", autoAlpha: 1, y: 0 });
       return;
     }
 
-    const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06 };
+    const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend };
     const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-    tl.to(root, { autoAlpha: 1, duration: 0.35 }, 0);
+    tl.to(mark, { autoAlpha: 1, y: 0, duration: 0.45, clearProps: clearBlend }, 0);
     tl.to(words, reveal, 0.08);
-    // Drop GSAP transform so CSS hover scale isn’t fighting an inline matrix.
-    tl.to(cards, { ...reveal, clearProps: "transform" }, ">");
+    tl.to(cards, reveal, ">");
+    tl.to(foot, { autoAlpha: 1, y: 0, duration: 0.4, clearProps: clearBlend }, "<0.1");
+    // Ensure ink nodes are fully clear of GSAP opacity after the timeline.
+    tl.add(() => {
+      gsap.set(ink, { clearProps: clearBlend });
+    });
   });
 }

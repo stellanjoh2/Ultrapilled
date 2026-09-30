@@ -31,11 +31,12 @@ import {
 import { isMicActive, sampleOnset, startMic, stopMic } from "./audioReact";
 import { activateFamily, localWeights, queryLocalCatalog } from "./localFonts";
 import { closeBackgroundUi, mountBackgroundPanel } from "./backgroundPanel";
-import { backgroundImage, backgroundPaint, gridDivisions, logoFill, logoSize, isSvgLogo } from "./background";
+import { backgroundImage, backgroundPaint, gridDivisions, logoBackdropColor, logoFill, logoSize, isSvgLogo } from "./background";
 import { mountColorPicker } from "./colorPicker";
 import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
 import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
-import { pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
+import { inkOn, logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
+import { LOGOTYPE_MARK_SVG } from "./logotypeMark";
 import { mountProTip, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
@@ -161,7 +162,10 @@ app.innerHTML = `
       </div>
     </div>
     <header class="topbar">
-      <h1 class="logotype">Ultrapilled</h1>
+      <h1 class="logotype">
+        <span class="logotype__label">Ultrapilled</span>
+        ${LOGOTYPE_MARK_SVG}
+      </h1>
     </header>
     <aside class="dev-panel" id="dev-panel" hidden>
       <h2 class="dev-panel__title">Dev</h2>
@@ -301,6 +305,7 @@ const themeShelf = createThemeShelf({
       slot.textColor = undefined;
       slot.textColorIndex = undefined;
     }
+    syncLogotypeAccent();
     applyLogo();
     live();
     revealTheme = true;
@@ -864,6 +869,7 @@ function applyBackground() {
   playfield.style.backgroundRepeat = paint.repeat;
   applyGrid();
   applyLogo();
+  syncLogotypeAccent();
 }
 
 function applyGrid() {
@@ -2165,6 +2171,7 @@ function openThemeSwatch(btn: HTMLButtonElement) {
         }
       }
       themeShelf.refresh();
+      syncLogotypeAccent();
       applyLogo();
       live();
     },
@@ -4192,6 +4199,22 @@ const devPanel = app.querySelector<HTMLElement>("#dev-panel")!;
 const INTRO_MS = 2250;
 const INTRO_SRC = "/images/intropill.gif";
 let introActive = true;
+/** Flips true when boot finishes and the main UI is revealed — logo stays white until then. */
+let logotypeLive = false;
+
+/**
+ * Pill → readable theme accent once live (skips fills that match the backdrop).
+ * Glyphs → white/black via inkOn (luminance > 0.55 → dark) against the stage/backdrop.
+ * Load sequence keeps everything white.
+ */
+function syncLogotypeAccent() {
+  const backdrop = logoBackdropColor(state.background, state.stageColor);
+  const pill = logotypeLive ? logotypePillColor(state.theme, backdrop) : "#ffffff";
+  const ink = logotypeLive ? inkOn(backdrop) : "#ffffff";
+  document.documentElement.style.setProperty("--logotype-pill", pill);
+  document.documentElement.style.setProperty("--logotype-ink", ink);
+}
+
 /** Resolves when the intro animation has finished (overlay may still cover). */
 let resolveIntroAnim: (() => void) | null = null;
 const introAnimDone = new Promise<void>((resolve) => {
@@ -4211,6 +4234,8 @@ function finishIntro() {
   void bootHold.then(() => {
     stopModeSelectPreview();
     const intro = app.querySelector<HTMLElement>("#app-intro");
+    logotypeLive = true;
+    syncLogotypeAccent();
     shell.classList.remove("ui-hidden");
     resize();
     if (!intro) return;
@@ -4708,6 +4733,7 @@ function adoptState(next: typeof state) {
     blend: blendMode(next.post.blend),
   };
   recountShapes();
+  syncLogotypeAccent();
   setUiSoundsMuted(state.audioReact.enabled);
   if (state.audioReact.enabled) void startMic();
   else {

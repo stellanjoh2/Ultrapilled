@@ -13,14 +13,32 @@ function parseHex(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+/** Same weighted luminance as inkOn — 0 dark, 1 bright. */
+function fillLuminance(hex: string): number {
+  const [r, g, b] = parseHex(hex);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
 export function pickTheme(theme: ColorTheme, index: number): string {
   return theme[index % theme.length];
 }
 
 export function inkOn(fill: string): string {
-  const [r, g, b] = parseHex(fill);
-  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  return lum > 0.55 ? "#111111" : "#ffffff";
+  return fillLuminance(fill) > 0.55 ? "#111111" : "#ffffff";
+}
+
+/**
+ * Logotype pill accent. Prefers theme[1] (primary), then other swatches —
+ * skips fills too close to the backdrop so the mark stays visible on bright stages.
+ */
+export function logotypePillColor(theme: ColorTheme, backdrop: string): string {
+  const backLum = fillLuminance(backdrop);
+  const readable = (hex: string) => Math.abs(fillLuminance(hex) - backLum) >= 0.22;
+  for (const index of [1, 2, 3, 4, 0]) {
+    const hex = theme[index];
+    if (hex && readable(hex)) return hex;
+  }
+  return theme[1] ?? theme[0] ?? "#ffffff";
 }
 
 /** Auto-contrast ink when no text colour is chosen. Not theme swatches — pick via the colour picker. */

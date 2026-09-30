@@ -252,6 +252,17 @@ export function backgroundPaint(background: BackgroundSettings, ratio: CanvasRat
   };
 }
 
+/** Fill sample behind the top-left logotype — solid stage, or the gradient edge under the mark. */
+export function logoBackdropColor(background: BackgroundSettings, stageColor: string): string {
+  if (background.kind === "gradient" && background.stops.length >= 1) {
+    // Linear is top→bottom; the mark sits on the top edge.
+    if (linearShape(background.shape)) return sampleStopColor(background.stops, 0);
+    // Radial is center-out; corners read the outer stop.
+    return sampleStopColor(background.stops, 100);
+  }
+  return stageColor;
+}
+
 export function stopBarGradient(stops: GradientStop[]): string {
   const sorted = sortedStops(stops);
   if (sorted.length < 2) return "transparent";

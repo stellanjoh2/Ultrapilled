@@ -64,6 +64,9 @@
   --radius-topbar: calc(8px * var(--ui-scale));
   --radius-tooltip: calc(10px * var(--ui-scale));
   --font-section: "Mattone Regular", Inter, "SF Pro Display", system-ui, -apple-system, sans-serif;
+  /* Logotype — white on load; ink flips via inkOn (lum > 0.55); pill → theme accent. */
+  --logotype-pill: #ffffff;
+  --logotype-ink: #ffffff;
   font-family: Inter, "SF Pro Display", system-ui, -apple-system, sans-serif;
   font-feature-settings: "ss01";
   font-synthesis: none;
@@ -245,7 +248,6 @@ body:has(.app.ui-hidden) .ui-tip {
   }
 }
 
-.topbar,
 .panel,
 .theme-shelf__inner,
 .pro-tip,
@@ -265,12 +267,11 @@ body:has(.app.ui-hidden) .ui-tip {
   z-index: 40;
   display: flex;
   align-items: center;
-  height: calc(48px * var(--ui-scale));
-  padding: 0 var(--space-1);
+  height: auto;
+  padding: 0;
   border: none;
-  border-radius: var(--radius-topbar);
-  overflow: hidden;
-  box-shadow: var(--shadow-1);
+  background: transparent;
+  box-shadow: none;
   transform-origin: top left;
 }
 
@@ -308,6 +309,42 @@ body:has(.app.ui-hidden) .ui-tip {
   line-height: 1.4;
   letter-spacing: -0.2px;
   pointer-events: none;
+}
+
+.topbar .logotype,
+.mode-select__mark.logotype {
+  display: flex;
+  align-items: center;
+  width: calc(240px * var(--ui-scale));
+  height: auto;
+  color: #ffffff;
+}
+
+.logotype__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.logotype__mark {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.logotype__glyph {
+  fill: var(--logotype-ink, #ffffff);
+}
+
+.logotype__pill {
+  fill: var(--logotype-pill, #ffffff);
 }
 
 .stage {
@@ -5348,11 +5385,23 @@ html[data-theme="day"] .settings-modal__body .keycap {
 
 /* Mode Select — first-run gate before UI / stage reveal.
    Always night chrome, even if day theme is saved in prefs.
-   Live physics sits in .mode-select-preview (z 190); this overlay is transparent. */
-.mode-select-preview {
+   Preview + UI share one host so text mix-blend-mode: difference can see the shapes.
+   Avoid z-index / scale / opacity on ancestors between ink and the preview. */
+.mode-select-host {
   position: fixed;
   inset: 0;
   z-index: 190;
+  pointer-events: none;
+}
+
+.mode-select-host.is-gate {
+  z-index: 210;
+  pointer-events: auto;
+}
+
+.mode-select-preview {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -5366,12 +5415,14 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 .mode-select {
-  position: fixed;
-  inset: 0;
-  z-index: 210;
+  position: relative;
+  z-index: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   padding: var(--space-2);
   background: transparent;
   color: #f5f5f5;
@@ -5387,21 +5438,17 @@ html[data-theme="day"] .settings-modal__body .keycap {
   position: absolute;
   top: var(--panel-inset);
   left: var(--panel-inset);
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  height: calc(48px * var(--ui-scale));
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-topbar);
-  background: var(--canvas);
-  box-shadow: var(--shadow-1);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  mix-blend-mode: difference;
   pointer-events: none;
 }
 
 .mode-select__upper,
 .mode-select__lower {
   position: relative;
-  z-index: 2;
   flex: 1 1 0;
   width: 100%;
   min-height: 0;
@@ -5428,7 +5475,6 @@ html[data-theme="day"] .settings-modal__body .keycap {
 
 .mode-select__inner {
   position: relative;
-  z-index: 2;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -5449,6 +5495,14 @@ html[data-theme="day"] .settings-modal__body .keycap {
   text-align: left;
 }
 
+.mode-select__vibe {
+  mix-blend-mode: normal;
+}
+
+.mode-select__rest {
+  mix-blend-mode: difference;
+}
+
 .mode-select__word {
   display: inline-block;
 }
@@ -5462,7 +5516,6 @@ html[data-theme="day"] .settings-modal__body .keycap {
 
 .mode-select__card {
   position: relative;
-  z-index: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -5477,16 +5530,6 @@ html[data-theme="day"] .settings-modal__body .keycap {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  /* Independent of GSAP’s transform (entrance fade-up), so hover isn’t overridden. */
-  scale: 1;
-  transform-origin: center top;
-  transition: scale 0.35s ease;
-}
-
-.mode-select__card:hover,
-.mode-select__card:focus-visible {
-  z-index: 1;
-  scale: 1.03;
 }
 
 .mode-select__card:focus {
@@ -5506,6 +5549,14 @@ html[data-theme="day"] .settings-modal__body .keycap {
   border-radius: var(--radius-reconnect);
   overflow: hidden;
   background: #1a1a1a;
+  transform-origin: center top;
+  scale: 1;
+  transition: scale 0.35s ease;
+}
+
+.mode-select__card:hover .mode-select__media,
+.mode-select__card:focus-visible .mode-select__media {
+  scale: 1.03;
 }
 
 .mode-select__video,
@@ -5527,14 +5578,14 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mode-select__card,
+  .mode-select__media,
   .mode-select__video,
   .mode-select__image {
     transition: none;
   }
 
-  .mode-select__card:hover,
-  .mode-select__card:focus-visible {
+  .mode-select__card:hover .mode-select__media,
+  .mode-select__card:focus-visible .mode-select__media {
     scale: 1;
   }
 
@@ -5607,6 +5658,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   line-height: 1.15;
   letter-spacing: -0.02em;
   border-radius: 4px;
+  mix-blend-mode: difference;
 }
 
 .mode-select__desc {
@@ -5617,6 +5669,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   font-weight: 300;
   line-height: 1.4;
   letter-spacing: -0.01em;
+  mix-blend-mode: difference;
 }
 
 @media (max-width: 640px) {
