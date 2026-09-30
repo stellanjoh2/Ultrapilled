@@ -5464,7 +5464,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
 .mode-select__card:hover,
 .mode-select__card:focus-visible {
   z-index: 1;
-  scale: 1.1;
+  scale: 1.03;
 }
 
 .mode-select__card:focus {
