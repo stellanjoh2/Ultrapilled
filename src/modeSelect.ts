@@ -2,7 +2,7 @@ import gsap from "gsap";
 import { backgroundPaint } from "./background";
 import { createPlaySession } from "./playSession";
 import { modeSelectPreviewState } from "./modeSelectTheme";
-import { LOGOTYPE_MARK_SVG } from "./logotypeMark";
+import { logotypeRevealMarkup, playLogotypeReveal } from "./logotypeReveal";
 import { DEFAULT_THEME } from "./theme";
 import { playClick, playNotify } from "./uiSounds";
 import { createWorld } from "./world";
@@ -204,7 +204,7 @@ export function askModeSelect(): Promise<AppMode> {
     root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-labelledby", "mode-select-title");
     root.innerHTML = `
-      <div class="mode-select__mark logotype" aria-hidden="true">${LOGOTYPE_MARK_SVG}</div>
+      <div class="mode-select__mark logotype" aria-hidden="true">${logotypeRevealMarkup()}</div>
       <div class="mode-select__upper" aria-hidden="true"></div>
       <div class="mode-select__inner">
         <h1 class="mode-select__headline" id="mode-select-title"></h1>
@@ -320,22 +320,28 @@ export function askModeSelect(): Promise<AppMode> {
 
     // Animate pieces — clear opacity/transform after so mix-blend-mode can reach the preview.
     const clearBlend = "opacity,visibility,transform";
-    gsap.set([mark, ...words, ...cards, foot], { autoAlpha: 0, y: 22 });
+    gsap.set([...words, ...cards, foot], { autoAlpha: 0, y: 22 });
+    gsap.set(mark, { autoAlpha: 1, y: 0 });
 
     if (reducedMotion()) {
+      gsap.set(mark.querySelectorAll(".logotype-reveal__layer"), { clipPath: "inset(0% 0% 0% 0%)" });
       gsap.set([mark, ...words, ...cards, foot], { clearProps: "all", autoAlpha: 1, y: 0 });
       return;
     }
 
-    const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend };
-    const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-    tl.to(mark, { autoAlpha: 1, y: 0, duration: 0.45, clearProps: clearBlend }, 0);
-    tl.to(words, reveal, 0.08);
-    tl.to(cards, reveal, ">");
-    tl.to(foot, { autoAlpha: 1, y: 0, duration: 0.4, clearProps: clearBlend }, "<0.1");
-    // Ensure ink nodes are fully clear of GSAP opacity after the timeline.
-    tl.add(() => {
-      gsap.set(ink, { clearProps: clearBlend });
-    });
+    mark.classList.add("is-revealing");
+    void (async () => {
+      await playLogotypeReveal(mark);
+      mark.classList.remove("is-revealing");
+
+      const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend };
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+      tl.to(words, reveal);
+      tl.to(cards, reveal, ">");
+      tl.to(foot, { autoAlpha: 1, y: 0, duration: 0.4, clearProps: clearBlend }, ">");
+      tl.add(() => {
+        gsap.set(ink, { clearProps: clearBlend });
+      });
+    })();
   });
 }

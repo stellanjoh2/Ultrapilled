@@ -37,6 +37,7 @@ import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPer
 import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
 import { inkOn, logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import { LOGOTYPE_MARK_SVG } from "./logotypeMark";
+import { logotypeRevealMarkup, playLogotypeReveal } from "./logotypeReveal";
 import { mountProTip, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
@@ -133,11 +134,7 @@ app.innerHTML = `
     <div class="app-intro" id="app-intro" aria-hidden="true">
       <img class="app-intro__gif" alt="" width="300" height="300" />
       <div class="app-intro__logo" aria-hidden="true">
-        <div class="app-intro__logo-scale">
-          <div class="app-intro__logo-layer app-intro__logo-layer--purple">${LOGOTYPE_MARK_SVG}</div>
-          <div class="app-intro__logo-layer app-intro__logo-layer--lime">${LOGOTYPE_MARK_SVG}</div>
-          <div class="app-intro__logo-layer app-intro__logo-layer--white">${LOGOTYPE_MARK_SVG}</div>
-        </div>
+        ${logotypeRevealMarkup()}
       </div>
     </div>
     <div class="stage" id="stage">
@@ -4204,14 +4201,15 @@ const devPanel = app.querySelector<HTMLElement>("#dev-panel")!;
 
 /** One playthrough of public/images/intropill.gif (40 frames × 5cs), shortened 0.25s. */
 const INTRO_MS = 2000;
+const INTRO_PILL_SCALE_S = 1.75;
+const INTRO_PILL_SCALE_FROM = 1;
+const INTRO_PILL_SCALE_TO = 0.5;
 const INTRO_SRC = "/images/intropill.gif";
-/** Left→right wipe: purple → lime → white in; reverse on the way out. */
-const INTRO_LOGO_MASK_S = 0.3;
+/** Left→right wipe timings live in logotypeReveal.ts — hold is intro-only. */
 const INTRO_LOGO_HOLD_S = 1;
-const INTRO_LOGO_STAGGER_S = 0.2;
-const INTRO_LOGO_EASE = "power2.inOut";
-const INTRO_LOGO_SCALE_FROM = 1.05;
+const INTRO_LOGO_SCALE_FROM = 1.2;
 const INTRO_LOGO_SCALE_TO = 0.95;
+const INTRO_LOGO_SCALE_EASE = "expo.out";
 let introActive = true;
 /** Flips true when boot finishes and the main UI is revealed — logo stays white until then. */
 let logotypeLive = false;
@@ -4273,45 +4271,18 @@ async function preloadIntroGif(): Promise<void> {
 }
 
 /** Mask the wordmark in (purple → lime → white), hold, mask out (white → lime → purple). */
-function playIntroLogotype(intro: HTMLElement): Promise<void> {
+async function playIntroLogotype(intro: HTMLElement): Promise<void> {
   const logo = intro.querySelector<HTMLElement>(".app-intro__logo");
-  const scaleEl = intro.querySelector<HTMLElement>(".app-intro__logo-scale");
-  const purple = intro.querySelector<HTMLElement>(".app-intro__logo-layer--purple");
-  const lime = intro.querySelector<HTMLElement>(".app-intro__logo-layer--lime");
-  const white = intro.querySelector<HTMLElement>(".app-intro__logo-layer--white");
-  if (!logo || !scaleEl || !purple || !lime || !white) return Promise.resolve();
-
-  const hiddenLeft = "inset(0% 100% 0% 0%)";
-  const visible = "inset(0% 0% 0% 0%)";
-  const hiddenRight = "inset(0% 0% 0% 100%)";
-  const layers = [purple, lime, white];
-  const totalS = INTRO_LOGO_STAGGER_S * 2 + INTRO_LOGO_MASK_S + INTRO_LOGO_HOLD_S + INTRO_LOGO_STAGGER_S * 2 + INTRO_LOGO_MASK_S;
-
-  return new Promise((resolve) => {
-    gsap.set(logo, { autoAlpha: 1 });
-    gsap.set(scaleEl, { scale: INTRO_LOGO_SCALE_FROM });
-    gsap.set(layers, { clipPath: hiddenLeft });
-    const tl = gsap.timeline({
-      onComplete: () => {
-        gsap.set(logo, { autoAlpha: 0 });
-        gsap.set(scaleEl, { clearProps: "transform" });
-        gsap.set(layers, { clearProps: "clipPath" });
-        resolve();
-      },
-    });
-    tl.to(scaleEl, {
-      scale: INTRO_LOGO_SCALE_TO,
-      duration: totalS,
-      ease: "none",
-    }, 0);
-    tl.to(purple, { clipPath: visible, duration: INTRO_LOGO_MASK_S, ease: INTRO_LOGO_EASE }, 0);
-    tl.to(lime, { clipPath: visible, duration: INTRO_LOGO_MASK_S, ease: INTRO_LOGO_EASE }, INTRO_LOGO_STAGGER_S);
-    tl.to(white, { clipPath: visible, duration: INTRO_LOGO_MASK_S, ease: INTRO_LOGO_EASE }, INTRO_LOGO_STAGGER_S * 2);
-    const outAt = INTRO_LOGO_STAGGER_S * 2 + INTRO_LOGO_MASK_S + INTRO_LOGO_HOLD_S;
-    tl.to(white, { clipPath: hiddenRight, duration: INTRO_LOGO_MASK_S, ease: INTRO_LOGO_EASE }, outAt);
-    tl.to(lime, { clipPath: hiddenRight, duration: INTRO_LOGO_MASK_S, ease: INTRO_LOGO_EASE }, outAt + INTRO_LOGO_STAGGER_S);
-    tl.to(purple, { clipPath: hiddenRight, duration: INTRO_LOGO_MASK_S, ease: INTRO_LOGO_EASE }, outAt + INTRO_LOGO_STAGGER_S * 2);
+  if (!logo) return;
+  gsap.set(logo, { autoAlpha: 1 });
+  await playLogotypeReveal(logo, {
+    maskOut: true,
+    holdS: INTRO_LOGO_HOLD_S,
+    scaleFrom: INTRO_LOGO_SCALE_FROM,
+    scaleTo: INTRO_LOGO_SCALE_TO,
+    scaleEase: INTRO_LOGO_SCALE_EASE,
   });
+  gsap.set(logo, { autoAlpha: 0 });
 }
 
 async function startIntro() {
@@ -4342,6 +4313,13 @@ async function startIntro() {
     }
   }
   intro.classList.add("is-ready");
+  if (img) {
+    gsap.fromTo(
+      img,
+      { scale: INTRO_PILL_SCALE_FROM },
+      { scale: INTRO_PILL_SCALE_TO, duration: INTRO_PILL_SCALE_S, ease: INTRO_LOGO_SCALE_EASE },
+    );
+  }
   await new Promise<void>((resolve) => {
     window.setTimeout(resolve, INTRO_MS);
   });
