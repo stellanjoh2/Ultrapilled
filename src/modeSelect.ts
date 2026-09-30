@@ -36,9 +36,9 @@ function fillHeadline(el: HTMLElement) {
   vibe.className = "mode-select__word mode-select__vibe";
   vibe.textContent = "Choose your vibe.";
   el.append(vibe, document.createTextNode(" "));
-  appendWords(el, ["Wild", "and"]);
+  appendWords(el, ["Completely"]);
   el.append(document.createElement("br"));
-  appendWords(el, ["wobbly,", "or", "calm", "and", "composed."]);
+  appendWords(el, ["unusable", "but", "fun,", "or", "calm", "and", "composed."]);
 }
 
 /** First-run mode gate. Resolves with the chosen mode after the overlay exits. */
