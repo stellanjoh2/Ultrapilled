@@ -49,16 +49,18 @@ export function modeSelectPreviewState(): AppState {
   const slots: Slot[] = [
     text({
       text: "Lorem",
-      scale: 0.75,
+      scale: 0.58,
       color: "#191919",
       textColor: "#191919",
     }),
+    icon("Clovers", 2, { scale: 0.25 })!,
     text({
       text: "frffrfrfr",
       scale: 1,
       color: "#121133",
       textColor: "#131133",
     }),
+    icon("Stars", 4, { scale: 0.25 })!,
     text({
       text: "Lorem",
       scale: 1,
@@ -69,7 +71,7 @@ export function modeSelectPreviewState(): AppState {
       gradientFrom: "#202215",
       gradientColorIndex: 1,
     }),
-    icon("Stars", 1, { scale: 0.6 })!,
+    icon("Spheres", 2, { scale: 0.85 })!,
     text({
       text: "Lorem",
       textHeight: 9,
@@ -86,13 +88,15 @@ export function modeSelectPreviewState(): AppState {
       textColor: "#131133",
       pillPad: 5,
     }),
+    icon("Quads", 4, { scale: 0.6 })!,
     text({
       text: "hhhuhhuhu",
       textHeight: 9,
       scale: 0.35,
-      color: "#202215",
-      textColor: "#1f2215",
+      colorIndex: 2,
+      textColorIndex: 2,
       tracking: 500,
+      pillPad: 22,
     }),
     text({
       text: "frr",
@@ -112,13 +116,13 @@ export function modeSelectPreviewState(): AppState {
       color: "#191919",
       textColor: "#191919",
     }),
-    icon("Quads", 4, { scale: 0.6 })!,
     text({
       text: "Lorem",
       scale: 0.9,
       color: "#191919",
       textColor: "#191919",
     }),
+    icon("Stars", 1, { scale: 0.6 })!,
   ].filter(Boolean) as Slot[];
 
   return {
@@ -146,7 +150,7 @@ export function modeSelectPreviewState(): AppState {
     sizeRandom: 100,
     pillPad: 30,
     textTracking: 37,
-    shapeAmount: 3,
+    shapeAmount: 6,
     theme: [...DEFAULT_THEME],
     post: { bloom: 0, bloomOpacity: 100, grain: 0, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
     physics: {

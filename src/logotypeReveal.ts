@@ -3,7 +3,7 @@ import { LOGOTYPE_MARK_SVG } from "./logotypeMark";
 
 /** Left→right wipe: purple → lime → white. */
 export const LOGOTYPE_REVEAL_MASK_S = 0.3;
-export const LOGOTYPE_REVEAL_STAGGER_S = 0.2;
+export const LOGOTYPE_REVEAL_STAGGER_S = 0.25;
 export const LOGOTYPE_REVEAL_HOLD_S = 1;
 export const LOGOTYPE_REVEAL_EASE = "power2.inOut";
 

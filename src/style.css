@@ -5510,22 +5510,93 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 .mode-select__lower {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  align-content: end;
+  column-gap: var(--space-3);
   padding-bottom: var(--panel-inset);
+}
+
+.mode-select__social {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: #555;
+  z-index: 1;
+}
+
+.mode-select__social a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mode-select__social a::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--space-1) * -0.5);
+}
+
+.mode-select__social a:hover {
+  color: var(--ink);
+}
+
+.mode-select__social svg,
+.mode-select__icon {
+  display: block;
+  width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
+}
+
+.mode-select__icon--x {
+  background-color: currentColor;
+  -webkit-mask-image: url("./assets/X-logo.svg");
+  mask-image: url("./assets/X-logo.svg");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.mode-select__s {
+  display: block;
+  width: calc(44px * 198 / 248.77 * var(--ui-scale));
+  height: calc(44px * var(--ui-scale));
+  background-color: #555;
+  -webkit-mask-image: url("./assets/s-logo.svg");
+  mask-image: url("./assets/s-logo.svg");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  pointer-events: none;
 }
 
 .mode-select__foot {
   margin: 0;
-  max-width: min(72em, 100%);
   color: #555;
-  font-size: calc(12px * var(--ui-scale));
+  font-size: calc(18px * var(--ui-scale));
   font-weight: 300;
   line-height: 1.45;
   letter-spacing: -0.01em;
   text-align: center;
   pointer-events: none;
+}
+
+.mode-select__foot strong {
+  font-weight: 700;
 }
 
 .mode-select__inner {
@@ -5534,8 +5605,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: clamp(96px, calc(6vw + 48px), calc(var(--space-3) * 2 + 48px));
-  width: min(calc(720px * 2 + 48px), 100%);
+  gap: clamp(48px, 6vw, calc(var(--space-3) * 2));
+  width: min(1790px, 100%);
   max-width: 100%;
 }
 

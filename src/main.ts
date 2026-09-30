@@ -4207,7 +4207,7 @@ const INTRO_PILL_SCALE_TO = 0.5;
 const INTRO_SRC = "/images/intropill.gif";
 /** Left→right wipe timings live in logotypeReveal.ts — hold is intro-only. */
 const INTRO_LOGO_HOLD_S = 1;
-const INTRO_LOGO_SCALE_FROM = 1.2;
+const INTRO_LOGO_SCALE_FROM = 1.4;
 const INTRO_LOGO_SCALE_TO = 0.95;
 const INTRO_LOGO_SCALE_EASE = "expo.out";
 let introActive = true;
