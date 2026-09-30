@@ -5725,14 +5725,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
   border-radius: var(--radius-panel);
   overflow: hidden;
   background: #1a1a1a;
-  transform-origin: center top;
-  scale: 1;
-  transition: scale 0.35s ease;
-}
-
-.mode-select__card:hover .mode-select__media,
-.mode-select__card:focus-visible .mode-select__media {
-  scale: 1.03;
+  /* Promote a stable layer — radius + video + parent scale flickers in Chromium. */
+  transform: translateZ(0);
 }
 
 .mode-select__video,
@@ -5741,28 +5735,25 @@ html[data-theme="day"] .settings-modal__body .keycap {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: inherit;
   pointer-events: none;
+  transform-origin: center center;
   scale: 1;
   transition: scale 0.35s ease;
+  transform: translateZ(0);
 }
 
 .mode-select__card:hover .mode-select__video,
 .mode-select__card:hover .mode-select__image,
 .mode-select__card:focus-visible .mode-select__video,
 .mode-select__card:focus-visible .mode-select__image {
-  scale: 1.05;
+  scale: 1.08;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mode-select__media,
   .mode-select__video,
   .mode-select__image {
     transition: none;
-  }
-
-  .mode-select__card:hover .mode-select__media,
-  .mode-select__card:focus-visible .mode-select__media {
-    scale: 1;
   }
 
   .mode-select__card:hover .mode-select__video,
