@@ -38,7 +38,7 @@ function fillHeadline(el: HTMLElement) {
   el.append(vibe, document.createTextNode(" "));
   appendWords(el, ["Completely"]);
   el.append(document.createElement("br"));
-  appendWords(el, ["unusable", "but", "fun,", "or", "calm", "and", "composed."]);
+  appendWords(el, ["unusable", "but", "very", "fun,", "or", "calm", "and", "composed."]);
 }
 
 /** First-run mode gate. Resolves with the chosen mode after the overlay exits. */
