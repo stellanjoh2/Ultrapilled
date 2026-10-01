@@ -91,6 +91,15 @@ function paintPreviewBackdrop(stage: HTMLElement, playfield: HTMLElement, state:
 
 let hostEl: HTMLElement | null = null;
 let previewCleanup: (() => void) | null = null;
+/** Live preview world/session — used to open the floor on Mode Select exit. */
+let previewWorld: ReturnType<typeof createWorld> | null = null;
+let previewSession: ReturnType<typeof createPlaySession> | null = null;
+let previewPosePinned = false;
+let previewRepeat = true;
+let previewRunning = false;
+
+/** Cap how long we wait for chips to fall off before forcing teardown. */
+const EXIT_DUMP_MAX_MS = 2800;
 
 function ensureHost(): HTMLElement {
   if (hostEl) return hostEl;
@@ -99,6 +108,14 @@ function ensureHost(): HTMLElement {
   document.body.append(host);
   hostEl = host;
   return host;
+}
+
+function clearPreviewHandles() {
+  previewWorld = null;
+  previewSession = null;
+  previewPosePinned = false;
+  previewRepeat = true;
+  previewRunning = false;
 }
 
 /** Silent looping physics behind intro + mode gate. Idempotent. */
@@ -141,8 +158,9 @@ export function warmModeSelectPreview() {
   world.setImpactListener(() => {});
 
   let alive = true;
-  let running = false;
-  let posePinned = false;
+  previewRunning = false;
+  previewPosePinned = false;
+  previewRepeat = true;
 
   const session = createPlaySession({
     world,
@@ -174,19 +192,22 @@ export function warmModeSelectPreview() {
     nudgeEmptyScene: () => {},
     notifyLayoutModeBlocksPhysics: async () => {},
     playButton: () => {},
-    getRunning: () => running,
+    getRunning: () => previewRunning,
     setRunningFlag: (on) => {
-      running = on;
+      previewRunning = on;
     },
     getPaused: () => false,
     setPaused: () => {},
-    getRepeat: () => true,
-    getPosePinned: () => posePinned,
+    getRepeat: () => previewRepeat,
+    getPosePinned: () => previewPosePinned,
     setPosePinned: (on) => {
-      posePinned = on;
+      previewPosePinned = on;
     },
     shouldContinue: () => alive,
   });
+
+  previewWorld = world;
+  previewSession = session;
 
   const onResize = () => {
     if (!alive || world.chipCount() === 0) return;
@@ -205,19 +226,81 @@ export function warmModeSelectPreview() {
     window.removeEventListener("resize", onResize);
     session.setRunning(false);
     world.destroy();
+    clearPreviewHandles();
     hostEl?.remove();
     hostEl = null;
     previewCleanup = null;
   };
 }
 
-/** Tear down the early preview (call when revealing the real app UI). */
+/**
+ * Open the floor so the preview pile dumps out (same as Clear canvas).
+ * Safe if already dumping — just stops the loop from respawning.
+ */
+export function beginModeSelectExitDump() {
+  const world = previewWorld;
+  const session = previewSession;
+  if (!world || !session || reducedMotion()) return;
+
+  previewRepeat = false;
+  previewPosePinned = false;
+  session.clearingDump = true;
+  session.dropTicket++;
+  if (!previewRunning) {
+    previewRunning = true;
+    world.setRunning(true);
+  }
+  // Wakes a frozen hold pile; no-op if the floor is already open mid-loop.
+  world.setFloorOpen(true);
+  session.phase = "dumping";
+}
+
+/** Tear down the early preview immediately. */
 export function stopModeSelectPreview() {
   previewCleanup?.();
   if (hostEl) {
     hostEl.remove();
     hostEl = null;
   }
+  clearPreviewHandles();
+}
+
+/**
+ * Keep the dumping preview under chrome until chips are gone, then remove it.
+ * Call instead of stopModeSelectPreview when leaving Mode Select into a fresh app.
+ */
+export function handoffModeSelectPreview(onDone?: () => void) {
+  const host = hostEl;
+  if (!host || !previewCleanup) {
+    onDone?.();
+    return;
+  }
+
+  if (reducedMotion() || !previewWorld) {
+    stopModeSelectPreview();
+    onDone?.();
+    return;
+  }
+
+  host.classList.remove("is-gate");
+  host.classList.add("is-handoff");
+  beginModeSelectExitDump();
+
+  const world = previewWorld;
+  const started = performance.now();
+  const tick = () => {
+    if (!hostEl || hostEl !== host) {
+      onDone?.();
+      return;
+    }
+    if (!world || world.chipCount() === 0 || performance.now() - started > EXIT_DUMP_MAX_MS) {
+      stopModeSelectPreview();
+      onDone?.();
+      return;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 /** First-run mode gate. Resolves with the chosen mode after the overlay exits. */
@@ -306,6 +389,8 @@ export function askModeSelect(): Promise<AppMode> {
       settled = true;
       window.removeEventListener("keydown", onKey);
       playNotify();
+      // Floor opens while the mode UI fades — dump instead of a hard cut later.
+      beginModeSelectExitDump();
 
       const done = () => {
         video?.pause();

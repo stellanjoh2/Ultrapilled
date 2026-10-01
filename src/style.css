@@ -461,17 +461,37 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   pointer-events: none;
 }
 
+@property --grid-reveal {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 .grid-layer {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: var(--grid-opacity, 0);
+  /* --grid-opacity = user strength; --grid-reveal = on/off + boot fade (0–1). */
+  opacity: calc(var(--grid-opacity, 0) * var(--grid-reveal));
   background-image:
     linear-gradient(to right, var(--grid-color, #fff) 1px, transparent 1px),
     linear-gradient(to bottom, var(--grid-color, #fff) 1px, transparent 1px);
   background-size: calc(100% / var(--grid-cols, 16)) calc(100% / var(--grid-rows, 9));
   clip-path: inset(1px);
+  /* Transition the registered property so calc(opacity) actually interpolates. */
+  transition: --grid-reveal 0.18s ease;
+}
+
+.grid-layer.is-boot-reveal {
+  transition: --grid-reveal 1s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-layer,
+  .grid-layer.is-boot-reveal {
+    transition: none;
+  }
 }
 
 .logo-layer {
@@ -5416,6 +5436,12 @@ html[data-theme="day"] .settings-modal__body .keycap {
 .mode-select-host.is-gate {
   z-index: 210;
   pointer-events: auto;
+}
+
+/* Under panel/topbar, over the real stage — falling world stays while chrome lands. */
+.mode-select-host.is-handoff {
+  z-index: 5;
+  pointer-events: none;
 }
 
 .mode-select-preview {

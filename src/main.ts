@@ -69,7 +69,7 @@ import {
 import { checkInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
-import { askModeSelect, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
+import { askModeSelect, handoffModeSelectPreview, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
@@ -883,18 +883,89 @@ function applyBackground() {
   syncLogotypeAccent();
 }
 
+/** Hold grid invisible until Mode Select preview finishes dumping. */
+let gridHoldForHandoff = false;
+
 function applyGrid() {
   const layer = playfield.querySelector<HTMLElement>("#grid-layer");
   if (!layer) return;
   const { background, canvas } = state;
   const on = background.grid;
-  layer.hidden = !on;
-  if (!on) return;
   const { cols, rows } = gridDivisions(canvas, background.gridDensity);
   layer.style.setProperty("--grid-color", background.gridColor || "#ffffff");
   layer.style.setProperty("--grid-opacity", `${(background.gridOpacity ?? 0) / 100}`);
   layer.style.setProperty("--grid-cols", String(cols));
   layer.style.setProperty("--grid-rows", String(rows));
+
+  // Under Mode Select / dump: keep paint ready but invisible so it doesn't pop in.
+  if (shell.classList.contains("ui-hidden") || gridHoldForHandoff) {
+    layer.classList.remove("is-boot-reveal");
+    layer.hidden = !on;
+    layer.style.setProperty("--grid-reveal", "0");
+    if (on) layer.removeAttribute("aria-hidden");
+    else layer.setAttribute("aria-hidden", "true");
+    return;
+  }
+
+  layer.classList.remove("is-boot-reveal");
+  if (on) {
+    layer.hidden = false;
+    layer.removeAttribute("aria-hidden");
+    // Start from 0 if we were off so the swift fade runs.
+    if (layer.style.getPropertyValue("--grid-reveal").trim() !== "1") {
+      layer.style.setProperty("--grid-reveal", "0");
+      // Force a style flush so the 0→1 transition has a from-value.
+      void layer.offsetWidth;
+      layer.style.setProperty("--grid-reveal", "1");
+    } else {
+      layer.style.setProperty("--grid-reveal", "1");
+    }
+    return;
+  }
+
+  layer.setAttribute("aria-hidden", "true");
+  layer.style.setProperty("--grid-reveal", "0");
+  const hide = () => {
+    if (state.background.grid) return;
+    layer.hidden = true;
+  };
+  layer.addEventListener("transitionend", hide, { once: true });
+  window.setTimeout(hide, 220);
+}
+
+/** Fade grid in over 1s once the Mode Select preview is gone. */
+function bootRevealGrid() {
+  const layer = playfield.querySelector<HTMLElement>("#grid-layer");
+  gridHoldForHandoff = false;
+  if (!layer || !state.background.grid) {
+    applyGrid();
+    return;
+  }
+  const { background, canvas } = state;
+  const { cols, rows } = gridDivisions(canvas, background.gridDensity);
+  const strength = (background.gridOpacity ?? 0) / 100;
+  layer.style.setProperty("--grid-color", background.gridColor || "#ffffff");
+  layer.style.setProperty("--grid-opacity", `${strength}`);
+  layer.style.setProperty("--grid-cols", String(cols));
+  layer.style.setProperty("--grid-rows", String(rows));
+  layer.hidden = false;
+  layer.removeAttribute("aria-hidden");
+  layer.classList.remove("is-boot-reveal");
+  // Drive opacity directly — more reliable than transitioning a CSS variable under a dump cut.
+  layer.style.setProperty("--grid-reveal", "1");
+  gsap.fromTo(
+    layer,
+    { opacity: 0 },
+    {
+      opacity: strength,
+      duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1,
+      ease: "power1.out",
+      onComplete: () => {
+        gsap.set(layer, { clearProps: "opacity" });
+        layer.style.setProperty("--grid-reveal", "1");
+      },
+    },
+  );
 }
 
 const logoImages = new Map<string, HTMLImageElement>();
@@ -4246,17 +4317,27 @@ const bootHold = new Promise<void>((resolve) => {
   resolveBootHold = resolve;
 });
 
+/** Fresh Mode Select → fade the falling preview out after chrome lands (not reconnect). */
+let modeSelectContinuity = false;
+
 function finishIntro() {
   if (!introActive) return;
   introActive = false;
   resolveIntroAnim?.();
   resolveIntroAnim = null;
   void bootHold.then(() => {
-    stopModeSelectPreview();
+    if (modeSelectContinuity) {
+      // Fade finished under the dumping preview before — wait until it's gone, then 1s in.
+      gridHoldForHandoff = true;
+      handoffModeSelectPreview(() => bootRevealGrid());
+    } else {
+      stopModeSelectPreview();
+    }
     const intro = app.querySelector<HTMLElement>("#app-intro");
     logotypeLive = true;
     syncLogotypeAccent();
     shell.classList.remove("ui-hidden");
+    applyGrid(); // held at --grid-reveal 0 while gridHoldForHandoff
     resize();
     if (!intro) return;
     intro.classList.add("is-done");
@@ -5373,6 +5454,7 @@ async function gateModeSelect() {
   intro?.querySelector(".app-intro__gif")?.remove();
   intro?.querySelector(".app-intro__logo")?.remove();
   const mode = await askModeSelect();
+  modeSelectContinuity = true;
   await applyStartupMode(mode);
 }
 
