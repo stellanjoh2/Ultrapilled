@@ -394,6 +394,8 @@ export function askModeSelect(): Promise<AppMode> {
 
       const done = () => {
         video?.pause();
+        // Same spot as the app topbar mark — keep it until chrome lands over it.
+        if (mark.isConnected) host.append(mark);
         root.remove();
         host.classList.remove("is-gate");
         resolve(mode);
@@ -404,15 +406,27 @@ export function askModeSelect(): Promise<AppMode> {
         return;
       }
 
-      // Fade UI only — never opacity on a parent shared with the preview (breaks difference).
-      const tl = gsap.timeline({ onComplete: done });
-      tl.to([mark, headline, ...cards, ...chrome], {
+      // Tear down in reverse of the enter beat (chrome → cards → words). Mark stays.
+      const tl = gsap.timeline({ defaults: { ease: "power3.in" }, onComplete: done });
+      tl.to(chrome, {
         autoAlpha: 0,
-        y: 10,
-        duration: 0.22,
-        stagger: 0.04,
-        ease: "power2.in",
+        y: 14,
+        duration: 0.28,
+        stagger: { each: 0.04, from: "end" },
       }, 0);
+      tl.to(cards, {
+        autoAlpha: 0,
+        y: 20,
+        scale: 0.96,
+        duration: 0.36,
+        stagger: { each: 0.07, from: "end" },
+      }, "-=0.1");
+      tl.to(words, {
+        autoAlpha: 0,
+        y: 16,
+        duration: 0.32,
+        stagger: { each: 0.03, from: "end" },
+      }, "-=0.16");
     };
 
     const onKey = (event: KeyboardEvent) => {
