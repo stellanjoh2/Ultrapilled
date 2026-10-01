@@ -44,7 +44,7 @@ import {
   logotypeRevealMarkup,
   playLogotypeReveal,
 } from "./logotypeReveal";
-import { mountProTip, setProTipsEnabled } from "./proTip";
+import { mountProTip, releaseProTips, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
 import { blankPrefabText, blankState, templateLabel } from "./templates";
@@ -939,6 +939,7 @@ function bootRevealGrid() {
   gridHoldForHandoff = false;
   if (!layer || !state.background.grid) {
     applyGrid();
+    releaseProTips();
     return;
   }
   const { background, canvas } = state;
@@ -963,6 +964,7 @@ function bootRevealGrid() {
       onComplete: () => {
         gsap.set(layer, { clearProps: "opacity" });
         layer.style.setProperty("--grid-reveal", "1");
+        releaseProTips();
       },
     },
   );
@@ -4338,6 +4340,7 @@ function finishIntro() {
     syncLogotypeAccent();
     shell.classList.remove("ui-hidden");
     applyGrid(); // held at --grid-reveal 0 while gridHoldForHandoff
+    if (!modeSelectContinuity) releaseProTips();
     resize();
     if (!intro) return;
     intro.classList.add("is-done");

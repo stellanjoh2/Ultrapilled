@@ -5542,6 +5542,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
   color: inherit;
   cursor: pointer;
   text-decoration: none;
+  opacity: 0.55;
+  transition: opacity 0.2s ease, color 0.2s ease;
 }
 
 .mode-select__social a::before {
@@ -5552,6 +5554,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
 
 .mode-select__social a:hover {
   color: var(--ink);
+  opacity: 1;
 }
 
 .mode-select__social svg,
@@ -5590,10 +5593,13 @@ html[data-theme="day"] .settings-modal__body .keycap {
   cursor: pointer;
   text-decoration: none;
   z-index: 1;
+  opacity: 0.55;
+  transition: opacity 0.2s ease, color 0.2s ease;
 }
 
 .mode-select__s:hover {
   color: var(--ink);
+  opacity: 1;
 }
 
 .mode-select__foot {

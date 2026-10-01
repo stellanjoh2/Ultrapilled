@@ -1,7 +1,7 @@
 import exclamationMark from "@phosphor-icons/core/assets/regular/exclamation-mark.svg?raw";
 import { setPrefs } from "./prefs";
 
-const SHOW_DELAY_MS = 5000;
+const AFTER_READY_MS = 2000;
 const HOLD_MS = 5000;
 const GAP_MS = 5000;
 const ANIM_MS = 1000;
@@ -188,9 +188,20 @@ export function setProTipsEnabled(on: boolean) {
   remove();
 }
 
+/**
+ * Start the tip cycle once boot UI is up (after Mode Select / grid reveal).
+ * Safe to call more than once — resets any early flash.
+ */
+export function releaseProTips(delayMs = AFTER_READY_MS) {
+  if (!hostEl) return;
+  clearTimers();
+  remove();
+  if (!enabled) return;
+  showTimer = window.setTimeout(() => show(0), delayMs);
+}
+
 export function mountProTip(host: Element, opts?: { blank?: () => boolean }): void {
   hostEl = host;
   isBlank = opts?.blank ?? (() => false);
-  if (!enabled) return;
-  showTimer = window.setTimeout(() => show(0), SHOW_DELAY_MS);
+  // Don't schedule yet — wait for releaseProTips after boot so tips don't flash under Mode Select.
 }
