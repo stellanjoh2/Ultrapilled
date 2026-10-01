@@ -5591,8 +5591,9 @@ html[data-theme="day"] .settings-modal__body .keycap {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: clamp(48px, 6vw, calc(var(--space-3) * 2));
-  width: min(1790px, 100%);
+  /* Authored at 2560×1440 (ui-scale: 1); keep that composition at other sizes. */
+  gap: calc(var(--space-3) * 2);
+  width: min(calc(1790px * var(--ui-scale)), 100%);
   max-width: 100%;
 }
 
@@ -5600,7 +5601,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: clamp(44px, 4.6vw, 64px);
+  font-size: calc(64px * var(--ui-scale));
   font-weight: 400;
   line-height: 1.2;
   letter-spacing: -0.03em;
@@ -5622,7 +5623,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
 .mode-select__row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(16px, 3.2vw, 48px);
+  gap: var(--space-3);
   width: 100%;
 }
 
@@ -5649,8 +5650,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 .mode-select__card:focus-visible .mode-select__name {
-  outline: 2px solid var(--loop-stroke-a);
-  outline-offset: 4px;
+  outline: calc(2px * var(--ui-scale)) solid var(--loop-stroke-a);
+  outline-offset: calc(4px * var(--ui-scale));
 }
 
 .mode-select__media {
@@ -5756,22 +5757,22 @@ html[data-theme="day"] .settings-modal__body .keycap {
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
-  margin: 48px 0 0;
+  margin: var(--space-3) 0 0;
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: 36px;
+  font-size: calc(36px * var(--ui-scale));
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.02em;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--ui-scale));
   mix-blend-mode: difference;
 }
 
 .mode-select__name-icon {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
   flex-shrink: 0;
 }
 
@@ -5784,7 +5785,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   margin: calc(10px * var(--ui-scale)) 0 0;
   max-width: 28em;
   color: rgb(255 255 255 / 0.8);
-  font-size: 20px;
+  font-size: calc(20px * var(--ui-scale));
   font-weight: 300;
   line-height: 1.4;
   letter-spacing: -0.01em;
