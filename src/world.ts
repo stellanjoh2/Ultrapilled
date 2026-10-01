@@ -137,7 +137,7 @@ type DroppedChip = {
   body: Matter.Body;
   el: HTMLElement;
   glow: HTMLElement;
-  /** Selection chrome host in `.chip-chrome-layer` (frame / handle / wheel). */
+  /** Selection chrome host in `.chip-chrome-layer` (frame / scale handle). */
   chrome: HTMLElement | null;
   mirrors: ChipMirror[];
   width: number;
@@ -1981,10 +1981,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (on) {
         const frameHost = ensureChrome(chip);
         const needFrame = !frameHost.querySelector(":scope > .chip-xform-frame");
-        const needHandles = !chip.el.querySelector(":scope > .chip-xform-handle");
+        const needHandles = !frameHost.querySelector(":scope > .chip-xform-handle");
         const hadWheel = Boolean(chip.el.querySelector(":scope > .chip-grad-wheel"));
         ensureXformFrame(frameHost);
-        ensureXformHandle(chip.el);
+        ensureXformHandle(frameHost);
         syncGradWheel(chip);
         const createdWheel =
           !hadWheel && Boolean(chip.el.querySelector(":scope > .chip-grad-wheel"));
@@ -1999,8 +1999,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         syncXformHandleSide(chip, chipCssMul(chip));
       } else {
         chip.el.classList.remove("is-picked");
-        clearXformHandleCorner(chip.el.querySelector(":scope > .chip-xform-handle"));
         const host = chip.chrome;
+        clearXformHandleCorner(
+          (host ?? chip.el).querySelector(":scope > .chip-xform-handle"),
+        );
         if (host && host !== chip.el) {
           host.classList.remove("is-picked", "is-scaling", "is-rotating", "is-grad-angling");
         }
@@ -2014,19 +2016,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   const CHROME_FADE_MS = 150;
 
   /**
-   * Overlay host for the selection gradient only. Interactive handle / wheel stay
-   * on the chip so they don't steal picks from assets in front.
+   * Overlay host for selection frame + scale handle (always on top).
+   * Gradient wheel stays on the chip so it doesn't steal picks from assets in front.
    */
   function ensureChrome(chip: DroppedChip): HTMLElement {
     if (chip.chrome?.isConnected) {
-      // Pull interactive chrome back onto the chip if a prior build left it on the overlay.
-      for (const node of [
-        ...chip.chrome.querySelectorAll(":scope > .chip-xform-handle, :scope > .chip-grad-wheel"),
-      ]) {
+      // Wheel stays on the chip; frame + handle live on the overlay.
+      for (const node of chip.chrome.querySelectorAll(":scope > .chip-grad-wheel")) {
         chip.el.append(node);
       }
-      const orphanFrame = chip.el.querySelector(":scope > .chip-xform-frame");
-      if (orphanFrame) chip.chrome.append(orphanFrame);
+      for (const node of chip.el.querySelectorAll(
+        ":scope > .chip-xform-frame, :scope > .chip-xform-handle",
+      )) {
+        chip.chrome.append(node);
+      }
       return chip.chrome;
     }
     if (!chromeLayer) {
@@ -2036,12 +2039,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const host = document.createElement("div");
     host.className = "chip-chrome";
     host.dataset.bodyId = String(chip.body.id);
-    // Migrate a frame left on the chip from earlier mounts / hot reload.
-    const orphan = chip.el.querySelector(":scope > .chip-xform-frame");
-    if (orphan) host.append(orphan);
+    // Migrate frame / handle left on the chip from earlier mounts / hot reload.
+    for (const node of chip.el.querySelectorAll(
+      ":scope > .chip-xform-frame, :scope > .chip-xform-handle",
+    )) {
+      host.append(node);
+    }
     chromeLayer.append(host);
     chip.chrome = host;
     return host;
+  }
+
+  /** Frame / scale-handle host (overlay when available, else the chip). */
+  function xformChromeOf(chip: DroppedChip): HTMLElement {
+    return chip.chrome?.isConnected ? chip.chrome : chip.el;
   }
 
   function chipFromEl(el: Element | null): DroppedChip | undefined {
@@ -2148,8 +2159,6 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     for (const old of el.querySelectorAll(":scope > .chip-scale-handle, :scope > .chip-rotate-handle")) {
       old.remove();
     }
-    // Frame lives on the overlay host — strip any leftover on the chip.
-    el.querySelector(":scope > .chip-xform-frame")?.remove();
 
     // One SE handle (older builds had NW rotate + SE scale).
     const handles = [...el.querySelectorAll(":scope > .chip-xform-handle")];
@@ -2239,7 +2248,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function syncXformHandleSide(chip: DroppedChip, mul = 1) {
     if (!isPickPainted(chip) || bounds.height < 8) return;
     if (xformDrag && xformDrag.chip.body.id === chip.body.id) return;
-    const handle = chip.el.querySelector(":scope > .chip-xform-handle");
+    const handle = xformChromeOf(chip).querySelector(":scope > .chip-xform-handle");
     if (!(handle instanceof HTMLElement)) return;
 
     const hover =
@@ -2295,8 +2304,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const point = stagePoint(event);
     const overHandle = (event.target as Element | null)?.closest?.(".chip-xform-handle");
     if (overHandle instanceof HTMLElement) {
-      const el = overHandle.closest(".chip");
-      const chip = chipFromEl(el);
+      const host = overHandle.closest(".chip, .chip-chrome");
+      const chip = chipFromEl(host);
       if (chip && isPickPainted(chip)) {
         const corner = readXformHandleCorner(overHandle);
         const changed =
@@ -2316,7 +2325,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     let bestDist = Infinity;
     for (const chip of chips) {
       if (!isPickPainted(chip)) continue;
-      const handle = chip.el.querySelector(":scope > .chip-xform-handle");
+      const handle = xformChromeOf(chip).querySelector(":scope > .chip-xform-handle");
       const current =
         xformHover?.bodyId === chip.body.id
           ? xformHover.corner
@@ -2635,6 +2644,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     endScrub();
     for (const item of xformTargets(slotId)) {
       item.el.classList.remove("is-scaling", "is-rotating");
+      item.chrome?.classList.remove("is-scaling", "is-rotating");
       item.el.style.removeProperty("--scale-preview");
       item.el.style.removeProperty("--chrome-scale");
       if (item.slotId !== editingId && item.body.isStatic) Body.setStatic(item.body, false);
@@ -2668,8 +2678,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       Body.setVelocity(chip.body, { x: 0, y: 0 });
       Body.setAngularVelocity(chip.body, 0);
       Body.setStatic(chip.body, true);
-      if (mode === "xforming") chip.el.classList.add("is-scaling", "is-rotating");
-      else chip.el.classList.add("is-grad-angling");
+      if (mode === "xforming") {
+        chip.el.classList.add("is-scaling", "is-rotating");
+        chip.chrome?.classList.add("is-scaling", "is-rotating");
+      } else chip.el.classList.add("is-grad-angling");
       seat(chip);
     }
   }
@@ -2941,9 +2953,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
     const xformHandle = target?.closest?.(".chip-xform-handle");
     if (xformHandle instanceof HTMLElement) {
-      const el = xformHandle.closest(".chip");
-      if (!(el instanceof HTMLElement) || el.closest(".bloom-layer")) return;
-      const chip = chipFromEl(el);
+      const host = xformHandle.closest(".chip, .chip-chrome");
+      if (!(host instanceof HTMLElement) || host.closest(".bloom-layer")) return;
+      const chip = chipFromEl(host);
       if (!chip || chip.slotId === editingId) return;
       event.preventDefault();
       event.stopPropagation();
@@ -3347,7 +3359,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     if (isPickPainted(chip)) {
       ensureXformFrame(ensureChrome(chip));
-      ensureXformHandle(chip.el);
+      ensureXformHandle(xformChromeOf(chip));
       syncGradWheel(chip);
       syncChromeSeat(chip);
       // Selection chrome tracks the painted box immediately; body remesh may follow.

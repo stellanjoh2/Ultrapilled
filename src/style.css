@@ -569,7 +569,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   mix-blend-mode: plus-lighter;
 }
 
-/* Selection chrome only — keeps assets at true layer order. */
+/* Selection chrome (frame + scale handle) — keeps assets at true layer order. */
 .chip-chrome-layer {
   z-index: 3;
 }
@@ -968,7 +968,8 @@ html[data-theme="day"] .chip-xform-handle {
   border-color: #111;
 }
 
-.chip.is-picked > .chip-xform-handle {
+.chip.is-picked > .chip-xform-handle,
+.chip-chrome.is-picked > .chip-xform-handle {
   --xform-pop: 1;
   opacity: 1;
   visibility: visible;
@@ -983,7 +984,9 @@ html[data-theme="day"] .chip-xform-handle {
 
 .chip-xform-handle:active,
 .chip.is-scaling > .chip-xform-handle,
-.chip.is-rotating > .chip-xform-handle {
+.chip.is-rotating > .chip-xform-handle,
+.chip-chrome.is-scaling > .chip-xform-handle,
+.chip-chrome.is-rotating > .chip-xform-handle {
   cursor: grabbing;
   background: #fff;
   color: #111;
@@ -1010,13 +1013,17 @@ html[data-theme="day"] .chip-xform-handle {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .chip.is-picked > .chip-xform-handle:hover {
+  .chip.is-picked > .chip-xform-handle:hover,
+  .chip-chrome.is-picked > .chip-xform-handle:hover {
     --xform-pop: 1.08;
   }
 
   .chip.is-picked > .chip-xform-handle:active,
   .chip.is-scaling > .chip-xform-handle,
-  .chip.is-rotating > .chip-xform-handle {
+  .chip.is-rotating > .chip-xform-handle,
+  .chip-chrome.is-picked > .chip-xform-handle:active,
+  .chip-chrome.is-scaling > .chip-xform-handle,
+  .chip-chrome.is-rotating > .chip-xform-handle {
     --xform-pop: 0.96;
   }
 }
@@ -1025,7 +1032,8 @@ html[data-theme="day"] .chip-xform-handle {
   .chip-xform-frame,
   .chip-chrome.is-picked > .chip-xform-frame,
   .chip-xform-handle,
-  .chip.is-picked > .chip-xform-handle {
+  .chip.is-picked > .chip-xform-handle,
+  .chip-chrome.is-picked > .chip-xform-handle {
     transition: none;
   }
 
@@ -1035,22 +1043,26 @@ html[data-theme="day"] .chip-xform-handle {
 }
 
 /* Keep the handle a constant screen size while the chip CSS-previews scale. */
-.chip.is-scaling > .chip-xform-handle {
+.chip.is-scaling > .chip-xform-handle,
+.chip-chrome.is-scaling > .chip-xform-handle {
   transform: translate(calc(100% + 6px), calc(100% + 6px))
     scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
 }
 
-.chip.is-scaling > .chip-xform-handle--ne {
+.chip.is-scaling > .chip-xform-handle--ne,
+.chip-chrome.is-scaling > .chip-xform-handle--ne {
   transform: translate(calc(100% + 6px), calc(-100% - 6px))
     scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
 }
 
-.chip.is-scaling > .chip-xform-handle--nw {
+.chip.is-scaling > .chip-xform-handle--nw,
+.chip-chrome.is-scaling > .chip-xform-handle--nw {
   transform: translate(calc(-100% - 6px), calc(-100% - 6px))
     scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
 }
 
-.chip.is-scaling > .chip-xform-handle--sw {
+.chip.is-scaling > .chip-xform-handle--sw,
+.chip-chrome.is-scaling > .chip-xform-handle--sw {
   transform: translate(calc(-100% - 6px), calc(100% + 6px))
     scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
 }
@@ -3225,10 +3237,6 @@ button.pill.slot-add:hover {
   filter: none;
 }
 
-.canvas-add-menu > button.pill.slot-add.is-clear .slot-add__icon svg {
-  transform: rotate(45deg);
-}
-
 .canvas-add-menu > button.pill.slot-add.is-clear:hover {
   background: #c62828;
   color: #fff;
@@ -4304,8 +4312,16 @@ html[data-theme="day"] .shape-swatch {
   }
 }
 
-.slot-menu {
+.slot-menu-host {
   position: fixed;
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.slot-menu {
+  position: relative;
   z-index: 90;
   display: flex;
   flex-direction: column;
@@ -4335,6 +4351,83 @@ html[data-theme="day"] .shape-swatch {
     transition:
       opacity 0.14s ease,
       transform 0.14s ease;
+  }
+}
+
+.slot-menu__layers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.slot-menu__layer {
+  display: grid;
+  place-items: center;
+  width: calc(54px * var(--ui-scale));
+  height: calc(54px * var(--ui-scale));
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
+  background: var(--canvas);
+  color: var(--ink);
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    opacity 0.15s ease,
+    transform 0.1s ease;
+}
+
+.slot-menu__layer:hover:not(:disabled) {
+  background: var(--canvas-soft);
+}
+
+.slot-menu__layer:active:not(:disabled) {
+  background: #fff;
+  color: #111;
+}
+
+.slot-menu__layer:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--canvas) 52%, transparent);
+  color: color-mix(in srgb, var(--ink) 42%, transparent);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  cursor: default;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .slot-menu__layer:disabled {
+    background: color-mix(in srgb, var(--canvas) 78%, transparent);
+    opacity: 0.55;
+  }
+}
+
+.slot-menu__layer-icon {
+  display: grid;
+  place-items: center;
+  width: calc(26px * var(--ui-scale));
+  height: calc(26px * var(--ui-scale));
+  pointer-events: none;
+}
+
+.slot-menu__layer-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .slot-menu__layer:hover:not(:disabled) {
+    transform: scale(1.06);
+  }
+
+  .slot-menu__layer:active:not(:disabled) {
+    transform: scale(0.96);
   }
 }
 
@@ -4421,7 +4514,9 @@ html[data-theme="day"] .shape-swatch {
 }
 
 .slot-menu__item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: calc(10px * var(--ui-scale));
   width: auto;
   margin: 0 calc(-1 * var(--space-1));
   padding: var(--space-0) var(--space-1);
@@ -4436,6 +4531,25 @@ html[data-theme="day"] .shape-swatch {
   text-align: left;
   cursor: pointer;
   transition: background 0.15s ease;
+}
+
+.slot-menu__item-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
+  pointer-events: none;
+}
+
+.slot-menu__item-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.slot-menu__item-label {
+  min-width: 0;
 }
 
 .slot-menu__item:disabled {

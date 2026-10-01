@@ -1,3 +1,23 @@
+import arrowCounterClockwise from "@phosphor-icons/core/assets/regular/arrow-counter-clockwise.svg?raw";
+import arrowsInLineHorizontal from "@phosphor-icons/core/assets/regular/arrows-in-line-horizontal.svg?raw";
+import caretDown from "@phosphor-icons/core/assets/regular/caret-down.svg?raw";
+import caretLineDown from "@phosphor-icons/core/assets/regular/caret-line-down.svg?raw";
+import caretLineUp from "@phosphor-icons/core/assets/regular/caret-line-up.svg?raw";
+import caretUp from "@phosphor-icons/core/assets/regular/caret-up.svg?raw";
+import circleHalf from "@phosphor-icons/core/assets/regular/circle-half.svg?raw";
+import copySimple from "@phosphor-icons/core/assets/regular/copy-simple.svg?raw";
+import eyedropper from "@phosphor-icons/core/assets/regular/eyedropper.svg?raw";
+import flipHorizontal from "@phosphor-icons/core/assets/regular/flip-horizontal.svg?raw";
+import flipVertical from "@phosphor-icons/core/assets/regular/flip-vertical.svg?raw";
+import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
+import paintBrush from "@phosphor-icons/core/assets/regular/paint-brush.svg?raw";
+import paintBucket from "@phosphor-icons/core/assets/regular/paint-bucket.svg?raw";
+import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
+import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?raw";
+import sparkle from "@phosphor-icons/core/assets/regular/sparkle.svg?raw";
+import trashSimple from "@phosphor-icons/core/assets/regular/trash-simple.svg?raw";
+import videoCamera from "@phosphor-icons/core/assets/regular/video-camera.svg?raw";
+import gsap from "gsap";
 import { wrapCheckInput } from "../checkBox";
 import { mountColorPicker } from "../colorPicker";
 import { isSvgSource } from "../chipKinds";
@@ -8,6 +28,13 @@ import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
 import { sanitizeTextMotion } from "../types";
 
 export type LayerMove = "front" | "forward" | "backward" | "back";
+
+const LAYER_ACTIONS: { label: string; where: LayerMove; icon: string }[] = [
+  { label: "Bring to front", where: "front", icon: caretLineUp },
+  { label: "Bring forward", where: "forward", icon: caretUp },
+  { label: "Send backward", where: "backward", icon: caretDown },
+  { label: "Send to back", where: "back", icon: caretLineDown },
+];
 
 export type SlotMenuHost = {
   state: AppState;
@@ -81,10 +108,12 @@ export function bindSlotMenu(host: SlotMenuHost) {
   H = host;
 }
 
-function placeSlotMenu(menu: HTMLElement, x: number, y: number) {
+function placeSlotMenu(root: HTMLElement, x: number, y: number) {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  document.body.append(menu);
-  placeZoomedFixed(menu, x, y, 8);
+  document.body.append(root);
+  placeZoomedFixed(root, x, y, 8);
+  const menu = root.querySelector(".slot-menu");
+  if (!(menu instanceof HTMLElement)) return;
   if (reduceMotion) menu.classList.add("is-in");
   else requestAnimationFrame(() => menu.classList.add("is-in"));
 }
@@ -210,9 +239,12 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
   H.pickSlot(id, { force: true });
   const slot = H.state.slots.find((item) => item.id === id);
   const abort = new AbortController();
+  const root = document.createElement("div");
+  root.className = "slot-menu-host";
   const menu = document.createElement("div");
   menu.className = "slot-menu";
   menu.setAttribute("role", "menu");
+  root.append(menu);
   // Panel scroll closes the menu; ignore scrolls caused by in-menu updates.
   let ignoreScroll = 0;
   const holdScrollClose = (fn: () => void) => {
@@ -226,7 +258,7 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     }
   };
 
-  // Solid select stroke while the menu is open; clear chip outline on option/close.
+  // Selection stroke while the menu is open; clear only when the menu dismisses.
   let menuStroke = true;
   const paintMenuStroke = () => {
     if (!menuStroke) return;
@@ -250,26 +282,22 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       H.remember();
       slot.colorIndex = index;
       slot.color = undefined;
-      clearMenuStroke();
       holdScrollClose(() => H.liveChip(slot.id));
     };
     const paintShapeCustom = (index: number, hex: string) => {
       slot.colorIndex = index;
       slot.color = hex;
-      clearMenuStroke();
       holdScrollClose(() => H.liveChip(slot.id));
     };
     const paintGradColor = (index: number) => {
       H.remember();
       slot.gradientColorIndex = index;
       slot.gradientColor = undefined;
-      clearMenuStroke();
       holdScrollClose(() => H.liveChip(slot.id));
     };
     const paintGradCustom = (index: number, hex: string) => {
       slot.gradientColorIndex = index;
       slot.gradientColor = hex;
-      clearMenuStroke();
       holdScrollClose(() => H.liveChip(slot.id));
     };
     const mountImageInk = () => {
@@ -287,10 +315,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
             slot.stroked = next;
             if (next && slot.stroke == null) slot.stroke = 4;
             panelNeedsSync = true;
-            clearMenuStroke();
             holdScrollClose(() => H.liveChip(slot.id));
             mountImageInk();
-            placeSlotMenu(menu, x, y);
+            placeSlotMenu(root, x, y);
           }),
         );
       } else if (H.iconCanGradient(slot)) {
@@ -319,10 +346,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
               slot.gradientColorIndex = gradientEndIndex(H.state.theme, slot);
             }
             panelNeedsSync = true;
-            clearMenuStroke();
             holdScrollClose(() => H.liveChip(slot.id));
             mountImageInk();
-            placeSlotMenu(menu, x, y);
+            placeSlotMenu(root, x, y);
           }),
         );
       }
@@ -339,7 +365,6 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
         slot.color = undefined;
         slot.textColorIndex = undefined;
         slot.textColor = undefined;
-        clearMenuStroke();
         holdScrollClose(() => H.liveChip(slot.id));
       };
       const paintCustom = (index: number, hex: string) => {
@@ -347,20 +372,17 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
         slot.color = hex;
         slot.textColorIndex = undefined;
         slot.textColor = undefined;
-        clearMenuStroke();
         holdScrollClose(() => H.liveChip(slot.id));
       };
       const paintGradColor = (index: number) => {
         H.remember();
         slot.gradientColorIndex = index;
         slot.gradientColor = undefined;
-        clearMenuStroke();
         holdScrollClose(() => H.liveChip(slot.id));
       };
       const paintGradCustom = (index: number, hex: string) => {
         slot.gradientColorIndex = index;
         slot.gradientColor = hex;
-        clearMenuStroke();
         holdScrollClose(() => H.liveChip(slot.id));
       };
       const nodes: HTMLElement[] = [];
@@ -393,10 +415,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
             slot.animatedGradient = undefined;
           }
           panelNeedsSync = true;
-          clearMenuStroke();
           holdScrollClose(() => H.liveChip(slot.id));
           mountBareInk();
-          placeSlotMenu(menu, x, y);
+          placeSlotMenu(root, x, y);
         }),
       );
       insertMenuInk(menu, nodes);
@@ -418,13 +439,11 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
             H.remember();
             slot.textColorIndex = index;
             slot.textColor = undefined;
-            clearMenuStroke();
             holdScrollClose(() => H.liveChip(slot.id));
           },
           (index, hex) => {
             slot.textColorIndex = index;
             slot.textColor = hex;
-            clearMenuStroke();
             holdScrollClose(() => H.liveChip(slot.id));
           },
           slot.textColor,
@@ -439,13 +458,11 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
               H.remember();
               slot.colorIndex = index;
               slot.color = undefined;
-              clearMenuStroke();
               holdScrollClose(() => H.liveChip(slot.id));
             },
             (index, hex) => {
               slot.colorIndex = index;
               slot.color = hex;
-              clearMenuStroke();
               holdScrollClose(() => H.liveChip(slot.id));
             },
             slot.color,
@@ -457,13 +474,11 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
               H.remember();
               slot.gradientColorIndex = index;
               slot.gradientColor = undefined;
-              clearMenuStroke();
               holdScrollClose(() => H.liveChip(slot.id));
             },
             (index, hex) => {
               slot.gradientColorIndex = index;
               slot.gradientColor = hex;
-              clearMenuStroke();
               holdScrollClose(() => H.liveChip(slot.id));
             },
             slot.gradientColor,
@@ -478,13 +493,11 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
               H.remember();
               slot.colorIndex = index;
               slot.color = undefined;
-              clearMenuStroke();
               holdScrollClose(() => H.liveChip(slot.id));
             },
             (index, hex) => {
               slot.colorIndex = index;
               slot.color = hex;
-              clearMenuStroke();
               holdScrollClose(() => H.liveChip(slot.id));
             },
             slot.color,
@@ -500,10 +513,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
             slot.gradient = false;
           }
           panelNeedsSync = true;
-          clearMenuStroke();
           holdScrollClose(() => H.liveChip(slot.id));
           mountTextInk();
-          placeSlotMenu(menu, x, y);
+          placeSlotMenu(root, x, y);
         }),
         menuCheckRow("Gradient", Boolean(slot.gradient) && !slot.stroked, (next) => {
           H.remember();
@@ -520,10 +532,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
             slot.animatedGradient = undefined;
           }
           panelNeedsSync = true;
-          clearMenuStroke();
           holdScrollClose(() => H.liveChip(slot.id));
           mountTextInk();
-          placeSlotMenu(menu, x, y);
+          placeSlotMenu(root, x, y);
         }),
       );
       insertMenuInk(menu, nodes);
@@ -532,15 +543,18 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
   }
 
   const actions: {
+    id: string;
     label: string;
+    icon: string;
     run: () => void;
     stay?: boolean;
-    layer?: LayerMove;
     disabled?: () => boolean;
   }[] = [];
   if (slot?.kind === "image" && H.uploadedShape(slot)) {
     actions.push({
+      id: "replace-image",
       label: "Replace image",
+      icon: imageIcon,
       run: () => {
         void H.pickImageFiles(false).then((files) => {
           const file = files[0];
@@ -558,7 +572,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
   }
   if (slot?.kind === "image" && slot.video) {
     actions.push({
+      id: "replace-video",
       label: "Replace video",
+      icon: videoCamera,
       run: () => {
         void H.pickImageFiles(false).then((files) => {
           const file = files[0];
@@ -580,7 +596,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
   }
   if (slot?.kind === "image" && H.uploadedShape(slot) && isSvgSource(slot) && !slot.tint) {
     actions.push({
+      id: "recolor",
       label: "Recolor",
+      icon: paintBucket,
       stay: true,
       run: () => {
         H.remember();
@@ -588,15 +606,16 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
         playSwitch(true);
         panelNeedsSync = true;
         revealImageInk?.();
-        clearMenuStroke();
         holdScrollClose(() => H.liveChip(id));
-        placeSlotMenu(menu, x, y);
+        placeSlotMenu(root, x, y);
       },
     });
   }
   if (slot?.kind === "image" && H.uploadedShape(slot) && isSvgSource(slot) && slot.tint) {
     actions.push({
+      id: "original-color",
       label: "Original Color",
+      icon: arrowCounterClockwise,
       run: () => {
         H.remember();
         slot.tint = undefined;
@@ -609,23 +628,37 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     });
   }
   if (slot?.kind === "text") {
-    actions.push({ label: "Edit text", run: () => H.editChipText(id, false) });
+    actions.push({
+      id: "edit-text",
+      label: "Edit text",
+      icon: pencilSimple,
+      run: () => H.editChipText(id, false),
+    });
   }
   // Invert: text/SVG/presets flip ink; rasters toggle pixel invert. Recolor is SVG-only.
-  actions.push({ label: "Duplicate", run: () => H.duplicateSlot(id) });
+  actions.push({
+    id: "duplicate",
+    label: "Duplicate",
+    icon: copySimple,
+    run: () => H.duplicateSlot(id),
+  });
   if (slot) {
     actions.push({
+      id: "copy-style",
       label: "Copy style",
+      icon: eyedropper,
       stay: true,
       run: () => {
         H.copySlotStyle(slot);
         menu.querySelectorAll<HTMLButtonElement>(".slot-menu__item").forEach((btn) => {
-          if (btn.textContent === "Paste style") btn.disabled = !H.canPasteSlotStyle(slot);
+          if (btn.dataset.action === "paste-style") btn.disabled = !H.canPasteSlotStyle(slot);
         });
       },
     });
     actions.push({
+      id: "paste-style",
       label: "Paste style",
+      icon: paintBrush,
       disabled: () => !H.canPasteSlotStyle(slot),
       run: () => H.pasteSlotStyle(id),
     });
@@ -636,7 +669,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     const chipAnimating = Boolean(H.world.chipEl(id)?.classList.contains("is-text-anim-host"));
     const animating = Boolean(slot.textAnim) || chipAnimating;
     actions.push({
+      id: animating ? "stop-animation" : "animate",
       label: animating ? "Stop Animation" : "Animate",
+      icon: animating ? pauseIcon : sparkle,
       run: () => {
         H.remember();
         const current = H.state.slots.find((item) => item.id === id);
@@ -649,28 +684,11 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       },
     });
   }
-  if (H.state.physics.layoutMode && H.state.slots.length > 1) {
-    const layers: { label: string; where: LayerMove; stay?: boolean }[] = [
-      { label: "Bring to front", where: "front" },
-      { label: "Bring forward", where: "forward", stay: true },
-      { label: "Send backward", where: "backward", stay: true },
-      { label: "Send to back", where: "back" },
-    ];
-    for (const item of layers) {
-      actions.push({
-        label: item.label,
-        stay: item.stay,
-        layer: item.where,
-        disabled: () => !H.canMoveSlotLayer(id, item.where),
-        run: () => {
-          H.moveSlotLayer(id, item.where);
-        },
-      });
-    }
-  }
   if (H.state.physics.layoutMode) {
     actions.push({
+      id: "align-straight",
       label: "Align straight",
+      icon: arrowsInLineHorizontal,
       stay: true,
       run: () => {
         holdScrollClose(() => H.alignSlotStraight(id));
@@ -679,21 +697,27 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
   }
   actions.push(
     {
+      id: "flip-horizontal",
       label: "Flip horizontal",
+      icon: flipHorizontal,
       stay: true,
       run: () => {
         holdScrollClose(() => H.flipSlot(id, "x"));
       },
     },
     {
+      id: "flip-vertical",
       label: "Flip vertical",
+      icon: flipVertical,
       stay: true,
       run: () => {
         holdScrollClose(() => H.flipSlot(id, "y"));
       },
     },
     {
+      id: "invert",
       label: "Invert",
+      icon: circleHalf,
       stay: true,
       disabled: () => Boolean(slot?.kind === "image" && slot.emoji),
       run: () => {
@@ -703,10 +727,10 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
         if (enableTint) {
           panelNeedsSync = true;
           revealImageInk?.();
-          menu.querySelectorAll(".slot-menu__item").forEach((item) => {
-            if (item.textContent === "Recolor") item.remove();
+          menu.querySelectorAll<HTMLElement>(".slot-menu__item").forEach((item) => {
+            if (item.dataset.action === "recolor") item.remove();
           });
-          placeSlotMenu(menu, x, y);
+          placeSlotMenu(root, x, y);
         }
         menu.querySelectorAll<HTMLElement>(".slot-menu__colors").forEach((row) => {
           const name = row.getAttribute("aria-label") || "";
@@ -718,50 +742,88 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
         });
       },
     },
-    { label: "Remove", run: () => H.removeSlot(id) },
+    {
+      id: "remove",
+      label: "Remove",
+      icon: trashSimple,
+      run: () => H.removeSlot(id),
+    },
   );
-  const refreshDisabled = () => {
-    menu.querySelectorAll<HTMLButtonElement>(".slot-menu__item[data-layer]").forEach((btn) => {
-      const where = btn.dataset.layer as LayerMove | undefined;
-      if (!where) return;
-      btn.disabled = !H.canMoveSlotLayer(id, where);
-    });
-  };
   for (const action of actions) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "slot-menu__item";
+    btn.dataset.action = action.id;
     btn.setAttribute("role", "menuitem");
-    btn.textContent = action.label;
-    if (action.layer) btn.dataset.layer = action.layer;
+    btn.innerHTML = `<span class="slot-menu__item-icon" aria-hidden="true">${action.icon}</span><span class="slot-menu__item-label">${action.label}</span>`;
     if (action.disabled) btn.disabled = action.disabled();
     btn.addEventListener("click", () => {
       if (btn.disabled) return;
-      clearMenuStroke();
       if (!action.stay) closeSlotMenu();
       action.run();
-      if (action.layer && action.stay) refreshDisabled();
-      if (action.label === "Recolor") {
+      if (action.id === "recolor") {
         btn.remove();
-        placeSlotMenu(menu, x, y);
+        placeSlotMenu(root, x, y);
       }
     });
     menu.append(btn);
   }
 
-  placeSlotMenu(menu, x, y);
+  const layerBtns: HTMLButtonElement[] = [];
+  if (H.state.physics.layoutMode && H.state.slots.length > 1) {
+    const layers = document.createElement("div");
+    layers.className = "slot-menu__layers";
+    layers.setAttribute("role", "group");
+    layers.setAttribute("aria-label", "Layer order");
+    const refreshLayers = () => {
+      layers.querySelectorAll<HTMLButtonElement>(".slot-menu__layer").forEach((btn) => {
+        const where = btn.dataset.layer as LayerMove | undefined;
+        if (!where) return;
+        btn.disabled = !H.canMoveSlotLayer(id, where);
+      });
+    };
+    for (const item of LAYER_ACTIONS) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "slot-menu__layer";
+      btn.dataset.layer = item.where;
+      btn.setAttribute("aria-label", item.label);
+      btn.innerHTML = `<span class="slot-menu__layer-icon" aria-hidden="true">${item.icon}</span>`;
+      btn.disabled = !H.canMoveSlotLayer(id, item.where);
+      btn.addEventListener("click", () => {
+        if (btn.disabled) return;
+        H.moveSlotLayer(id, item.where);
+        refreshLayers();
+      });
+      layers.append(btn);
+      layerBtns.push(btn);
+    }
+    root.append(layers);
+  }
+
+  placeSlotMenu(root, x, y);
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (layerBtns.length && !reduceMotion) {
+    gsap.fromTo(
+      layerBtns,
+      { autoAlpha: 0, y: -10 },
+      { autoAlpha: 1, y: 0, duration: 0.11, stagger: 0.025, ease: "power2.out" },
+    );
+  }
 
   const closeCurrent = () => {
     abort.abort();
+    gsap.killTweensOf(layerBtns);
     if (getCloseSlotMenu() === closeCurrent) setCloseSlotMenu(() => {});
     if (H.tintPicker && menu.contains(H.tintPicker.anchor)) H.tintPicker.close();
     clearMenuStroke();
-    menu.remove();
+    root.remove();
     if (panelNeedsSync) {
       panelNeedsSync = false;
       H.renderPanel();
     }
   };
   setCloseSlotMenu(closeCurrent);
-  H.bindSlotMenuDismiss(menu, abort, closeCurrent, { keepOnScroll: () => ignoreScroll > 0 });
+  H.bindSlotMenuDismiss(root, abort, closeCurrent, { keepOnScroll: () => ignoreScroll > 0 });
 }

@@ -59,6 +59,16 @@ import {
 } from "./customTemplates";
 import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
 import playIcon from "@phosphor-icons/core/assets/regular/play.svg?raw";
+import pillIcon from "@phosphor-icons/core/assets/regular/pill.svg?raw";
+import textT from "@phosphor-icons/core/assets/regular/text-t.svg?raw";
+import shapesIcon from "@phosphor-icons/core/assets/regular/shapes.svg?raw";
+import smileyIcon from "@phosphor-icons/core/assets/regular/smiley.svg?raw";
+import uploadSimple from "@phosphor-icons/core/assets/regular/upload-simple.svg?raw";
+import imagesIcon from "@phosphor-icons/core/assets/regular/images.svg?raw";
+import youtubeLogo from "@phosphor-icons/core/assets/regular/youtube-logo.svg?raw";
+import eyeIcon from "@phosphor-icons/core/assets/regular/eye.svg?raw";
+import eyeSlash from "@phosphor-icons/core/assets/regular/eye-slash.svg?raw";
+import trashSimple from "@phosphor-icons/core/assets/regular/trash-simple.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
 import { isAboutOpen } from "./aboutPanel";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
@@ -89,7 +99,6 @@ import { createWorld } from "./world";
 import { cancelSlotDrag } from "./slotDrag";
 import { bindUiClickSounds, bindUiTypeSounds, playButton, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
 import gsap from "gsap";
-import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
 import "./style.css";
 import { placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
 import { beginScrub, endScrub } from "./scrub";
@@ -3209,13 +3218,15 @@ function openCanvasMenu(x: number, y: number) {
   menu.setAttribute("role", "menu");
 
   const at: PlaceAt = { clientX: x, clientY: y };
-  const entries: { label: string; run: () => void; clear?: boolean }[] = [
-    { label: "Add pill", run: () => addPillSlot(at) },
-    { label: "Add Text", run: () => addTypeSlot(at) },
-    { label: "Add shape", run: () => addShapeSlot(at) },
-    { label: "Add emoji", run: () => addEmojiSlot(at) },
+  const uiHidden = shell.classList.contains("ui-hidden");
+  const entries: { label: string; icon: string; run: () => void; clear?: boolean }[] = [
+    { label: "Add pill", icon: pillIcon, run: () => addPillSlot(at) },
+    { label: "Add Text", icon: textT, run: () => addTypeSlot(at) },
+    { label: "Add shape", icon: shapesIcon, run: () => addShapeSlot(at) },
+    { label: "Add emoji", icon: smileyIcon, run: () => addEmojiSlot(at) },
     {
       label: "Upload image",
+      icon: uploadSimple,
       run: () => {
         void pickImageFiles(true).then((files) => {
           if (!files.length) return;
@@ -3225,6 +3236,7 @@ function openCanvasMenu(x: number, y: number) {
     },
     {
       label: "Add from Unsplash",
+      icon: imagesIcon,
       run: () => {
         openUnsplashImport({
           onPick: (file) => addImagesFromFiles([file], at),
@@ -3233,6 +3245,7 @@ function openCanvasMenu(x: number, y: number) {
     },
     {
       label: "Add from YouTube",
+      icon: youtubeLogo,
       run: () => {
         openYouTubeImport({
           onPick: (clip) => addYouTubeSlot(clip, at),
@@ -3240,14 +3253,15 @@ function openCanvasMenu(x: number, y: number) {
       },
     },
     {
-      label: shell.classList.contains("ui-hidden") ? "Show UI" : "Hide UI",
+      label: uiHidden ? "Show UI" : "Hide UI",
+      icon: uiHidden ? eyeIcon : eyeSlash,
       run: () => {
         shell.classList.toggle("ui-hidden");
         playTransition(!shell.classList.contains("ui-hidden"));
         resize();
       },
     },
-    { label: "Clear canvas", clear: true, run: () => clearCanvas() },
+    { label: "Clear canvas", icon: trashSimple, clear: true, run: () => clearCanvas() },
   ];
 
   const buttons: HTMLButtonElement[] = [];
@@ -3256,7 +3270,7 @@ function openCanvasMenu(x: number, y: number) {
     btn.type = "button";
     btn.className = entry.clear ? "pill slot-add is-clear" : "pill slot-add";
     btn.setAttribute("role", "menuitem");
-    btn.innerHTML = `<span class="slot-add__icon" aria-hidden="true">${plus}</span>${entry.label}`;
+    btn.innerHTML = `<span class="slot-add__icon" aria-hidden="true">${entry.icon}</span>${entry.label}`;
     btn.addEventListener("click", () => {
       closeSlotMenu();
       entry.run();
@@ -3586,7 +3600,7 @@ function editChipText(id: string, wipe: boolean) {
       queueMicrotask(() => {
         if (!armBlur) return;
         if (world.editingId() !== id) return;
-        if (document.activeElement?.closest?.(".chip-edit, .slot-menu")) return;
+        if (document.activeElement?.closest?.(".chip-edit, .slot-menu, .slot-menu-host")) return;
         endChipEdit();
       });
     },
@@ -4887,7 +4901,7 @@ function toggleRepeat() {
 
 function typingInField(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  return Boolean(target.closest("input, textarea, select, [contenteditable], .font-pick, .font-menu, .slot-menu, .color-pop, .theme-shelf, .dev-panel"));
+  return Boolean(target.closest("input, textarea, select, [contenteditable], .font-pick, .font-menu, .slot-menu, .slot-menu-host, .color-pop, .theme-shelf, .dev-panel"));
 }
 
 function editingText(target: EventTarget | null): boolean {
