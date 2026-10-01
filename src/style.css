@@ -354,6 +354,18 @@ body:has(.app.ui-hidden) .ui-tip {
   pointer-events: none;
 }
 
+.topbar .logotype {
+  pointer-events: auto;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .topbar .logotype,
 .mode-select__mark.logotype {
   display: flex;
@@ -361,6 +373,19 @@ body:has(.app.ui-hidden) .ui-tip {
   width: calc(240px * var(--ui-scale));
   height: auto;
   color: #ffffff;
+}
+
+/* Idle topbar: themed white layer visible; purple/lime stay clipped. */
+.topbar .logotype-reveal__layer--white {
+  clip-path: inset(0% 0% 0% 0%);
+}
+
+.topbar .logotype-reveal__layer--white .logotype__glyph {
+  fill: var(--logotype-ink, #ffffff);
+}
+
+.topbar .logotype-reveal__layer--white .logotype__pill {
+  fill: var(--logotype-pill, #ffffff);
 }
 
 .logotype__label {
@@ -1230,6 +1255,15 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   background-size: 200% 200%;
 }
 
+.chip-label .char.is-text-gradient,
+.chip-edit .char.is-text-gradient {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background-repeat: no-repeat;
+}
+
 .chip-label.is-text-gradient .char,
 .chip-edit.is-text-gradient .char {
   color: inherit;
@@ -1241,6 +1275,13 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 .loop-chip__text.is-text-anim {
   display: block;
   line-height: 1;
+  overflow: hidden;
+}
+
+/* Bare type: seat to ink box in JS — never clip resting glyphs. */
+.chip.chip-bare > .chip-label.is-text-anim,
+.chip.chip-bare > .chip-label.is-bare-text-anim {
+  overflow: visible;
 }
 
 /* Clip letters to the pill’s rounded box — not a tight line box mid-air. */
@@ -1248,6 +1289,11 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 .smash-btn__label.is-text-anim-host,
 .panel-util.is-text-anim-host {
   overflow: hidden;
+}
+
+/* Bare type: ink-tight chip — resting overhang OK; travel clips on the label for pills only. */
+.chip.chip-bare.is-text-anim-host {
+  overflow: visible;
 }
 
 /* Keep transform handles visible while picked. */
@@ -1262,18 +1308,31 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   display: block;
   height: 1em;
   line-height: 1;
+  overflow: hidden;
 }
 
+.chip.chip-bare .text-anim-clip {
+  overflow: visible;
+}
+
+/* Inline flow so inherited letter-spacing applies between .char (flex ignores it). */
 .chip-label .text-anim-word,
 .smash-btn__text .text-anim-word,
 .loop-chip__text .text-anim-word {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  text-align: center;
   white-space: nowrap;
   line-height: 1;
+}
+
+/* Bare: left-align at ink origin (JS also sets these; keep CSS fallback aligned). */
+.chip.chip-bare .text-anim-word {
+  position: relative;
+  inset: auto;
+  text-align: left;
+  width: max-content;
 }
 
 .chip-label .char,

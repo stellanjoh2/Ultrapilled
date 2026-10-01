@@ -7,7 +7,7 @@ import { peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
 import { rasterRing, textLookFlags } from "../chipLook";
 import { textAnimCharPose, textAnimTravel } from "../textAnim";
-import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
+import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 
 const GRAIN_URL =
   "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix type='saturate' values='0' in='t' result='m'/%3E%3CfeComponentTransfer in='m'%3E%3CfeFuncR type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncG type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncB type='linear' slope='2.2' intercept='-0.6'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
@@ -249,6 +249,7 @@ function drawText(
   theme: string[],
   timeMs = 0,
 ) {
+  sanitizeTextMotion(slot);
   const radius = chip.radius * scale;
   const { ring, bare, shapeGradient: gradient } = textLookFlags(slot);
   if (gradient) {

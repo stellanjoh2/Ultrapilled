@@ -23,7 +23,8 @@ export type PlaySessionHost = {
   paintPhysDebug: () => void;
   tickAudioReact: (now: number) => void;
   nudgeEmptyScene: () => void;
-  notifyLayoutModeBlocksPhysics: () => Promise<void>;
+  /** Resolves true when layout mode was turned off so physics can run. */
+  notifyLayoutModeBlocksPhysics: () => Promise<boolean>;
   playButton: () => void;
   getRunning: () => boolean;
   setRunningFlag: (on: boolean) => void;
@@ -138,8 +139,8 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
       return;
     }
     if (state.physics.layoutMode) {
-      await host.notifyLayoutModeBlocksPhysics();
-      return;
+      const activated = await host.notifyLayoutModeBlocksPhysics();
+      if (!activated) return;
     }
     host.playButton();
     setRunning(true);

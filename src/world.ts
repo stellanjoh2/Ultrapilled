@@ -30,7 +30,21 @@ import { beginScrub, endScrub } from "./scrub";
 
 export type { ChipDraw, ChipPose } from "./chipKinds";
 
-const { Engine, Runner, Bodies, Composite, Body, Constraint, Sleeping, Events, Collision, Query } = Matter;
+const { Engine, Runner, Bodies, Composite, Body, Constraint, Sleeping, Events, Collision, Query, Axes } =
+  Matter;
+
+/**
+ * Mirror a Matter body on one axis. `Body.scale` with a negative factor reverses
+ * vertex winding, which breaks `Query.point` / `Vertices.contains` (and SAT axes).
+ * Reverse vertices afterward so hit-testing and collisions stay valid.
+ */
+function flipBodyAxis(body: Matter.Body, axis: "x" | "y") {
+  Body.scale(body, axis === "x" ? -1 : 1, axis === "y" ? -1 : 1);
+  for (const part of body.parts) {
+    part.vertices.reverse();
+    part.axes = Axes.fromVertices(part.vertices);
+  }
+}
 
 const WALL = 120;
 /** Shapes stop this far inside the canvas so the border never clips them. */
@@ -1783,8 +1797,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   /** Mirror Matter vertices to match visual flip. */
   function applyBodyFlip(chip: DroppedChip) {
-    if (chip.flipX) Body.scale(chip.body, -1, 1);
-    if (chip.flipY) Body.scale(chip.body, 1, -1);
+    if (chip.flipX) flipBodyAxis(chip.body, "x");
+    if (chip.flipY) flipBodyAxis(chip.body, "y");
   }
 
   function flipChips(slotId: string, axis: "x" | "y") {
@@ -1793,11 +1807,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     for (const chip of targets) {
       if (axis === "x") {
         chip.flipX = !chip.flipX;
-        Body.scale(chip.body, -1, 1);
       } else {
         chip.flipY = !chip.flipY;
-        Body.scale(chip.body, 1, -1);
       }
+      flipBodyAxis(chip.body, axis);
       syncWallCollision(chip);
       seat(chip);
     }
@@ -2495,6 +2508,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function updateChipGradientPaint(chip: DroppedChip, from: string, to: string, angle: number, scale: number) {
     const slot = chip.look?.slot;
     if (!slot) return;
+    // look.slot is a scaled copy from the last paint — keep angle/scale in sync with the live wheel.
+    if ("gradientAngle" in slot) slot.gradientAngle = angle;
+    if ("gradientScale" in slot) slot.gradientScale = scale;
     const radius = chip.look?.radius ?? 0;
     if (slot.kind === "text") {
       if (slot.shape === "none" && slot.gradient) {
@@ -2509,8 +2525,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
             }
           }
         } else {
-          paintBareText(chip.el, slot, chip.width, chip.height, tracking, from, shiftEm, to);
-          paintBareText(chip.glow, slot, chip.width, chip.height, tracking, from, shiftEm, to);
+          paintBareText(chip.el, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
+          paintBareText(chip.glow, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
         }
         return;
       }

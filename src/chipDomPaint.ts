@@ -1,12 +1,12 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { rasterRing, textLookFlags } from "./chipLook";
-import { measureTextInk, paintTextInk } from "./measure";
+import { measureTextInk, paintTextInk, TEXT_INK_PAD } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
 import { applyTextAnim, stopTextAnim } from "./textAnim";
 import { inkOn } from "./theme";
 import { peekTrim } from "./trim";
-import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, type Slot, type TextSlot } from "./types";
+import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type Slot, type TextSlot } from "./types";
 import { armYouTubeLoop, clearYouTubeLoop, youtubeEmbedKey, youtubeEmbedSrc } from "./youtube";
 
 export function paintSweepBand(
@@ -146,6 +146,8 @@ export function paintBareText(
   color: string,
   shiftEm: number,
   gradientTo = "",
+  angle?: number,
+  scale?: number,
 ) {
   const found = el.querySelector(":scope > canvas");
   const canvas = found instanceof HTMLCanvasElement ? found : document.createElement("canvas");
@@ -174,7 +176,15 @@ export function paintBareText(
   const ink = measureTextInk(slot, tracking);
   const fill =
     slot.gradient && gradientTo
-      ? textGradientFill(ctx, width, height, color, gradientTo, slot.gradientAngle, slot.gradientScale)
+      ? textGradientFill(
+          ctx,
+          width,
+          height,
+          color,
+          gradientTo,
+          angle ?? slot.gradientAngle,
+          scale ?? slot.gradientScale,
+        )
       : color;
   paintTextInk(ctx, slot, tracking, fill, shiftEm, ink);
 }
@@ -185,6 +195,8 @@ export function clearBareTextCss(el: HTMLElement) {
   el.style.removeProperty("background-image");
   el.style.removeProperty("background-color");
   el.style.removeProperty("background-size");
+  el.style.removeProperty("background-position");
+  el.style.removeProperty("background-repeat");
   el.style.removeProperty("-webkit-background-clip");
   el.style.removeProperty("background-clip");
   el.style.removeProperty("color");
@@ -215,13 +227,100 @@ export function styleBareTextCss(
     el.style.removeProperty("--grad-angle");
   }
   el.style.backgroundColor = "transparent";
+  el.style.backgroundRepeat = "no-repeat";
   el.style.webkitBackgroundClip = "text";
   el.style.backgroundClip = "text";
   el.style.color = "transparent";
   el.style.webkitTextFillColor = "transparent";
 }
 
-/** CSS text fill for bare type that can't use the ink canvas (edit / text anim / animated gradient). */
+/** One static gradient across a word of split glyphs (layout offsets; ignores GSAP transforms). */
+function syncCharWordGradient(word: HTMLElement) {
+  const chars = [...word.querySelectorAll<HTMLElement>(".char")];
+  if (!chars.length) return;
+  let minL = Infinity;
+  let maxR = -Infinity;
+  let minT = Infinity;
+  let maxB = -Infinity;
+  for (const char of chars) {
+    const l = char.offsetLeft;
+    const t = char.offsetTop;
+    minL = Math.min(minL, l);
+    maxR = Math.max(maxR, l + char.offsetWidth);
+    minT = Math.min(minT, t);
+    maxB = Math.max(maxB, t + char.offsetHeight);
+  }
+  const wordW = Math.max(1, maxR - minL);
+  const wordH = Math.max(1, maxB - minT);
+  for (const char of chars) {
+    char.style.backgroundSize = `${wordW}px ${wordH}px`;
+    char.style.backgroundPosition = `${-(char.offsetLeft - minL)}px ${-(char.offsetTop - minT)}px`;
+  }
+}
+
+/** Pin bare letter-cycle DOM to the same ink origin as the canvas paint path. */
+function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: number) {
+  const ink = measureTextInk(slot, tracking);
+
+  label.classList.add("is-bare-text-anim");
+  label.style.position = "absolute";
+  label.style.left = "0";
+  label.style.top = "0";
+  label.style.width = "100%";
+  label.style.height = "100%";
+  label.style.overflow = "visible";
+  label.style.display = "block";
+  label.style.lineHeight = "1";
+  label.style.boxSizing = "border-box";
+  label.style.margin = "0";
+  label.style.padding = "0";
+
+  const clip = label.querySelector<HTMLElement>(":scope > .text-anim-clip");
+  if (clip) {
+    // Same top pad as measureTextInk / paintTextInk.
+    clip.style.position = "absolute";
+    clip.style.left = `${ink.originX}px`;
+    clip.style.top = `${TEXT_INK_PAD}px`;
+    clip.style.width = `${Math.max(1, ink.width - ink.originX - TEXT_INK_PAD)}px`;
+    clip.style.height = `${Math.ceil(slot.fontSize)}px`;
+    clip.style.overflow = "visible";
+    clip.style.lineHeight = "1";
+  }
+  for (const word of label.querySelectorAll<HTMLElement>(".text-anim-word")) {
+    word.style.position = "relative";
+    word.style.inset = "auto";
+    word.style.left = "0";
+    word.style.top = "0";
+    word.style.display = "block";
+    word.style.textAlign = "left";
+    word.style.width = "max-content";
+    word.style.height = "100%";
+  }
+  for (const char of label.querySelectorAll<HTMLElement>(".char")) {
+    // Top-align so the em box shares the canvas ink top (baseline align sits lower).
+    char.style.verticalAlign = "top";
+  }
+}
+
+function clearBareTextAnimSeat(label: HTMLElement) {
+  if (!label.classList.contains("is-bare-text-anim")) return;
+  label.classList.remove("is-bare-text-anim");
+  for (const prop of [
+    "position",
+    "left",
+    "top",
+    "width",
+    "height",
+    "overflow",
+    "display",
+    "line-height",
+    "box-sizing",
+    "margin",
+    "padding",
+  ] as const) {
+    label.style.removeProperty(prop);
+  }
+}
 export function paintBareTextCss(
   label: HTMLElement,
   from: string,
@@ -232,17 +331,23 @@ export function paintBareTextCss(
   speed?: number,
 ) {
   const words = [...label.querySelectorAll<HTMLElement>(".text-anim-word")];
+  const chars = [...label.querySelectorAll<HTMLElement>(".char")];
   if (!to) {
     clearBareTextCss(label);
     for (const word of words) clearBareTextCss(word);
+    for (const char of chars) clearBareTextCss(char);
     return;
   }
-  // Keep the host marked so .char inherits transparent fill; paint each word for clip.
-  if (words.length > 0) {
-    label.classList.add("is-text-gradient");
-    if (animated) label.classList.add("is-gradient-animated");
-    else label.classList.remove("is-gradient-animated");
-    for (const word of words) styleBareTextCss(word, from, to, angle, scale, animated, speed);
+  // Letter-cycle + animated gradient are mutually exclusive. With textAnim we only
+  // ever paint a static gradient — share one word-sized tile across glyphs.
+  if (chars.length > 0) {
+    clearBareTextCss(label);
+    for (const word of words) {
+      clearBareTextCss(word);
+      const wordChars = [...word.querySelectorAll<HTMLElement>(".char")];
+      for (const char of wordChars) styleBareTextCss(char, from, to, angle, scale, false, speed);
+      syncCharWordGradient(word);
+    }
     return;
   }
   styleBareTextCss(label, from, to, angle, scale, animated, speed);
@@ -251,7 +356,10 @@ export function paintBareTextCss(
 export function textLabel(el: HTMLElement, editing: boolean): HTMLElement {
   const found = el.querySelector(":scope > .chip-label, :scope > .chip-edit");
   const label = found instanceof HTMLElement ? found : document.createElement("span");
-  label.className = editing ? "chip-edit" : "chip-label";
+  // Swap role classes only — a full className reset drops is-text-anim /
+  // is-text-gradient and leaves GSAP letter motion in a broken inline layout.
+  label.classList.remove("chip-label", "chip-edit");
+  label.classList.add(editing ? "chip-edit" : "chip-label");
   if (editing) {
     label.setAttribute("contenteditable", "plaintext-only");
     if (label.contentEditable !== "plaintext-only") label.contentEditable = "true";
@@ -328,6 +436,7 @@ export function applyVisual(
   el.style.webkitMaskImage = "";
 
   if (slot.kind === "text") {
+    sanitizeTextMotion(slot);
     const { ring, bare, shapeGradient, textGradient: wantsTextGradient } = textLookFlags(slot);
     const textGradient = wantsTextGradient && Boolean(gradientTo);
     const hideText = bloom && !bare;
@@ -388,23 +497,51 @@ export function applyVisual(
     }
     // While editing, the caret owns the text — don't clobber it from slot.
     if (!liveEdit) {
+      const paintGrad = () => {
+        if (!textGradient) return;
+        paintBareTextCss(
+          label,
+          fill,
+          gradientTo,
+          slot.gradientAngle,
+          slot.gradientScale,
+          Boolean(slot.animatedGradient),
+          slot.gradientSpeed,
+        );
+      };
       if (hideText) {
         stopTextAnim(label);
+        clearBareTextAnimSeat(label);
         label.textContent = "";
-      } else if (!applyTextAnim(label, slot)) {
+      } else if (
+        !applyTextAnim(label, slot, (lbl) => {
+          // Seat while glyphs are still at rest — before the GSAP timeline starts.
+          if (bare) seatBareTextAnimLabel(lbl, slot, tracking);
+          if (textGradient) paintGrad();
+        })
+      ) {
+        clearBareTextAnimSeat(label);
         label.textContent = slot.text;
+      } else if (bare) {
+        // Timeline reused (early return) — prepare was skipped; reseat + repaint.
+        seatBareTextAnimLabel(label, slot, tracking);
+      } else {
+        clearBareTextAnimSeat(label);
       }
+      // Gradient clip hides the native caret — use solid ink while typing.
+      // Also refreshes fill when the letter-cycle timeline was reused (early return).
+      if (textGradient) paintGrad();
+      else paintBareTextCss(label, "", "");
+      if (textGradient) el.style.color = "transparent";
     } else if (label.classList.contains("is-text-anim")) {
       stopTextAnim(label);
+      clearBareTextAnimSeat(label);
       label.textContent = slot.text;
     }
-    // Gradient clip hides the native caret — use solid ink while typing.
-    if (textGradient && !liveEdit) {
-      paintBareTextCss(label, fill, gradientTo, slot.gradientAngle, slot.gradientScale, Boolean(slot.animatedGradient), slot.gradientSpeed);
-      el.style.color = "transparent";
-    } else {
+    if (liveEdit) {
+      // Gradient clip hides the native caret — use solid ink while typing.
       paintBareTextCss(label, "", "");
-      if (liveEdit && textGradient) el.style.color = fill;
+      if (textGradient) el.style.color = fill;
     }
     // Caret must read on any surface: match ink on bare type; contrast the pill fill otherwise.
     if (liveEdit) {

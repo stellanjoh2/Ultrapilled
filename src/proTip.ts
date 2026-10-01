@@ -26,6 +26,7 @@ const HINTS: Hint[] = [
   { text: "Toggle the guide grid", key: "G" },
   { text: "Delete a selected piece with Backspace" },
   { text: "Duplicate a selection with ⌘D or Ctrl+D" },
+  { text: "Copy and paste assets with ⌘C / ⌘V or Ctrl+C / Ctrl+V" },
   { text: "Invert the selected piece", key: "I" },
   { text: "Click a piece to edit it" },
   { text: "Double-click one shape in a group to edit it alone" },

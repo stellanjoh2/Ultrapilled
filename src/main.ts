@@ -26,6 +26,7 @@ import {
   type ImageSlot,
   type Slot,
   type TextSlot,
+  sanitizeTextMotion,
   weightName,
 } from "./types";
 import { isMicActive, sampleOnset, startMic, stopMic } from "./audioReact";
@@ -36,13 +37,14 @@ import { mountColorPicker } from "./colorPicker";
 import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
 import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
 import { inkOn, logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
-import { LOGOTYPE_MARK_SVG } from "./logotypeMark";
 import {
   LOGOTYPE_REVEAL_EASE,
   LOGOTYPE_REVEAL_MASK_S,
   LOGOTYPE_REVEAL_STAGGER_S,
   logotypeRevealMarkup,
+  loopLogotypeReveal,
   playLogotypeReveal,
+  settleLogotypeReveal,
 } from "./logotypeReveal";
 import { mountProTip, releaseProTips, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
@@ -173,10 +175,10 @@ app.innerHTML = `
       </div>
     </div>
     <header class="topbar">
-      <h1 class="logotype">
+      <button type="button" class="logotype" aria-label="Ultrapilled — start over" data-tip="Start over">
         <span class="logotype__label">Ultrapilled</span>
-        ${LOGOTYPE_MARK_SVG}
-      </h1>
+        ${logotypeRevealMarkup()}
+      </button>
     </header>
     <aside class="dev-panel" id="dev-panel" hidden>
       <h2 class="dev-panel__title">Dev</h2>
@@ -2918,6 +2920,8 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       if (input instanceof HTMLInputElement && input.type === "checkbox") playSwitch(Boolean(value));
       else if (input instanceof HTMLSelectElement) playClick();
       (slot as Record<string, unknown>)[key] = value;
+      if (slot.kind === "text" && key === "textAnim" && value) slot.animatedGradient = undefined;
+      if (slot.kind === "text" && key === "animatedGradient" && value) slot.textAnim = undefined;
       if (key === "blend") {
         const mode = blendMode(String(value));
         slot.blend = mode === "normal" ? undefined : mode;
@@ -3663,6 +3667,7 @@ function duplicateSlot(id: string) {
   remember();
   const copy = structuredClone(source);
   copy.id = uid();
+  if (copy.kind === "text") sanitizeTextMotion(copy);
   copyBaseline(source, copy);
   state.slots.splice(index + 1, 0, copy);
   revealSlotId = copy.id;
@@ -3675,6 +3680,62 @@ function duplicateSlot(id: string) {
   playCreate();
   renderPanel();
   live();
+}
+
+/** Full asset clipboard for ⌘/Ctrl+C/V (separate from look-only styleClipboard). */
+let slotClipboard: Slot[] | null = null;
+
+function copyPickedSlots(): boolean {
+  if (pickedSlotIds.size === 0) return false;
+  const selected = pickedSlotIds;
+  const slots = state.slots.filter((slot) => selected.has(slot.id));
+  if (!slots.length) return false;
+  slotClipboard = structuredClone(slots);
+  playClick();
+  return true;
+}
+
+function pasteClipboardSlots(): boolean {
+  if (!slotClipboard?.length) return false;
+  remember();
+  const copies: Slot[] = [];
+  for (const source of slotClipboard) {
+    const copy = structuredClone(source);
+    copy.id = uid();
+    if (copy.kind === "text") sanitizeTextMotion(copy);
+    captureBaseline(copy);
+    copies.push(copy);
+  }
+  let insertAt = state.slots.length;
+  if (pickedSlotId) {
+    const idx = state.slots.findIndex((slot) => slot.id === pickedSlotId);
+    if (idx >= 0) insertAt = idx + 1;
+  }
+  state.slots.splice(insertAt, 0, ...copies);
+
+  const last = copies[copies.length - 1]!;
+  revealSlotId = last.id;
+  if (copies.length === 1) {
+    const next = panel.querySelector<HTMLElement>(`[data-id="${pickedSlotId}"]`)?.nextElementSibling;
+    const anchor = next instanceof HTMLElement ? next : panel.querySelector<HTMLElement>(".slot-adds");
+    insertMotion = {
+      id: last.id,
+      scroll: panel.scrollTop,
+      anchorId: anchor?.classList.contains("slot-card") ? anchor.dataset.id ?? null : null,
+      anchorTop: anchor?.getBoundingClientRect().top ?? 0,
+    };
+  }
+
+  pickedSlotIds.clear();
+  for (const copy of copies) pickedSlotIds.add(copy.id);
+  pickedSlotId = last.id;
+
+  playCreate();
+  renderPanel();
+  live();
+  applyWorldPick();
+  syncPanelPicks();
+  return true;
 }
 
 /** Look-only clipboard — never includes text / image contents. */
@@ -3789,6 +3850,7 @@ function pasteSlotStyle(id: string) {
     slot.gradientSpeed = style.gradientSpeed;
     slot.textAnim = style.textAnim;
     slot.textAnimSpeed = style.textAnimSpeed;
+    sanitizeTextMotion(slot);
     slot.textColorIndex = style.textColorIndex;
     slot.textColor = style.textColor;
     slot.blend = style.blend;
@@ -4744,11 +4806,17 @@ session = createPlaySession({
   paintPhysDebug,
   tickAudioReact,
   nudgeEmptyScene,
-  notifyLayoutModeBlocksPhysics: () =>
-    askNotice({
+  notifyLayoutModeBlocksPhysics: async () => {
+    const ok = await askConfirm({
       title: "Can't trigger physics",
       body: "Layout mode is on. Turn on Physics first.",
-    }),
+      confirmLabel: "Activate Physics",
+      cancelLabel: "Got it",
+    });
+    if (!ok) return false;
+    await setLayoutMode(false);
+    return !state.physics.layoutMode;
+  },
   playButton,
   getRunning: () => running,
   setRunningFlag: (on) => {
@@ -4833,6 +4901,9 @@ function editingText(target: EventTarget | null): boolean {
 
 function adoptState(next: typeof state) {
   state.slots = next.slots;
+  for (const slot of state.slots) {
+    if (slot.kind === "text") sanitizeTextMotion(slot);
+  }
   state.physics = {
     ...DEFAULT_PHYSICS,
     ...next.physics,
@@ -5131,6 +5202,18 @@ window.addEventListener("keydown", (event) => {
       event.preventDefault();
       if (event.repeat) return;
       duplicateSlot(pickedSlotId);
+      return;
+    }
+    if (key === "c") {
+      if (event.shiftKey || event.repeat) return;
+      if (!copyPickedSlots()) return;
+      event.preventDefault();
+      return;
+    }
+    if (key === "v") {
+      if (event.shiftKey || event.repeat) return;
+      if (!pasteClipboardSlots()) return;
+      event.preventDefault();
       return;
     }
   }
@@ -5448,6 +5531,79 @@ async function applyStartupMode(mode: AppMode) {
   state.physics.layoutMode = mode === "layout";
   renderPanel();
   paintWelcome();
+}
+
+/** Clear the canvas and return to Mode Select (logotype click). */
+async function resetToModeSelect() {
+  const ok = await askConfirm({
+    title: "Start over?",
+    body: "This clears the canvas and returns to Mode Select.",
+    confirmLabel: "Start over",
+    cancelLabel: "Cancel",
+  });
+  if (!ok) return;
+
+  endChipEdit(false);
+  closeSlotMenu();
+  closeFontMenu();
+  tintPicker?.close();
+  session.setRunning(false);
+  running = false;
+  paused = false;
+  posePinned = false;
+  session.phase = "idle";
+  session.dropTicket++;
+  session.clearingDump = false;
+  machineFont = "";
+  appliedFont = "";
+  pickedSlotId = null;
+  pickedSlotIds.clear();
+  world.setPicked(null);
+  world.setFloorOpen(false);
+  world.discardAll();
+  openSlots.clear();
+  past.length = 0;
+  future.length = 0;
+  await clearDraft().catch(() => {});
+  lastDraftJson = "";
+  adoptState(blankState());
+  for (const slot of state.slots) captureBaseline(slot);
+  applyBackground();
+  applyPost();
+  syncCanvas(false);
+  renderPanel();
+  paintTransport();
+  paintWelcome();
+
+  warmModeSelectPreview();
+  modeSelectContinuity = true;
+  gridHoldForHandoff = true;
+  const mode = await askModeSelect();
+  await applyStartupMode(mode);
+  handoffModeSelectPreview(() => bootRevealGrid());
+  releaseProTips();
+  syncLogotypeAccent();
+}
+
+{
+  const logo = shell.querySelector<HTMLElement>(".topbar .logotype");
+  if (logo) {
+    settleLogotypeReveal(logo);
+    let stopLoop: (() => void) | null = null;
+    const endLoop = () => {
+      stopLoop?.();
+      stopLoop = null;
+    };
+    logo.addEventListener("pointerenter", () => {
+      if (stopLoop) return;
+      stopLoop = loopLogotypeReveal(logo);
+    });
+    logo.addEventListener("pointerleave", endLoop);
+    logo.addEventListener("click", () => {
+      endLoop();
+      void resetToModeSelect();
+    });
+  }
 }
 
 /** Fresh start: keep black overlay, pick mode, then release UI. */

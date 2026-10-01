@@ -75,6 +75,8 @@ function shortcutsMarkup(): string {
     shortcutRow("Invert selection", keycap("I"), "Selected piece"),
     shortcutRow("Delete selection", `${keycap("⌫")}${keycap("Del")}`),
     shortcutRow("Duplicate", `${keycap(mod)}${keycap("D")}`),
+    shortcutRow("Copy selection", `${keycap(mod)}${keycap("C")}`),
+    shortcutRow("Paste selection", `${keycap(mod)}${keycap("V")}`),
     shortcutRow("Undo", `${keycap(mod)}${keycap("Z")}`),
     shortcutRow("Redo", `${keycap(mod)}${keycap("⇧")}${keycap("Z")}`, `Also ${mod}+Y`),
     shortcutRow("Deselect / exit edit", keycap("Esc")),

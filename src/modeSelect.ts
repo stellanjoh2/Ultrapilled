@@ -190,7 +190,7 @@ export function warmModeSelectPreview() {
     paintPhysDebug: () => {},
     tickAudioReact: () => {},
     nudgeEmptyScene: () => {},
-    notifyLayoutModeBlocksPhysics: async () => {},
+    notifyLayoutModeBlocksPhysics: async () => false,
     playButton: () => {},
     getRunning: () => previewRunning,
     setRunningFlag: (on) => {

@@ -406,8 +406,8 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         <button type="button" class="section-reset${H.assetAnimsFrozen ? " is-on" : ""}" data-freeze-anims aria-pressed="${H.assetAnimsFrozen}" aria-label="${H.assetAnimsFrozen ? "Resume animations" : "Pause animations"}" data-tip="${H.assetAnimsFrozen ? "Resume text and gradient animations" : "Freeze text and gradient animations on all assets"}">${H.assetAnimsFrozen ? playIcon : pauseIcon}</button>
       </div>
       <div class="check-row">
-        <label class="check">
-          ${checkInput(`data-key="textAnim" ${slot.textAnim ? "checked" : ""}`)}
+        <label class="check"${slot.animatedGradient ? ' data-tip="Turn off Animated Gradient to use Text animation"' : ""}>
+          ${checkInput(`data-key="textAnim" ${slot.textAnim ? "checked" : ""} ${slot.animatedGradient ? "disabled" : ""}`)}
           Text animation
         </label>
         ${H.resetControl("Text animation", "textAnim", H.fieldDirty(slot, "textAnim"))}
@@ -422,8 +422,8 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       ${
         slot.gradient
           ? `<div class="check-row">
-        <label class="check">
-          ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""}`)}
+        <label class="check"${slot.textAnim ? ' data-tip="Turn off Text animation to use Animated Gradient"' : ""}>
+          ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""} ${slot.textAnim ? "disabled" : ""}`)}
           Animated Gradient
         </label>
         ${H.resetControl("Animated Gradient", "animatedGradient", H.fieldDirty(slot, "animatedGradient"))}

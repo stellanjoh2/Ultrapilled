@@ -5,6 +5,7 @@ import { gradientEndIndex } from "../pillFill";
 import { playClick, playCreate, playSwitch } from "../uiSounds";
 import { placeZoomedFixed } from "../uiScale";
 import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
+import { sanitizeTextMotion } from "../types";
 
 export type LayerMove = "front" | "forward" | "backward" | "back";
 
@@ -630,13 +631,21 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     });
   }
   if (slot?.kind === "text") {
+    // Prefer the live flag; also treat an on-stage letter cycle as animating
+    // so the menu never offers "Animate" while letters are still moving.
+    const chipAnimating = Boolean(H.world.chipEl(id)?.classList.contains("is-text-anim-host"));
+    const animating = Boolean(slot.textAnim) || chipAnimating;
     actions.push({
-      label: slot.textAnim ? "Stop Animation" : "Animate",
+      label: animating ? "Stop Animation" : "Animate",
       run: () => {
         H.remember();
-        slot.textAnim = !slot.textAnim;
+        const current = H.state.slots.find((item) => item.id === id);
+        if (!current || current.kind !== "text") return;
+        current.textAnim = animating ? undefined : true;
+        if (current.textAnim) current.animatedGradient = undefined;
+        sanitizeTextMotion(current);
+        H.liveChip(current.id);
         H.renderPanel();
-        H.liveChip(slot.id);
       },
     });
   }

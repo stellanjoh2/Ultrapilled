@@ -134,6 +134,7 @@ function measureLineWidth(text: string, fontSize: number, tracking: number): num
 
 export function measureTextSlot(slot: TextSlot, pad = 1, tracking = 0.02): ChipSize {
   if (slot.shape === "none") {
+    // Keep physics / selection on the ink AABB — letter travel clips in CSS, not by padding the chip.
     return measureTextInk(slot, tracking);
   }
   if (!measureCtx) return { width: 80, height: 40 };

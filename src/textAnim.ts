@@ -23,6 +23,8 @@ export type RollingTextOpts = {
   fontSize?: number;
   /** Keep the full string as one cycle row (no word split). */
   asPhrase?: boolean;
+  /** After split markup is mounted, before the timeline starts (e.g. gradient fill). */
+  prepare?: (label: HTMLElement) => void;
 };
 
 export function textAnimSpeedOf(speed: number | undefined): number {
@@ -58,7 +60,17 @@ export function textAnimTravel(chipHeight: number, fontSize: number): number {
 }
 
 function travelPx(label: HTMLElement, fontSize: number): number {
-  return textAnimTravel(label.parentElement?.clientHeight ?? 0, fontSize);
+  const host = label.parentElement;
+  if (!host) return textAnimTravel(0, fontSize);
+  // Bare type stays ink-tight — travel is font-based so letters clear the clip edge.
+  if (host.classList.contains("chip-bare")) {
+    return textAnimTravel(0, fontSize);
+  }
+  // Prefer laid-out height; fall back to the inline size applyVisual just set
+  // (clientHeight can still be 0 in the same frame as a canvas→DOM switch).
+  const styled = Number.parseFloat(host.style.height);
+  const height = host.clientHeight > 0 ? host.clientHeight : styled > 0 ? styled : 0;
+  return textAnimTravel(height, fontSize);
 }
 
 function easePower2Out(t: number): number {
@@ -144,11 +156,16 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
   // would otherwise tear down + rebuild the GSAP cycle (hard on/off flicker).
   const sig = `cycle|${speed}|${text}|${asPhrase ? "phrase" : "words"}`;
   const prev = running.get(label);
-  if (prev?.sig === sig) return true;
+  const host = label.parentElement;
+  if (prev?.sig === sig) {
+    // Repaints must keep host/label markers even when the timeline is reused.
+    label.classList.add("is-text-anim");
+    host?.classList.add("is-text-anim-host");
+    return true;
+  }
 
   stopTextAnim(label);
 
-  const host = label.parentElement;
   host?.classList.add("is-text-anim-host");
 
   if (reducedMotion()) {
@@ -188,6 +205,8 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
   }
   if (maxW > 0) clip.style.width = `${Math.ceil(maxW)}px`;
 
+  opts.prepare?.(label);
+
   gsap.set(rows, { autoAlpha: 0 });
   const tl = gsap.timeline({ repeat: -1 });
   for (const row of rows) {
@@ -224,7 +243,11 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
 }
 
 /** Builds split markup and starts looping letter motion on the full label. Returns false if caller should use plain text. */
-export function applyTextAnim(label: HTMLElement, slot: TextSlot): boolean {
+export function applyTextAnim(
+  label: HTMLElement,
+  slot: TextSlot,
+  prepare?: (label: HTMLElement) => void,
+): boolean {
   if (!slot.textAnim) {
     stopTextAnim(label);
     return false;
@@ -233,5 +256,6 @@ export function applyTextAnim(label: HTMLElement, slot: TextSlot): boolean {
     speed: slot.textAnimSpeed,
     fontSize: slot.fontSize,
     asPhrase: true,
+    prepare,
   });
 }

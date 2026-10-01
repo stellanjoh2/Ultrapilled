@@ -61,6 +61,11 @@ export type TextSlot = {
   scale: number;
 };
 
+/** Letter-cycle and animated gradient fight over the same DOM — keep only one. */
+export function sanitizeTextMotion(slot: TextSlot) {
+  if (slot.textAnim && slot.animatedGradient) slot.animatedGradient = undefined;
+}
+
 export type ImageSlot = {
   id: string;
   kind: "image";
