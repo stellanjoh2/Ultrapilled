@@ -37,7 +37,13 @@ import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPer
 import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
 import { inkOn, logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import { LOGOTYPE_MARK_SVG } from "./logotypeMark";
-import { logotypeRevealMarkup, playLogotypeReveal } from "./logotypeReveal";
+import {
+  LOGOTYPE_REVEAL_EASE,
+  LOGOTYPE_REVEAL_MASK_S,
+  LOGOTYPE_REVEAL_STAGGER_S,
+  logotypeRevealMarkup,
+  playLogotypeReveal,
+} from "./logotypeReveal";
 import { mountProTip, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
@@ -135,7 +141,7 @@ app.innerHTML = `
     <div class="app-intro" id="app-intro" aria-hidden="true">
       <img class="app-intro__gif" alt="" width="300" height="300" />
       <div class="app-intro__logo" aria-hidden="true">
-        ${logotypeRevealMarkup({ glow: true })}
+        ${logotypeRevealMarkup()}
       </div>
     </div>
     <div class="stage" id="stage">
@@ -1145,8 +1151,8 @@ function recountShapes() {
 const AMOUNT_SOFT_CAP = 8;
 const SHAPE_TOTAL_SOFT_CAP = 36;
 const SHAPE_PERF_WARN = 20;
-/** Slider ceiling for text/shape/SVG scale. Templates top out ~5; canvas drag can go higher. */
-const SCALE_SLIDER_MAX = 6;
+/** Slider ceiling for text/shape/SVG scale. Canvas drag can go higher. */
+const SCALE_SLIDER_MAX = 3;
 /** Hard ceiling for canvas / programmatic scale (raster uploads stay at 2). */
 const SCALE_HARD_MAX = 100;
 const SCALE_UPLOAD_MAX = 4;
@@ -1956,7 +1962,7 @@ function scaleFieldName(slot: Slot): string {
 /** Raster uploads cap at 2 so they can't swamp the frame. SVGs/text/shapes keep a high hard max for canvas drag. */
 function clampSlotScale(slot: Slot, scale: number): number {
   const max = slot.kind === "image" && uploadedShape(slot) && !isSvgSource(slot) ? SCALE_UPLOAD_MAX : SCALE_HARD_MAX;
-  return Math.min(max, Math.max(0.25, Math.round(scale * 100) / 100));
+  return Math.min(max, Math.max(0.1, Math.round(scale * 100) / 100));
 }
 
 /** Soft slider range; expands if the current value was set higher via canvas drag. */
@@ -4211,7 +4217,7 @@ const INTRO_SRC = "/images/intropill.gif";
 const INTRO_LOGO_HOLD_S = 1;
 const INTRO_LOGO_SCALE_FROM = 1.5;
 const INTRO_LOGO_SCALE_TO = 1;
-const INTRO_LOGO_SCALE_EASE = "circ.inOut";
+const INTRO_LOGO_SCALE_EASE = "expo.inOut";
 let introActive = true;
 /** Flips true when boot finishes and the main UI is revealed — logo stays white until then. */
 let logotypeLive = false;
@@ -4325,10 +4331,20 @@ async function startIntro() {
       { scale: INTRO_PILL_SCALE_TO, duration: INTRO_PILL_SCALE_S, ease: INTRO_PILL_SCALE_EASE },
     );
   }
+  // Full wordmark out-span, 25% faster so a single wipe doesn't feel sluggish.
+  const wipeS = (LOGOTYPE_REVEAL_STAGGER_S * 2 + LOGOTYPE_REVEAL_MASK_S) * 0.75;
+  // Start the wipe before the single-play gif freezes on its last frame.
   await new Promise<void>((resolve) => {
-    window.setTimeout(resolve, INTRO_MS);
+    window.setTimeout(resolve, Math.max(0, INTRO_MS - wipeS * 1000));
   });
-  img?.remove();
+  if (img) {
+    await gsap.fromTo(
+      img,
+      { clipPath: "inset(0% 0% 0% 0%)" },
+      { clipPath: "inset(0% 0% 0% 100%)", duration: wipeS, ease: LOGOTYPE_REVEAL_EASE },
+    );
+    img.remove();
+  }
   await playIntroLogotype(intro);
   finishIntro();
 }

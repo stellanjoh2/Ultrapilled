@@ -171,22 +171,16 @@ body,
 }
 
 .app-intro.is-ready .app-intro__gif {
-  animation: app-intro-opacity 2s ease-out forwards;
+  animation: app-intro-opacity 0.2s ease-out forwards;
 }
 
-/* Fade in 0.2s, hold through the gif, fade out over the last 0.25s. */
+/* Fade in only — exit is a clip wipe in JS. */
 @keyframes app-intro-opacity {
-  0% {
+  from {
     opacity: 0;
   }
-  10% {
+  to {
     opacity: 1;
-  }
-  87.5% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
   }
 }
 
@@ -247,47 +241,6 @@ body,
 
 .logotype-reveal__layer--white .logotype__glyph,
 .logotype-reveal__layer--white .logotype__pill {
-  fill: #ffffff;
-}
-
-/* Glow lives outside the wipe clip — only used on the boot splash. */
-.logotype-reveal__glow {
-  display: none;
-}
-
-.app-intro__logo .logotype-reveal__glow {
-  display: block;
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100%;
-  line-height: 0;
-  pointer-events: none;
-  opacity: 0;
-  filter: blur(24px);
-  overflow: visible;
-}
-
-.app-intro__logo .logotype-reveal__layer--purple,
-.app-intro__logo .logotype-reveal__layer--lime,
-.app-intro__logo .logotype-reveal__layer--white {
-  position: relative;
-  z-index: 1;
-}
-
-.app-intro__logo .logotype-reveal__layer--lime,
-.app-intro__logo .logotype-reveal__layer--white {
-  position: absolute;
-}
-
-.app-intro__logo .logotype-reveal__glow .logotype__mark {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.app-intro__logo .logotype-reveal__glow .logotype__glyph,
-.app-intro__logo .logotype-reveal__glow .logotype__pill {
   fill: #ffffff;
 }
 
@@ -2059,7 +2012,8 @@ button.pill.smash-btn.is-on::after {
 }
 
 .segment [data-theme-chrome],
-.segment [data-design-mode] {
+.segment [data-design-mode],
+.segment [data-layout-mode] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2067,7 +2021,8 @@ button.pill.smash-btn.is-on::after {
 }
 
 .segment [data-theme-chrome] .theme-chrome__icon,
-.segment [data-design-mode] .theme-chrome__icon {
+.segment [data-design-mode] .theme-chrome__icon,
+.segment [data-layout-mode] .theme-chrome__icon {
   display: grid;
   place-items: center;
   width: calc(20px * var(--ui-scale));
@@ -2076,7 +2031,8 @@ button.pill.smash-btn.is-on::after {
 }
 
 .segment [data-theme-chrome] .theme-chrome__icon svg,
-.segment [data-design-mode] .theme-chrome__icon svg {
+.segment [data-design-mode] .theme-chrome__icon svg,
+.segment [data-layout-mode] .theme-chrome__icon svg {
   width: calc(20px * var(--ui-scale));
   height: calc(20px * var(--ui-scale));
 }
@@ -4482,17 +4438,6 @@ html[data-theme="day"] .shape-swatch {
   pointer-events: none;
 }
 
-.pro-tip::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  border-radius: inherit;
-  background: #fff;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .pro-tip.is-in {
   opacity: 1;
   transform: none;
@@ -4546,10 +4491,6 @@ html[data-theme="day"] .shape-swatch {
       transform 1s cubic-bezier(0.83, 0, 0.17, 1);
   }
 
-  .pro-tip.is-in::before {
-    animation: pro-tip-flash 0.28s ease-out;
-  }
-
   .pro-tip.is-in .pro-tip__mark {
     animation: pro-tip-mark-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.7s forwards;
   }
@@ -4568,18 +4509,6 @@ html[data-theme="day"] .shape-swatch {
   .pro-tip__stop {
     opacity: 1;
     transform: none;
-  }
-}
-
-@keyframes pro-tip-flash {
-  0%,
-  45% {
-    opacity: 1;
-  }
-
-  60%,
-  100% {
-    opacity: 0;
   }
 }
 
@@ -5622,7 +5551,8 @@ html[data-theme="day"] .settings-modal__body .keycap {
   display: block;
   width: calc(44px * 198 / 248.77 * var(--ui-scale));
   height: calc(44px * var(--ui-scale));
-  background-color: #555;
+  color: #555;
+  background-color: currentColor;
   -webkit-mask-image: url("./assets/s-logo.svg");
   mask-image: url("./assets/s-logo.svg");
   -webkit-mask-repeat: no-repeat;
@@ -5631,7 +5561,13 @@ html[data-theme="day"] .settings-modal__body .keycap {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
-  pointer-events: none;
+  cursor: pointer;
+  text-decoration: none;
+  z-index: 1;
+}
+
+.mode-select__s:hover {
+  color: var(--ink);
 }
 
 .mode-select__foot {
@@ -5817,6 +5753,9 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 .mode-select__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
   margin: 48px 0 0;
   color: var(--ink);
   font-family: var(--font-section);
@@ -5828,11 +5767,24 @@ html[data-theme="day"] .settings-modal__body .keycap {
   mix-blend-mode: difference;
 }
 
+.mode-select__name-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.mode-select__name-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
 .mode-select__desc {
   margin: calc(10px * var(--ui-scale)) 0 0;
   max-width: 28em;
   color: rgb(255 255 255 / 0.8);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 300;
   line-height: 1.4;
   letter-spacing: -0.01em;

@@ -1,4 +1,6 @@
+import atomIcon from "@phosphor-icons/core/assets/regular/atom.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
+import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
 import { isCanvasRatio } from "../canvas";
 import { openAbout } from "../aboutPanel";
@@ -298,8 +300,8 @@ panel.innerHTML = `
     "Physics",
     "How pieces fall, bounce, and settle — or place them freely",
     `<div class="segment" role="group" aria-label="Placement mode">
-      <button type="button" class="pill${!H.state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!H.state.physics.layoutMode}" data-tip="Pieces fall, bounce, and stack">Physics</button>
-      <button type="button" class="pill${H.state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${H.state.physics.layoutMode}" data-tip="Place freely like Figma — no physics, no throws, pieces can overlap">Layout</button>
+      <button type="button" class="pill${!H.state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!H.state.physics.layoutMode}" data-tip="Pieces fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${atomIcon}</span>Physics</button>
+      <button type="button" class="pill${H.state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${H.state.physics.layoutMode}" data-tip="Place freely like Figma — no physics, no throws, pieces can overlap"><span class="theme-chrome__icon" aria-hidden="true">${gridFourIcon}</span>Layout</button>
     </div>
     <div class="physics-dynamics"${H.state.physics.layoutMode ? " inert" : ""}>
     <label class="field" data-tip="Simple = boxes, Normal = circle/box, Ultra = traced icon shapes. Higher is heavier on the CPU.">Physics complexity
@@ -400,7 +402,7 @@ panel.innerHTML = `
   <footer class="panel-credit">
     <span class="panel-credit__s" aria-hidden="true"></span>
     <p>
-      Ultrapilled is created by<br />
+      Ultrapilled™ is created by<br />
       <button type="button" class="panel-credit__author" id="open-about">Stellan Johansson</button>
     </p>
     <p class="panel-credit__social">

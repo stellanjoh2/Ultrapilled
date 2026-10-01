@@ -1,4 +1,6 @@
 import gsap from "gsap";
+import atomIcon from "@phosphor-icons/core/assets/regular/atom.svg?raw";
+import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
 import { backgroundPaint } from "./background";
 import { createPlaySession } from "./playSession";
 import { modeSelectPreviewState } from "./modeSelectTheme";
@@ -249,7 +251,7 @@ export function askModeSelect(): Promise<AppMode> {
                 aria-hidden="true"
               ></video>
             </span>
-            <span class="mode-select__name">Physics</span>
+            <span class="mode-select__name"><span class="mode-select__name-icon" aria-hidden="true">${atomIcon}</span>Physics</span>
             <span class="mode-select__desc">Create your design, then watch the chaos unfold.</span>
           </button>
           <button type="button" class="mode-select__card" data-mode="layout">
@@ -262,7 +264,7 @@ export function askModeSelect(): Promise<AppMode> {
                 draggable="false"
               />
             </span>
-            <span class="mode-select__name">Layout</span>
+            <span class="mode-select__name"><span class="mode-select__name-icon" aria-hidden="true">${gridFourIcon}</span>Layout</span>
             <span class="mode-select__desc">Place freely — no physics, pieces can overlap.</span>
           </button>
         </div>
@@ -279,10 +281,10 @@ export function askModeSelect(): Promise<AppMode> {
           </a>
         </p>
         <p class="mode-select__foot">
-          Ultrapilled is a free physics playground for dropping text, icons, and images into motion.<br />
+          Ultrapilled™ is a free physics playground for dropping text, icons, and images into motion.<br />
           We don’t track you, and <strong>we don’t use anything you upload to train AI</strong> — your files stay on your device.
         </p>
-        <span class="mode-select__s" aria-hidden="true"></span>
+        <a href="https://www.linkedin.com/in/stellanj/" target="_blank" rel="noopener noreferrer" class="mode-select__s" aria-label="LinkedIn"></a>
       </div>
     `;
 

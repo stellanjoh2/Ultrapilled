@@ -53,7 +53,7 @@ const SETTLED_SPIN = 0.01;
 const CLICK_SLOP = 6;
 const HOLD_DRAG_MS = 220;
 /** Floor for canvas / panel scale. Uploaded images cap lower so they can't swamp the frame. */
-const SCALE_MIN = 0.25;
+const SCALE_MIN = 0.1;
 const SCALE_MAX = 100;
 const SCALE_MAX_UPLOAD = 4;
 /** Closing speed along the contact normal before an impact sound plays. */

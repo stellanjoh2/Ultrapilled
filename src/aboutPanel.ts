@@ -2,7 +2,7 @@ import gsap from "gsap";
 import { playRemove, playTransition } from "./uiSounds";
 
 const ABOUT_TEXT =
-  "Hi, I'm Stellan Johansson, a creative director and brand designer with 20+ years across games, 3D, motion, UI and visual identity — shipping titles at studios, running agencies, and shaping platforms used by millions of creators. Ultrapilled is one of my sideprojects.";
+  "Hi, I'm Stellan Johansson, a creative director and brand designer with 20+ years across games, 3D, motion, UI and visual identity — shipping titles at studios, running agencies, and shaping platforms used by millions of creators. Ultrapilled™ is one of my sideprojects.";
 
 const ABOUT_LINKS = [
   { text: "LinkedIn", href: "https://www.linkedin.com/in/stellanj/" },

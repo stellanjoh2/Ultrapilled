@@ -323,7 +323,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         </div>
       </div>
       <label class="field">${H.settingLabel(slot, "Text scale", "scale", slot.scale.toFixed(2))}
-        <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+        <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
       </label>
       <label class="field">${H.settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
         <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
@@ -528,7 +528,7 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
     <p class="slot-label">Shapes</p>
     <div class="icon-grid" data-presets></div>
     <label class="field">${H.settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+      <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
@@ -580,7 +580,7 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
     </label>
     <div class="emoji-grid" data-emoji-results></div>
     <label class="field">${H.settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+      <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
@@ -672,7 +672,7 @@ function youtubeFields(slot: ImageSlot, open: boolean): HTMLElement {
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
     </label>
     <label class="field">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+      <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
   `;
   placeFold(wrap, editor, open);
@@ -729,7 +729,7 @@ function videoFields(slot: ImageSlot, open: boolean): HTMLElement {
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
     </label>
     <label class="field">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+      <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     ${videoReplaceControl(slot)}
   `;
@@ -850,7 +850,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
         : `${H.dropShadowField(slot)}`
     }
     <label class="field">${H.settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
-      <input type="range" data-key="scale" min="0.25" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+      <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />

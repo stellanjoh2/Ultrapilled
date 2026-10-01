@@ -1,4 +1,5 @@
 import gsap from "gsap";
+import atomIcon from "@phosphor-icons/core/assets/regular/atom.svg?raw";
 import circleHalfIcon from "@phosphor-icons/core/assets/regular/circle-half.svg?raw";
 import clockCounterClockwiseIcon from "@phosphor-icons/core/assets/regular/clock-counter-clockwise.svg?raw";
 import gaugeIcon from "@phosphor-icons/core/assets/regular/gauge.svg?raw";
@@ -7,7 +8,6 @@ import keyboardIcon from "@phosphor-icons/core/assets/regular/keyboard.svg?raw";
 import layoutIcon from "@phosphor-icons/core/assets/regular/layout.svg?raw";
 import lightbulbIcon from "@phosphor-icons/core/assets/regular/lightbulb.svg?raw";
 import moonIcon from "@phosphor-icons/core/assets/regular/moon.svg?raw";
-import smileyIcon from "@phosphor-icons/core/assets/regular/smiley.svg?raw";
 import speakerHighIcon from "@phosphor-icons/core/assets/regular/speaker-high.svg?raw";
 import sunIcon from "@phosphor-icons/core/assets/regular/sun.svg?raw";
 import { getPrefs, setPrefs, type AppPrefs, type ChromeTheme } from "./prefs";
@@ -172,7 +172,7 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
     <section class="section">
       <h2 data-tip="Physics fall or free Layout placement — shortcut L">${sectionTitleIcon(layoutIcon)}Design Mode</h2>
       <div class="segment" role="group" aria-label="Design Mode">
-        <button type="button" class="pill${!layoutMode ? " is-on" : ""}" data-design-mode="physics" aria-pressed="${!layoutMode}" data-tip="Pieces fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${smileyIcon}</span>Physics</button>
+        <button type="button" class="pill${!layoutMode ? " is-on" : ""}" data-design-mode="physics" aria-pressed="${!layoutMode}" data-tip="Pieces fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${atomIcon}</span>Physics</button>
         <button type="button" class="pill${layoutMode ? " is-on" : ""}" data-design-mode="layout" aria-pressed="${layoutMode}" data-tip="Place freely like Figma — no physics, pieces can overlap"><span class="theme-chrome__icon" aria-hidden="true">${gridFourIcon}</span>Layout</button>
       </div>
     </section>
