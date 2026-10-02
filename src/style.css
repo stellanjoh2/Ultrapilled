@@ -1133,7 +1133,7 @@ html[data-theme="day"] .chip-xform-handle {
 
 .chip.is-picked > .chip-grad-wheel {
   /* Dim until proximity / drag — mirrors xform-handle soft→hot feel. */
-  opacity: 0.8;
+  opacity: 0.5;
   visibility: visible;
   scale: 1;
   transition:
@@ -1277,10 +1277,20 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+  /* Separate from position `transform` (placeGradStop). */
+  scale: 1;
+  transition: scale 0.14s ease;
 }
 
 .chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop {
   pointer-events: auto;
+}
+
+/* Hover or active stop drag: +50% size. --hot survives pointer-capture leave. */
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover,
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop.chip-grad-wheel__stop--hot {
+  scale: 1.5;
+  z-index: 2;
 }
 
 .chip-grad-wheel__stop:focus-visible {
@@ -1294,8 +1304,13 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 
 @media (prefers-reduced-motion: reduce) {
   .chip-grad-wheel,
-  .chip.is-picked > .chip-grad-wheel {
+  .chip.is-picked > .chip-grad-wheel,
+  .chip-grad-wheel__stop {
     transition: none;
+  }
+
+  .chip-grad-wheel,
+  .chip.is-picked > .chip-grad-wheel {
     scale: 1;
   }
 }

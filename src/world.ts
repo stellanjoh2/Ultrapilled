@@ -2616,6 +2616,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       placeGradStop(toStop, info.angle, scaleR);
     }
     syncGradWheelNear(chip);
+    if (
+      gradAngleDrag &&
+      gradAngleDrag.chip.body.id === chip.body.id &&
+      gradAngleDrag.stopEl &&
+      wheelEl.contains(gradAngleDrag.stopEl)
+    ) {
+      gradAngleDrag.stopEl.classList.add("chip-grad-wheel__stop--hot");
+    }
   }
 
   function placeGradStop(el: HTMLElement, angleDeg: number, radius: number) {
@@ -2715,6 +2723,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (!gradAngleDrag) return;
     const { lastAngle, lastScale, slotId, stop, stopEl, moved, rotating, chip } = gradAngleDrag;
     gradAngleDrag = null;
+    stopEl?.classList.remove("chip-grad-wheel__stop--hot");
     if (rotating) endScrub();
     for (const item of xformTargets(slotId)) {
       item.el.classList.remove("is-grad-angling");
@@ -3055,6 +3064,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         moved: false,
         rotating: false,
       };
+      // Keep stop at 1.5× while dragging even if pointer leaves :hover.
+      gradStop.classList.add("chip-grad-wheel__stop--hot");
       lockHandle(chip.slotId, "grad-angling");
       gradStop.setPointerCapture(event.pointerId);
       return;
