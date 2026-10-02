@@ -897,7 +897,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 @media (prefers-reduced-motion: no-preference) {
   .chip-chrome.is-picked > .chip-xform-frame {
-    animation: smash-stroke-spin 1s linear infinite;
+    animation: smash-stroke-spin 2s linear infinite;
   }
 }
 
@@ -1985,6 +1985,7 @@ button.pill.smash-btn.is-on::after {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overflow-anchor: none;
   padding: var(--panel-pad) var(--panel-pad) var(--space-3);
 }
 
@@ -2407,7 +2408,8 @@ button.pill.smash-btn.is-on::after {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-0);
-  min-height: calc(18px * var(--ui-scale));
+  /* Match .field-reset height so unhiding reset doesn't grow the row ~1px. */
+  min-height: calc(22px * var(--ui-scale));
 }
 
 .field-label-end {
@@ -2455,7 +2457,10 @@ button.pill.smash-btn.is-on::after {
 }
 
 .field-reset[hidden] {
-  display: none;
+  /* Keep the 22px slot so dirty↔clean never reflows the slider row. */
+  display: grid !important;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .row {
@@ -2926,8 +2931,14 @@ input[type="range"] {
   cursor: pointer;
 }
 
-input[type="range"]:focus {
+input[type="range"]:focus,
+input[type="range"]:focus-visible {
   outline: none;
+}
+
+/* Firefox draws a 1px focus ring via ::-moz-focus-outer that reflows the row. */
+input[type="range"]::-moz-focus-outer {
+  border: 0;
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
