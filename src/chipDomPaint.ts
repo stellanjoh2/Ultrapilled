@@ -1,7 +1,7 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { rasterRing, textLookFlags } from "./chipLook";
-import { measureTextFontAscent, measureTextInk, paintTextInk, TEXT_INK_PAD } from "./measure";
+import { measureTextInk, paintTextInk, TEXT_INK_PAD } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
 import { applyTextAnim, stopTextAnim, stopTextAnimIn } from "./textAnim";
 import { inkOn } from "./theme";
@@ -260,11 +260,63 @@ function syncCharWordGradient(word: HTMLElement) {
 
 /**
  * Pin bare letter-cycle DOM so resting glyph ink matches the static canvas paint.
- *
- * Canvas paintTextInk already bakes shiftEm into the baseline. We seat in the same
- * coordinate space and must NOT also apply label translateY(shiftEm) afterward
- * (that was shoving the word below the selection frame).
+ * Prefer live canvas alpha bounds (same pixels the user sees) over font-metric guesses.
  */
+function measureCanvasInkLocal(
+  canvas: HTMLCanvasElement,
+  label: HTMLElement,
+): { left: number; top: number; right: number; bottom: number } | null {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  const bw = canvas.width;
+  const bh = canvas.height;
+  if (bw < 1 || bh < 1) return null;
+  let data: ImageData;
+  try {
+    data = ctx.getImageData(0, 0, bw, bh);
+  } catch {
+    return null;
+  }
+  let minX = bw;
+  let minY = bh;
+  let maxX = -1;
+  let maxY = -1;
+  const px = data.data;
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      if (px[(y * bw + x) * 4 + 3]! > 10) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+
+  const labelRect = label.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  const ow = Math.max(1, label.offsetWidth);
+  const oh = Math.max(1, label.offsetHeight);
+  const sx = labelRect.width / ow;
+  const sy = labelRect.height / oh;
+  if (!(sx > 0) || !(sy > 0)) return null;
+
+  // Bitmap → canvas CSS px, then into label-local CSS px.
+  const cssW = canvasRect.width / Math.max(1, sx);
+  const cssH = canvasRect.height / Math.max(1, sy);
+  const scaleX = cssW / bw;
+  const scaleY = cssH / bh;
+  const canvasL = (canvasRect.left - labelRect.left) / sx;
+  const canvasT = (canvasRect.top - labelRect.top) / sy;
+  return {
+    left: canvasL + minX * scaleX,
+    top: canvasT + minY * scaleY,
+    right: canvasL + (maxX + 1) * scaleX,
+    bottom: canvasT + (maxY + 1) * scaleY,
+  };
+}
+
 function seatBareTextAnimLabel(
   label: HTMLElement,
   slot: TextSlot,
@@ -272,13 +324,10 @@ function seatBareTextAnimLabel(
   shiftEm = 0,
 ) {
   const ink = measureTextInk(slot, tracking);
-  const fontAscent = measureTextFontAscent(slot);
-  // Same y as paintTextInk: alphabetic baseline + optical shift.
+  const actualAscent = Math.max(1, ink.baseline - TEXT_INK_PAD);
   const paintBaseline = ink.baseline + shiftEm * slot.fontSize;
-  const expectL = TEXT_INK_PAD;
-  const expectT = TEXT_INK_PAD + shiftEm * slot.fontSize;
 
-  // Identity while seating — shift is baked into clip.top via paintBaseline/expectT.
+  // Identity while seating — never stack translateY(shiftEm) on top of canvas paint.
   label.style.transform = "none";
   label.classList.add("is-bare-text-anim");
   label.style.position = "absolute";
@@ -298,9 +347,9 @@ function seatBareTextAnimLabel(
 
   clip.style.position = "absolute";
   clip.style.left = `${ink.originX}px`;
-  clip.style.top = `${paintBaseline - fontAscent}px`;
+  clip.style.top = `${paintBaseline - actualAscent}px`;
   clip.style.width = `${Math.max(1, ink.width - ink.originX - TEXT_INK_PAD)}px`;
-  clip.style.height = `${Math.ceil(slot.fontSize)}px`;
+  clip.style.height = `${Math.ceil(actualAscent + (ink.height - ink.baseline))}px`;
   clip.style.overflow = "visible";
   clip.style.lineHeight = "1";
   clip.style.transform = "";
@@ -313,41 +362,38 @@ function seatBareTextAnimLabel(
     word.style.display = "block";
     word.style.textAlign = "left";
     word.style.width = "max-content";
-    word.style.height = "100%";
+    word.style.height = "auto";
     word.style.lineHeight = "1";
     word.style.transform = "";
   }
   for (const char of label.querySelectorAll<HTMLElement>(".char")) {
-    char.style.verticalAlign = "top";
+    char.style.verticalAlign = "baseline";
     char.style.lineHeight = "1";
     char.style.transform = "none";
   }
 
-  // Nudge letter-ink AABB onto the canvas ink AABB (iterate — Range can settle after move).
   const host = label.parentElement;
   const canvas =
     host instanceof HTMLElement ? host.querySelector(":scope > canvas") : null;
-  for (let i = 0; i < 4; i++) {
+
+  for (let i = 0; i < 6; i++) {
     void label.offsetWidth;
     const inkBox = measureLabelInkLocal(label);
     if (!inkBox) break;
 
-    let targetL = expectL;
-    let targetT = expectT;
-    // Prefer live canvas element origin when present (full-bleed ink surface).
-    if (canvas instanceof HTMLCanvasElement) {
-      const labelRect = label.getBoundingClientRect();
-      const canvasRect = canvas.getBoundingClientRect();
-      const sx = labelRect.width / Math.max(1, label.offsetWidth);
-      const sy = labelRect.height / Math.max(1, label.offsetHeight);
-      if (sx > 0 && sy > 0) {
-        targetL = (canvasRect.left - labelRect.left) / sx + expectL;
-        targetT = (canvasRect.top - labelRect.top) / sy + expectT;
-      }
+    let target =
+      canvas instanceof HTMLCanvasElement ? measureCanvasInkLocal(canvas, label) : null;
+    if (!target) {
+      target = {
+        left: TEXT_INK_PAD,
+        top: TEXT_INK_PAD + shiftEm * slot.fontSize,
+        right: ink.width - TEXT_INK_PAD,
+        bottom: ink.height - TEXT_INK_PAD + shiftEm * slot.fontSize,
+      };
     }
 
-    const dx = targetL - inkBox.left;
-    const dy = targetT - inkBox.top;
+    const dx = target.left - inkBox.left;
+    const dy = target.top - inkBox.top;
     if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) break;
     const curL = Number.parseFloat(clip.style.left) || 0;
     const curT = Number.parseFloat(clip.style.top) || 0;
@@ -651,7 +697,12 @@ export function applyVisual(
       if (textGradient) paintGrad();
       else paintBareTextCss(label, "", "");
       if (textGradient) el.style.color = "transparent";
-      if (keepInkCanvas) el.querySelector(":scope > canvas")?.remove();
+      if (keepInkCanvas) {
+        // Drop the ink canvas after paint+seat so the first frame is letter-DOM only.
+        requestAnimationFrame(() => {
+          el.querySelector(":scope > canvas")?.remove();
+        });
+      }
     } else if (label.classList.contains("is-text-anim")) {
       stopTextAnim(label);
       clearBareTextAnimSeat(label);
