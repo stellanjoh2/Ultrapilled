@@ -30,9 +30,14 @@ export function freeTransformScaleMax(masterScale: number): number {
   return Math.min(SCALE_FREE_CEILING, Math.max(SCALE_FREE_BASE, Math.round(dynamic * 100) / 100));
 }
 
+/** Clamp only — no centi rounding. Live preview and committed free-transform. */
+export function clampScaleContinuous(value: number, max: number): number {
+  return Math.min(max, Math.max(SCALE_MIN, value));
+}
+
+/** Canvas free-transform: clamp without rounding so release matches live preview. */
 export function clampScaleForFreeTransform(value: number, masterScale: number): number {
-  const max = freeTransformScaleMax(masterScale);
-  return Math.min(max, Math.max(SCALE_MIN, Math.round(value * 100) / 100));
+  return clampScaleContinuous(value, freeTransformScaleMax(masterScale));
 }
 
 /**
@@ -44,7 +49,8 @@ export function slotScaleSliderMax(scale: number, rasterUpload: boolean): number
   return Math.max(soft, scale);
 }
 
-/** Clamp a panel slider value; hard ceiling matches free-transform (soft max is HTML). */
+/** Panel slider: clamp + centi snap for stable captions / range step alignment. */
 export function clampScaleForSlider(value: number, masterScale: number): number {
-  return clampScaleForFreeTransform(value, masterScale);
+  const max = freeTransformScaleMax(masterScale);
+  return Math.min(max, Math.max(SCALE_MIN, Math.round(value * 100) / 100));
 }

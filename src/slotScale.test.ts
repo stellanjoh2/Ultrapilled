@@ -6,6 +6,7 @@ import {
   SCALE_MIN,
   SCALE_SLIDER_MAX,
   SCALE_UPLOAD_SLIDER_MAX,
+  clampScaleContinuous,
   clampScaleForFreeTransform,
   clampScaleForSlider,
   freeTransformScaleMax,
@@ -39,10 +40,22 @@ describe("freeTransformScaleMax", () => {
   });
 });
 
+describe("clampScaleContinuous", () => {
+  it("clamps without centi rounding (live + committed free-transform)", () => {
+    expect(clampScaleContinuous(1.23456, 100)).toBe(1.23456);
+    expect(clampScaleContinuous(0.01, 100)).toBe(SCALE_MIN);
+    expect(clampScaleContinuous(999, 50)).toBe(50);
+  });
+});
+
 describe("clampScaleForFreeTransform", () => {
   it("allows growing far past the panel slider soft max", () => {
     expect(clampScaleForFreeTransform(50, 3.5)).toBe(50);
     expect(clampScaleForFreeTransform(3.05, 3.5)).toBe(3.05);
+  });
+
+  it("keeps sub-centi precision so release matches live preview", () => {
+    expect(clampScaleForFreeTransform(1.23456, 3.5)).toBe(1.23456);
   });
 
   it("floors at SCALE_MIN and caps at the free-transform max", () => {
@@ -56,5 +69,9 @@ describe("clampScaleForSlider", () => {
   it("shares the free-transform hard ceiling (HTML soft-max is separate)", () => {
     expect(clampScaleForSlider(2.5, 3.5)).toBe(2.5);
     expect(clampScaleForSlider(80, 3.5)).toBe(80);
+  });
+
+  it("snaps to centi for stable panel captions", () => {
+    expect(clampScaleForSlider(1.23456, 3.5)).toBe(1.23);
   });
 });

@@ -21,7 +21,7 @@ import {
   trackingEm,
   trackingOf,
 } from "./measure";
-import { SCALE_FREE_BASE, SCALE_MIN } from "./slotScale";
+import { SCALE_FREE_BASE, SCALE_MIN, clampScaleContinuous } from "./slotScale";
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
 import { stopTextAnimIn } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
@@ -2758,8 +2758,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return freeScaleMax;
   }
 
+  /** Free-transform clamp — continuous (no 0.01 snap) so release matches live preview. */
   function clampScale(value: number, max = freeScaleMax) {
-    return Math.min(max, Math.max(SCALE_MIN, Math.round(value * 100) / 100));
+    return clampScaleContinuous(value, max);
   }
 
   function endXformDrag(event?: PointerEvent) {
@@ -3200,7 +3201,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const dx = point.x - xformDrag.chip.body.position.x;
       const dy = point.y - xformDrag.chip.body.position.y;
       const dist = Math.max(1, Math.hypot(dx, dy));
-      const nextScale = clampScale(
+      // Continuous while dragging — 0.01 rounding here stair-steps slow gestures.
+      const nextScale = clampScaleContinuous(
         xformDrag.startScale * (dist / xformDrag.startDist),
         scaleMaxFor(xformDrag.chip.look?.slot),
       );
@@ -3217,7 +3219,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       } else {
         nextAngle = xformDrag.startBodyAngle + (pointerAngle - xformDrag.startPointerAngle);
       }
-      const scaleChanged = nextScale !== xformDrag.lastScale;
+      const scaleChanged = Math.abs(nextScale - xformDrag.lastScale) >= 0.0005;
       const angleChanged = Math.abs(nextAngle - xformDrag.lastAngle) >= 0.0005;
       if (!scaleChanged && !angleChanged) return;
       applyLiveXform(nextScale, nextAngle);
