@@ -1225,6 +1225,8 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
   box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) rgba(0, 0, 0, 0.45);
   pointer-events: none;
   box-sizing: border-box;
+  /* border-width (+ matching box size) for hover thicken only.
+     Do NOT fight live --scale-diam updates during drag — see rule below. */
   transition:
     border-width 0.14s ease,
     width 0.14s ease,
@@ -1235,6 +1237,12 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
 .chip.is-picked > .chip-grad-wheel.chip-grad-wheel--near .chip-grad-wheel__scale,
 .chip.is-grad-angling > .chip-grad-wheel .chip-grad-wheel__scale {
   --grad-stroke: calc(5px / var(--chrome-scale, 1));
+}
+
+/* Live diam must track the pointer 1:1. Size transitions lag every --scale-diam frame. */
+.chip.is-grad-angling > .chip-grad-wheel .chip-grad-wheel__scale,
+.chip.is-scaling > .chip-grad-wheel .chip-grad-wheel__scale {
+  transition: none;
 }
 
 html[data-theme="day"] .chip-grad-wheel__scale {
