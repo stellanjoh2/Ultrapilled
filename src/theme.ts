@@ -14,9 +14,24 @@ function parseHex(hex: string): [number, number, number] {
 }
 
 /** Same weighted luminance as inkOn — 0 dark, 1 bright. */
-function fillLuminance(hex: string): number {
+export function fillLuminance(hex: string): number {
   const [r, g, b] = parseHex(hex);
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+/**
+ * Post bloom ignores near-black fills so dark shapes stay hard-edged.
+ * Rec.709 luma floor; peak-channel escape so deep neon blues/purples still glow.
+ */
+export const BLOOM_MIN_LUMINANCE = 0.18;
+export const BLOOM_MIN_PEAK = 0.5;
+
+/** True when a solid fill is bright enough to contribute to bloom. */
+export function fillBlooms(hex: string): boolean {
+  const [r, g, b] = parseHex(hex);
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  if (lum >= BLOOM_MIN_LUMINANCE) return true;
+  return Math.max(r, g, b) / 255 >= BLOOM_MIN_PEAK;
 }
 
 export function pickTheme(theme: ColorTheme, index: number): string {
