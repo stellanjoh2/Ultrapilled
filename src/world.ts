@@ -269,8 +269,8 @@ export type WorldHandle = {
   impulseAudioJump: (slotIds: Iterable<string>, speed?: number) => void;
   setFloorOpen: (open: boolean) => void;
   freezePile: () => void;
-  /** Wake sleeping chips in place (re-trigger physics without respawning). */
-  wakePile: () => void;
+  /** Lift existing chips above the stage and wake them for a fresh fall (keeps transforms). */
+  redeployFall: () => void;
   purgeFallen: (limitY: number) => void;
   isSettled: () => boolean;
   isQuiet: () => boolean;
@@ -3063,17 +3063,49 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
   }
 
-  /** Re-start simulation from the current board poses (no clear / respawn). */
-  function wakePile() {
+  /**
+   * Re-trigger fall without clear/respawn: keep each chip's scaleMul, sizeUnit,
+   * flips, angle, and horizontal place; stack them above the stage so gravity
+   * runs the normal tumble sequence from the user's current design.
+   */
+  function redeployFall() {
     dropPin();
     cancelPending();
     endXformDrag();
     endGradAngleDrag();
-    for (const chip of chips) {
+    if (!chips.length || bounds.width < 8) return;
+
+    const stageW = bounds.width;
+    // Match play()'s above-canvas stack so the fall reads the same as a first drop.
+    let spawnY = -160;
+
+    // Top-most first so relative vertical order stays roughly familiar after lift.
+    const ordered = [...chips].sort(
+      (a, b) => a.body.position.y - b.body.position.y || a.body.position.x - b.body.position.x,
+    );
+
+    for (const chip of ordered) {
       if (chip.slotId !== editingId && chip.body.isStatic) Body.setStatic(chip.body, false);
+
+      const angle = chip.body.angle;
+      const half = tiltedHalfHeight(chip.width, chip.height, angle);
+      spawnY -= half + 16;
+      const y = spawnY;
+      spawnY -= half;
+
+      const reach = Math.hypot(chip.width, chip.height) / 2;
+      const inset = Math.min(Math.max(reach + 12, 24), Math.max(24, stageW / 2 - 8));
+      const x = Math.min(
+        Math.max(chip.body.position.x, inset),
+        Math.max(inset, stageW - inset),
+      );
+
+      Body.setPosition(chip.body, { x, y });
+      Body.setAngle(chip.body, angle);
       Body.setVelocity(chip.body, { x: 0, y: 0 });
       Body.setAngularVelocity(chip.body, 0);
       Sleeping.set(chip.body, false);
+      syncWallCollision(chip);
       seat(chip);
     }
   }
@@ -3890,7 +3922,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     refreshFrost,
     setFloorOpen,
     freezePile,
-    wakePile,
+    redeployFall,
     purgeFallen,
     isSettled,
     isQuiet,

@@ -150,7 +150,7 @@ const pickedSlotIds = new Set<string>();
 let focusSlotId: string | null = null;
 let revealSlotId: string | null = null;
 let revealTheme = false;
-/** Keep restored chip poses on canvas; Trigger Physics re-falls from them (no respawn). */
+/** Keep restored chip poses on canvas; Trigger Physics lifts & re-falls them (no respawn). */
 let posePinned = false;
 /** Play/physics session; assigned once helpers below exist. */
 let session!: PlaySession;

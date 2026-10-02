@@ -27,7 +27,7 @@ function stubWorld(overrides: Partial<WorldHandle> = {}): WorldHandle {
     impulseAudioJump: vi.fn(),
     setFloorOpen: vi.fn(),
     freezePile: vi.fn(),
-    wakePile: vi.fn(),
+    redeployFall: vi.fn(),
     purgeFallen: vi.fn(),
     isSettled: () => true,
     isQuiet: () => true,
@@ -99,12 +99,12 @@ describe("playSession drop / triggerPhysics", () => {
     await session.triggerPhysics();
 
     expect(world.play).toHaveBeenCalledTimes(1);
-    expect(world.wakePile).not.toHaveBeenCalled();
+    expect(world.redeployFall).not.toHaveBeenCalled();
     expect(world.refresh).not.toHaveBeenCalled();
     expect(session.phase).toBe("falling");
   });
 
-  it("reuses current chips on re-trigger instead of play()", async () => {
+  it("lifts and re-falls current chips on re-trigger instead of play()", async () => {
     const state = blankState();
     state.slots = [defaultTextSlot({ text: "HELLO", scale: 4.5 })];
     const world = stubWorld({ chipCount: () => 2 });
@@ -115,7 +115,7 @@ describe("playSession drop / triggerPhysics", () => {
 
     expect(world.play).not.toHaveBeenCalled();
     expect(world.refresh).toHaveBeenCalledTimes(1);
-    expect(world.wakePile).toHaveBeenCalledTimes(1);
+    expect(world.redeployFall).toHaveBeenCalledTimes(1);
     expect(world.sync).toHaveBeenCalled();
     expect(session.phase).toBe("falling");
   });
@@ -132,16 +132,16 @@ describe("playSession drop / triggerPhysics", () => {
 
     count = 3;
     await session.triggerPhysics();
-    expect(world.wakePile).toHaveBeenCalledTimes(1);
+    expect(world.redeployFall).toHaveBeenCalledTimes(1);
     expect(world.play).not.toHaveBeenCalled();
 
     // Simulate post-dump empty board, then a fresh drop (repeat path).
     count = 0;
-    vi.mocked(world.wakePile).mockClear();
+    vi.mocked(world.redeployFall).mockClear();
     vi.mocked(world.refresh).mockClear();
     await session.drop();
 
     expect(world.play).toHaveBeenCalledTimes(1);
-    expect(world.wakePile).not.toHaveBeenCalled();
+    expect(world.redeployFall).not.toHaveBeenCalled();
   });
 });
