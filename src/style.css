@@ -1063,21 +1063,7 @@ html[data-theme="day"] .chip-xform-handle {
     height 0.14s ease;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .chip.is-picked > .chip-xform-handle.chip-xform-handle--hot:hover,
-  .chip-chrome.is-picked > .chip-xform-handle.chip-xform-handle--hot:hover {
-    --xform-pop: 1.08;
-  }
-
-  .chip.is-picked > .chip-xform-handle.chip-xform-handle--hot:active,
-  .chip.is-scaling > .chip-xform-handle.chip-xform-handle--hot,
-  .chip.is-rotating > .chip-xform-handle.chip-xform-handle--hot,
-  .chip-chrome.is-picked > .chip-xform-handle.chip-xform-handle--hot:active,
-  .chip-chrome.is-scaling > .chip-xform-handle.chip-xform-handle--hot,
-  .chip-chrome.is-rotating > .chip-xform-handle.chip-xform-handle--hot {
-    --xform-pop: 0.96;
-  }
-}
+/* No --xform-pop hover/press scale: release must shrink from grab size, never enlarge. */
 
 @media (prefers-reduced-motion: reduce) {
   .chip-xform-frame,

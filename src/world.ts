@@ -2266,8 +2266,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
    * Soft = show mini; hot = morph to large. Stick radii avoid flicker at the edge.
    * Distances are stage px from the selection-frame corner.
    */
-  const CORNER_SOFT_ENTER = 120;
-  const CORNER_SOFT_STICK = 155;
+  const CORNER_SOFT_ENTER = 240;
+  const CORNER_SOFT_STICK = 310;
   const CORNER_HOT_ENTER = 48;
   const CORNER_HOT_STICK = 68;
 
@@ -2302,38 +2302,26 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return "soft";
   }
 
-  function updateXformHandleHover(event: PointerEvent) {
-    if (xformDrag || drag || gradAngleDrag || editingId) return;
-    if (pickedIds.size === 0) {
-      if (xformHover) {
-        xformHover = null;
-        for (const chip of chips) {
-          if (!isPickPainted(chip)) continue;
-          syncXformHandleSide(chip);
-        }
-      }
-      return;
-    }
-    const point = stagePoint(event);
-    const overHandle = (event.target as Element | null)?.closest?.(".chip-xform-handle");
+  /**
+   * Resolve soft/hot/hidden from a stage point (and optional DOM target).
+   * Used by pointermove and by release settle so we never flash larger than grab.
+   */
+  function resolveXformHoverAt(
+    point: { x: number; y: number },
+    target: EventTarget | null = null,
+  ): typeof xformHover {
+    if (pickedIds.size === 0) return null;
+    const overHandle =
+      target instanceof Element ? target.closest(".chip-xform-handle") : null;
     if (overHandle instanceof HTMLElement) {
       const host = overHandle.closest(".chip, .chip-chrome");
       const chip = chipFromEl(host);
       if (chip && isPickPainted(chip)) {
-        const corner = readXformHandleCorner(overHandle);
-        const next = { bodyId: chip.body.id, corner, phase: "hot" as const };
-        const changed =
-          xformHover?.bodyId !== next.bodyId ||
-          xformHover?.corner !== next.corner ||
-          xformHover?.phase !== next.phase;
-        xformHover = next;
-        if (changed) {
-          for (const item of chips) {
-            if (!isPickPainted(item)) continue;
-            syncXformHandleSide(item);
-          }
-        }
-        return;
+        return {
+          bodyId: chip.body.id,
+          corner: readXformHandleCorner(overHandle),
+          phase: "hot",
+        };
       }
     }
     let bestChip: DroppedChip | null = null;
@@ -2350,21 +2338,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         bestCorner = hit.corner;
       }
     }
-    const prev = xformHover;
-    const next =
-      bestChip && bestCorner
-        ? {
-            bodyId: bestChip.body.id,
-            corner: bestCorner,
-            phase: hoverPhaseFor(
-              bestDist,
-              bestCorner,
-              prev?.bodyId === bestChip.body.id
-                ? { corner: prev.corner, phase: prev.phase }
-                : null,
-            ),
-          }
+    if (!bestChip || !bestCorner) return null;
+    const prev =
+      xformHover?.bodyId === bestChip.body.id
+        ? { corner: xformHover.corner, phase: xformHover.phase }
         : null;
+    return {
+      bodyId: bestChip.body.id,
+      corner: bestCorner,
+      phase: hoverPhaseFor(bestDist, bestCorner, prev),
+    };
+  }
+
+  function applyXformHover(next: typeof xformHover) {
+    const prev = xformHover;
     if (
       (next?.bodyId ?? null) === (prev?.bodyId ?? null) &&
       (next?.corner ?? null) === (prev?.corner ?? null) &&
@@ -2377,6 +2364,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (!isPickPainted(chip)) continue;
       syncXformHandleSide(chip);
     }
+  }
+
+  function updateXformHandleHover(event: PointerEvent) {
+    if (xformDrag || drag || gradAngleDrag || editingId) return;
+    applyXformHover(resolveXformHoverAt(stagePoint(event), event.target));
   }
 
   /** CSS degrees: 0 up, 90 right — matches linear-gradient / gradientLine. */
@@ -2655,12 +2647,22 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return Math.min(max, Math.max(SCALE_MIN, Math.round(value * 100) / 100));
   }
 
-  function endXformDrag() {
+  function endXformDrag(event?: PointerEvent) {
     if (!xformDrag) return;
-    const { lastScale, startScale, startScales, lastAngle, slotId, chip, bodyFactor } = xformDrag;
+    const { lastScale, startScale, startScales, lastAngle, slotId, chip, bodyFactor, corner } =
+      xformDrag;
     const solo = soloBodyId != null && soloBodyId === chip.body.id;
     const factor = lastScale / startScale;
+    // Settle hover BEFORE clearing is-scaling so --xform-pop / size never enlarge on release.
+    // hot→soft (still near) or hot→hidden (outside soft); stay hot only if still in grab range.
     xformDrag = null;
+    if (event) {
+      applyXformHover(resolveXformHoverAt(stagePoint(event), event.target));
+    } else {
+      // No pointer sample — drop to soft on the grabbed corner (shrink, never pop up).
+      xformHover = { bodyId: chip.body.id, corner, phase: "soft" };
+      syncXformHandleSide(chip);
+    }
     endScrub();
     for (const item of xformTargets(slotId)) {
       item.el.classList.remove("is-scaling", "is-rotating");
@@ -2675,6 +2677,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       }
       // Live Body.scale is only a preview — clear the mesh key so refresh remeshes to the final size.
       if (bodyFactor !== 1) item.meshKey = "";
+      // Re-sync after class clear so soft/hot win over leftover drag chrome.
+      if (isPickPainted(item)) syncXformHandleSide(item);
     }
     if (solo) {
       // Keep slot.scale shared; bake the gesture into this chip only, then remesh.
@@ -3119,7 +3123,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function onPointerUp(event: PointerEvent) {
     if (xformDrag && event.pointerId === xformDrag.pointerId) {
-      endXformDrag();
+      endXformDrag(event);
       return;
     }
     if (gradAngleDrag && event.pointerId === gradAngleDrag.pointerId) {
@@ -3178,7 +3182,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function onPointerCancel(event: PointerEvent) {
     if (xformDrag && event.pointerId === xformDrag.pointerId) {
-      endXformDrag();
+      endXformDrag(event);
       return;
     }
     if (gradAngleDrag && event.pointerId === gradAngleDrag.pointerId) {
