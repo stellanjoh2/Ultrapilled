@@ -66,7 +66,6 @@ export type CreatePanelHost = SlotCardHost & {
   ): void;
   paintPerfHints(): void;
   syncInheritedPillPads(): void;
-  syncInheritedTracking(): void;
   scaleFallingAmounts(amount: number): void;
   paintRange(input: HTMLInputElement): void;
   mountFontPick(
@@ -222,9 +221,6 @@ panel.innerHTML = `
     </label>
     <label class="field" data-tip="Space inside text holding shapes"><span data-range-label="pillPad">Shape padding ${H.state.pillPad}</span>
       <input type="range" id="pillPad" min="0" max="100" step="1" value="${H.state.pillPad}" />
-    </label>
-    <label class="field" data-tip="Letter spacing for text"><span data-range-label="textTracking">Tracking ${H.state.textTracking}</span>
-      <input type="range" id="textTracking" min="-400" max="500" step="1" value="${H.state.textTracking}" />
     </label>
     <label class="field" data-tip="How many pieces drop into the frame"><span data-range-label="shapeAmount">Amount of shapes ${H.state.shapeAmount}</span>
       <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${H.state.shapeAmount}" />
@@ -495,11 +491,6 @@ H.bindRange("sizeRandom", "Size random", (v) => {
 H.bindRange("pillPad", "Shape padding", (v) => {
   H.state.pillPad = Math.round(v);
   H.syncInheritedPillPads();
-  H.live();
-}, (v) => `${Math.round(v)}`);
-H.bindRange("textTracking", "Tracking", (v) => {
-  H.state.textTracking = Math.round(v);
-  H.syncInheritedTracking();
   H.live();
 }, (v) => `${Math.round(v)}`);
 H.bindRange("shapeAmount", "Amount of shapes", (v) => {

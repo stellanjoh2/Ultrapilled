@@ -1471,7 +1471,6 @@ function createPanelHost(): CreatePanelHost {
     bindRange,
     paintPerfHints,
     syncInheritedPillPads,
-    syncInheritedTracking,
     scaleFallingAmounts,
     paintRange,
     getAppliedFont() {
@@ -1554,18 +1553,6 @@ function syncInheritedPillPads() {
     paintRange(input);
     const caption = input.closest("label")?.querySelector("[data-range-label]");
     if (caption) caption.textContent = `Shape padding ${state.pillPad}`;
-  });
-}
-
-function syncInheritedTracking() {
-  panel.querySelectorAll<HTMLInputElement>('[data-key="tracking"]').forEach((input) => {
-    const id = input.closest<HTMLElement>("[data-id]")?.dataset.id;
-    const slot = state.slots.find((item) => item.id === id);
-    if (!slot || slot.kind !== "text" || slot.tracking != null) return;
-    input.value = String(state.textTracking);
-    paintRange(input);
-    const caption = input.closest("label")?.querySelector("[data-range-label]");
-    if (caption) caption.textContent = `Tracking ${state.textTracking}`;
   });
 }
 
