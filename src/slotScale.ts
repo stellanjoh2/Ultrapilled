@@ -30,6 +30,12 @@ export function freeTransformScaleMax(masterScale: number): number {
   return Math.min(SCALE_FREE_CEILING, Math.max(SCALE_FREE_BASE, Math.round(dynamic * 100) / 100));
 }
 
+/** Clamp only — no centi rounding. Use for live free-transform preview. */
+export function clampScaleContinuous(value: number, max: number): number {
+  return Math.min(max, Math.max(SCALE_MIN, value));
+}
+
+/** Persist / panel: clamp and round to 0.01. */
 export function clampScaleForFreeTransform(value: number, masterScale: number): number {
   const max = freeTransformScaleMax(masterScale);
   return Math.min(max, Math.max(SCALE_MIN, Math.round(value * 100) / 100));

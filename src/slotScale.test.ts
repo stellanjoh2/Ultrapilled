@@ -6,6 +6,7 @@ import {
   SCALE_MIN,
   SCALE_SLIDER_MAX,
   SCALE_UPLOAD_SLIDER_MAX,
+  clampScaleContinuous,
   clampScaleForFreeTransform,
   clampScaleForSlider,
   freeTransformScaleMax,
@@ -36,6 +37,14 @@ describe("freeTransformScaleMax", () => {
     expect(low).toBeLessThanOrEqual(SCALE_FREE_CEILING);
     // ≈ 100 * 3.5 / 0.4 = 875 → ceiling 500
     expect(low).toBe(SCALE_FREE_CEILING);
+  });
+});
+
+describe("clampScaleContinuous", () => {
+  it("clamps without centi rounding (live free-transform preview)", () => {
+    expect(clampScaleContinuous(1.23456, 100)).toBe(1.23456);
+    expect(clampScaleContinuous(0.01, 100)).toBe(SCALE_MIN);
+    expect(clampScaleContinuous(999, 50)).toBe(50);
   });
 });
 
