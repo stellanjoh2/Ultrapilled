@@ -269,6 +269,8 @@ export type WorldHandle = {
   impulseAudioJump: (slotIds: Iterable<string>, speed?: number) => void;
   setFloorOpen: (open: boolean) => void;
   freezePile: () => void;
+  /** Wake sleeping chips in place (re-trigger physics without respawning). */
+  wakePile: () => void;
   purgeFallen: (limitY: number) => void;
   isSettled: () => boolean;
   isQuiet: () => boolean;
@@ -3061,6 +3063,21 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
   }
 
+  /** Re-start simulation from the current board poses (no clear / respawn). */
+  function wakePile() {
+    dropPin();
+    cancelPending();
+    endXformDrag();
+    endGradAngleDrag();
+    for (const chip of chips) {
+      if (chip.slotId !== editingId && chip.body.isStatic) Body.setStatic(chip.body, false);
+      Body.setVelocity(chip.body, { x: 0, y: 0 });
+      Body.setAngularVelocity(chip.body, 0);
+      Sleeping.set(chip.body, false);
+      seat(chip);
+    }
+  }
+
   function stagePoint(event: { clientX: number; clientY: number }) {
     const rect = (layer?.parentElement ?? stageEl)?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
@@ -3873,6 +3890,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     refreshFrost,
     setFloorOpen,
     freezePile,
+    wakePile,
     purgeFallen,
     isSettled,
     isQuiet,
