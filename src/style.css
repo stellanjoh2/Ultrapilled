@@ -1214,10 +1214,19 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
   top: 50%;
   translate: -50% -50%;
   border-radius: 50%;
-  border: var(--grad-stroke) solid #fff;
+  border-width: var(--grad-stroke);
+  border-style: solid;
+  border-color: #fff;
   box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) rgba(0, 0, 0, 0.45);
   pointer-events: none;
   box-sizing: border-box;
+  transition: border-width 0.14s ease;
+}
+
+/* Grab-ready / dragging: double stroke on the inner solid ring only. */
+.chip.is-picked > .chip-grad-wheel.chip-grad-wheel--near .chip-grad-wheel__scale,
+.chip.is-grad-angling > .chip-grad-wheel .chip-grad-wheel__scale {
+  --grad-stroke: calc(5px / var(--chrome-scale, 1));
 }
 
 html[data-theme="day"] .chip-grad-wheel__scale {
@@ -1327,7 +1336,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 @media (prefers-reduced-motion: reduce) {
   .chip-grad-wheel,
   .chip.is-picked > .chip-grad-wheel,
-  .chip-grad-wheel__stop-dot {
+  .chip-grad-wheel__stop-dot,
+  .chip-grad-wheel__scale {
     transition: none;
   }
 
