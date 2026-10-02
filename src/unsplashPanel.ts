@@ -295,18 +295,25 @@ export function openUnsplashImport(opts: { onPick: (file: File) => void }): void
     );
   } else {
     setStatus("");
-    input.focus({ preventScroll: true });
   }
+
+  // Focus after the card is visible — gsap autoAlpha:0 would otherwise drop focus.
+  const focusSearch = () => {
+    if (!modalRoot || input.disabled) return;
+    input.focus({ preventScroll: true });
+    if (input.value) input.select();
+  };
 
   gsap.set(scrim, { autoAlpha: 0 });
   gsap.set(card, { autoAlpha: 0, y: 16, scale: 0.96 });
 
   if (reducedMotion()) {
     gsap.set([scrim, card], { clearProps: "all", autoAlpha: 1, y: 0, scale: 1 });
+    focusSearch();
     return;
   }
 
   const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
   tl.to(scrim, { autoAlpha: 1, duration: 0.28 }, 0);
-  tl.to(card, { autoAlpha: 1, y: 0, scale: 1, duration: 0.36 }, 0.04);
+  tl.to(card, { autoAlpha: 1, y: 0, scale: 1, duration: 0.36, onStart: focusSearch }, 0.04);
 }

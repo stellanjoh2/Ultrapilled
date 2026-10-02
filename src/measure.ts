@@ -20,6 +20,28 @@ export function trackingEm(slider: number): number {
   return (slider / 100) * 0.04;
 }
 
+/**
+ * How far a glyph’s ink sticks past its advance box (CSS px, identity CTM).
+ * Negative letter-spacing tightens layout width to advances; last/first stems still
+ * paint outside that box — callers pad clip/layout so overflow:hidden won’t crop.
+ */
+export function textGlyphSideOverhangs(
+  font: string,
+  firstChar: string,
+  lastChar: string = firstChar,
+): { left: number; right: number } {
+  if (!measureCtx) return { left: 0, right: 0 };
+  measureCtx.font = font;
+  measureCtx.letterSpacing = "0px";
+  const first = !firstChar || firstChar === " " ? "\u00a0" : firstChar;
+  const last = !lastChar || lastChar === " " ? "\u00a0" : lastChar;
+  const fm = measureCtx.measureText(first);
+  const lm = last === first ? fm : measureCtx.measureText(last);
+  const left = Math.max(0, fm.actualBoundingBoxLeft ?? 0);
+  const right = Math.max(0, (lm.actualBoundingBoxRight ?? 0) - (lm.width || 0));
+  return { left, right };
+}
+
 /** A word's own pill padding, or the global slider while it still follows that. */
 export function pillPadOf(slot: Slot, globalPad: number): number {
   return slot.kind === "text" && slot.pillPad != null ? slot.pillPad : globalPad;
@@ -40,6 +62,19 @@ export function textShiftEm(slider: number): number {
  * the ink canvas / physics box (visible on round bottoms and final stems).
  */
 export const TEXT_INK_PAD = 2;
+
+/** CSS em-box ascent (top → alphabetic baseline) for matching DOM to canvas paint. */
+export function measureTextFontAscent(slot: TextSlot): number {
+  if (!measureCtx) return slot.fontSize * 0.8;
+  measureCtx.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
+  measureCtx.letterSpacing = "0px";
+  const metrics = measureCtx.measureText(slot.text || "M");
+  return (
+    metrics.fontBoundingBoxAscent ??
+    metrics.actualBoundingBoxAscent ??
+    slot.fontSize * 0.8
+  );
+}
 
 /** Tight letterform bounds for free-standing type (no holding shape). */
 export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
@@ -106,6 +141,50 @@ export function measureTextEditSize(slot: TextSlot, pad = 1, tracking = 0.02): C
   };
 }
 
+/** Per-glyph pose for bare letter-cycle (y in CSS px, alpha 0..1). */
+export type GlyphPose = { y: number; alpha: number };
+
+/**
+ * Horizontal caret starts for each glyph, matching fillText + letterSpacing + kerning.
+ * Canvas measureText ignores letterSpacing, so gaps are added explicitly; pair kerning
+ * is recovered from measureText(a+b) - measureText(a) - measureText(b).
+ * Always measure on the shared untransformed probe — a live paint ctx may carry a DPR
+ * setTransform, and measureText under that CTM skews advances after scale (tracking snapback).
+ */
+export function textInkGlyphStarts(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  fontSize: number,
+  tracking: number,
+  originX: number,
+): number[] {
+  const chars = [...text];
+  const spacing = fontSize * tracking;
+  // Measure on the shared probe (identity CTM). Anim frames setTransform(dpr) on
+  // the paint ctx; measureText under that matrix skews advances after scale so
+  // glyphs sit too tight inside a correctly wide ink box (tracking "snapback").
+  const probe = measureCtx ?? ctx;
+  probe.font = ctx.font;
+  probe.letterSpacing = "0px";
+  const starts: number[] = [];
+  let x = originX;
+  for (let i = 0; i < chars.length; i++) {
+    starts.push(x);
+    const ch = chars[i] === " " ? "\u00a0" : chars[i]!;
+    const w = probe.measureText(ch).width;
+    if (i < chars.length - 1) {
+      const next = chars[i + 1] === " " ? "\u00a0" : chars[i + 1]!;
+      const pairW = probe.measureText(ch + next).width;
+      const nextW = probe.measureText(next).width;
+      const kern = pairW - w - nextW;
+      x += w + kern + spacing;
+    } else {
+      x += w;
+    }
+  }
+  return starts;
+}
+
 /** Paint glyphs into an ink-tight box. Origin matches measureTextInk. */
 export function paintTextInk(
   ctx: CanvasRenderingContext2D,
@@ -114,13 +193,34 @@ export function paintTextInk(
   color: string | CanvasGradient,
   shiftEm: number,
   ink: TextInk = measureTextInk(slot, tracking),
+  /** Per-glyph y/alpha for bare letter-cycle. Omit (or all rest) for static ink. */
+  poses?: GlyphPose[] | null,
 ) {
-  ctx.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
-  ctx.letterSpacing = `${tracking}em`;
+  const text = slot.text || "";
+  const chars = [...text];
+  const n = chars.length;
+  if (n === 0) return;
+  const fontSize = slot.fontSize;
+  const baselineY = ink.baseline + shiftEm * fontSize;
+
+  ctx.font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
   ctx.fillStyle = color;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(slot.text || "", ink.originX, ink.baseline + shiftEm * slot.fontSize);
+  // Always glyph-by-glyph with the same starts — static and Animate share layout
+  // (pair kerning + tracking). Never clip a full-string draw (that shredded letters).
+  const starts = textInkGlyphStarts(ctx, text, fontSize, tracking, ink.originX);
+  ctx.letterSpacing = "0px";
+
+  for (let i = 0; i < n; i++) {
+    const pose = poses?.[i] ?? { y: 0, alpha: 1 };
+    if (pose.alpha < 0.001) continue;
+    const ch = chars[i] === " " ? "\u00a0" : chars[i]!;
+    ctx.save();
+    ctx.globalAlpha *= pose.alpha;
+    ctx.fillText(ch, starts[i]!, baselineY + pose.y);
+    ctx.restore();
+  }
 }
 
 function measureLineWidth(text: string, fontSize: number, tracking: number): number {

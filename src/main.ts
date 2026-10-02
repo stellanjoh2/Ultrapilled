@@ -1471,7 +1471,6 @@ function createPanelHost(): CreatePanelHost {
     bindRange,
     paintPerfHints,
     syncInheritedPillPads,
-    syncInheritedTracking,
     scaleFallingAmounts,
     paintRange,
     getAppliedFont() {
@@ -1554,18 +1553,6 @@ function syncInheritedPillPads() {
     paintRange(input);
     const caption = input.closest("label")?.querySelector("[data-range-label]");
     if (caption) caption.textContent = `Shape padding ${state.pillPad}`;
-  });
-}
-
-function syncInheritedTracking() {
-  panel.querySelectorAll<HTMLInputElement>('[data-key="tracking"]').forEach((input) => {
-    const id = input.closest<HTMLElement>("[data-id]")?.dataset.id;
-    const slot = state.slots.find((item) => item.id === id);
-    if (!slot || slot.kind !== "text" || slot.tracking != null) return;
-    input.value = String(state.textTracking);
-    paintRange(input);
-    const caption = input.closest("label")?.querySelector("[data-range-label]");
-    if (caption) caption.textContent = `Tracking ${state.textTracking}`;
   });
 }
 
@@ -4821,14 +4808,18 @@ session = createPlaySession({
   tickAudioReact,
   nudgeEmptyScene,
   notifyLayoutModeBlocksPhysics: async () => {
+    const overlapping = world.chipCount() > 0 && world.chipsOverlap();
     const ok = await askConfirm({
       title: "Can't trigger physics",
-      body: "Layout mode is on. Turn on Physics first.",
+      body: overlapping
+        ? "Layout mode is on. Activate Physics to tumble — overlapping pieces will push apart and your layout will change."
+        : "Layout mode is on. Turn on Physics first.",
       confirmLabel: "Activate Physics",
       cancelLabel: "Got it",
     });
     if (!ok) return false;
-    await setLayoutMode(false);
+    // Already confirmed above — skip setLayoutMode's overlap dialog.
+    await setLayoutMode(false, { skipConfirm: true });
     return !state.physics.layoutMode;
   },
   playButton,
@@ -4847,10 +4838,10 @@ session = createPlaySession({
   },
 });
 
-async function setLayoutMode(next: boolean) {
+async function setLayoutMode(next: boolean, opts?: { skipConfirm?: boolean }) {
   if (next === state.physics.layoutMode) return;
 
-  if (!next && world.chipCount() > 0 && world.chipsOverlap()) {
+  if (!opts?.skipConfirm && !next && world.chipCount() > 0 && world.chipsOverlap()) {
     const ok = await askConfirm({
       title: "Turn physics back on?",
       body: "Overlapping pieces will push apart and your layout will change. Continue?",

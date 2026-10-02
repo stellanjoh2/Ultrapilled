@@ -1,5 +1,7 @@
 import gsap from "gsap";
-import type { TextSlot } from "./types";
+import { measureTextInk, paintTextInk, TEXT_INK_PAD, textGlyphSideOverhangs, type GlyphPose } from "./measure";
+import { textGradientFill } from "./pillFill";
+import { defaultTypeSlot, type TextSlot } from "./types";
 
 export const DEFAULT_TEXT_ANIM_SPEED = 50;
 
@@ -128,6 +130,8 @@ function clearInline(label: HTMLElement) {
   gsap.killTweensOf(label.querySelectorAll(".char, .text-anim-word, .text-anim-clip"));
   label.classList.remove("is-text-anim");
   label.parentElement?.classList.remove("is-text-anim-host");
+  // Closest chip in case the label was already reparented/detached mid-teardown.
+  label.closest(".chip")?.classList.remove("is-text-anim-host");
   label.replaceChildren();
 }
 
@@ -145,6 +149,263 @@ export function stopTextAnimIn(root: ParentNode) {
   root.querySelectorAll<HTMLElement>(".chip-label").forEach(stopTextAnim);
 }
 
+
+type BareCanvasRun = {
+  sig: string;
+  kill: () => void;
+  slot: TextSlot;
+  width: number;
+  height: number;
+  tracking: number;
+  shiftEm: number;
+  color: string;
+  gradientTo: string;
+  angle?: number;
+  scale?: number;
+};
+
+const bareCanvasRuns = new WeakMap<HTMLCanvasElement, BareCanvasRun>();
+const bareCanvasTickers = new Set<() => void>();
+
+function paintBareRollingFrame(
+  canvas: HTMLCanvasElement,
+  slot: TextSlot,
+  width: number,
+  height: number,
+  tracking: number,
+  color: string,
+  shiftEm: number,
+  gradientTo: string,
+  timeMs: number,
+  angle?: number,
+  scale?: number,
+) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.ceil(width * dpr));
+  const h = Math.max(1, Math.ceil(height * dpr));
+  // Exact buffer (not grow-only): after scale-up a leftover larger bitmap made
+  // sx≠sy and tracking looked non-uniform. Anim already redraws every frame.
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.style.display = "block";
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  // Identity CTM + device-pixel font: measure/paint share one space (no DPR transform
+  // skewing glyph advances after scale remesh).
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const inkCss = measureTextInk(slot, tracking);
+  const paintSlot = { ...slot, fontSize: slot.fontSize * dpr };
+  const ink = {
+    width: inkCss.width * dpr,
+    height: inkCss.height * dpr,
+    originX: inkCss.originX * dpr,
+    baseline: inkCss.baseline * dpr,
+    advance: inkCss.advance * dpr,
+  };
+  const fill =
+    slot.gradient && gradientTo
+      ? textGradientFill(
+          ctx,
+          w,
+          h,
+          color,
+          gradientTo,
+          angle ?? slot.gradientAngle,
+          scale ?? slot.gradientScale,
+        )
+      : color;
+
+  const fontSize = slot.fontSize;
+  const travel = textAnimTravel(0, fontSize);
+  const text = slot.text || "";
+  const chars = [...text];
+  const n = chars.length;
+  const { letter, stagger } = pace(slot.textAnimSpeed);
+  const wave = letter + Math.max(0, n - 1) * stagger;
+  // Match live GSAP: begin at resting hold (skip the export-style enter-from-below).
+  const poseMs = timeMs + wave * 1000;
+
+  const poses: GlyphPose[] = [];
+  for (let i = 0; i < n; i++) {
+    const pose = textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel);
+    poses.push({ y: pose.y * dpr, alpha: pose.alpha });
+  }
+  // Same painter as static bare type (per-glyph starts + pair kerning).
+  paintTextInk(ctx, paintSlot, tracking, fill, shiftEm, ink, poses);
+}
+
+/** Bare type: animate on the ink canvas so resting glyphs never leave static paint. */
+export function applyBareCanvasTextAnim(
+  canvas: HTMLCanvasElement,
+  host: HTMLElement,
+  slot: TextSlot,
+  width: number,
+  height: number,
+  tracking: number,
+  color: string,
+  shiftEm: number,
+  gradientTo = "",
+  angle?: number,
+  scale?: number,
+): void {
+  const speed = textAnimSpeedOf(slot.textAnimSpeed);
+  const sig = `bare-canvas|${speed}|${slot.text}|${slot.fontFamily}|${slot.fontWeight}|${slot.fontSize}|${tracking}|${shiftEm}|${width}|${height}|${color}|${gradientTo}|${angle ?? ""}|${scale ?? ""}`;
+  const prev = bareCanvasRuns.get(canvas);
+  if (prev?.sig === sig) {
+    host.classList.add("is-text-anim-host");
+    return;
+  }
+  stopBareCanvasTextAnim(canvas);
+
+  host.classList.add("is-text-anim-host");
+  let start = performance.now();
+  let pausedAt: number | null = textAnimsPaused ? start : null;
+
+  const tick = () => {
+    if (textAnimsPaused) {
+      if (pausedAt == null) pausedAt = performance.now();
+      return;
+    }
+    if (pausedAt != null) {
+      start += performance.now() - pausedAt;
+      pausedAt = null;
+    }
+    const run = bareCanvasRuns.get(canvas);
+    if (!run) return;
+    paintBareRollingFrame(
+      canvas,
+      run.slot,
+      run.width,
+      run.height,
+      run.tracking,
+      run.color,
+      run.shiftEm,
+      run.gradientTo,
+      performance.now() - start,
+      run.angle,
+      run.scale,
+    );
+  };
+
+  // Resting first frame (time 0 + wave offset) matches static paintTextInk.
+  paintBareRollingFrame(
+    canvas,
+    slot,
+    width,
+    height,
+    tracking,
+    color,
+    shiftEm,
+    gradientTo,
+    0,
+    angle,
+    scale,
+  );
+
+  gsap.ticker.add(tick);
+  bareCanvasTickers.add(tick);
+
+  bareCanvasRuns.set(canvas, {
+    sig,
+    slot,
+    width,
+    height,
+    tracking,
+    shiftEm,
+    color,
+    gradientTo,
+    angle,
+    scale,
+    kill: () => {
+      gsap.ticker.remove(tick);
+      bareCanvasTickers.delete(tick);
+      host.classList.remove("is-text-anim-host");
+      bareCanvasRuns.delete(canvas);
+    },
+  });
+}
+
+export function stopBareCanvasTextAnim(canvas: HTMLCanvasElement) {
+  const prev = bareCanvasRuns.get(canvas);
+  if (prev) prev.kill();
+}
+
+export function stopBareCanvasTextAnimIn(root: ParentNode) {
+  root.querySelectorAll("canvas").forEach((node) => {
+    if (node instanceof HTMLCanvasElement) stopBareCanvasTextAnim(node);
+  });
+}
+
+/**
+ * Keep the letter-cycle clip as wide as the live word after tracking/scale remesh.
+ * Must use layout px (offsetWidth + max-content), not getBoundingClientRect: the chip
+ * carries CSS rotate/scale from seat(), and after scale-drag remesh the preview scale
+ * is often still on the transform until the next seat(). Visual rects inflate the clip
+ * so flex+overflow:hidden on the label crushes tracking; rotated chips do the same.
+ *
+ * offsetWidth is advance-tight under negative letter-spacing; glyph ink (esp. the last
+ * stem) overhangs that box. Pad both sides by the max side-bearing so centered rows
+ * still clear overflow:hidden on .text-anim-clip / .is-text-anim. Also take the
+ * canvas ink width (same metrics as bare type) so we never undershoot painted bounds.
+ */
+function refreshAnimClipWidth(label: HTMLElement) {
+  const clip = label.querySelector(":scope > .text-anim-clip");
+  if (!(clip instanceof HTMLElement)) return;
+  const rows = [...clip.querySelectorAll<HTMLElement>(".text-anim-word")];
+  const cs = getComputedStyle(label);
+  // Prefer the serialized shorthand; fall back when the browser leaves font empty.
+  const font = cs.font?.trim() || `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const fontSize = Number.parseFloat(cs.fontSize) || 14;
+  const spacingPx = Number.parseFloat(cs.letterSpacing);
+  const tracking = Number.isFinite(spacingPx) ? spacingPx / fontSize : 0;
+  const fontWeight = Number.parseFloat(cs.fontWeight) || 700;
+  const fontFamily =
+    cs.fontFamily.split(",")[0]?.trim().replace(/^["']|["']$/g, "") || "sans-serif";
+  let maxW = 0;
+  for (const row of rows) {
+    const prev = {
+      position: row.style.position,
+      inset: row.style.inset,
+      left: row.style.left,
+      right: row.style.right,
+      width: row.style.width,
+      textAlign: row.style.textAlign,
+    };
+    // Absolute+inset:0 stretches to the (possibly stale) clip; measure intrinsic ink instead.
+    row.style.position = "relative";
+    row.style.inset = "auto";
+    row.style.left = "auto";
+    row.style.right = "auto";
+    row.style.width = "max-content";
+    row.style.textAlign = "left";
+    const layoutW = row.offsetWidth;
+    const chars = [...row.querySelectorAll(".char")];
+    const first = chars[0]?.textContent ?? "";
+    const last = chars.length > 1 ? (chars[chars.length - 1]?.textContent ?? first) : first;
+    const word = chars.map((c) => c.textContent ?? "").join("") || " ";
+    const { left, right } = textGlyphSideOverhangs(font, first, last);
+    // text-align:center on absolute rows — equal side room so asymmetric bearings still fit.
+    const side = Math.max(left, right, 0);
+    const ink = measureTextInk(
+      defaultTypeSlot({ text: word, fontFamily, fontWeight, fontSize }),
+      tracking,
+    );
+    maxW = Math.max(maxW, layoutW + side * 2 + TEXT_INK_PAD * 2, ink.width);
+    row.style.position = prev.position;
+    row.style.inset = prev.inset;
+    row.style.left = prev.left;
+    row.style.right = prev.right;
+    row.style.width = prev.width;
+    row.style.textAlign = prev.textAlign;
+  }
+  if (maxW > 0) clip.style.width = `${Math.ceil(maxW)}px`;
+  else clip.style.removeProperty("width");
+}
+
 /** Looping letter motion (same engine as pill text anim). */
 export function applyRollingText(label: HTMLElement, text: string, opts: RollingTextOpts = {}): boolean {
   const speed = textAnimSpeedOf(opts.speed);
@@ -152,15 +413,17 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
     opts.fontSize ?? (Number.parseFloat(getComputedStyle(label).fontSize) || 14);
   const travel = travelPx(label, fontSize);
   const asPhrase = Boolean(opts.asPhrase);
-  // Omit travel from the signature — pill height changes every tracking/scale tick and
-  // would otherwise tear down + rebuild the GSAP cycle (hard on/off flicker).
-  const sig = `cycle|${speed}|${text}|${asPhrase ? "phrase" : "words"}`;
+  // Rebuild when font size changes (scale remesh) so travel + glyph boxes match.
+  // Tracking stays out of the sig — CSS letter-spacing updates live; we only
+  // refresh the clip width so a stale maxW cannot crush letters after scrub/scale.
+  const sig = `cycle|${speed}|${text}|${asPhrase ? "phrase" : "words"}|fs:${Math.round(fontSize)}`;
   const prev = running.get(label);
   const host = label.parentElement;
   if (prev?.sig === sig) {
     // Repaints must keep host/label markers even when the timeline is reused.
     label.classList.add("is-text-anim");
     host?.classList.add("is-text-anim-host");
+    refreshAnimClipWidth(label);
     return true;
   }
 
@@ -195,28 +458,27 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
     clip.append(row);
   }
   label.replaceChildren(clip);
+  refreshAnimClipWidth(label);
 
   const rows = [...clip.querySelectorAll<HTMLElement>(".text-anim-word")];
-  let maxW = 0;
-  for (const row of rows) {
-    row.style.position = "relative";
-    maxW = Math.max(maxW, row.getBoundingClientRect().width);
-    row.style.position = "";
-  }
-  if (maxW > 0) clip.style.width = `${Math.ceil(maxW)}px`;
 
+  // Start at resting pose (identity) BEFORE prepare/seat so ink measurement matches
+  // the first visible frame — no travel offset, no fly-in on Animate.
+  gsap.set(rows, { autoAlpha: 0 });
+  const first = rows[0];
+  if (first) {
+    gsap.set(first, { autoAlpha: 1 });
+    gsap.set(first.querySelectorAll<HTMLElement>(".char"), { y: 0, autoAlpha: 1, x: 0 });
+  }
   opts.prepare?.(label);
 
-  gsap.set(rows, { autoAlpha: 0 });
   const tl = gsap.timeline({ repeat: -1 });
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
     const chars = row.querySelectorAll<HTMLElement>(".char");
-    tl.set(row, { autoAlpha: 1 });
-    tl.fromTo(
-      chars,
-      { y: travel, autoAlpha: 0 },
-      { y: 0, autoAlpha: 1, duration: timing.letter, stagger: timing.stagger, ease: "power2.out" },
-    );
+    const next = rows[(i + 1) % rows.length]!;
+    const nextChars = next.querySelectorAll<HTMLElement>(".char");
+    // Hold at rest, then exit upward.
     tl.to(chars, {
       y: -travel,
       autoAlpha: 0,
@@ -226,6 +488,20 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
       delay: timing.pause,
     });
     tl.set(row, { autoAlpha: 0 });
+    // Enter the next row from below (wraps to first so the loop stays continuous).
+    tl.set(next, { autoAlpha: 1 });
+    tl.fromTo(
+      nextChars,
+      { y: travel, autoAlpha: 0 },
+      {
+        y: 0,
+        autoAlpha: 1,
+        duration: timing.letter,
+        stagger: timing.stagger,
+        ease: "power2.out",
+        immediateRender: false,
+      },
+    );
   }
 
   timelines.add(tl);

@@ -37,6 +37,7 @@ export function blankState(): AppState {
     shapeAmount: 0,
     sizeRandom: 0,
     pillPad: 30,
+    textTracking: 0,
     template: "blank",
   };
 }

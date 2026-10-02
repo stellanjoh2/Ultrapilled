@@ -900,22 +900,26 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   }
 }
 
-/* Transform grab (SE by default): polar drag — radial = scale, angular = rotate.
-   Hover near a corner swaps the solo handle there; SE→NE when SE would clip the stage. */
+/* Transform grab: four corner handles stay hidden until proximity.
+   Soft (outer) → mini tile on nearest corner; hot (inner / drag) → large arrows-out.
+   Polar drag — radial = scale, angular = rotate. */
 .chip-xform-handle {
   --xform-pop: 0.92;
+  --xform-size: 38px;
+  --xform-icon: 20px;
+  --xform-radius: 7px;
   position: absolute;
   z-index: 5;
   left: auto;
   top: auto;
   right: calc(-1 * var(--xform-pad, 12px));
   bottom: calc(-1 * var(--xform-pad, 12px));
-  width: 76px;
-  height: 76px;
+  width: var(--xform-size);
+  height: var(--xform-size);
   margin: 0;
   padding: 0;
   border: 1.5px solid #111;
-  border-radius: 14px;
+  border-radius: var(--xform-radius);
   background: #1a1a1a;
   color: #fff;
   box-sizing: border-box;
@@ -934,8 +938,17 @@ html[data-theme="day"] .stage.is-portrait .playfield {
     opacity 0.14s ease,
     visibility 0s linear 0.14s,
     transform 0.14s ease,
-    background-color 0.1s ease,
-    color 0.1s ease;
+    width 0.14s ease,
+    height 0.14s ease,
+    border-radius 0.14s ease;
+}
+
+.chip-xform-handle.chip-xform-handle--se {
+  left: auto;
+  top: auto;
+  right: calc(-1 * var(--xform-pad, 12px));
+  bottom: calc(-1 * var(--xform-pad, 12px));
+  transform: translate(calc(100% + 6px), calc(100% + 6px)) scale(var(--xform-pop));
 }
 
 .chip-xform-handle.chip-xform-handle--ne {
@@ -971,62 +984,80 @@ html[data-theme="day"] .chip-xform-handle {
 .chip.is-picked > .chip-xform-handle,
 .chip-chrome.is-picked > .chip-xform-handle {
   --xform-pop: 1;
-  opacity: 1;
+  /* Hidden until soft/hot proximity — avoids four-corner icon clutter. */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.14s ease,
+    visibility 0s linear 0.14s,
+    transform 0.14s ease,
+    width 0.14s ease,
+    height 0.14s ease,
+    border-radius 0.14s ease;
+}
+
+/* Outer proximity: only the nearest corner shows as a mini tile. */
+.chip.is-picked > .chip-xform-handle.chip-xform-handle--soft,
+.chip-chrome.is-picked > .chip-xform-handle.chip-xform-handle--soft {
+  opacity: 0.88;
   visibility: visible;
   pointer-events: auto;
+  z-index: 6;
   transition:
     opacity 0.14s ease,
     visibility 0s,
     transform 0.14s ease,
-    background-color 0.1s ease,
-    color 0.1s ease;
+    width 0.14s ease,
+    height 0.14s ease,
+    border-radius 0.14s ease;
 }
 
-.chip-xform-handle:active,
-.chip.is-scaling > .chip-xform-handle,
-.chip.is-rotating > .chip-xform-handle,
-.chip-chrome.is-scaling > .chip-xform-handle,
-.chip-chrome.is-rotating > .chip-xform-handle {
+/* Inner proximity / drag: morph that corner into the large arrow tile. */
+.chip.is-picked > .chip-xform-handle.chip-xform-handle--hot,
+.chip-chrome.is-picked > .chip-xform-handle.chip-xform-handle--hot {
+  --xform-size: 76px;
+  --xform-icon: 40px;
+  --xform-radius: 14px;
+  --xform-pop: 1;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 7;
+  transition:
+    opacity 0.14s ease,
+    visibility 0s,
+    transform 0.14s ease,
+    width 0.14s ease,
+    height 0.14s ease,
+    border-radius 0.14s ease;
+}
+
+/* Inverted chrome only while the gesture is live (parent is-scaling).
+   :active omitted so pointer-up snaps straight back to neutral dark. */
+.chip.is-scaling > .chip-xform-handle.chip-xform-handle--hot,
+.chip.is-rotating > .chip-xform-handle.chip-xform-handle--hot,
+.chip-chrome.is-scaling > .chip-xform-handle.chip-xform-handle--hot,
+.chip-chrome.is-rotating > .chip-xform-handle.chip-xform-handle--hot {
   cursor: grabbing;
   background: #fff;
   color: #111;
+  transition: none;
 }
 
 .chip-xform-handle svg {
-  width: 40px;
-  height: 40px;
+  width: var(--xform-icon);
+  height: var(--xform-icon);
   display: block;
   pointer-events: none;
-  transform: scaleX(-1);
-}
-
-.chip-xform-handle--ne svg {
-  transform: scale(-1);
-}
-
-.chip-xform-handle--nw svg {
-  transform: scaleX(-1);
-}
-
-.chip-xform-handle--sw svg {
+  /* Grab hand stays upright on every corner (not directional like arrows-out). */
   transform: none;
+  transition:
+    width 0.14s ease,
+    height 0.14s ease;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .chip.is-picked > .chip-xform-handle:hover,
-  .chip-chrome.is-picked > .chip-xform-handle:hover {
-    --xform-pop: 1.08;
-  }
-
-  .chip.is-picked > .chip-xform-handle:active,
-  .chip.is-scaling > .chip-xform-handle,
-  .chip.is-rotating > .chip-xform-handle,
-  .chip-chrome.is-picked > .chip-xform-handle:active,
-  .chip-chrome.is-scaling > .chip-xform-handle,
-  .chip-chrome.is-rotating > .chip-xform-handle {
-    --xform-pop: 0.96;
-  }
-}
+/* No --xform-pop hover/press scale: release must shrink from grab size, never enlarge. */
 
 @media (prefers-reduced-motion: reduce) {
   .chip-xform-frame,
@@ -1037,14 +1068,19 @@ html[data-theme="day"] .chip-xform-handle {
     transition: none;
   }
 
+  .chip-xform-handle,
+  .chip-xform-handle svg {
+    transition: none;
+  }
+
   .chip-xform-handle {
     --xform-pop: 1;
   }
 }
 
-/* Keep the handle a constant screen size while the chip CSS-previews scale. */
-.chip.is-scaling > .chip-xform-handle,
-.chip-chrome.is-scaling > .chip-xform-handle {
+/* Keep handles a constant screen size while the chip CSS-previews scale. */
+.chip.is-scaling > .chip-xform-handle--se,
+.chip-chrome.is-scaling > .chip-xform-handle--se {
   transform: translate(calc(100% + 6px), calc(100% + 6px))
     scale(calc(var(--xform-pop) / var(--scale-preview, 1)));
 }
@@ -1288,6 +1324,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   display: block;
   line-height: 1;
   overflow: hidden;
+  /* overflow:hidden zeroes flex min-size — don't let the chip crush the letter-cycle. */
+  flex-shrink: 0;
 }
 
 /* Bare type: seat to ink box in JS — never clip resting glyphs. */

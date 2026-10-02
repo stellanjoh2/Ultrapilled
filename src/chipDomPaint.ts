@@ -1,9 +1,15 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { rasterRing, textLookFlags } from "./chipLook";
-import { measureTextInk, paintTextInk, TEXT_INK_PAD } from "./measure";
+import { measureTextInk, paintTextInk } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
-import { applyTextAnim, stopTextAnim } from "./textAnim";
+import {
+  applyBareCanvasTextAnim,
+  applyTextAnim,
+  stopBareCanvasTextAnimIn,
+  stopTextAnim,
+  stopTextAnimIn,
+} from "./textAnim";
 import { inkOn } from "./theme";
 import { peekTrim } from "./trim";
 import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type Slot, type TextSlot } from "./types";
@@ -158,35 +164,38 @@ export function paintBareText(
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = Math.max(1, Math.ceil(width * dpr));
   const h = Math.max(1, Math.ceil(height * dpr));
-  // Grow-only backing store avoids clear-flashes on expand. When CSS size shrinks,
-  // draw in logical coords across the full bitmap so the browser's CSS scale does
-  // not squash glyphs (setting canvas.width clears and used to flicker on scrub).
-  if (canvas.width < w) canvas.width = w;
-  if (canvas.height < h) canvas.height = h;
+  // Exact buffer in device pixels with identity CTM (same as bare Animate).
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.style.display = "block";
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const sx = canvas.width / Math.max(1, width);
-  const sy = canvas.height / Math.max(1, height);
-  ctx.setTransform(sx, 0, 0, sy, 0, 0);
-  const ink = measureTextInk(slot, tracking);
+  ctx.clearRect(0, 0, w, h);
+  const inkCss = measureTextInk(slot, tracking);
+  const paintSlot = { ...slot, fontSize: slot.fontSize * dpr };
+  const ink = {
+    width: inkCss.width * dpr,
+    height: inkCss.height * dpr,
+    originX: inkCss.originX * dpr,
+    baseline: inkCss.baseline * dpr,
+    advance: inkCss.advance * dpr,
+  };
   const fill =
     slot.gradient && gradientTo
       ? textGradientFill(
           ctx,
-          width,
-          height,
+          w,
+          h,
           color,
           gradientTo,
           angle ?? slot.gradientAngle,
           scale ?? slot.gradientScale,
         )
       : color;
-  paintTextInk(ctx, slot, tracking, fill, shiftEm, ink);
+  paintTextInk(ctx, paintSlot, tracking, fill, shiftEm, ink);
 }
 
 export function clearBareTextCss(el: HTMLElement) {
@@ -258,50 +267,6 @@ function syncCharWordGradient(word: HTMLElement) {
   }
 }
 
-/** Pin bare letter-cycle DOM to the same ink origin as the canvas paint path. */
-function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: number) {
-  const ink = measureTextInk(slot, tracking);
-
-  label.classList.add("is-bare-text-anim");
-  label.style.position = "absolute";
-  label.style.left = "0";
-  label.style.top = "0";
-  label.style.width = "100%";
-  label.style.height = "100%";
-  label.style.overflow = "visible";
-  label.style.display = "block";
-  label.style.lineHeight = "1";
-  label.style.boxSizing = "border-box";
-  label.style.margin = "0";
-  label.style.padding = "0";
-
-  const clip = label.querySelector<HTMLElement>(":scope > .text-anim-clip");
-  if (clip) {
-    // Same top pad as measureTextInk / paintTextInk.
-    clip.style.position = "absolute";
-    clip.style.left = `${ink.originX}px`;
-    clip.style.top = `${TEXT_INK_PAD}px`;
-    clip.style.width = `${Math.max(1, ink.width - ink.originX - TEXT_INK_PAD)}px`;
-    clip.style.height = `${Math.ceil(slot.fontSize)}px`;
-    clip.style.overflow = "visible";
-    clip.style.lineHeight = "1";
-  }
-  for (const word of label.querySelectorAll<HTMLElement>(".text-anim-word")) {
-    word.style.position = "relative";
-    word.style.inset = "auto";
-    word.style.left = "0";
-    word.style.top = "0";
-    word.style.display = "block";
-    word.style.textAlign = "left";
-    word.style.width = "max-content";
-    word.style.height = "100%";
-  }
-  for (const char of label.querySelectorAll<HTMLElement>(".char")) {
-    // Top-align so the em box shares the canvas ink top (baseline align sits lower).
-    char.style.verticalAlign = "top";
-  }
-}
-
 function clearBareTextAnimSeat(label: HTMLElement) {
   if (!label.classList.contains("is-bare-text-anim")) return;
   label.classList.remove("is-bare-text-anim");
@@ -317,10 +282,32 @@ function clearBareTextAnimSeat(label: HTMLElement) {
     "box-sizing",
     "margin",
     "padding",
+    "z-index",
   ] as const) {
     label.style.removeProperty(prop);
   }
+  for (const node of label.querySelectorAll<HTMLElement>(".text-anim-clip, .text-anim-word, .char")) {
+    for (const prop of [
+      "position",
+      "left",
+      "top",
+      "right",
+      "bottom",
+      "inset",
+      "width",
+      "height",
+      "overflow",
+      "display",
+      "line-height",
+      "text-align",
+      "vertical-align",
+      "transform",
+    ] as const) {
+      node.style.removeProperty(prop);
+    }
+  }
 }
+
 export function paintBareTextCss(
   label: HTMLElement,
   from: string,
@@ -441,9 +428,10 @@ export function applyVisual(
     const textGradient = wantsTextGradient && Boolean(gradientTo);
     const hideText = bloom && !bare;
     const liveEdit = editing && !bloom;
-    // Ink canvas can't host GSAP letter motion or CSS animated gradients.
+    // Pill letter-cycle + animated CSS gradients need a DOM label.
+    // Bare letter-cycle stays on the ink canvas (seamless with static paint).
     const bareCss =
-      Boolean(slot.textAnim) ||
+      (Boolean(slot.textAnim) && !bare) ||
       (textGradient && (liveEdit || Boolean(slot.animatedGradient)));
     el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video");
     el.classList.toggle("chip-bare", bare || ring);
@@ -462,14 +450,68 @@ export function applyVisual(
     el.style.fontSize = `${slot.fontSize}px`;
     el.style.letterSpacing = `${tracking}em`;
 
-    // Live edit / text anim need a DOM label — never the ink canvas.
+    // Bare Animate: canvas letter poses — never swap to DOM (that caused the jump).
+    if (bare && slot.textAnim && !liveEdit && !hideText) {
+      stopTextAnimIn(el);
+      el.querySelectorAll(":scope > .chip-label, :scope > .chip-edit").forEach((n) => n.remove());
+      // Ensure the ink canvas exists without resetting a running cycle every tick.
+      const found = el.querySelector(":scope > canvas");
+      if (!(found instanceof HTMLCanvasElement)) {
+        paintBareText(
+          el,
+          slot,
+          width,
+          height,
+          tracking,
+          textGradient ? fill : ink,
+          shiftEm,
+          textGradient ? gradientTo : "",
+        );
+      } else {
+        // Keep chrome / drop other look nodes, but leave this canvas mounted.
+        for (const child of [...el.children]) {
+          if (child === found || isChipChrome(child)) continue;
+          child.remove();
+        }
+        mountLookChild(el, found);
+        // Match chip box immediately (anim frame will set the bitmap).
+        found.style.width = `${width}px`;
+        found.style.height = `${height}px`;
+      }
+      const canvas = el.querySelector(":scope > canvas");
+      if (canvas instanceof HTMLCanvasElement) {
+        applyBareCanvasTextAnim(
+          canvas,
+          el,
+          slot,
+          width,
+          height,
+          tracking,
+          textGradient ? fill : ink,
+          shiftEm,
+          textGradient ? gradientTo : "",
+          slot.gradientAngle,
+          slot.gradientScale,
+        );
+      } else {
+        el.classList.add("is-text-anim-host");
+      }
+      return;
+    }
+
     if (bare && !bareCss && !liveEdit) {
+      // Tear down letter-cycle BEFORE stripLookChildren — otherwise is-text-anim-host
+      // stays on the chip and the context menu keeps offering "Stop Animation".
+      stopTextAnimIn(el);
+      stopBareCanvasTextAnimIn(el);
+      el.classList.remove("is-text-anim-host");
       // Solid or static-gradient ink canvas (tight AABB).
       paintBareText(el, slot, width, height, tracking, textGradient ? fill : ink, shiftEm, textGradient ? gradientTo : "");
       return;
     }
 
-    if (liveEdit || bareCss) el.querySelector(":scope > canvas")?.remove();
+    stopBareCanvasTextAnimIn(el);
+    el.querySelector(":scope > canvas")?.remove();
 
     const label = textLabel(el, liveEdit);
     if (label.parentElement !== el) {
@@ -514,17 +556,13 @@ export function applyVisual(
         clearBareTextAnimSeat(label);
         label.textContent = "";
       } else if (
-        !applyTextAnim(label, slot, (lbl) => {
-          // Seat while glyphs are still at rest — before the GSAP timeline starts.
-          if (bare) seatBareTextAnimLabel(lbl, slot, tracking);
+        !applyTextAnim(label, slot, () => {
           if (textGradient) paintGrad();
         })
       ) {
         clearBareTextAnimSeat(label);
+        label.style.lineHeight = "1";
         label.textContent = slot.text;
-      } else if (bare) {
-        // Timeline reused (early return) — prepare was skipped; reseat + repaint.
-        seatBareTextAnimLabel(label, slot, tracking);
       } else {
         clearBareTextAnimSeat(label);
       }
