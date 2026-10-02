@@ -1259,38 +1259,60 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) #fff;
 }
 
+/* Hit shell is always 1.5× the visual so :hover scale never oscillates at the edge. */
 .chip-grad-wheel__stop {
+  --stop-visual: calc(28px / var(--chrome-scale, 1));
   position: absolute;
   left: 50%;
   top: 50%;
   z-index: 1;
-  width: calc(28px / var(--chrome-scale, 1));
-  height: calc(28px / var(--chrome-scale, 1));
+  width: calc(var(--stop-visual) * 1.5);
+  height: calc(var(--stop-visual) * 1.5);
   margin: 0;
   padding: 0;
-  border: calc(2px / var(--chrome-scale, 1)) solid #fff;
+  border: 0;
   border-radius: 50%;
-  box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) #111;
+  background: transparent;
+  box-shadow: none;
   box-sizing: border-box;
   pointer-events: none;
   touch-action: none;
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
-  /* Separate from position `transform` (placeGradStop). */
-  scale: 1;
-  transition: scale 0.14s ease;
+  display: grid;
+  place-items: center;
 }
 
 .chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop {
   pointer-events: auto;
 }
 
-/* Hover or active stop drag: +50% size. --hot survives pointer-capture leave. */
+.chip-grad-wheel__stop-dot {
+  width: var(--stop-visual);
+  height: var(--stop-visual);
+  border: calc(2px / var(--chrome-scale, 1)) solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) #111;
+  box-sizing: border-box;
+  pointer-events: none;
+  /* Visual-only scale; position stays on the button `transform`. */
+  scale: 1;
+  transition: scale 0.14s ease;
+}
+
+/* Hover / drag: clean 1.5× on the dot. Hit box already matches max size — no flicker. */
 .chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover,
 .chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop.chip-grad-wheel__stop--hot {
-  scale: 1.5;
   z-index: 2;
+}
+
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover > .chip-grad-wheel__stop-dot,
+.chip.is-picked
+  > .chip-grad-wheel
+  .chip-grad-wheel__stop.chip-grad-wheel__stop--hot
+  > .chip-grad-wheel__stop-dot {
+  scale: 1.5;
 }
 
 .chip-grad-wheel__stop:focus-visible {
@@ -1305,7 +1327,7 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 @media (prefers-reduced-motion: reduce) {
   .chip-grad-wheel,
   .chip.is-picked > .chip-grad-wheel,
-  .chip-grad-wheel__stop {
+  .chip-grad-wheel__stop-dot {
     transition: none;
   }
 

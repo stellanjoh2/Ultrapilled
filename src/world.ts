@@ -2389,21 +2389,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   /**
-   * Gradient gizmo proximity: far ≈ 0.8 opacity, near rings / drag = 1.0.
-   * Distances are stage px from the active scale ring or outer guide ring.
-   * Stick radius avoids flicker at the threshold edge (same idea as corner soft/hot).
+   * Gradient gizmo proximity: far ≈ 0.5 opacity, near / drag = 1.0.
+   * Distance is stage px to the **inner** scale ring only (outer dashed ring is
+   * a visual guide — not part of the near zone). No stick hysteresis: enter = leave = 48.
    */
   let gradWheelNearBodyId: number | null = null;
-  const GRAD_NEAR_ENTER = 48;
-  const GRAD_NEAR_STICK = 72;
+  const GRAD_NEAR_PX = 48;
 
-  function distToGradRings(chip: DroppedChip, point: { x: number; y: number }): number | null {
+  function distToGradScaleRing(chip: DroppedChip, point: { x: number; y: number }): number | null {
     const info = gradientOf?.(chip.slotId);
     if (!info) return null;
     const polar = localPolar(chip, point);
     const { maxR, chipR } = chipWheelMetrics(chip);
     const scaleR = radiusForGradScale(info.scale, maxR, chipR);
-    return Math.min(Math.abs(polar.dist - scaleR), Math.abs(polar.dist - maxR));
+    return Math.abs(polar.dist - scaleR);
   }
 
   function resolveGradWheelNearAt(
@@ -2411,11 +2410,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     target: EventTarget | null = null,
   ): number | null {
     if (pickedIds.size === 0) return null;
+    // Only stop hits + inner scale-ring hit stroke — not the outer dashed guide.
     const overWheel =
       target instanceof Element
-        ? target.closest(
-            ".chip-grad-wheel__stop, .chip-grad-wheel__hit-ring, .chip-grad-wheel__hit, .chip-grad-wheel__scale, .chip-grad-wheel__ring",
-          )
+        ? target.closest(".chip-grad-wheel__stop, .chip-grad-wheel__hit-ring")
         : null;
     if (overWheel instanceof Element) {
       const host = overWheel.closest(".chip");
@@ -2426,10 +2424,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     let bestDist = Infinity;
     for (const chip of chips) {
       if (!isPickPainted(chip)) continue;
-      const dist = distToGradRings(chip, point);
+      const dist = distToGradScaleRing(chip, point);
       if (dist == null) continue;
-      const limit = gradWheelNearBodyId === chip.body.id ? GRAD_NEAR_STICK : GRAD_NEAR_ENTER;
-      if (dist <= limit && dist < bestDist) {
+      if (dist <= GRAD_NEAR_PX && dist < bestDist) {
         bestDist = dist;
         bestId = chip.body.id;
       }
@@ -2527,7 +2524,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (
       !(wheel instanceof HTMLElement) ||
       !wheel.querySelector(":scope > .chip-grad-wheel__scale") ||
-      !wheel.querySelector(".chip-grad-wheel__ring-path")
+      !wheel.querySelector(".chip-grad-wheel__ring-path") ||
+      !wheel.querySelector(".chip-grad-wheel__stop-dot")
     ) {
       wheel?.remove();
       wheel = document.createElement("div");
@@ -2567,12 +2565,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       from.dataset.stop = "from";
       from.tabIndex = -1;
       from.setAttribute("aria-label", "Start color");
+      const fromDot = document.createElement("span");
+      fromDot.className = "chip-grad-wheel__stop-dot";
+      fromDot.setAttribute("aria-hidden", "true");
+      from.append(fromDot);
       const to = document.createElement("button");
       to.type = "button";
       to.className = "chip-grad-wheel__stop";
       to.dataset.stop = "to";
       to.tabIndex = -1;
       to.setAttribute("aria-label", "End color");
+      const toDot = document.createElement("span");
+      toDot.className = "chip-grad-wheel__stop-dot";
+      toDot.setAttribute("aria-hidden", "true");
+      to.append(toDot);
       wheel.append(hit, ring, scaleRing, arm, hub, from, to);
       host.append(wheel);
     }
@@ -2608,11 +2614,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const fromStop = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__stop[data-stop='from']");
     const toStop = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__stop[data-stop='to']");
     if (fromStop) {
-      fromStop.style.background = info.from;
+      const fromDot = fromStop.querySelector<HTMLElement>(":scope > .chip-grad-wheel__stop-dot");
+      if (fromDot) fromDot.style.background = info.from;
       placeGradStop(fromStop, info.angle + 180, scaleR);
     }
     if (toStop) {
-      toStop.style.background = info.to;
+      const toDot = toStop.querySelector<HTMLElement>(":scope > .chip-grad-wheel__stop-dot");
+      if (toDot) toDot.style.background = info.to;
       placeGradStop(toStop, info.angle, scaleR);
     }
     syncGradWheelNear(chip);
