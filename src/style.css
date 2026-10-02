@@ -492,6 +492,13 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   initial-value: 0;
 }
 
+/* Animated selection / smash stroke angle (Orby magic-btn technique). */
+@property --stroke-rotate {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .grid-layer {
   position: absolute;
   inset: 0;
@@ -835,9 +842,12 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   font-size: 0;
 }
 
-/* Bounding-box selection — Loop-style spinning gradient stroke.
+/* Bounding-box selection — Orby magic-btn border-box chase stroke.
+   Transparent padding-box + angled linear-gradient border-box stays continuous
+   on rounded corners (mask-exclude + conic disc jagged at joins).
    Stroke thickness is compensated by --chrome-scale so CSS scale
-   (live scale drag / audio pulse) doesn't thin or break the line. */
+   (live scale drag / audio pulse) doesn't thin or break the line.
+   Outer radius tracks asset radius + pad when --chip-radius is set. */
 .chip-xform-frame {
   --chrome-stroke: calc(2px / var(--chrome-scale, 1));
   position: absolute;
@@ -847,9 +857,8 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   width: calc(100% + 2 * var(--xform-pad, 12px));
   height: calc(100% + 2 * var(--xform-pad, 12px));
   box-sizing: border-box;
-  padding: var(--chrome-stroke);
-  border-radius: 14px;
-  overflow: hidden;
+  border: var(--chrome-stroke) solid transparent;
+  border-radius: calc(var(--chip-radius, 2px) + var(--xform-pad, 12px));
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
@@ -857,14 +866,22 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   transition:
     opacity 0.14s ease,
     visibility 0s linear 0.14s;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask-composite: exclude;
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    linear-gradient(
+        var(--stroke-rotate),
+        var(--loop-stroke-a) 0%,
+        var(--loop-stroke-b) 32%,
+        transparent 40%,
+        transparent 46%,
+        transparent 51%,
+        transparent 58%,
+        var(--loop-stroke-a) 100%
+      )
+      border-box;
+  background-origin: padding-box, border-box;
+  -webkit-background-clip: padding-box, border-box;
+  background-clip: padding-box, border-box;
 }
 
 .chip-chrome.is-picked > .chip-xform-frame {
@@ -875,38 +892,28 @@ html[data-theme="day"] .stage.is-portrait .playfield {
     visibility 0s;
 }
 
-.chip-xform-frame::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 160%;
-  aspect-ratio: 1;
-  translate: -50% -50%;
-  background: conic-gradient(
-    from 0deg,
-    var(--loop-stroke-a) 0deg,
-    var(--loop-stroke-b) 90deg,
-    transparent 130deg,
-    transparent 230deg,
-    var(--loop-stroke-a) 360deg
-  );
-  pointer-events: none;
-}
-
 @media (prefers-reduced-motion: no-preference) {
-  .chip-chrome.is-picked > .chip-xform-frame::before {
+  .chip-chrome.is-picked > .chip-xform-frame {
     animation: smash-stroke-spin 1s linear infinite;
   }
 }
 
 /* Subtle Select — solid Orby accent, no spin (Settings → Subtle Select). */
-html[data-subtle-select="true"] .chip-xform-frame::before {
-  background: color-mix(in srgb, var(--loop-stroke-a) 80%, transparent);
+html[data-subtle-select="true"] .chip-xform-frame {
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    linear-gradient(
+        color-mix(in srgb, var(--loop-stroke-a) 80%, transparent),
+        color-mix(in srgb, var(--loop-stroke-a) 80%, transparent)
+      )
+      border-box;
+  background-origin: padding-box, border-box;
+  -webkit-background-clip: padding-box, border-box;
+  background-clip: padding-box, border-box;
   animation: none;
 }
 
-html[data-subtle-select="true"] .chip-chrome.is-picked > .chip-xform-frame::before {
+html[data-subtle-select="true"] .chip-chrome.is-picked > .chip-xform-frame {
   animation: none;
 }
 
@@ -1860,7 +1867,7 @@ button.pill.smash-btn.is-on::before {
   aspect-ratio: 1;
   translate: -50% -50%;
   background: conic-gradient(
-    from 0deg,
+    from var(--stroke-rotate, 0deg),
     var(--loop-stroke-a) 0deg,
     var(--loop-stroke-b) 90deg,
     transparent 130deg,
@@ -1882,7 +1889,7 @@ button.pill.smash-btn.is-on::after {
 
 @keyframes smash-stroke-spin {
   to {
-    rotate: 360deg;
+    --stroke-rotate: 360deg;
   }
 }
 
@@ -2035,7 +2042,7 @@ button.pill.smash-btn.is-on::after {
 .physics-dynamics {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .physics-dynamics[inert] {
@@ -2346,7 +2353,8 @@ button.pill.smash-btn.is-on::after {
 .section-fold-clip {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  /* Same field rhythm as .slot-group / .slot-editor. */
+  gap: var(--space-1);
   min-width: 0;
   max-width: 100%;
   min-height: 0;
@@ -3456,7 +3464,8 @@ body.is-reordering * {
 .slot-editor {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  /* Match .slot-group (Visual tweaks) — denser stacked fields, less scroll. */
+  gap: var(--space-1);
   min-width: 0;
   max-width: 100%;
   padding-top: var(--space-1);
@@ -4930,7 +4939,7 @@ html[data-theme="day"] .shape-swatch {
   aspect-ratio: 1;
   translate: -50% -50%;
   background: conic-gradient(
-    from 0deg,
+    from var(--stroke-rotate, 0deg),
     var(--loop-stroke-a) 0deg,
     var(--loop-stroke-b) 90deg,
     transparent 130deg,
@@ -5985,7 +5994,7 @@ html[data-theme="day"] .settings-modal__body .keycap {
   aspect-ratio: 1;
   translate: -50% -50%;
   background: conic-gradient(
-    from 0deg,
+    from var(--stroke-rotate, 0deg),
     var(--loop-stroke-a) 0deg,
     var(--loop-stroke-b) 90deg,
     transparent 130deg,
