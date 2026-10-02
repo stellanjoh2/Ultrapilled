@@ -1207,17 +1207,15 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
 }
 
 /* Active scale ring — radius tracks gradientScale.
-   --scale-diam is the stroke centerline diameter (set in JS). Outer box =
-   diam + stroke so border-width changes thicken evenly in and out. */
+   Box size is set in JS (2× scaleR). Stroke thickens inward only so release /
+   near-clear never animates outer geometry (center-out diam+stroke + size
+   transitions caused a visible pop when is-grad-angling/--near cleared). */
 .chip-grad-wheel__scale {
   --grad-stroke: calc(2.5px / var(--chrome-scale, 1));
-  --scale-diam: 0px;
   position: absolute;
   left: 50%;
   top: 50%;
   translate: -50% -50%;
-  width: calc(var(--scale-diam) + var(--grad-stroke));
-  height: calc(var(--scale-diam) + var(--grad-stroke));
   border-radius: 50%;
   border-width: var(--grad-stroke);
   border-style: solid;
@@ -1225,24 +1223,13 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
   box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) rgba(0, 0, 0, 0.45);
   pointer-events: none;
   box-sizing: border-box;
-  /* border-width (+ matching box size) for hover thicken only.
-     Do NOT fight live --scale-diam updates during drag — see rule below. */
-  transition:
-    border-width 0.14s ease,
-    width 0.14s ease,
-    height 0.14s ease;
+  transition: border-width 0.14s ease;
 }
 
-/* Grab-ready / dragging: double stroke; box grows with stroke so midline holds. */
+/* Grab-ready / dragging: double stroke on the inner solid ring only. */
 .chip.is-picked > .chip-grad-wheel.chip-grad-wheel--near .chip-grad-wheel__scale,
 .chip.is-grad-angling > .chip-grad-wheel .chip-grad-wheel__scale {
   --grad-stroke: calc(5px / var(--chrome-scale, 1));
-}
-
-/* Live diam must track the pointer 1:1. Size transitions lag every --scale-diam frame. */
-.chip.is-grad-angling > .chip-grad-wheel .chip-grad-wheel__scale,
-.chip.is-scaling > .chip-grad-wheel .chip-grad-wheel__scale {
-  transition: none;
 }
 
 html[data-theme="day"] .chip-grad-wheel__scale {

@@ -2603,10 +2603,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     const scaleRing = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__scale");
     if (scaleRing) {
-      // Midline diameter; CSS adds stroke so thickening grows evenly in/out.
-      scaleRing.style.setProperty("--scale-diam", `${scaleR * 2}px`);
-      scaleRing.style.removeProperty("width");
-      scaleRing.style.removeProperty("height");
+      // Fixed outer box; border-width thickens inward — quiet on near/drag release.
+      scaleRing.style.width = `${scaleR * 2}px`;
+      scaleRing.style.height = `${scaleR * 2}px`;
     }
     const arm = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__arm");
     if (arm) {
