@@ -79,16 +79,32 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     host.syncCanvas(false);
     host.world.setFloorOpen(false);
     const state = host.getState();
-    host.world.play(
-      state.slots,
-      state.physics,
-      host.stage,
-      host.fitScale(),
-      state.theme,
-      state.pillPad,
-      state.textTracking,
-      state.sizeRandom,
-    );
+    // Re-trigger with chips on the board: keep user transforms, lift above stage, fall again.
+    // Fresh spawn (template apply, empty canvas, post-dump loop) still uses play().
+    if (host.world.chipCount() > 0) {
+      host.world.refresh(
+        state.slots,
+        state.physics,
+        host.fitScale(),
+        state.theme,
+        state.pillPad,
+        state.textTracking,
+        state.sizeRandom,
+      );
+      host.world.redeployFall();
+      host.world.sync();
+    } else {
+      host.world.play(
+        state.slots,
+        state.physics,
+        host.stage,
+        host.fitScale(),
+        state.theme,
+        state.pillPad,
+        state.textTracking,
+        state.sizeRandom,
+      );
+    }
     droppedAt = performance.now();
     settledSince = 0;
     holdStarted = 0;
