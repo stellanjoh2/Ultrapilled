@@ -1,4 +1,5 @@
-import { isSvgSource } from "./chipKinds";
+import { isColorMask, isSvgSource } from "./chipKinds";
+import { fillBlooms } from "./theme";
 import {
   IMAGE_TEMPERATURE_NEUTRAL_K,
   imageContrastOf,
@@ -8,6 +9,7 @@ import {
   imageTemperatureNormalized,
   imageTemperatureOf,
   type ImageSlot,
+  type Slot,
   type TextSlot,
 } from "./types";
 
@@ -27,6 +29,30 @@ export function textLookFlags(slot: TextSlot): TextLookFlags {
   const textGradient = Boolean(slot.gradient) && bare;
   return { ring, bare, shapeGradient, textGradient };
 }
+
+/**
+ * Whether a chip may contribute to the post-process bloom silhouette.
+ * Near-black / low-luminance fills stay hard-edged; bright neon keeps glowing.
+ * Photo rasters still bloom as a whole (per-pixel extract not applied yet).
+ * YouTube / video bloom stand-ins are near-black and are skipped.
+ */
+export function chipContributesBloom(slot: Slot, fill: string, ink: string, gradientTo = ""): boolean {
+  if (slot.kind === "image") {
+    if (slot.youtube || slot.video) return false;
+    if (slot.emoji) return true;
+    if (!isColorMask(slot)) return true;
+    if (fillBlooms(fill)) return true;
+    return Boolean(gradientTo) && fillBlooms(gradientTo);
+  }
+  const { bare } = textLookFlags(slot);
+  if (bare) {
+    if (slot.gradient && gradientTo) return fillBlooms(fill) || fillBlooms(gradientTo);
+    return fillBlooms(ink);
+  }
+  if (fillBlooms(fill)) return true;
+  return Boolean(gradientTo) && fillBlooms(gradientTo);
+}
+
 
 /** Raster upload inner stroke — SVGs skip the ring overlay. */
 export function rasterRing(slot: ImageSlot): boolean {

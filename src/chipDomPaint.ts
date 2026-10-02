@@ -1,6 +1,6 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
-import { imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
+import { chipContributesBloom, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
 import { measureTextInk, paintTextInk } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
 import {
@@ -420,6 +420,26 @@ export function applyVisual(
   el.style.borderRadius = `${radius}px`;
   el.style.maskImage = "";
   el.style.webkitMaskImage = "";
+
+  // Bloom silhouette: skip near-black fills so dark shapes stay hard-edged.
+  if (bloom && !chipContributesBloom(slot, fill, ink, gradientTo)) {
+    el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video", "chip-bare", "is-editing");
+    el.style.background = "transparent";
+    el.style.backgroundColor = "transparent";
+    el.style.backgroundImage = "none";
+    el.style.color = "transparent";
+    el.style.border = "none";
+    el.style.boxShadow = "none";
+    el.style.fontSize = "";
+    el.style.letterSpacing = "";
+    el.style.fontFamily = "";
+    el.style.fontWeight = "";
+    stripLookChildren(el);
+    for (const node of [...el.childNodes]) {
+      if (node.nodeType === Node.TEXT_NODE) node.remove();
+    }
+    return;
+  }
 
   if (slot.kind === "text") {
     sanitizeTextMotion(slot);

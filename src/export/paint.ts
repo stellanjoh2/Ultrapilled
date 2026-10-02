@@ -5,7 +5,7 @@ import { EMOJI_FONT } from "../emojis";
 import { measureTextInk, paintTextInk } from "../measure";
 import { peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
-import { imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags } from "../chipLook";
+import { chipContributesBloom, imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags } from "../chipLook";
 import { textAnimCharPose, textAnimTravel } from "../textAnim";
 import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 
@@ -365,6 +365,16 @@ function drawChip(
   const width = chip.width * scale;
   const height = chip.height * scale;
   if (width < 1 || height < 1) return;
+  if (bloom) {
+    const slot = chip.slot;
+    const gradientTo =
+      slot.kind === "text" && slot.gradient && !slot.stroked
+        ? gradientEnd(theme, slot)
+        : slot.kind === "image" && slot.gradient && !slot.emoji && isColorMask(slot)
+          ? gradientEnd(theme, slot)
+          : "";
+    if (!chipContributesBloom(slot, chip.fill, chip.ink, gradientTo)) return;
+  }
   withChip(ctx, chip, scale, () => {
     withDropShadow(ctx, chip, scale, layoutMode, bloom, () => {
       const slot = chip.slot;
