@@ -842,9 +842,10 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   font-size: 0;
 }
 
-/* Bounding-box selection — Orby magic-btn border-box chase stroke.
-   Transparent padding-box + angled linear-gradient border-box stays continuous
-   on rounded corners (mask-exclude + conic disc jagged at joins).
+/* Bounding-box selection — Orby angle-chase gradient + hollow mask ring.
+   Orby magic-btn uses opaque padding-box to cover the border-box wash; selection
+   must stay transparent inside, so mask-exclude punches the content-box hole.
+   Animating --stroke-rotate (not a spinning conic disc) keeps corners fluid.
    Stroke thickness is compensated by --chrome-scale so CSS scale
    (live scale drag / audio pulse) doesn't thin or break the line.
    Outer radius tracks asset radius + pad when --chip-radius is set. */
@@ -857,7 +858,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   width: calc(100% + 2 * var(--xform-pad, 12px));
   height: calc(100% + 2 * var(--xform-pad, 12px));
   box-sizing: border-box;
-  border: var(--chrome-stroke) solid transparent;
+  padding: var(--chrome-stroke);
   border-radius: calc(var(--chip-radius, 2px) + var(--xform-pad, 12px));
   pointer-events: none;
   opacity: 0;
@@ -866,22 +867,24 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   transition:
     opacity 0.14s ease,
     visibility 0s linear 0.14s;
-  background:
-    linear-gradient(transparent, transparent) padding-box,
-    linear-gradient(
-        var(--stroke-rotate),
-        var(--loop-stroke-a) 0%,
-        var(--loop-stroke-b) 32%,
-        transparent 40%,
-        transparent 46%,
-        transparent 51%,
-        transparent 58%,
-        var(--loop-stroke-a) 100%
-      )
-      border-box;
-  background-origin: padding-box, border-box;
-  -webkit-background-clip: padding-box, border-box;
-  background-clip: padding-box, border-box;
+  background: linear-gradient(
+    var(--stroke-rotate),
+    var(--loop-stroke-a) 0%,
+    var(--loop-stroke-b) 32%,
+    transparent 40%,
+    transparent 46%,
+    transparent 51%,
+    transparent 58%,
+    var(--loop-stroke-a) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
 
 .chip-chrome.is-picked > .chip-xform-frame {
@@ -898,18 +901,9 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   }
 }
 
-/* Subtle Select — solid Orby accent, no spin (Settings → Subtle Select). */
+/* Subtle Select — solid Orby accent ring, no spin (Settings → Subtle Select). */
 html[data-subtle-select="true"] .chip-xform-frame {
-  background:
-    linear-gradient(transparent, transparent) padding-box,
-    linear-gradient(
-        color-mix(in srgb, var(--loop-stroke-a) 80%, transparent),
-        color-mix(in srgb, var(--loop-stroke-a) 80%, transparent)
-      )
-      border-box;
-  background-origin: padding-box, border-box;
-  -webkit-background-clip: padding-box, border-box;
-  background-clip: padding-box, border-box;
+  background: color-mix(in srgb, var(--loop-stroke-a) 80%, transparent);
   animation: none;
 }
 
@@ -2042,7 +2036,8 @@ button.pill.smash-btn.is-on::after {
 .physics-dynamics {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  /* Same ~48px slider-row rhythm as .slot-editor / .slot-group. */
+  gap: var(--space-0);
 }
 
 .physics-dynamics[inert] {
@@ -2353,8 +2348,8 @@ button.pill.smash-btn.is-on::after {
 .section-fold-clip {
   display: flex;
   flex-direction: column;
-  /* Same field rhythm as .slot-group / .slot-editor. */
-  gap: var(--space-1);
+  /* ~48px slider-row pitch with .field (label + track). */
+  gap: var(--space-0);
   min-width: 0;
   max-width: 100%;
   min-height: 0;
@@ -3464,8 +3459,8 @@ body.is-reordering * {
 .slot-editor {
   display: flex;
   flex-direction: column;
-  /* Match .slot-group (Visual tweaks) — denser stacked fields, less scroll. */
-  gap: var(--space-1);
+  /* ~48px slider-row pitch (was ~54 with space-1). */
+  gap: var(--space-0);
   min-width: 0;
   max-width: 100%;
   padding-top: var(--space-1);
@@ -3474,12 +3469,14 @@ body.is-reordering * {
 .slot-group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  /* Same ~48px slider-row rhythm as .slot-editor. */
+  gap: var(--space-0);
   margin: 0;
 }
 
 .slot-group > .slot-label,
 .slot-group-head > .slot-label {
+  margin: 0;
   color: var(--ink);
   font-size: calc(15px * var(--ui-scale));
   font-weight: 300;
