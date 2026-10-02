@@ -839,7 +839,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
    Stroke thickness is compensated by --chrome-scale so CSS scale
    (live scale drag / audio pulse) doesn't thin or break the line. */
 .chip-xform-frame {
-  --chrome-stroke: calc(4px / var(--chrome-scale, 1));
+  --chrome-stroke: calc(2px / var(--chrome-scale, 1));
   position: absolute;
   z-index: 3;
   left: calc(-1 * var(--xform-pad, 12px));
@@ -898,6 +898,16 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   .chip-chrome.is-picked > .chip-xform-frame::before {
     animation: smash-stroke-spin 1s linear infinite;
   }
+}
+
+/* Subtle Select — solid Orby accent, no spin (Settings → Subtle Select). */
+html[data-subtle-select="true"] .chip-xform-frame::before {
+  background: color-mix(in srgb, var(--loop-stroke-a) 80%, transparent);
+  animation: none;
+}
+
+html[data-subtle-select="true"] .chip-chrome.is-picked > .chip-xform-frame::before {
+  animation: none;
 }
 
 /* Transform grab: four corner handles stay hidden until proximity.
