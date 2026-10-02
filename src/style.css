@@ -905,9 +905,9 @@ html[data-theme="day"] .stage.is-portrait .playfield {
    Polar drag — radial = scale, angular = rotate. */
 .chip-xform-handle {
   --xform-pop: 0.92;
-  --xform-size: 31px;
-  --xform-icon: 16px;
-  --xform-radius: 9px;
+  --xform-size: 24px;
+  --xform-icon: 12px;
+  --xform-radius: 7px;
   position: absolute;
   z-index: 5;
   left: auto;
@@ -940,9 +940,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
     transform 0.14s ease,
     width 0.14s ease,
     height 0.14s ease,
-    border-radius 0.14s ease,
-    background-color 0.1s ease,
-    color 0.1s ease;
+    border-radius 0.14s ease;
 }
 
 .chip-xform-handle.chip-xform-handle--se {
@@ -996,9 +994,7 @@ html[data-theme="day"] .chip-xform-handle {
     transform 0.14s ease,
     width 0.14s ease,
     height 0.14s ease,
-    border-radius 0.14s ease,
-    background-color 0.1s ease,
-    color 0.1s ease;
+    border-radius 0.14s ease;
 }
 
 /* Outer proximity: only the nearest corner shows as a mini tile. */
@@ -1014,9 +1010,7 @@ html[data-theme="day"] .chip-xform-handle {
     transform 0.14s ease,
     width 0.14s ease,
     height 0.14s ease,
-    border-radius 0.14s ease,
-    background-color 0.1s ease,
-    color 0.1s ease;
+    border-radius 0.14s ease;
 }
 
 /* Inner proximity / drag: morph that corner into the large arrow tile. */
@@ -1036,12 +1030,11 @@ html[data-theme="day"] .chip-xform-handle {
     transform 0.14s ease,
     width 0.14s ease,
     height 0.14s ease,
-    border-radius 0.14s ease,
-    background-color 0.1s ease,
-    color 0.1s ease;
+    border-radius 0.14s ease;
 }
 
-.chip-xform-handle.chip-xform-handle--hot:active,
+/* Inverted chrome only while the gesture is live (parent is-scaling).
+   :active omitted so pointer-up snaps straight back to neutral dark. */
 .chip.is-scaling > .chip-xform-handle.chip-xform-handle--hot,
 .chip.is-rotating > .chip-xform-handle.chip-xform-handle--hot,
 .chip-chrome.is-scaling > .chip-xform-handle.chip-xform-handle--hot,
@@ -1049,6 +1042,7 @@ html[data-theme="day"] .chip-xform-handle {
   cursor: grabbing;
   background: #fff;
   color: #111;
+  transition: none;
 }
 
 .chip-xform-handle svg {

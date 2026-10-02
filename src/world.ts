@@ -2653,13 +2653,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       xformDrag;
     const solo = soloBodyId != null && soloBodyId === chip.body.id;
     const factor = lastScale / startScale;
-    // Settle hover BEFORE clearing is-scaling so --xform-pop / size never enlarge on release.
-    // hot→soft (still near) or hot→hidden (outside soft); stay hot only if still in grab range.
+    // Settle BEFORE clearing is-scaling: shrink size ok, but never stay hot / inverted.
+    // Release always snaps to soft (neutral dark) if still in soft range, else hidden.
     xformDrag = null;
+    const host = xformChromeOf(chip);
+    for (const node of host.querySelectorAll(":scope > .chip-xform-handle")) {
+      if (node instanceof HTMLElement) node.blur();
+    }
     if (event) {
-      applyXformHover(resolveXformHoverAt(stagePoint(event), event.target));
+      // Ignore event.target (over-handle would force hot) — release is never hot.
+      const settled = resolveXformHoverAt(stagePoint(event), null);
+      applyXformHover(
+        settled ? { bodyId: settled.bodyId, corner: settled.corner, phase: "soft" } : null,
+      );
     } else {
-      // No pointer sample — drop to soft on the grabbed corner (shrink, never pop up).
       xformHover = { bodyId: chip.body.id, corner, phase: "soft" };
       syncXformHandleSide(chip);
     }
@@ -2677,7 +2684,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       }
       // Live Body.scale is only a preview — clear the mesh key so refresh remeshes to the final size.
       if (bodyFactor !== 1) item.meshKey = "";
-      // Re-sync after class clear so soft/hot win over leftover drag chrome.
+      // Re-sync after class clear so soft/neutral wins over leftover drag chrome.
       if (isPickPainted(item)) syncXformHandleSide(item);
     }
     if (solo) {
