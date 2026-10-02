@@ -1177,6 +1177,9 @@ html[data-theme="day"] .chip-xform-handle {
   height: 100%;
   overflow: visible;
   pointer-events: none;
+  /* Soft halo so the dashed outer guide reads on light/white stage fills
+     (inner .chip-grad-wheel__scale already has a hard 1px contrast ring). */
+  filter: drop-shadow(0 0 0.7px rgb(0 0 0 / 0.5));
 }
 
 .chip-grad-wheel__ring-path {
@@ -1186,6 +1189,10 @@ html[data-theme="day"] .chip-xform-handle {
   /* Longer dashes, wider gaps — less “dotted” than CSS border:dashed. */
   stroke-dasharray: 5 9;
   vector-effect: non-scaling-stroke;
+}
+
+html[data-theme="day"] .chip-grad-wheel__ring {
+  filter: drop-shadow(0 0 0.7px rgb(255 255 255 / 0.55));
 }
 
 html[data-theme="day"] .chip-grad-wheel__ring-path {
