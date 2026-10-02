@@ -15,6 +15,7 @@ import sunIcon from "@phosphor-icons/core/assets/regular/sun.svg?raw";
 import { getPrefs, setPrefs, type AppPrefs, type ChromeTheme } from "./prefs";
 import { checkInput } from "./checkBox";
 import { playRemove, playSwitch, playTransition } from "./uiSounds";
+import { bindRangeValueEdit, rangeCaptionHtml, setRangeCaptionValue } from "./rangeCaption";
 
 export type SettingsController = {
   prefsChanged(): void;
@@ -124,7 +125,7 @@ function paintVolume() {
     const pct = ((prefs.soundVolume - min) / (max - min || 1)) * 100;
     input.style.setProperty("--pct", `${pct}%`);
   }
-  if (caption) caption.textContent = `Volume ${prefs.soundVolume}`;
+  if (caption) setRangeCaptionValue(caption, String(prefs.soundVolume));
 }
 
 function paintToggles(controller?: SettingsController) {
@@ -201,7 +202,7 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
           UI Sounds
         </label>
       </div>
-      <label class="field" data-tip="Master level for UI and impact sounds"><span data-range-label="settings-volume">Volume ${prefs.soundVolume}</span>
+      <label class="field" data-tip="Master level for UI and impact sounds">${rangeCaptionHtml("settings-volume", "Volume", String(prefs.soundVolume))}
         <input type="range" id="settings-volume" min="0" max="100" step="1" value="${prefs.soundVolume}" ${prefs.soundOn ? "" : "disabled"} />
       </label>
     </section>
@@ -298,7 +299,10 @@ function mountSettingsBody(panel: HTMLElement, controller: SettingsController) {
   bindCheck(panel, "settings-performance", "performance", controller);
   bindCheck(panel, "settings-subtle-select", "subtleSelect", controller);
 
-  panel.querySelector<HTMLInputElement>("#settings-volume")?.addEventListener("input", (event) => {
+  const volumeInput = panel.querySelector<HTMLInputElement>("#settings-volume");
+  const volumeCaption = panel.querySelector("[data-range-label='settings-volume']");
+  if (volumeInput && volumeCaption) bindRangeValueEdit(volumeCaption, volumeInput);
+  volumeInput?.addEventListener("input", (event) => {
     const input = event.currentTarget as HTMLInputElement;
     setPrefs({ soundVolume: Number(input.value) });
     paintVolume();
