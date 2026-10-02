@@ -192,16 +192,26 @@ function paintBareRollingFrame(
   canvas.style.display = "block";
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, width, height);
+  // Identity CTM + device-pixel font: measure/paint share one space (no DPR transform
+  // skewing glyph advances after scale remesh).
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
 
-  const ink = measureTextInk(slot, tracking);
+  const inkCss = measureTextInk(slot, tracking);
+  const paintSlot = { ...slot, fontSize: slot.fontSize * dpr };
+  const ink = {
+    width: inkCss.width * dpr,
+    height: inkCss.height * dpr,
+    originX: inkCss.originX * dpr,
+    baseline: inkCss.baseline * dpr,
+    advance: inkCss.advance * dpr,
+  };
   const fill =
     slot.gradient && gradientTo
       ? textGradientFill(
           ctx,
-          width,
-          height,
+          w,
+          h,
           color,
           gradientTo,
           angle ?? slot.gradientAngle,
@@ -221,10 +231,11 @@ function paintBareRollingFrame(
 
   const poses: GlyphPose[] = [];
   for (let i = 0; i < n; i++) {
-    poses.push(textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel));
+    const pose = textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel);
+    poses.push({ y: pose.y * dpr, alpha: pose.alpha });
   }
   // Same painter as static bare type (per-glyph starts + pair kerning).
-  paintTextInk(ctx, slot, tracking, fill, shiftEm, ink, poses);
+  paintTextInk(ctx, paintSlot, tracking, fill, shiftEm, ink, poses);
 }
 
 /** Bare type: animate on the ink canvas so resting glyphs never leave static paint. */

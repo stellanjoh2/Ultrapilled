@@ -126,6 +126,8 @@ export type GlyphPose = { y: number; alpha: number };
  * Horizontal caret starts for each glyph, matching fillText + letterSpacing + kerning.
  * Canvas measureText ignores letterSpacing, so gaps are added explicitly; pair kerning
  * is recovered from measureText(a+b) - measureText(a) - measureText(b).
+ * Always measure on the shared untransformed probe — a live paint ctx may carry a DPR
+ * setTransform, and measureText under that CTM skews advances after scale (tracking snapback).
  */
 export function textInkGlyphStarts(
   ctx: CanvasRenderingContext2D,
@@ -136,17 +138,22 @@ export function textInkGlyphStarts(
 ): number[] {
   const chars = [...text];
   const spacing = fontSize * tracking;
-  ctx.letterSpacing = "0px";
+  // Measure on the shared probe (identity CTM). Anim frames setTransform(dpr) on
+  // the paint ctx; measureText under that matrix skews advances after scale so
+  // glyphs sit too tight inside a correctly wide ink box (tracking "snapback").
+  const probe = measureCtx ?? ctx;
+  probe.font = ctx.font;
+  probe.letterSpacing = "0px";
   const starts: number[] = [];
   let x = originX;
   for (let i = 0; i < chars.length; i++) {
     starts.push(x);
     const ch = chars[i] === " " ? "\u00a0" : chars[i]!;
-    const w = ctx.measureText(ch).width;
+    const w = probe.measureText(ch).width;
     if (i < chars.length - 1) {
       const next = chars[i + 1] === " " ? "\u00a0" : chars[i + 1]!;
-      const pairW = ctx.measureText(ch + next).width;
-      const nextW = ctx.measureText(next).width;
+      const pairW = probe.measureText(ch + next).width;
+      const nextW = probe.measureText(next).width;
       const kern = pairW - w - nextW;
       x += w + kern + spacing;
     } else {

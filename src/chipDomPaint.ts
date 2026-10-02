@@ -164,8 +164,7 @@ export function paintBareText(
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = Math.max(1, Math.ceil(width * dpr));
   const h = Math.max(1, Math.ceil(height * dpr));
-  // Exact buffer (same as bare Animate). Grow-only left sx≠sy after tracking/scale
-  // changed the CSS aspect, which looked like massive minus tracking.
+  // Exact buffer in device pixels with identity CTM (same as bare Animate).
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
   canvas.style.width = `${width}px`;
@@ -173,22 +172,30 @@ export function paintBareText(
   canvas.style.display = "block";
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, width, height);
-  const ink = measureTextInk(slot, tracking);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const inkCss = measureTextInk(slot, tracking);
+  const paintSlot = { ...slot, fontSize: slot.fontSize * dpr };
+  const ink = {
+    width: inkCss.width * dpr,
+    height: inkCss.height * dpr,
+    originX: inkCss.originX * dpr,
+    baseline: inkCss.baseline * dpr,
+    advance: inkCss.advance * dpr,
+  };
   const fill =
     slot.gradient && gradientTo
       ? textGradientFill(
           ctx,
-          width,
-          height,
+          w,
+          h,
           color,
           gradientTo,
           angle ?? slot.gradientAngle,
           scale ?? slot.gradientScale,
         )
       : color;
-  paintTextInk(ctx, slot, tracking, fill, shiftEm, ink);
+  paintTextInk(ctx, paintSlot, tracking, fill, shiftEm, ink);
 }
 
 export function clearBareTextCss(el: HTMLElement) {
