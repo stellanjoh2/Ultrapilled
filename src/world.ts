@@ -2003,6 +2003,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         frameHost.classList.add("is-picked");
         syncChromeSeat(chip);
         syncXformHandleSide(chip, chipCssMul(chip));
+        syncGradWheelNear(chip);
       } else {
         chip.el.classList.remove("is-picked");
         const host = chip.chrome;
@@ -2010,6 +2011,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           host.classList.remove("is-picked", "is-scaling", "is-rotating", "is-grad-angling");
         }
         if (xformHover?.bodyId === chip.body.id) xformHover = null;
+        if (gradWheelNearBodyId === chip.body.id) gradWheelNearBodyId = null;
         releaseGradWheel(chip.el);
       }
     }
@@ -2386,6 +2388,84 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     applyXformHover(resolveXformHoverAt(stagePoint(event), event.target));
   }
 
+  /**
+   * Gradient gizmo proximity: far ≈ 0.5 opacity, near / drag = 1.0.
+   * Distance is stage px to the **inner** scale ring only (outer dashed ring is
+   * a visual guide — not part of the near zone). No stick hysteresis: enter = leave = 48.
+   */
+  let gradWheelNearBodyId: number | null = null;
+  const GRAD_NEAR_PX = 48;
+
+  function distToGradScaleRing(chip: DroppedChip, point: { x: number; y: number }): number | null {
+    const info = gradientOf?.(chip.slotId);
+    if (!info) return null;
+    const polar = localPolar(chip, point);
+    const { maxR, chipR } = chipWheelMetrics(chip);
+    const scaleR = radiusForGradScale(info.scale, maxR, chipR);
+    return Math.abs(polar.dist - scaleR);
+  }
+
+  function resolveGradWheelNearAt(
+    point: { x: number; y: number },
+    target: EventTarget | null = null,
+  ): number | null {
+    if (pickedIds.size === 0) return null;
+    // Only stop hits + inner scale-ring hit stroke — not the outer dashed guide.
+    const overWheel =
+      target instanceof Element
+        ? target.closest(".chip-grad-wheel__stop, .chip-grad-wheel__hit-ring")
+        : null;
+    if (overWheel instanceof Element) {
+      const host = overWheel.closest(".chip");
+      const chip = chipFromEl(host);
+      if (chip && isPickPainted(chip) && gradientOf?.(chip.slotId)) return chip.body.id;
+    }
+    let bestId: number | null = null;
+    let bestDist = Infinity;
+    for (const chip of chips) {
+      if (!isPickPainted(chip)) continue;
+      const dist = distToGradScaleRing(chip, point);
+      if (dist == null) continue;
+      if (dist <= GRAD_NEAR_PX && dist < bestDist) {
+        bestDist = dist;
+        bestId = chip.body.id;
+      }
+    }
+    return bestId;
+  }
+
+  function syncGradWheelNear(chip: DroppedChip) {
+    const wheel = chip.el.querySelector(":scope > .chip-grad-wheel");
+    if (!(wheel instanceof HTMLElement)) return;
+    const near =
+      (gradAngleDrag != null && gradAngleDrag.chip.body.id === chip.body.id) ||
+      gradWheelNearBodyId === chip.body.id;
+    wheel.classList.toggle("chip-grad-wheel--near", near);
+  }
+
+  function applyGradWheelNear(next: number | null) {
+    if (next === gradWheelNearBodyId) {
+      // Still refresh drag-forced near on the active chip.
+      if (gradAngleDrag) syncGradWheelNear(gradAngleDrag.chip);
+      return;
+    }
+    gradWheelNearBodyId = next;
+    for (const chip of chips) {
+      if (!isPickPainted(chip)) continue;
+      syncGradWheelNear(chip);
+    }
+  }
+
+  function updateGradWheelHover(event: PointerEvent) {
+    if (drag || xformDrag || editingId) return;
+    if (gradAngleDrag) {
+      // Stop/dot or ring drag: force full opacity on all gizmo elements.
+      applyGradWheelNear(gradAngleDrag.chip.body.id);
+      return;
+    }
+    applyGradWheelNear(resolveGradWheelNearAt(stagePoint(event), event.target));
+  }
+
   /** CSS degrees: 0 up, 90 right — matches linear-gradient / gradientLine. */
   function localPolar(chip: DroppedChip, point: { x: number; y: number }) {
     const dx = point.x - chip.body.position.x;
@@ -2444,7 +2524,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (
       !(wheel instanceof HTMLElement) ||
       !wheel.querySelector(":scope > .chip-grad-wheel__scale") ||
-      !wheel.querySelector(".chip-grad-wheel__ring-path")
+      !wheel.querySelector(".chip-grad-wheel__ring-path") ||
+      !wheel.querySelector(".chip-grad-wheel__stop-dot")
     ) {
       wheel?.remove();
       wheel = document.createElement("div");
@@ -2484,12 +2565,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       from.dataset.stop = "from";
       from.tabIndex = -1;
       from.setAttribute("aria-label", "Start color");
+      const fromDot = document.createElement("span");
+      fromDot.className = "chip-grad-wheel__stop-dot";
+      fromDot.setAttribute("aria-hidden", "true");
+      from.append(fromDot);
       const to = document.createElement("button");
       to.type = "button";
       to.className = "chip-grad-wheel__stop";
       to.dataset.stop = "to";
       to.tabIndex = -1;
       to.setAttribute("aria-label", "End color");
+      const toDot = document.createElement("span");
+      toDot.className = "chip-grad-wheel__stop-dot";
+      toDot.setAttribute("aria-hidden", "true");
+      to.append(toDot);
       wheel.append(hit, ring, scaleRing, arm, hub, from, to);
       host.append(wheel);
     }
@@ -2514,6 +2603,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     const scaleRing = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__scale");
     if (scaleRing) {
+      // Fixed outer box; border-width thickens inward — quiet on near/drag release.
       scaleRing.style.width = `${scaleR * 2}px`;
       scaleRing.style.height = `${scaleR * 2}px`;
     }
@@ -2525,12 +2615,23 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const fromStop = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__stop[data-stop='from']");
     const toStop = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__stop[data-stop='to']");
     if (fromStop) {
-      fromStop.style.background = info.from;
+      const fromDot = fromStop.querySelector<HTMLElement>(":scope > .chip-grad-wheel__stop-dot");
+      if (fromDot) fromDot.style.background = info.from;
       placeGradStop(fromStop, info.angle + 180, scaleR);
     }
     if (toStop) {
-      toStop.style.background = info.to;
+      const toDot = toStop.querySelector<HTMLElement>(":scope > .chip-grad-wheel__stop-dot");
+      if (toDot) toDot.style.background = info.to;
       placeGradStop(toStop, info.angle, scaleR);
+    }
+    syncGradWheelNear(chip);
+    if (
+      gradAngleDrag &&
+      gradAngleDrag.chip.body.id === chip.body.id &&
+      gradAngleDrag.stopEl &&
+      wheelEl.contains(gradAngleDrag.stopEl)
+    ) {
+      gradAngleDrag.stopEl.classList.add("chip-grad-wheel__stop--hot");
     }
   }
 
@@ -2629,8 +2730,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function endGradAngleDrag() {
     if (!gradAngleDrag) return;
-    const { lastAngle, lastScale, slotId, stop, stopEl, moved, rotating } = gradAngleDrag;
+    const { lastAngle, lastScale, slotId, stop, stopEl, moved, rotating, chip } = gradAngleDrag;
     gradAngleDrag = null;
+    stopEl?.classList.remove("chip-grad-wheel__stop--hot");
     if (rotating) endScrub();
     for (const item of xformTargets(slotId)) {
       item.el.classList.remove("is-grad-angling");
@@ -2641,6 +2743,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         Sleeping.set(item.body, true);
       }
     }
+    // Drop drag-forced full opacity; next pointermove re-resolves proximity.
+    syncGradWheelNear(chip);
     if (!moved && stop && stopEl) {
       onGradientStop?.(slotId, stop, stopEl);
       return;
@@ -2723,7 +2827,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (mode === "xforming") {
         chip.el.classList.add("is-scaling", "is-rotating");
         chip.chrome?.classList.add("is-scaling", "is-rotating");
-      } else chip.el.classList.add("is-grad-angling");
+      } else {
+        chip.el.classList.add("is-grad-angling");
+        // Color-stop / ring drag: full opacity on the whole gizmo immediately.
+        applyGradWheelNear(chip.body.id);
+      }
       seat(chip);
     }
   }
@@ -2965,6 +3073,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         moved: false,
         rotating: false,
       };
+      // Keep stop at 1.5× while dragging even if pointer leaves :hover.
+      gradStop.classList.add("chip-grad-wheel__stop--hot");
       lockHandle(chip.slotId, "grad-angling");
       gradStop.setPointerCapture(event.pointerId);
       return;
@@ -3008,6 +3118,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
               moved: true,
               rotating: true,
             };
+            // Ring path sets rotating up-front — must scrub now or fill `background`
+            // transitions (0.15s) fight every live angle paint and direction looks stuck.
+            beginScrub();
             lockHandle(chip.slotId, "grad-angling");
             const svg = gradHit.closest("svg");
             const capture = svg ?? (gradHit instanceof HTMLElement ? gradHit : null);
@@ -3150,7 +3263,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const dy = event.clientY - pending.originY;
       if (dx * dx + dy * dy > CLICK_SLOP * CLICK_SLOP) beginDrag();
     }
-    if (!drag) updateXformHandleHover(event);
+    if (!drag) {
+      updateXformHandleHover(event);
+      updateGradWheelHover(event);
+    }
     if (!drag || event.pointerId !== drag.pointerId) return;
     const point = stagePoint(event);
     drag.x = point.x;

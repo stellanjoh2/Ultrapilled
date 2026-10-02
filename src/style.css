@@ -1132,13 +1132,20 @@ html[data-theme="day"] .chip-xform-handle {
 }
 
 .chip.is-picked > .chip-grad-wheel {
-  opacity: 1;
+  /* Dim until proximity / drag — mirrors xform-handle soft→hot feel. */
+  opacity: 0.5;
   visibility: visible;
   scale: 1;
   transition:
     opacity 0.15s ease-out,
     scale 0.15s ease-out,
     visibility 0s;
+}
+
+/* Near rings (pointer distance) or while dragging stops/ring: full strength. */
+.chip.is-picked > .chip-grad-wheel.chip-grad-wheel--near,
+.chip.is-grad-angling > .chip-grad-wheel {
+  opacity: 1;
 }
 
 .chip-grad-wheel__hit {
@@ -1177,6 +1184,9 @@ html[data-theme="day"] .chip-xform-handle {
   height: 100%;
   overflow: visible;
   pointer-events: none;
+  /* Soft halo so the dashed outer guide reads on light/white stage fills
+     (inner .chip-grad-wheel__scale already has a hard 1px contrast ring). */
+  filter: drop-shadow(0 0 0.7px rgb(0 0 0 / 0.5));
 }
 
 .chip-grad-wheel__ring-path {
@@ -1188,11 +1198,18 @@ html[data-theme="day"] .chip-xform-handle {
   vector-effect: non-scaling-stroke;
 }
 
+html[data-theme="day"] .chip-grad-wheel__ring {
+  filter: drop-shadow(0 0 0.7px rgb(255 255 255 / 0.55));
+}
+
 html[data-theme="day"] .chip-grad-wheel__ring-path {
   stroke: rgba(0, 0, 0, 0.4);
 }
 
-/* Active scale ring — radius tracks gradientScale. */
+/* Active scale ring — radius tracks gradientScale.
+   Box size is set in JS (2× scaleR). Stroke thickens inward only so release /
+   near-clear never animates outer geometry (center-out diam+stroke + size
+   transitions caused a visible pop when is-grad-angling/--near cleared). */
 .chip-grad-wheel__scale {
   --grad-stroke: calc(2.5px / var(--chrome-scale, 1));
   position: absolute;
@@ -1200,10 +1217,19 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
   top: 50%;
   translate: -50% -50%;
   border-radius: 50%;
-  border: var(--grad-stroke) solid #fff;
+  border-width: var(--grad-stroke);
+  border-style: solid;
+  border-color: #fff;
   box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) rgba(0, 0, 0, 0.45);
   pointer-events: none;
   box-sizing: border-box;
+  transition: border-width 0.14s ease;
+}
+
+/* Grab-ready / dragging: double stroke on the inner solid ring only. */
+.chip.is-picked > .chip-grad-wheel.chip-grad-wheel--near .chip-grad-wheel__scale,
+.chip.is-grad-angling > .chip-grad-wheel .chip-grad-wheel__scale {
+  --grad-stroke: calc(5px / var(--chrome-scale, 1));
 }
 
 html[data-theme="day"] .chip-grad-wheel__scale {
@@ -1245,28 +1271,60 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) #fff;
 }
 
+/* Hit shell is always 1.5× the visual so :hover scale never oscillates at the edge. */
 .chip-grad-wheel__stop {
+  --stop-visual: calc(28px / var(--chrome-scale, 1));
   position: absolute;
   left: 50%;
   top: 50%;
   z-index: 1;
-  width: calc(28px / var(--chrome-scale, 1));
-  height: calc(28px / var(--chrome-scale, 1));
+  width: calc(var(--stop-visual) * 1.5);
+  height: calc(var(--stop-visual) * 1.5);
   margin: 0;
   padding: 0;
-  border: calc(2px / var(--chrome-scale, 1)) solid #fff;
+  border: 0;
   border-radius: 50%;
-  box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) #111;
+  background: transparent;
+  box-shadow: none;
   box-sizing: border-box;
   pointer-events: none;
   touch-action: none;
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+  display: grid;
+  place-items: center;
 }
 
 .chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop {
   pointer-events: auto;
+}
+
+.chip-grad-wheel__stop-dot {
+  width: var(--stop-visual);
+  height: var(--stop-visual);
+  border: calc(2px / var(--chrome-scale, 1)) solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 calc(1px / var(--chrome-scale, 1)) #111;
+  box-sizing: border-box;
+  pointer-events: none;
+  /* Visual-only scale; position stays on the button `transform`. */
+  scale: 1;
+  transition: scale 0.14s ease;
+}
+
+/* Hover / drag: clean 1.5× on the dot. Hit box already matches max size — no flicker. */
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover,
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop.chip-grad-wheel__stop--hot {
+  z-index: 2;
+}
+
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover > .chip-grad-wheel__stop-dot,
+.chip.is-picked
+  > .chip-grad-wheel
+  .chip-grad-wheel__stop.chip-grad-wheel__stop--hot
+  > .chip-grad-wheel__stop-dot {
+  scale: 1.5;
 }
 
 .chip-grad-wheel__stop:focus-visible {
@@ -1280,8 +1338,14 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 
 @media (prefers-reduced-motion: reduce) {
   .chip-grad-wheel,
-  .chip.is-picked > .chip-grad-wheel {
+  .chip.is-picked > .chip-grad-wheel,
+  .chip-grad-wheel__stop-dot,
+  .chip-grad-wheel__scale {
     transition: none;
+  }
+
+  .chip-grad-wheel,
+  .chip.is-picked > .chip-grad-wheel {
     scale: 1;
   }
 }
