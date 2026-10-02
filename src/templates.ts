@@ -14,13 +14,14 @@ import {
   type TextSlot,
 } from "./types";
 
-export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | typeof MODE_SELECT_THEME_ID;
+export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | "tokyo" | typeof MODE_SELECT_THEME_ID;
 
 export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }[] = [
   { id: "acid", label: "London", build: acidState },
   { id: "new-york", label: "New York", build: newYorkState },
   { id: "miami", label: "Miami", build: miamiState },
   { id: "berlin", label: "Berlin", build: berlinState },
+  { id: "tokyo", label: "Tokyo", build: tokyoState },
   { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
 ];
 
@@ -488,6 +489,92 @@ export function berlinState(): AppState {
     post: { bloom: 0, bloomOpacity: 77, grain: 99, vignette: 52, saturate: 120, hue: 0, blend: "normal" },
     physics: { ...DEFAULT_PHYSICS },
     template: "berlin",
+    slots,
+  };
+}
+
+/** Street-sign collage: stacked lightbox plates, traffic colours, bold gothic kanji; pastel dusk canvas. */
+export function tokyoState(): AppState {
+  const RED = 0;
+  const GREEN = 1;
+  const BLUE = 2;
+  const YELLOW = 3;
+  const CYAN = 4;
+  const bare = "none" as const;
+  const plate = { shape: "box" as const, radius: 4 };
+  const tile = { shape: "box" as const, radius: 2 };
+  const gothic = (weight: number) => ({ fontFamily: "Noto Sans JP", fontWeight: weight });
+  const kaku = (weight: number) => ({ fontFamily: "Zen Kaku Gothic New", fontWeight: weight });
+  const display = { fontFamily: "Dela Gothic One", fontWeight: 400 };
+  const soft = (weight: number) => ({ fontFamily: "M PLUS 1", fontWeight: weight });
+  const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
+  const slots = [
+    // Hero — big city name like a street header
+    text({ text: "東京", ...display, shape: bare, colorIndex: RED, scale: 3.2, tracking: -40 }),
+    emoji("🏮", "Chōchin", 3, 0.7),
+    // Stacked single-kanji sign tiles (vertical column vibe)
+    text({ text: "東", ...gothic(900), ...tile, colorIndex: RED, textColor: "#ffffff", scale: 1.5, pillPad: 36 }),
+    text({ text: "京", ...gothic(900), ...tile, colorIndex: YELLOW, textColor: "#111111", scale: 1.5, pillPad: 36 }),
+    text({ text: "夜", ...gothic(900), ...tile, colorIndex: BLUE, textColor: "#ffffff", scale: 1.5, pillPad: 36 }),
+    text({ text: "花", ...gothic(900), ...tile, colorIndex: GREEN, textColor: "#ffffff", scale: 1.5, pillPad: 36 }),
+    // Horizontal lightbox plates
+    text({ text: "駅", ...kaku(900), ...plate, colorIndex: BLUE, textColor: "#ffffff", scale: 1.8, pillPad: 48, tracking: -20 }),
+    photo("tokyo", "tokyo-street.jpg", "Tokyo Street 1905", 115, 0, 1.1),
+    text({ text: "入口", ...gothic(800), ...plate, colorIndex: GREEN, textColor: "#ffffff", scale: 1.35, pillPad: 40 }),
+    presetIcon("Tiles", 2, CYAN, { scale: 0.55 }),
+    text({ text: "出口", ...gothic(800), ...plate, colorIndex: RED, textColor: "#ffffff", scale: 1.35, pillPad: 40 }),
+    text({ text: "桜", ...soft(800), shape: bare, colorIndex: RED, scale: 2.4, tracking: -20 }),
+    photo("tokyo", "asukayama-hanami.jpg", "Asukayama Hanami", 115, 10, 1.2),
+    // Traffic-plate accents
+    text({ text: "北", ...kaku(900), ...plate, colorIndex: YELLOW, textColor: "#111111", scale: 1.2, pillPad: 44 }),
+    text({ text: "南", ...kaku(900), ...plate, colorIndex: YELLOW, textColor: "#111111", scale: 1.2, pillPad: 44 }),
+    text({ text: "春", ...display, shape: bare, colorIndex: CYAN, scale: 2.6 }),
+    presetIcon("Gates", 1, RED, { scale: 0.85 }),
+    text({ text: "夢", ...gothic(900), shape: "pill", colorIndex: BLUE, textColor: "#ffffff", scale: 1.4, pillPad: 36, textAnim: true }),
+    emoji("🌸", "Sakura", 2, 0.65),
+    text({ text: "開", ...kaku(700), ...plate, stroked: true, stroke: 3, colorIndex: CYAN, scale: 1.1, pillPad: 40 }),
+    photo("tokyo", "hokusai-manga.jpg", "Hokusai Manga", 110, 6),
+    text({ text: "店", ...gothic(800), ...plate, colorIndex: GREEN, textColor: "#ffffff", scale: 1.1, pillPad: 42 }),
+    presetIcon("Boxes", 2, YELLOW, { scale: 0.5 }),
+    text({ text: "西", ...kaku(900), ...plate, colorIndex: BLUE, textColor: "#ffffff", scale: 1.15, pillPad: 40 }),
+    text({ text: "東", ...kaku(900), ...plate, colorIndex: RED, textColor: "#ffffff", scale: 1.15, pillPad: 40 }),
+    // Soft pastel accent chips (secondary to signage)
+    text({
+      text: "花",
+      ...soft(800),
+      shape: "pill",
+      color: "#ffb7c5",
+      textColor: "#4a2040",
+      scale: 1.0,
+      pillPad: 48,
+    }),
+    presetIcon("Blossoms", 2, RED, { scale: 0.45 }),
+    text({ text: "注意", ...gothic(700), ...plate, colorIndex: YELLOW, textColor: "#111111", scale: 0.85, pillPad: 36, tracking: -40 }),
+    emoji("➡️", "Arrow", 2, 0.55),
+    text({ text: "浅草", ...kaku(700), shape: "pill", stroked: true, stroke: 2, colorIndex: CYAN, scale: 0.7, pillPad: 32 }),
+    text({ text: "新宿", ...gothic(900), ...plate, colorIndex: RED, textColor: "#ffffff", scale: 1.0, pillPad: 36, tracking: -30 }),
+    presetIcon("Chevrons", 1, GREEN, { scale: 0.7 }),
+    text({ text: "夜", ...display, shape: bare, colorIndex: BLUE, scale: 2.2 }),
+  ].filter((slot): slot is Slot => slot != null);
+  return {
+    ...demoState(),
+    stageColor: "#2a1838",
+    background: {
+      ...defaultBackground(),
+      kind: "gradient",
+      shape: "radial",
+      stops: [
+        { id: uid(), color: "#ffb3c6", at: 0 },
+        { id: uid(), color: "#2a1838", at: 100 },
+      ],
+      grid: true,
+      gridColor: "#ff8fab",
+      gridOpacity: 14,
+    },
+    theme: ["#ff2d55", "#00c853", "#2962ff", "#ffd600", "#00e5ff"],
+    post: { bloom: 0, bloomOpacity: 85, grain: 10, vignette: 18, saturate: 118, hue: 0, blend: "normal" },
+    physics: { ...DEFAULT_PHYSICS },
+    template: "tokyo",
     slots,
   };
 }
