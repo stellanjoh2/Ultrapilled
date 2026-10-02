@@ -4808,14 +4808,18 @@ session = createPlaySession({
   tickAudioReact,
   nudgeEmptyScene,
   notifyLayoutModeBlocksPhysics: async () => {
+    const overlapping = world.chipCount() > 0 && world.chipsOverlap();
     const ok = await askConfirm({
       title: "Can't trigger physics",
-      body: "Layout mode is on. Turn on Physics first.",
+      body: overlapping
+        ? "Layout mode is on. Activate Physics to tumble — overlapping pieces will push apart and your layout will change."
+        : "Layout mode is on. Turn on Physics first.",
       confirmLabel: "Activate Physics",
       cancelLabel: "Got it",
     });
     if (!ok) return false;
-    await setLayoutMode(false);
+    // Already confirmed above — skip setLayoutMode's overlap dialog.
+    await setLayoutMode(false, { skipConfirm: true });
     return !state.physics.layoutMode;
   },
   playButton,
@@ -4834,10 +4838,10 @@ session = createPlaySession({
   },
 });
 
-async function setLayoutMode(next: boolean) {
+async function setLayoutMode(next: boolean, opts?: { skipConfirm?: boolean }) {
   if (next === state.physics.layoutMode) return;
 
-  if (!next && world.chipCount() > 0 && world.chipsOverlap()) {
+  if (!opts?.skipConfirm && !next && world.chipCount() > 0 && world.chipsOverlap()) {
     const ok = await askConfirm({
       title: "Turn physics back on?",
       body: "Overlapping pieces will push apart and your layout will change. Continue?",
