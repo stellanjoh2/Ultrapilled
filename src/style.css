@@ -897,7 +897,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 @media (prefers-reduced-motion: no-preference) {
   .chip-chrome.is-picked > .chip-xform-frame {
-    animation: smash-stroke-spin 2s linear infinite;
+    animation: smash-stroke-spin calc(8s / 3) linear infinite;
   }
 }
 
