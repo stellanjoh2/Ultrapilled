@@ -492,7 +492,7 @@ H.bindRange("sizeRandom", "Size random", (v) => {
 H.bindRange("pillPad", "Shape padding", (v) => {
   H.state.pillPad = Math.round(v);
   H.syncInheritedPillPads();
-  H.live();
+  H.live({ quiet: true });
 }, (v) => `${Math.round(v)}`);
 H.bindRange("shapeAmount", "Amount of shapes", (v) => {
   H.scaleFallingAmounts(Math.round(v));

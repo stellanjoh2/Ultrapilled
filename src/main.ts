@@ -3093,7 +3093,9 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       }
       // Amount adds/removes chip copies — needs a full refresh. Everything else is
       // slot-local so other pills can keep their gradient / text animations rolling.
+      // Shape padding remeshes the collider into neighbors — keep that calm (no rocket).
       if (slot.kind === "image" && key === "amount") live();
+      else if (key === "pillPad") liveChip(slot.id, { quiet: true });
       else liveChip(slot.id);
     });
     if (continuous) {
@@ -4326,7 +4328,7 @@ function tickAudioReact(now: number) {
   paintAudioScales(now);
 }
 
-function relayout() {
+function relayout(opts?: { quiet?: boolean }) {
   return world.refresh(
     state.slots,
     state.physics,
@@ -4335,6 +4337,7 @@ function relayout() {
     state.pillPad,
     state.textTracking,
     state.sizeRandom,
+    opts,
   );
 }
 
@@ -4356,7 +4359,7 @@ function refreshUploadPreviews() {
   }
 }
 
-function live() {
+function live(opts?: { quiet?: boolean }) {
   for (const slot of state.slots) {
     const next = clampSlotScale(slot, slot.scale);
     if (next !== slot.scale) slot.scale = next;
@@ -4364,11 +4367,14 @@ function live() {
   const bump = () => {
     refreshUploadPreviews();
     const before = world.chipCount();
-    const disturbed = relayout();
+    const disturbed = relayout(opts);
     // Add/remove or remesh (Composition Scale etc.) should wake a held pile.
+    // Quiet pad remesh still marks interact time but skips the theatrical fall kick.
     if (disturbed || world.chipCount() !== before) {
       session.lastInteractAt = performance.now();
-      if (session.phase === "holding" && !state.physics.layoutMode) {
+      if (opts?.quiet) {
+        /* calm mesh update — neighbors already depenetrated without rockets */
+      } else if (session.phase === "holding" && !state.physics.layoutMode) {
         posePinned = false;
         session.phase = "falling";
         session.settledSince = 0;

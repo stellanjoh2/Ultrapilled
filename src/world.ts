@@ -221,6 +221,7 @@ export type WorldHandle = {
     pillPad: number,
     tracking: number,
     sizeRandom: number,
+    opts?: { quiet?: boolean },
   ) => boolean;
   clear: () => void;
   /** Scale-down-remove every chip without touching app slot data. */
@@ -698,6 +699,28 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   /**
+   * Quiet remesh (shape padding / free-transform bake): dig overlaps with position
+   * only — no separation velocity — then keep ~25% residual on neighbors so the
+   * pile can breathe without rocketing away from the edited chip.
+   */
+  function settleQuietRemesh(exceptSlotIds?: ReadonlySet<string>) {
+    if (layoutMode) return;
+    separateOverlaps("calm");
+    for (const chip of chips) {
+      if (exceptSlotIds?.has(chip.slotId)) continue;
+      if (isDraggedBody(chip.body) || chip.body.isStatic) continue;
+      const v = chip.body.velocity;
+      Body.setVelocity(chip.body, {
+        x: scaleXformReleaseImpulse(v.x),
+        y: scaleXformReleaseImpulse(v.y),
+      });
+      Body.setAngularVelocity(chip.body, scaleXformReleaseImpulse(chip.body.angularVelocity));
+    }
+    if (!running) setRunning(true);
+    for (const chip of chips) pinInsideWalls(chip);
+  }
+
+  /**
    * After a chip widens (typing / scale), stay inside the side walls and shove
    * overlapping neighbors up — never out into the side void.
    */
@@ -993,7 +1016,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return chips.some((chip) => chip.slotId === slotId && chip.body === body);
   }
 
-  function resolveOverlap(a: Matter.Body, b: Matter.Body, hard = false): boolean {
+  function resolveOverlap(a: Matter.Body, b: Matter.Body, hard = false, calm = false): boolean {
     if ((a.isStatic || isDraggedBody(a) || isHandleBody(a)) && (b.isStatic || isDraggedBody(b) || isHandleBody(b))) {
       return false;
     }
@@ -1071,8 +1094,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (invA) Body.setPosition(parentA, { x: parentA.position.x + nx * push * invA, y: parentA.position.y + ny * push * invA });
     if (invB) Body.setPosition(parentB, { x: parentB.position.x - nx * push * invB, y: parentB.position.y - ny * push * invB });
 
-    // Near rest / sleep islands / live scale: position nudges only — velocity kicks re-wake the pile.
-    if (!incoming || sleepIsland || handleDrag) return true;
+    // Near rest / sleep islands / live scale / quiet pad remesh: position nudges only —
+    // velocity kicks re-wake the pile (and pad growth used to rocket neighbors).
+    if (!incoming || sleepIsland || handleDrag || calm) return true;
 
     const relN = (parentB.velocity.x - parentA.velocity.x) * nx + (parentB.velocity.y - parentA.velocity.y) * ny;
     if (relN > 0) {
@@ -1092,8 +1116,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return true;
   }
 
-  function separateOverlaps(hard: false | true | "audio" = false) {
+  function separateOverlaps(hard: false | true | "audio" | "calm" = false) {
     if (layoutMode || chips.length === 0) return;
+    const calm = hard === "calm";
     const intense = hard === "audio";
     const force = Boolean(hard);
     // Soft digs on a fully sleeping pile desync DOM during hold (no sync) and
@@ -1160,7 +1185,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
             const id = lo * n + hi;
             if (seen.has(id)) continue;
             seen.add(id);
-            if (resolveOverlap(bodies[i], bodies[j], force)) moved = true;
+            if (resolveOverlap(bodies[i], bodies[j], force, calm)) moved = true;
           }
         }
       }
@@ -1482,6 +1507,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     pillPad: number,
     tracking: number,
     sizeRandom: number,
+    opts?: { quiet?: boolean },
   ): boolean {
     applyPhysics(physics);
     const byId = new Map(slots.map((slot) => [slot.id, slot]));
@@ -1493,6 +1519,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
     let removed = 0;
     let remeshed = 0;
+    const remeshedSlotIds = new Set<string>();
     const grown: DroppedChip[] = [];
     chips = chips.filter((chip) => {
       const slot = byId.get(chip.slotId);
@@ -1524,6 +1551,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (chip.meshKey !== meshKey(slot, size.width, size.height, chamfer, physicsComplexity(physics.complexity))) {
         replaceBody(chip, slot, size, chamfer, physics);
         remeshed += 1;
+        remeshedSlotIds.add(chip.slotId);
         if (size.width > prevW + 1 || size.height > prevH + 1) grown.push(chip);
       }
       return true;
@@ -1641,6 +1669,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         Sleeping.set(chip.body, true);
         pinInsideWalls(chip);
       }
+    } else if (opts?.quiet && remeshed > 0) {
+      // Shape padding: update mesh, calm depenetrate — no releaseGrowth rocket.
+      for (const chip of grown) pinInsideWalls(chip);
+      settleQuietRemesh(remeshedSlotIds);
     } else {
       if (disturbed) {
         wakeAll();
@@ -1703,10 +1735,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       syncWallCollision(chip);
     }
     if (grown.length > 0) {
-      // Quiet: live scale already depenetrated — remesh without the upward shove.
+      // Quiet: pad / free-transform bake — remesh without the upward releaseGrowth shove.
       if (opts?.quiet) {
         for (const chip of grown) pinInsideWalls(chip);
-        if (!layoutMode) separateOverlaps(true);
+        settleQuietRemesh(new Set([slotId]));
       } else {
         releaseGrowth(grown);
       }
@@ -1719,6 +1751,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           Sleeping.set(chip.body, true);
           pinInsideWalls(chip);
         }
+      } else if (opts?.quiet) {
+        settleQuietRemesh(new Set([slotId]));
       } else {
         wakeAll();
         if (!running) setRunning(true);

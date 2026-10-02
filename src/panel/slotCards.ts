@@ -41,7 +41,7 @@ export type SlotCardHost = {
   openSlots: Set<string>;
   pickedSlotIds: Set<string>;
   remember(key?: string): void;
-  live(): void;
+  live(opts?: { quiet?: boolean }): void;
   endGesture(): void;
   renderPanel(): void;
   openSlotMenu(x: number, y: number, id: string): void;
