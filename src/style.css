@@ -900,8 +900,9 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   }
 }
 
-/* Transform grab: four corner handles. Mini when selected; nearest (or drag)
-   corner morphs to the large arrows-out tile. Polar drag — radial = scale, angular = rotate. */
+/* Transform grab: four corner handles stay hidden until proximity.
+   Soft (outer) → mini tile on nearest corner; hot (inner / drag) → large arrows-out.
+   Polar drag — radial = scale, angular = rotate. */
 .chip-xform-handle {
   --xform-pop: 0.92;
   --xform-size: 28px;
@@ -985,9 +986,28 @@ html[data-theme="day"] .chip-xform-handle {
 .chip.is-picked > .chip-xform-handle,
 .chip-chrome.is-picked > .chip-xform-handle {
   --xform-pop: 1;
-  opacity: 0.82;
+  /* Hidden until soft/hot proximity — avoids four-corner icon clutter. */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.14s ease,
+    visibility 0s linear 0.14s,
+    transform 0.14s ease,
+    width 0.14s ease,
+    height 0.14s ease,
+    border-radius 0.14s ease,
+    background-color 0.1s ease,
+    color 0.1s ease;
+}
+
+/* Outer proximity: only the nearest corner shows as a mini tile. */
+.chip.is-picked > .chip-xform-handle.chip-xform-handle--soft,
+.chip-chrome.is-picked > .chip-xform-handle.chip-xform-handle--soft {
+  opacity: 0.88;
   visibility: visible;
   pointer-events: auto;
+  z-index: 6;
   transition:
     opacity 0.14s ease,
     visibility 0s,
@@ -999,7 +1019,7 @@ html[data-theme="day"] .chip-xform-handle {
     color 0.1s ease;
 }
 
-/* Proximity / drag corner: grow into the large arrow tile. */
+/* Inner proximity / drag: morph that corner into the large arrow tile. */
 .chip.is-picked > .chip-xform-handle.chip-xform-handle--hot,
 .chip-chrome.is-picked > .chip-xform-handle.chip-xform-handle--hot {
   --xform-size: 76px;
@@ -1007,7 +1027,18 @@ html[data-theme="day"] .chip-xform-handle {
   --xform-radius: 14px;
   --xform-pop: 1;
   opacity: 1;
-  z-index: 6;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 7;
+  transition:
+    opacity 0.14s ease,
+    visibility 0s,
+    transform 0.14s ease,
+    width 0.14s ease,
+    height 0.14s ease,
+    border-radius 0.14s ease,
+    background-color 0.1s ease,
+    color 0.1s ease;
 }
 
 .chip-xform-handle.chip-xform-handle--hot:active,

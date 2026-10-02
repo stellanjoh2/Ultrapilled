@@ -2170,8 +2170,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     sw: "chip-xform-handle--sw",
   };
 
-  /** Nearest corner within proximity; that handle morphs mini → large. */
-  let xformHover: { bodyId: number; corner: XformCorner } | null = null;
+  /** Nearest corner in soft/hot range; phase drives mini vs large morph. */
+  type XformHoverPhase = "soft" | "hot";
+  let xformHover: { bodyId: number; corner: XformCorner; phase: XformHoverPhase } | null = null;
 
   function readXformHandleCorner(handle: HTMLElement): XformCorner {
     if (handle.classList.contains("chip-xform-handle--nw")) return "nw";
@@ -2240,45 +2241,65 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   /**
-   * Mark the proximity (or drag) corner as `--hot` so it grows; others stay mini.
-   * `mul` kept for call-site compatibility with seat()/paintPicked.
+   * Reveal only the proximity (or drag) corner: `--soft` = mini, `--hot` = large.
+   * All other corners stay hidden. `mul` kept for seat()/paintPicked call sites.
    */
   function syncXformHandleSide(chip: DroppedChip, _mul = 1) {
     if (!isPickPainted(chip)) return;
-    const hot: XformCorner | null =
-      xformDrag && xformDrag.chip.body.id === chip.body.id
-        ? xformDrag.corner
-        : xformHover && xformHover.bodyId === chip.body.id
-          ? xformHover.corner
-          : null;
+    let soft: XformCorner | null = null;
+    let hot: XformCorner | null = null;
+    if (xformDrag && xformDrag.chip.body.id === chip.body.id) {
+      hot = xformDrag.corner;
+    } else if (xformHover && xformHover.bodyId === chip.body.id) {
+      if (xformHover.phase === "hot") hot = xformHover.corner;
+      else soft = xformHover.corner;
+    }
     for (const node of xformChromeOf(chip).querySelectorAll(":scope > .chip-xform-handle")) {
       if (!(node instanceof HTMLElement)) continue;
-      node.classList.toggle("chip-xform-handle--hot", readXformHandleCorner(node) === hot);
+      const corner = readXformHandleCorner(node);
+      node.classList.toggle("chip-xform-handle--soft", corner === soft);
+      node.classList.toggle("chip-xform-handle--hot", corner === hot);
     }
   }
 
-  /** Enter / stick radii (stage px) from the selection-frame corner. */
-  const CORNER_HOVER_ENTER = 100;
-  const CORNER_HOVER_STICK = 140;
+  /**
+   * Soft = show mini; hot = morph to large. Stick radii avoid flicker at the edge.
+   * Distances are stage px from the selection-frame corner.
+   */
+  const CORNER_SOFT_ENTER = 120;
+  const CORNER_SOFT_STICK = 155;
+  const CORNER_HOT_ENTER = 48;
+  const CORNER_HOT_STICK = 68;
 
   function hoverCornerNear(
     chip: DroppedChip,
     point: { x: number; y: number },
     current: XformCorner | null,
-  ): XformCorner | null {
+  ): { corner: XformCorner; dist: number } | null {
     const mul = chipCssMul(chip);
     let best: XformCorner | null = null;
     let bestDist = Infinity;
     for (const { id } of XFORM_CORNERS) {
       const at = xformCornerWorld(chip, id, mul);
       const dist = Math.hypot(point.x - at.x, point.y - at.y);
-      const limit = id === current ? CORNER_HOVER_STICK : CORNER_HOVER_ENTER;
+      const limit = id === current ? CORNER_SOFT_STICK : CORNER_SOFT_ENTER;
       if (dist <= limit && dist < bestDist) {
         bestDist = dist;
         best = id;
       }
     }
-    return best;
+    return best ? { corner: best, dist: bestDist } : null;
+  }
+
+  function hoverPhaseFor(
+    dist: number,
+    corner: XformCorner,
+    prev: { corner: XformCorner; phase: XformHoverPhase } | null,
+  ): XformHoverPhase {
+    const same = prev?.corner === corner;
+    if (dist <= CORNER_HOT_ENTER) return "hot";
+    if (same && prev?.phase === "hot" && dist <= CORNER_HOT_STICK) return "hot";
+    return "soft";
   }
 
   function updateXformHandleHover(event: PointerEvent) {
@@ -2300,9 +2321,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const chip = chipFromEl(host);
       if (chip && isPickPainted(chip)) {
         const corner = readXformHandleCorner(overHandle);
+        const next = { bodyId: chip.body.id, corner, phase: "hot" as const };
         const changed =
-          xformHover?.bodyId !== chip.body.id || xformHover?.corner !== corner;
-        xformHover = { bodyId: chip.body.id, corner };
+          xformHover?.bodyId !== next.bodyId ||
+          xformHover?.corner !== next.corner ||
+          xformHover?.phase !== next.phase;
+        xformHover = next;
         if (changed) {
           for (const item of chips) {
             if (!isPickPainted(item)) continue;
@@ -2318,27 +2342,37 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     for (const chip of chips) {
       if (!isPickPainted(chip)) continue;
       const current = xformHover?.bodyId === chip.body.id ? xformHover.corner : null;
-      const corner = hoverCornerNear(chip, point, current);
-      if (!corner) continue;
-      const mul = chipCssMul(chip);
-      const at = xformCornerWorld(chip, corner, mul);
-      const dist = Math.hypot(point.x - at.x, point.y - at.y);
-      if (dist < bestDist) {
-        bestDist = dist;
+      const hit = hoverCornerNear(chip, point, current);
+      if (!hit) continue;
+      if (hit.dist < bestDist) {
+        bestDist = hit.dist;
         bestChip = chip;
-        bestCorner = corner;
+        bestCorner = hit.corner;
       }
     }
-    const prevBody = xformHover?.bodyId ?? null;
-    const prevCorner = xformHover?.corner ?? null;
-    xformHover =
-      bestChip && bestCorner ? { bodyId: bestChip.body.id, corner: bestCorner } : null;
+    const prev = xformHover;
+    const next =
+      bestChip && bestCorner
+        ? {
+            bodyId: bestChip.body.id,
+            corner: bestCorner,
+            phase: hoverPhaseFor(
+              bestDist,
+              bestCorner,
+              prev?.bodyId === bestChip.body.id
+                ? { corner: prev.corner, phase: prev.phase }
+                : null,
+            ),
+          }
+        : null;
     if (
-      (xformHover?.bodyId ?? null) === prevBody &&
-      (xformHover?.corner ?? null) === prevCorner
+      (next?.bodyId ?? null) === (prev?.bodyId ?? null) &&
+      (next?.corner ?? null) === (prev?.corner ?? null) &&
+      (next?.phase ?? null) === (prev?.phase ?? null)
     ) {
       return;
     }
+    xformHover = next;
     for (const chip of chips) {
       if (!isPickPainted(chip)) continue;
       syncXformHandleSide(chip);
@@ -2734,7 +2768,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const startPointerAngle = Math.atan2(dy, dx);
     const startBodyAngle = chip.body.angle;
     const corner = readXformHandleCorner(handle);
-    xformHover = { bodyId: chip.body.id, corner };
+    xformHover = { bodyId: chip.body.id, corner, phase: "hot" };
     xformDrag = {
       chip,
       slotId: chip.slotId,
