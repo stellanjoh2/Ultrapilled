@@ -12,6 +12,10 @@ import {
   dropShadowRadiusOf,
   dropShadowDistanceOf,
   dropShadowColorOf,
+  imageContrastOf,
+  imageExposureOf,
+  imageHueOf,
+  imageSaturationOf,
   physicsComplexity,
   normalizeBackground,
   defaultImageSlot,
@@ -1696,6 +1700,10 @@ function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
   slot.collider = undefined;
   slot.tint = undefined;
   slot.inverted = undefined;
+  slot.exposure = undefined;
+  slot.contrast = undefined;
+  slot.saturation = undefined;
+  slot.hue = undefined;
   if (svg) {
     slot.radius = 0;
     slot.stroked = undefined;
@@ -1750,6 +1758,10 @@ function assignVideoFile(slot: ImageSlot, file: File): Promise<void> {
   slot.youtube = undefined;
   slot.tint = undefined;
   slot.inverted = undefined;
+  slot.exposure = undefined;
+  slot.contrast = undefined;
+  slot.saturation = undefined;
+  slot.hue = undefined;
   slot.collider = undefined;
   if (slot.radius == null) slot.radius = 12;
   slot.size = DEFAULT_YOUTUBE_SIZE;
@@ -2400,6 +2412,10 @@ type ImageBaseline = Pick<
   | "radius"
   | "stroked"
   | "stroke"
+  | "exposure"
+  | "contrast"
+  | "saturation"
+  | "hue"
   | "tint"
   | "collider"
   | "blend"
@@ -2477,6 +2493,10 @@ function captureBaseline(slot: Slot) {
     radius: slot.radius ?? 0,
     stroked: Boolean(slot.stroked),
     stroke: slot.stroke ?? 4,
+    exposure: slot.exposure,
+    contrast: slot.contrast,
+    saturation: slot.saturation,
+    hue: slot.hue,
     tint: slot.tint,
     collider: slot.collider,
     blend: slot.blend,
@@ -2550,6 +2570,10 @@ function imageBaseline(slot: ImageSlot): ImageBaseline {
     radius: seed.radius ?? 0,
     stroked: Boolean(seed.stroked),
     stroke: seed.stroke ?? 4,
+    exposure: seed.exposure,
+    contrast: seed.contrast,
+    saturation: seed.saturation,
+    hue: seed.hue,
     tint: seed.tint,
     collider: seed.collider,
     blend: seed.blend,
@@ -2648,6 +2672,14 @@ function fieldDirty(slot: Slot, key: string): boolean {
       return Boolean(slot.stroked) !== Boolean(base.stroked);
     case "stroke":
       return (slot.stroke ?? 4) !== (base.stroke ?? 4);
+    case "exposure":
+      return imageExposureOf(slot.exposure) !== imageExposureOf(base.exposure);
+    case "contrast":
+      return imageContrastOf(slot.contrast) !== imageContrastOf(base.contrast);
+    case "saturation":
+      return imageSaturationOf(slot.saturation) !== imageSaturationOf(base.saturation);
+    case "hue":
+      return imageHueOf(slot.hue) !== imageHueOf(base.hue);
     case "tint":
       return Boolean(slot.tint) !== Boolean(base.tint);
     case "color":
@@ -2801,6 +2833,10 @@ function applyFieldReset(slot: Slot, key: string) {
     else if (key === "radius") slot.radius = base.radius ?? 0;
     else if (key === "stroked") slot.stroked = base.stroked;
     else if (key === "stroke") slot.stroke = base.stroke ?? 4;
+    else if (key === "exposure") slot.exposure = base.exposure;
+    else if (key === "contrast") slot.contrast = base.contrast;
+    else if (key === "saturation") slot.saturation = base.saturation;
+    else if (key === "hue") slot.hue = base.hue;
     else if (key === "tint") {
       slot.tint = base.tint;
       if (!slot.tint) {
@@ -2939,6 +2975,10 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       if (key === "dropShadowRadius") slot.dropShadowRadius = dropShadowRadiusOf(Number(value));
       if (key === "dropShadowDistance") slot.dropShadowDistance = dropShadowDistanceOf(Number(value));
       if (key === "dropShadowOpacity") slot.dropShadowOpacity = dropShadowOpacityOf(Number(value));
+      if (slot.kind === "image" && key === "exposure") slot.exposure = imageExposureOf(Number(value));
+      if (slot.kind === "image" && key === "contrast") slot.contrast = imageContrastOf(Number(value));
+      if (slot.kind === "image" && key === "saturation") slot.saturation = imageSaturationOf(Number(value));
+      if (slot.kind === "image" && key === "hue") slot.hue = imageHueOf(Number(value));
       if (slot.kind === "image" && key === "amount") {
         slot.amount = Math.max(1, Math.min(AMOUNT_SOFT_CAP, Math.round(Number(value))));
         recountShapes();
@@ -3001,7 +3041,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) caption.textContent = `Text anim speed ${Math.round(Number(input.value))}`;
       }
-      if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius" || key === "dropShadowRadius" || key === "dropShadowDistance" || key === "dropShadowOpacity") {
+      if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius" || key === "dropShadowRadius" || key === "dropShadowDistance" || key === "dropShadowOpacity" || key === "exposure" || key === "contrast" || key === "saturation" || key === "hue") {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
           const name =
@@ -3021,8 +3061,17 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
                           ? "Shadow distance"
                           : key === "dropShadowOpacity"
                             ? "Shadow opacity"
-                            : "Amount";
-          caption.textContent = `${name} ${Math.round(Number(input.value))}`;
+                            : key === "exposure"
+                              ? "Exposure"
+                              : key === "contrast"
+                                ? "Contrast"
+                                : key === "saturation"
+                                  ? "Saturation"
+                                  : key === "hue"
+                                    ? "Hue"
+                                    : "Amount";
+          const suffix = key === "hue" ? "°" : "";
+          caption.textContent = `${name} ${Math.round(Number(input.value))}${suffix}`;
         }
       }
       if (key === "scale" && input instanceof HTMLInputElement) {
@@ -3810,6 +3859,10 @@ function copySlotStyle(slot: Slot) {
         stroked: slot.stroked,
         stroke: slot.stroke,
         inverted: slot.inverted,
+        exposure: slot.exposure,
+        contrast: slot.contrast,
+        saturation: slot.saturation,
+        hue: slot.hue,
         tint: slot.tint,
         blend: slot.blend,
         dropShadow: slot.dropShadow,
@@ -3889,6 +3942,10 @@ function pasteSlotStyle(id: string) {
     slot.stroked = style.stroked;
     slot.stroke = style.stroke;
     slot.inverted = style.inverted;
+    slot.exposure = style.exposure;
+    slot.contrast = style.contrast;
+    slot.saturation = style.saturation;
+    slot.hue = style.hue;
     slot.tint = style.tint;
     slot.blend = style.blend;
     slot.dropShadow = style.dropShadow;

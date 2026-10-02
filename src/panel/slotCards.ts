@@ -15,7 +15,16 @@ import {
 } from "../pillFill";
 import { textAnimSpeedOf } from "../textAnim";
 import { playCreate, playTransition } from "../uiSounds";
-import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
+import {
+  imageContrastOf,
+  imageExposureOf,
+  imageHueOf,
+  imageSaturationOf,
+  type AppState,
+  type ImageSlot,
+  type Slot,
+  type TextSlot,
+} from "../types";
 import { YOUTUBE_LOOP_MAX, YOUTUBE_LOOP_MIN } from "../youtube";
 
 const DUPLICATE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="4" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="4" y="9" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>`;
@@ -846,6 +855,18 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     ${H.dropShadowField(slot)}
     <label class="field">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
+    </label>
+    <label class="field" data-tip="Brighten or darken this image">${H.settingLabel(slot, "Exposure", "exposure", String(imageExposureOf(slot.exposure)))}
+      <input type="range" data-key="exposure" min="-100" max="100" step="1" value="${imageExposureOf(slot.exposure)}" />
+    </label>
+    <label class="field" data-tip="Boost or flatten tonal range">${H.settingLabel(slot, "Contrast", "contrast", String(imageContrastOf(slot.contrast)))}
+      <input type="range" data-key="contrast" min="-100" max="100" step="1" value="${imageContrastOf(slot.contrast)}" />
+    </label>
+    <label class="field" data-tip="Color intensity for this image">${H.settingLabel(slot, "Saturation", "saturation", String(imageSaturationOf(slot.saturation)))}
+      <input type="range" data-key="saturation" min="-100" max="100" step="1" value="${imageSaturationOf(slot.saturation)}" />
+    </label>
+    <label class="field" data-tip="Shift colors around the wheel">${H.settingLabel(slot, "Hue", "hue", `${imageHueOf(slot.hue)}°`)}
+      <input type="range" data-key="hue" min="-180" max="180" step="1" value="${imageHueOf(slot.hue)}" />
     </label>`
         : `${H.dropShadowField(slot)}`
     }
