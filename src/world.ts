@@ -2654,9 +2654,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return freeScaleMax;
   }
 
-  /** Persist / panel: centi precision. Live drag uses clampScaleContinuous. */
+  /** Free-transform clamp — continuous (no 0.01 snap) so release matches live preview. */
   function clampScale(value: number, max = freeScaleMax) {
-    return Math.min(max, Math.max(SCALE_MIN, Math.round(value * 100) / 100));
+    return clampScaleContinuous(value, max);
   }
 
   function endXformDrag(event?: PointerEvent) {
