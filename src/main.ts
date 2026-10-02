@@ -113,6 +113,12 @@ import gsap from "gsap";
 import "./style.css";
 import { placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
 import { beginScrub, endScrub } from "./scrub";
+import {
+  bindRangeValueEdit,
+  rangeCaptionHtml,
+  setRangeCaptionValue,
+  wireRangeCaptions,
+} from "./rangeCaption";
 import { mountCreatePanel, RESET_ICON, setSectionOpen, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
 import { closeOtherSlots, setSlotOpen } from "./panel/slotCards";
 import {
@@ -1313,7 +1319,7 @@ function paintImageAmounts() {
       paintRange(input);
     }
     const caption = card.querySelector("[data-range-label='amount']");
-    if (caption) caption.textContent = `Amount ${slot.amount}`;
+    if (caption) setRangeCaptionValue(caption, String(slot.amount));
     paintFieldReset(card, slot, "amount");
   }
 }
@@ -1558,7 +1564,7 @@ function syncInheritedPillPads() {
     input.value = String(state.pillPad);
     paintRange(input);
     const caption = input.closest("label")?.querySelector("[data-range-label]");
-    if (caption) caption.textContent = `Shape padding ${state.pillPad}`;
+    if (caption) setRangeCaptionValue(caption, String(state.pillPad));
   });
 }
 
@@ -1571,7 +1577,7 @@ function paintRange(input: HTMLInputElement) {
 
 function bindRange(
   id: string,
-  label: string,
+  _label: string,
   onChange: (value: number) => void,
   format: (value: number) => string = (value) => value.toFixed(2),
 ) {
@@ -1592,13 +1598,14 @@ function bindRange(
   input?.addEventListener("pointerdown", startScrub);
   input?.addEventListener("pointerup", stopScrub);
   input?.addEventListener("pointercancel", stopScrub);
+  if (caption && input) bindRangeValueEdit(caption, input);
   input?.addEventListener("input", () => {
     startScrub();
     remember(`range:${id}`);
     const value = Number(input.value);
     paintRange(input);
     onChange(value);
-    if (caption) caption.textContent = `${label} ${format(value)}`;
+    if (caption) setRangeCaptionValue(caption, format(value));
   });
   const finish = () => {
     stopScrub();
@@ -2039,12 +2046,6 @@ function uploadedShape(slot: ImageSlot): boolean {
   return Boolean(slot.src) && !slot.emoji && !slot.youtube && !slot.video && !presetIdForSrc(slot.src);
 }
 
-function scaleFieldName(slot: Slot): string {
-  if (slot.kind === "text") return "Text scale";
-  if (slot.kind === "image" && (slot.youtube || slot.video)) return "Clip scale";
-  if (slot.kind === "image" && uploadedShape(slot)) return "Image scale";
-  return "Shape scale";
-}
 
 /** Canvas / programmatic scale — free-transform hard max (masterScale-aware). */
 function clampSlotScale(_slot: Slot, scale: number): number {
@@ -2734,9 +2735,11 @@ function resetControl(name: string, key: string, dirty: boolean): string {
 }
 
 function settingLabel(slot: Slot, name: string, key: string, value?: string): string {
-  const shown = value == null ? name : `${name} ${value}`;
-  const marker = value == null ? "" : ` data-range-label="${key}"`;
-  return `<span class="field-label"><span${marker}>${shown}</span>${resetControl(name, key, fieldDirty(slot, key))}</span>`;
+  const reset = resetControl(name, key, fieldDirty(slot, key));
+  if (value == null) {
+    return `<span class="field-label"><span>${name}</span>${reset}</span>`;
+  }
+  return `<span class="field-label">${rangeCaptionHtml(key, name, value)}${reset}</span>`;
 }
 
 /** Layer blend — only useful when pieces can overlap (layout mode). */
@@ -3011,10 +3014,10 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       if (key === "gradientAngle" || key === "gradientScale") {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
-          caption.textContent =
-            key === "gradientAngle"
-              ? `Gradient angle ${Math.round(Number(input.value))}`
-              : `Gradient scale ${Math.round(Number(input.value))}`;
+          setRangeCaptionValue(
+            caption,
+            String(Math.round(Number(input.value))),
+          );
         }
         const card = input.closest(".slot-card");
         if (card instanceof HTMLElement) {
@@ -3039,7 +3042,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       }
       if (key === "gradientSpeed") {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
-        if (caption) caption.textContent = `Animation speed ${Math.round(Number(input.value))}`;
+        if (caption) setRangeCaptionValue(caption, String(Math.round(Number(input.value))));
         const card = input.closest(".slot-card");
         if (card instanceof HTMLElement) {
           const duration = `${gradientPeriodMs(slot.gradientSpeed) / 1000}s`;
@@ -3050,42 +3053,16 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       }
       if (key === "textAnimSpeed") {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
-        if (caption) caption.textContent = `Text anim speed ${Math.round(Number(input.value))}`;
+        if (caption) setRangeCaptionValue(caption, String(Math.round(Number(input.value))));
       }
       if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius" || key === "dropShadowRadius" || key === "dropShadowDistance" || key === "dropShadowOpacity" || key === "exposure" || key === "contrast" || key === "saturation" || key === "hue" || key === "temperature") {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
           if (key === "temperature") {
-            caption.textContent = `Temperature ${imageTemperatureLabel(Number(input.value))}`;
+            setRangeCaptionValue(caption, imageTemperatureLabel(Number(input.value)));
           } else {
-            const name =
-              key === "textHeight"
-                ? "Text height"
-                : key === "stroke"
-                  ? "Stroke"
-                  : key === "pillPad"
-                    ? "Shape padding"
-                    : key === "tracking"
-                      ? "Letter spacing"
-                      : key === "radius"
-                        ? "Corner radius"
-                        : key === "dropShadowRadius"
-                          ? "Shadow radius"
-                          : key === "dropShadowDistance"
-                            ? "Shadow distance"
-                            : key === "dropShadowOpacity"
-                              ? "Shadow opacity"
-                              : key === "exposure"
-                                ? "Exposure"
-                                : key === "contrast"
-                                  ? "Contrast"
-                                  : key === "saturation"
-                                    ? "Saturation"
-                                    : key === "hue"
-                                      ? "Hue"
-                                      : "Amount";
             const suffix = key === "hue" ? "°" : "";
-            caption.textContent = `${name} ${Math.round(Number(input.value))}${suffix}`;
+            setRangeCaptionValue(caption, `${Math.round(Number(input.value))}${suffix}`);
           }
         }
       }
@@ -3094,7 +3071,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         input.max = String(slotScaleSliderMax(slot));
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
-          caption.textContent = `${scaleFieldName(slot)} ${slot.scale.toFixed(2)}`;
+          setRangeCaptionValue(caption, slot.scale.toFixed(2));
         }
       }
       paintFieldReset(input.closest(".field, .check-row") ?? root, slot, key);
@@ -3129,6 +3106,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       input.addEventListener("blur", finish);
     }
   });
+  wireRangeCaptions(root);
 }
 
 function applySlotOrder(visualIds: string[]) {
@@ -3406,7 +3384,7 @@ function syncSlotScaleUi(slot: Slot) {
   }
   const caption = card.querySelector('[data-range-label="scale"]');
   if (caption) {
-    caption.textContent = `${scaleFieldName(slot)} ${slot.scale.toFixed(2)}`;
+    setRangeCaptionValue(caption, slot.scale.toFixed(2));
   }
   paintFieldReset(card, slot, "scale");
 }
@@ -3422,7 +3400,7 @@ function syncSlotGradientWheelUi(slot: Slot) {
     paintRange(angleInput);
   }
   const angleCaption = card.querySelector('[data-range-label="gradientAngle"]');
-  if (angleCaption) angleCaption.textContent = `Gradient angle ${Math.round(angle)}`;
+  if (angleCaption) setRangeCaptionValue(angleCaption, String(Math.round(angle)));
   paintFieldReset(card, slot, "gradientAngle");
   const scaleInput = card.querySelector<HTMLInputElement>('input[data-key="gradientScale"]');
   if (scaleInput) {
@@ -3430,7 +3408,7 @@ function syncSlotGradientWheelUi(slot: Slot) {
     paintRange(scaleInput);
   }
   const scaleCaption = card.querySelector('[data-range-label="gradientScale"]');
-  if (scaleCaption) scaleCaption.textContent = `Gradient scale ${scale}`;
+  if (scaleCaption) setRangeCaptionValue(scaleCaption, String(scale));
   paintFieldReset(card, slot, "gradientScale");
   if (slot.kind === "text") {
     const chip = card.querySelector<HTMLElement>(".slot-chip");

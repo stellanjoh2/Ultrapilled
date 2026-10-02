@@ -18,6 +18,7 @@ import { blankState, TEMPLATES } from "../templates";
 import { listCustomTemplates } from "../customTemplates";
 import { playClick, playSwitch, playTransition } from "../uiSounds";
 import { bindSlotCards, renderSlotCard, type SlotCardHost } from "./slotCards";
+import { rangeCaptionHtml } from "../rangeCaption";
 
 export const RESET_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 3v5h5"/></svg>';
@@ -213,16 +214,16 @@ panel.innerHTML = `
     "composition",
     "Composition",
     "Overall size and spacing of pieces",
-    `<label class="field" data-tip="Overall size of every piece"><span data-range-label="masterScale">Scale ${(H.state.masterScale * 10).toFixed(0)}</span>
+    `<label class="field" data-tip="Overall size of every piece">${rangeCaptionHtml("masterScale", "Scale", `${(H.state.masterScale * 10).toFixed(0)}`)}
       <input type="range" id="masterScale" min="4" max="100" step="1" value="${H.state.masterScale * 10}" />
     </label>
-    <label class="field" data-tip="How much piece sizes vary"><span data-range-label="sizeRandom">Size random ${H.state.sizeRandom}</span>
+    <label class="field" data-tip="How much piece sizes vary">${rangeCaptionHtml("sizeRandom", "Size random", String(H.state.sizeRandom))}
       <input type="range" id="sizeRandom" min="0" max="100" step="1" value="${H.state.sizeRandom}" />
     </label>
-    <label class="field" data-tip="Space inside text holding shapes"><span data-range-label="pillPad">Shape padding ${H.state.pillPad}</span>
+    <label class="field" data-tip="Space inside text holding shapes">${rangeCaptionHtml("pillPad", "Shape padding", String(H.state.pillPad))}
       <input type="range" id="pillPad" min="0" max="100" step="1" value="${H.state.pillPad}" />
     </label>
-    <label class="field" data-tip="How many pieces drop into the frame"><span data-range-label="shapeAmount">Amount of shapes ${H.state.shapeAmount}</span>
+    <label class="field" data-tip="How many pieces drop into the frame">${rangeCaptionHtml("shapeAmount", "Amount of shapes", String(H.state.shapeAmount))}
       <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${H.state.shapeAmount}" />
     </label>
     <p class="hint" id="amount-perf-hint"${H.state.shapeAmount >= H.SHAPE_PERF_WARN ? "" : " hidden"}>Many shapes can drop below 60 fps.</p>`,
@@ -306,36 +307,36 @@ panel.innerHTML = `
       </select>
     </label>
     <div class="row">
-      <label class="field" data-tip="How hard pieces pull downward"><span data-range-label="gravity">Gravity ${H.state.physics.gravity.toFixed(2)}</span>
+      <label class="field" data-tip="How hard pieces pull downward">${rangeCaptionHtml("gravity", "Gravity", H.state.physics.gravity.toFixed(2))}
         <input type="range" id="gravity" min="0" max="3" step="0.05" value="${H.state.physics.gravity}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
     <div class="row">
-      <label class="field" data-tip="How fast the simulation runs"><span data-range-label="speed">Speed ${H.state.physics.speed.toFixed(2)}</span>
+      <label class="field" data-tip="How fast the simulation runs">${rangeCaptionHtml("speed", "Speed", H.state.physics.speed.toFixed(2))}
         <input type="range" id="speed" min="0.2" max="2" step="0.05" value="${H.state.physics.speed}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
     <div class="row">
-      <label class="field" data-tip="How springy collisions are (above 1 = super-bouncy)"><span data-range-label="bounce">Bounciness ${H.state.physics.bounce.toFixed(2)}</span>
+      <label class="field" data-tip="How springy collisions are (above 1 = super-bouncy)">${rangeCaptionHtml("bounce", "Bounciness", H.state.physics.bounce.toFixed(2))}
         <input type="range" id="bounce" min="0" max="2" step="0.05" value="${H.state.physics.bounce}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
     <div class="row">
-      <label class="field" data-tip="Slide resistance when pieces touch"><span data-range-label="friction">Friction ${H.state.physics.friction.toFixed(2)}</span>
+      <label class="field" data-tip="Slide resistance when pieces touch">${rangeCaptionHtml("friction", "Friction", H.state.physics.friction.toFixed(2))}
         <input type="range" id="friction" min="0" max="1" step="0.05" value="${H.state.physics.friction}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
     <div class="row">
-      <label class="field" data-tip="How much pieces stick while sliding"><span data-range-label="grip">Grip ${H.state.physics.grip.toFixed(2)}</span>
+      <label class="field" data-tip="How much pieces stick while sliding">${rangeCaptionHtml("grip", "Grip", H.state.physics.grip.toFixed(2))}
         <input type="range" id="grip" min="0" max="1" step="0.05" value="${H.state.physics.grip}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
     <div class="row">
-      <label class="field" data-tip="How quickly spinning slows down"><span data-range-label="spin">Spin drag ${H.state.physics.spin.toFixed(2)}</span>
+      <label class="field" data-tip="How quickly spinning slows down">${rangeCaptionHtml("spin", "Spin drag", H.state.physics.spin.toFixed(2))}
         <input type="range" id="spin" min="0" max="0.12" step="0.01" value="${H.state.physics.spin}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
-    <label class="field" data-tip="How long the floor stays closed before opening"><span data-range-label="hold">Floor pause ${H.state.physics.hold.toFixed(2)}s</span>
+    <label class="field" data-tip="How long the floor stays closed before opening">${rangeCaptionHtml("hold", "Floor pause", `${H.state.physics.hold.toFixed(2)}s`)}
       <input type="range" id="hold" min="0.2" max="4" step="0.05" value="${H.state.physics.hold}"${H.state.physics.layoutMode ? " disabled" : ""} />
     </label>
     </div>`,
@@ -345,22 +346,22 @@ panel.innerHTML = `
     "look",
     "Look",
     "Post-process color and glow on the whole frame",
-    `<label class="field" data-tip="Shift all colors around the wheel"><span data-range-label="hue">Hue ${H.state.post.hue}°</span>
+    `<label class="field" data-tip="Shift all colors around the wheel">${rangeCaptionHtml("hue", "Hue", `${H.state.post.hue}°`)}
       <input type="range" id="hue" min="0" max="360" step="1" value="${H.state.post.hue}" />
     </label>
-    <label class="field" data-tip="Soft glow around bright areas"><span data-range-label="bloom">Bloom ${H.state.post.bloom}</span>
+    <label class="field" data-tip="Soft glow around bright areas">${rangeCaptionHtml("bloom", "Bloom", String(H.state.post.bloom))}
       <input type="range" id="bloom" min="0" max="100" step="1" value="${H.state.post.bloom}" />
     </label>
-    <label class="field" data-tip="Strength of the glow"><span data-range-label="bloomOpacity">Bloom opacity ${H.state.post.bloomOpacity}</span>
+    <label class="field" data-tip="Strength of the glow">${rangeCaptionHtml("bloomOpacity", "Bloom opacity", String(H.state.post.bloomOpacity))}
       <input type="range" id="bloomOpacity" min="0" max="100" step="1" value="${H.state.post.bloomOpacity}" />
     </label>
-    <label class="field" data-tip="Film-grain texture over the frame"><span data-range-label="grain">Grain ${H.state.post.grain}</span>
+    <label class="field" data-tip="Film-grain texture over the frame">${rangeCaptionHtml("grain", "Grain", String(H.state.post.grain))}
       <input type="range" id="grain" min="0" max="200" step="1" value="${H.state.post.grain}" />
     </label>
-    <label class="field" data-tip="Darken the edges of the frame"><span data-range-label="vignette">Vignette ${H.state.post.vignette}</span>
+    <label class="field" data-tip="Darken the edges of the frame">${rangeCaptionHtml("vignette", "Vignette", String(H.state.post.vignette))}
       <input type="range" id="vignette" min="0" max="100" step="1" value="${H.state.post.vignette}" />
     </label>
-    <label class="field" data-tip="Color intensity"><span data-range-label="saturate">Saturate ${H.state.post.saturate}</span>
+    <label class="field" data-tip="Color intensity">${rangeCaptionHtml("saturate", "Saturate", String(H.state.post.saturate))}
       <input type="range" id="saturate" min="40" max="180" step="1" value="${H.state.post.saturate}" />
     </label>
     <label class="field" data-tip="How overlapping pieces mix colors">Blending mode
@@ -381,16 +382,16 @@ panel.innerHTML = `
         <span class="smash-btn__text">${H.state.audioReact.enabled ? "Listening" : "Microphone"}</span>
       </span>
     </button>
-    <label class="field" data-tip="How easily quiet sounds trigger a reaction"><span data-range-label="audioSensitivity">Sensitivity ${Math.round(H.state.audioReact.sensitivity)}</span>
+    <label class="field" data-tip="How easily quiet sounds trigger a reaction">${rangeCaptionHtml("audioSensitivity", "Sensitivity", String(Math.round(H.state.audioReact.sensitivity)))}
       <input type="range" id="audioSensitivity" min="0" max="100" step="1" value="${H.state.audioReact.sensitivity}" />
     </label>
-    <label class="field" data-tip="How hard pieces hop on a hit"><span data-range-label="audioBounce">Bounce intensity ${H.state.audioReact.bounce.toFixed(1)}×</span>
+    <label class="field" data-tip="How hard pieces hop on a hit">${rangeCaptionHtml("audioBounce", "Bounce intensity", `${H.state.audioReact.bounce.toFixed(1)}×`)}
       <input type="range" id="audioBounce" min="1" max="4" step="0.1" value="${H.state.audioReact.bounce}" />
     </label>
-    <label class="field" data-tip="How much text pills swell on bass hits"><span data-range-label="audioBassBoost">Bass boost +${Math.round(H.state.audioReact.bassBoost)}%</span>
+    <label class="field" data-tip="How much text pills swell on bass hits">${rangeCaptionHtml("audioBassBoost", "Bass boost", `+${Math.round(H.state.audioReact.bassBoost)}%`)}
       <input type="range" id="audioBassBoost" min="5" max="20" step="1" value="${H.state.audioReact.bassBoost}" />
     </label>
-    <label class="field" data-tip="Small color-wheel kick on sharp hits that snaps back"><span data-range-label="audioHueNudge">Hue nudge ${Math.round(H.state.audioReact.hueNudge)}°</span>
+    <label class="field" data-tip="Small color-wheel kick on sharp hits that snaps back">${rangeCaptionHtml("audioHueNudge", "Hue nudge", `${Math.round(H.state.audioReact.hueNudge)}°`)}
       <input type="range" id="audioHueNudge" min="0" max="30" step="1" value="${H.state.audioReact.hueNudge}" />
     </label>`,
     { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react" },

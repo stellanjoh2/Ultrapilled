@@ -2411,6 +2411,49 @@ button.pill.smash-btn.is-on::after {
   /* Match .field-reset height so unhiding reset doesn't grow the row ~1px. */
   min-height: calc(22px * var(--ui-scale));
 }
+.field-caption {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 0.35em;
+  min-width: 0;
+  /* Inherit field metrics so swapping value↔input never reflows the row. */
+  line-height: inherit;
+}
+
+.field-caption-name {
+  flex-shrink: 0;
+}
+
+.field-caption-value {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "ss01";
+  cursor: default;
+}
+
+.field-caption-input {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: calc(4px * var(--ui-scale));
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "ss01";
+  line-height: inherit;
+  letter-spacing: inherit;
+  min-width: 3ch;
+  max-width: 100%;
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
+}
+
+.field-caption-input:focus {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
 
 .field-label-end {
   display: flex;

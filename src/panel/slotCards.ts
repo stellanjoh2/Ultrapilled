@@ -31,6 +31,7 @@ import {
   type TextSlot,
 } from "../types";
 import { YOUTUBE_LOOP_MAX, YOUTUBE_LOOP_MIN } from "../youtube";
+import { setRangeCaptionValue } from "../rangeCaption";
 
 const DUPLICATE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="4" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="4" y="9" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>`;
 
@@ -701,7 +702,7 @@ function youtubeFields(slot: ImageSlot, open: boolean): HTMLElement {
     const max = Number(loopInput.max) || 100;
     loopInput.style.setProperty("--pct", `${((next - min) / (max - min || 1)) * 100}%`);
     const caption = loopInput.closest("label")?.querySelector("[data-range-label]");
-    if (caption) caption.textContent = `Loop length ${next}s`;
+    if (caption) setRangeCaptionValue(caption, `${next}s`);
     H.live();
   });
   if (loopInput) {
