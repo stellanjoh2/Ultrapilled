@@ -340,17 +340,41 @@ export function stopBareCanvasTextAnimIn(root: ParentNode) {
   });
 }
 
-/** Keep the letter-cycle clip as wide as the live word after tracking/scale remesh. */
+/**
+ * Keep the letter-cycle clip as wide as the live word after tracking/scale remesh.
+ * Must use layout px (offsetWidth + max-content), not getBoundingClientRect: the chip
+ * carries CSS rotate/scale from seat(), and after scale-drag remesh the preview scale
+ * is often still on the transform until the next seat(). Visual rects inflate the clip
+ * so flex+overflow:hidden on the label crushes tracking; rotated chips do the same.
+ */
 function refreshAnimClipWidth(label: HTMLElement) {
   const clip = label.querySelector(":scope > .text-anim-clip");
   if (!(clip instanceof HTMLElement)) return;
   const rows = [...clip.querySelectorAll<HTMLElement>(".text-anim-word")];
   let maxW = 0;
   for (const row of rows) {
-    const prev = row.style.position;
+    const prev = {
+      position: row.style.position,
+      inset: row.style.inset,
+      left: row.style.left,
+      right: row.style.right,
+      width: row.style.width,
+      textAlign: row.style.textAlign,
+    };
+    // Absolute+inset:0 stretches to the (possibly stale) clip; measure intrinsic ink instead.
     row.style.position = "relative";
-    maxW = Math.max(maxW, row.getBoundingClientRect().width);
-    row.style.position = prev;
+    row.style.inset = "auto";
+    row.style.left = "auto";
+    row.style.right = "auto";
+    row.style.width = "max-content";
+    row.style.textAlign = "left";
+    maxW = Math.max(maxW, row.offsetWidth);
+    row.style.position = prev.position;
+    row.style.inset = prev.inset;
+    row.style.left = prev.left;
+    row.style.right = prev.right;
+    row.style.width = prev.width;
+    row.style.textAlign = prev.textAlign;
   }
   if (maxW > 0) clip.style.width = `${Math.ceil(maxW)}px`;
   else clip.style.removeProperty("width");

@@ -1324,6 +1324,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   display: block;
   line-height: 1;
   overflow: hidden;
+  /* overflow:hidden zeroes flex min-size — don't let the chip crush the letter-cycle. */
+  flex-shrink: 0;
 }
 
 /* Bare type: seat to ink box in JS — never clip resting glyphs. */
