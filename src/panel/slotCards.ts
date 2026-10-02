@@ -342,7 +342,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       <label class="field">${H.settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
         <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
       </label>
-      <label class="field">${H.settingLabel(slot, "Tracking", "tracking", String(trackingOf(slot, H.state.textTracking)))}
+      <label class="field">${H.settingLabel(slot, "Letter spacing", "tracking", String(trackingOf(slot, H.state.textTracking)))}
         <input type="range" data-key="tracking" min="-400" max="500" step="1" value="${trackingOf(slot, H.state.textTracking)}" />
       </label>
       ${
