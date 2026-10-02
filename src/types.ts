@@ -460,7 +460,7 @@ export function demoState(): AppState {
     masterScale: 3.5,
     sizeRandom: 100,
     pillPad: 14,
-    textTracking: 37,
+    textTracking: 0,
     shapeAmount: 15,
     theme: [...DEFAULT_THEME],
     post: { bloom: 0, bloomOpacity: 100, grain: 0, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
