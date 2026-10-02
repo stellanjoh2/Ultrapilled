@@ -95,6 +95,11 @@ import {
 } from "./project/pillFormat";
 import { ensureTrim, ensureTrims, peekTrim } from "./trim";
 import { isColorMask, isSvgSource } from "./chipKinds";
+import {
+  clampScaleForFreeTransform,
+  freeTransformScaleMax,
+  slotScaleSliderMax as softSlotScaleSliderMax,
+} from "./slotScale";
 import { createWorld } from "./world";
 import { cancelSlotDrag } from "./slotDrag";
 import { bindUiClickSounds, bindUiTypeSounds, playButton, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
@@ -1235,11 +1240,6 @@ function recountShapes() {
 const AMOUNT_SOFT_CAP = 8;
 const SHAPE_TOTAL_SOFT_CAP = 36;
 const SHAPE_PERF_WARN = 20;
-/** Slider ceiling for text/shape/SVG scale. Canvas drag can go higher. */
-const SCALE_SLIDER_MAX = 3;
-/** Hard ceiling for canvas / programmatic scale (raster uploads stay at 2). */
-const SCALE_HARD_MAX = 100;
-const SCALE_UPLOAD_MAX = 4;
 
 function shapeAmountRange() {
   const count = fallingImages().length;
@@ -2030,17 +2030,22 @@ function scaleFieldName(slot: Slot): string {
   return "Shape scale";
 }
 
-/** Raster uploads cap at 2 so they can't swamp the frame. SVGs/text/shapes keep a high hard max for canvas drag. */
-function clampSlotScale(slot: Slot, scale: number): number {
-  const max = slot.kind === "image" && uploadedShape(slot) && !isSvgSource(slot) ? SCALE_UPLOAD_MAX : SCALE_HARD_MAX;
-  return Math.min(max, Math.max(0.1, Math.round(scale * 100) / 100));
+/** Canvas / programmatic scale — free-transform hard max (masterScale-aware). */
+function clampSlotScale(_slot: Slot, scale: number): number {
+  return clampScaleForFreeTransform(scale, state.masterScale);
 }
 
 /** Soft slider range; expands if the current value was set higher via canvas drag. */
 function slotScaleSliderMax(slot: Slot): number {
-  const soft =
-    slot.kind === "image" && uploadedShape(slot) && !isSvgSource(slot) ? SCALE_UPLOAD_MAX : SCALE_SLIDER_MAX;
-  return Math.max(soft, slot.scale);
+  return softSlotScaleSliderMax(slot.scale, isRasterUploadSlot(slot));
+}
+
+function isRasterUploadSlot(slot: Slot): boolean {
+  return slot.kind === "image" && isRasterUpload(slot);
+}
+
+function syncFreeScaleMax() {
+  world.setFreeScaleMax(freeTransformScaleMax(state.masterScale));
 }
 
 function isRasterUpload(slot: ImageSlot): boolean {
@@ -4572,6 +4577,7 @@ function fitScale() {
   const scale = layoutScale(currentFrame());
   // shownScale is owned by syncCanvas — mutating it here desyncs refits after import.
   world.setSimulationScale(scale);
+  syncFreeScaleMax();
   return state.masterScale * scale;
 }
 
