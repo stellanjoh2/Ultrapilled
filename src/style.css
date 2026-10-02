@@ -2972,6 +2972,39 @@ input[type="range"]:disabled {
   cursor: default;
 }
 
+/* Orby Color & Tone Temperature — blue→peach Kelvin rail, hollow white ring thumb. */
+.field--temperature {
+  --rail-gradient: linear-gradient(90deg, #1d5bff, #f6f2ff, #ffbb6b);
+  --temp-thumb-size: calc(16px * var(--ui-scale));
+  --temp-thumb-border: calc(2px * var(--ui-scale));
+}
+
+.field--temperature input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--rail-gradient);
+}
+
+.field--temperature input[type="range"]::-moz-range-track {
+  background: var(--rail-gradient);
+}
+
+.field--temperature input[type="range"]:is(:active, :focus-visible)::-webkit-slider-runnable-track,
+.field--temperature input[type="range"]:is(:active, :focus-visible)::-moz-range-track {
+  background: var(--rail-gradient);
+  filter: brightness(1.14);
+}
+
+.field--temperature input[type="range"]::-webkit-slider-thumb {
+  background: transparent;
+  border: var(--temp-thumb-border) solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.field--temperature input[type="range"]::-moz-range-thumb {
+  background: transparent;
+  border: var(--temp-thumb-border) solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
 input[type="file"] {
   display: block;
   width: 100%;
@@ -3495,7 +3528,8 @@ body.is-reordering * {
 
 .slot-group + .slot-group,
 .slot-group--ruled {
-  padding-top: var(--space-1);
+  /* Match .slot-editor gap above the hairline so the rule sits centered in the gutter. */
+  padding-top: var(--space-2);
   border-top: 1px solid var(--panel-rule);
 }
 

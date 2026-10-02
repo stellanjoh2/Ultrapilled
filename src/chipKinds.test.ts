@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { isColorMask, isSvgSource } from "./chipKinds";
 import { imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
 import { ICON_PRESETS } from "./icons";
-import { defaultImageSlot, defaultTextSlot, defaultTypeSlot } from "./types";
+import {
+  defaultImageSlot,
+  defaultTextSlot,
+  defaultTypeSlot,
+  IMAGE_TEMPERATURE_NEUTRAL_K,
+  imageTemperatureLabel,
+  imageTemperatureNormalized,
+  imageTemperatureOf,
+} from "./types";
 
 describe("isSvgSource", () => {
   it("detects svg by name and data url", () => {
@@ -68,6 +76,16 @@ describe("imageRasterFilter", () => {
     ).toBe("invert(0) brightness(1.5) contrast(0.75) saturate(2) hue-rotate(-90deg)");
   });
 
+  it("applies Orby Kelvin white-balance via SVG filter url", () => {
+    expect(imageRasterFilter(defaultImageSlot({ temperature: 6000 }))).toBe("invert(0)");
+    expect(imageRasterFilter(defaultImageSlot({ temperature: 8000 }))).toBe(
+      "invert(0) url(#ultrapilled-wb-8000)",
+    );
+    expect(imageRasterFilter(defaultImageSlot({ temperature: 4000 }))).toBe(
+      "invert(0) url(#ultrapilled-wb-4000)",
+    );
+  });
+
   it("composes drop-shadow after color adjusts", () => {
     expect(
       imageRasterFilter(defaultImageSlot({ inverted: true, exposure: -50 }), "drop-shadow(0 8px 16px rgba(0,0,0,0.4))"),
@@ -78,5 +96,25 @@ describe("imageRasterFilter", () => {
     expect(imageAdjustActive(defaultImageSlot())).toBe(false);
     expect(imageAdjustActive(defaultImageSlot({ saturation: 1 }))).toBe(true);
     expect(imageAdjustActive(defaultImageSlot({ hue: 0, exposure: 0 }))).toBe(false);
+    expect(imageAdjustActive(defaultImageSlot({ temperature: 6000 }))).toBe(false);
+    expect(imageAdjustActive(defaultImageSlot({ temperature: 6500 }))).toBe(true);
+  });
+});
+
+describe("imageTemperature", () => {
+  it("clamps and snaps to Orby Kelvin step", () => {
+    expect(imageTemperatureOf(undefined)).toBe(IMAGE_TEMPERATURE_NEUTRAL_K);
+    expect(imageTemperatureOf(6010)).toBe(6000);
+    expect(imageTemperatureOf(6024)).toBe(6000);
+    expect(imageTemperatureOf(6025)).toBe(6050); // JS Math.round half-up
+    expect(imageTemperatureOf(1000)).toBe(2000);
+    expect(imageTemperatureOf(12000)).toBe(10000);
+  });
+
+  it("normalizes like Orby (warm positive above 6000K)", () => {
+    expect(imageTemperatureNormalized(6000)).toBe(0);
+    expect(imageTemperatureNormalized(10000)).toBe(1);
+    expect(imageTemperatureNormalized(2000)).toBe(-1);
+    expect(imageTemperatureLabel(8000)).toBe("8000K");
   });
 });
