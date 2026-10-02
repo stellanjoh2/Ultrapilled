@@ -2036,8 +2036,8 @@ button.pill.smash-btn.is-on::after {
 .physics-dynamics {
   display: flex;
   flex-direction: column;
-  /* Same ~48px slider-row rhythm as .slot-editor / .slot-group. */
-  gap: var(--space-0);
+  /* Pre-dense roomy rhythm — shared with .slot-editor / .slot-group. */
+  gap: var(--space-2);
 }
 
 .physics-dynamics[inert] {
@@ -2348,8 +2348,8 @@ button.pill.smash-btn.is-on::after {
 .section-fold-clip {
   display: flex;
   flex-direction: column;
-  /* ~48px slider-row pitch with .field (label + track). */
-  gap: var(--space-0);
+  /* Pre-dense roomy rhythm — shared with .slot-editor / .slot-group. */
+  gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
   min-height: 0;
@@ -3459,8 +3459,8 @@ body.is-reordering * {
 .slot-editor {
   display: flex;
   flex-direction: column;
-  /* ~48px slider-row pitch (was ~54 with space-1). */
-  gap: var(--space-0);
+  /* Restore pre-dense roomy field gap; Visual tweaks matches. */
+  gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
   padding-top: var(--space-1);
@@ -3469,8 +3469,8 @@ body.is-reordering * {
 .slot-group {
   display: flex;
   flex-direction: column;
-  /* Same ~48px slider-row rhythm as .slot-editor. */
-  gap: var(--space-0);
+  /* Same roomy slider-row rhythm as .slot-editor / Composition. */
+  gap: var(--space-2);
   margin: 0;
 }
 
