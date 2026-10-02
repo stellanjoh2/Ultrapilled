@@ -862,8 +862,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>
-    <div class="slot-group">
-      <p class="slot-label">Visual tweaks</p>
+    <div class="slot-group slot-group--ruled">
       <label class="field" data-tip="Brighten or darken this image">${H.settingLabel(slot, "Exposure", "exposure", String(imageExposureOf(slot.exposure)))}
         <input type="range" data-key="exposure" min="-100" max="100" step="1" value="${imageExposureOf(slot.exposure)}" />
       </label>

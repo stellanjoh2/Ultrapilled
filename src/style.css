@@ -3459,7 +3459,7 @@ body.is-reordering * {
 .slot-editor {
   display: flex;
   flex-direction: column;
-  /* Restore pre-dense roomy field gap; Visual tweaks matches. */
+  /* Restore pre-dense roomy field gap; ruled tweak group matches. */
   gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
@@ -3493,7 +3493,8 @@ body.is-reordering * {
   margin: 0;
 }
 
-.slot-group + .slot-group {
+.slot-group + .slot-group,
+.slot-group--ruled {
   padding-top: var(--space-1);
   border-top: 1px solid var(--panel-rule);
 }
