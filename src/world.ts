@@ -2003,6 +2003,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         frameHost.classList.add("is-picked");
         syncChromeSeat(chip);
         syncXformHandleSide(chip, chipCssMul(chip));
+        syncGradWheelNear(chip);
       } else {
         chip.el.classList.remove("is-picked");
         const host = chip.chrome;
@@ -2010,6 +2011,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           host.classList.remove("is-picked", "is-scaling", "is-rotating", "is-grad-angling");
         }
         if (xformHover?.bodyId === chip.body.id) xformHover = null;
+        if (gradWheelNearBodyId === chip.body.id) gradWheelNearBodyId = null;
         releaseGradWheel(chip.el);
       }
     }
@@ -2386,6 +2388,87 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     applyXformHover(resolveXformHoverAt(stagePoint(event), event.target));
   }
 
+  /**
+   * Gradient gizmo proximity: far ≈ 0.8 opacity, near rings / drag = 1.0.
+   * Distances are stage px from the active scale ring or outer guide ring.
+   * Stick radius avoids flicker at the threshold edge (same idea as corner soft/hot).
+   */
+  let gradWheelNearBodyId: number | null = null;
+  const GRAD_NEAR_ENTER = 48;
+  const GRAD_NEAR_STICK = 72;
+
+  function distToGradRings(chip: DroppedChip, point: { x: number; y: number }): number | null {
+    const info = gradientOf?.(chip.slotId);
+    if (!info) return null;
+    const polar = localPolar(chip, point);
+    const { maxR, chipR } = chipWheelMetrics(chip);
+    const scaleR = radiusForGradScale(info.scale, maxR, chipR);
+    return Math.min(Math.abs(polar.dist - scaleR), Math.abs(polar.dist - maxR));
+  }
+
+  function resolveGradWheelNearAt(
+    point: { x: number; y: number },
+    target: EventTarget | null = null,
+  ): number | null {
+    if (pickedIds.size === 0) return null;
+    const overWheel =
+      target instanceof Element
+        ? target.closest(
+            ".chip-grad-wheel__stop, .chip-grad-wheel__hit-ring, .chip-grad-wheel__hit, .chip-grad-wheel__scale, .chip-grad-wheel__ring",
+          )
+        : null;
+    if (overWheel instanceof Element) {
+      const host = overWheel.closest(".chip");
+      const chip = chipFromEl(host);
+      if (chip && isPickPainted(chip) && gradientOf?.(chip.slotId)) return chip.body.id;
+    }
+    let bestId: number | null = null;
+    let bestDist = Infinity;
+    for (const chip of chips) {
+      if (!isPickPainted(chip)) continue;
+      const dist = distToGradRings(chip, point);
+      if (dist == null) continue;
+      const limit = gradWheelNearBodyId === chip.body.id ? GRAD_NEAR_STICK : GRAD_NEAR_ENTER;
+      if (dist <= limit && dist < bestDist) {
+        bestDist = dist;
+        bestId = chip.body.id;
+      }
+    }
+    return bestId;
+  }
+
+  function syncGradWheelNear(chip: DroppedChip) {
+    const wheel = chip.el.querySelector(":scope > .chip-grad-wheel");
+    if (!(wheel instanceof HTMLElement)) return;
+    const near =
+      (gradAngleDrag != null && gradAngleDrag.chip.body.id === chip.body.id) ||
+      gradWheelNearBodyId === chip.body.id;
+    wheel.classList.toggle("chip-grad-wheel--near", near);
+  }
+
+  function applyGradWheelNear(next: number | null) {
+    if (next === gradWheelNearBodyId) {
+      // Still refresh drag-forced near on the active chip.
+      if (gradAngleDrag) syncGradWheelNear(gradAngleDrag.chip);
+      return;
+    }
+    gradWheelNearBodyId = next;
+    for (const chip of chips) {
+      if (!isPickPainted(chip)) continue;
+      syncGradWheelNear(chip);
+    }
+  }
+
+  function updateGradWheelHover(event: PointerEvent) {
+    if (drag || xformDrag || editingId) return;
+    if (gradAngleDrag) {
+      // Stop/dot or ring drag: force full opacity on all gizmo elements.
+      applyGradWheelNear(gradAngleDrag.chip.body.id);
+      return;
+    }
+    applyGradWheelNear(resolveGradWheelNearAt(stagePoint(event), event.target));
+  }
+
   /** CSS degrees: 0 up, 90 right — matches linear-gradient / gradientLine. */
   function localPolar(chip: DroppedChip, point: { x: number; y: number }) {
     const dx = point.x - chip.body.position.x;
@@ -2532,6 +2615,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       toStop.style.background = info.to;
       placeGradStop(toStop, info.angle, scaleR);
     }
+    syncGradWheelNear(chip);
   }
 
   function placeGradStop(el: HTMLElement, angleDeg: number, radius: number) {
@@ -2629,7 +2713,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function endGradAngleDrag() {
     if (!gradAngleDrag) return;
-    const { lastAngle, lastScale, slotId, stop, stopEl, moved, rotating } = gradAngleDrag;
+    const { lastAngle, lastScale, slotId, stop, stopEl, moved, rotating, chip } = gradAngleDrag;
     gradAngleDrag = null;
     if (rotating) endScrub();
     for (const item of xformTargets(slotId)) {
@@ -2641,6 +2725,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         Sleeping.set(item.body, true);
       }
     }
+    // Drop drag-forced full opacity; next pointermove re-resolves proximity.
+    syncGradWheelNear(chip);
     if (!moved && stop && stopEl) {
       onGradientStop?.(slotId, stop, stopEl);
       return;
@@ -2723,7 +2809,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (mode === "xforming") {
         chip.el.classList.add("is-scaling", "is-rotating");
         chip.chrome?.classList.add("is-scaling", "is-rotating");
-      } else chip.el.classList.add("is-grad-angling");
+      } else {
+        chip.el.classList.add("is-grad-angling");
+        // Color-stop / ring drag: full opacity on the whole gizmo immediately.
+        applyGradWheelNear(chip.body.id);
+      }
       seat(chip);
     }
   }
@@ -3150,7 +3240,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const dy = event.clientY - pending.originY;
       if (dx * dx + dy * dy > CLICK_SLOP * CLICK_SLOP) beginDrag();
     }
-    if (!drag) updateXformHandleHover(event);
+    if (!drag) {
+      updateXformHandleHover(event);
+      updateGradWheelHover(event);
+    }
     if (!drag || event.pointerId !== drag.pointerId) return;
     const point = stagePoint(event);
     drag.x = point.x;

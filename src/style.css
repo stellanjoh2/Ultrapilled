@@ -1132,13 +1132,20 @@ html[data-theme="day"] .chip-xform-handle {
 }
 
 .chip.is-picked > .chip-grad-wheel {
-  opacity: 1;
+  /* Dim until proximity / drag — mirrors xform-handle soft→hot feel. */
+  opacity: 0.8;
   visibility: visible;
   scale: 1;
   transition:
     opacity 0.15s ease-out,
     scale 0.15s ease-out,
     visibility 0s;
+}
+
+/* Near rings (pointer distance) or while dragging stops/ring: full strength. */
+.chip.is-picked > .chip-grad-wheel.chip-grad-wheel--near,
+.chip.is-grad-angling > .chip-grad-wheel {
+  opacity: 1;
 }
 
 .chip-grad-wheel__hit {
@@ -1177,6 +1184,9 @@ html[data-theme="day"] .chip-xform-handle {
   height: 100%;
   overflow: visible;
   pointer-events: none;
+  /* Soft halo so the dashed outer guide reads on light/white stage fills
+     (inner .chip-grad-wheel__scale already has a hard 1px contrast ring). */
+  filter: drop-shadow(0 0 0.7px rgb(0 0 0 / 0.5));
 }
 
 .chip-grad-wheel__ring-path {
@@ -1186,6 +1196,10 @@ html[data-theme="day"] .chip-xform-handle {
   /* Longer dashes, wider gaps — less “dotted” than CSS border:dashed. */
   stroke-dasharray: 5 9;
   vector-effect: non-scaling-stroke;
+}
+
+html[data-theme="day"] .chip-grad-wheel__ring {
+  filter: drop-shadow(0 0 0.7px rgb(255 255 255 / 0.55));
 }
 
 html[data-theme="day"] .chip-grad-wheel__ring-path {
