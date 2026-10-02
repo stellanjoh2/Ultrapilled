@@ -2102,6 +2102,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const scalePreview = chip.el.style.getPropertyValue("--scale-preview");
     if (scalePreview) host.style.setProperty("--scale-preview", scalePreview);
     else host.style.removeProperty("--scale-preview");
+    // Concentric selection stroke: outer radius = asset radius + xform pad.
+    host.style.setProperty("--chip-radius", `${chip.look?.radius ?? 0}px`);
   }
 
   function releaseGradWheel(host: HTMLElement) {
