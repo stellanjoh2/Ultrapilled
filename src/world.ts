@@ -504,7 +504,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let pickedId: string | null = null;
   /** All selected slot ids (includes `pickedId`). Shift-click grows this set. */
   const pickedIds = new Set<string>();
-  /** When set, only this body in the picked slot shows handles / takes xforms. */
+  /** Active Amount instance: selection chrome + pick/drag/rotate/free-transform target. */
   let soloBodyId: number | null = null;
   let editingId: string | null = null;
   /** Spawn these slot ids at a point on the next refresh (import / drop). */
@@ -832,7 +832,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     clickChip = null;
     const { chip, pointerId, x, y, originX, originY } = armed;
     dropPin();
-    // Same set as scale/rotate: multi-select (or same-slot group) moves together.
+    // Multi-select (distinct slots) moves together; Amount copies stay independent via soloBodyId.
     const targets = xformTargets(chip.slotId);
     const group = targets.some((item) => item.body.id === chip.body.id) ? targets : [chip];
     const pins = group.map((item) => {
@@ -1341,9 +1341,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     Body.setAngularVelocity(body, angularVelocity);
     Composite.add(engine.world, body);
     const priorBounces = bounceCount.get(chip.body.id) ?? 0;
+    const wasSolo = soloBodyId === chip.body.id;
     bounceCount.delete(chip.body.id);
     bounceCount.set(body.id, priorBounces);
     chip.body = body;
+    if (wasSolo) soloBodyId = body.id;
     chip.anchorX = anchor.x;
     chip.anchorY = anchor.y;
     chip.meshKey = meshKey(slot, size.width, size.height, chamfer, physicsComplexity(physics.complexity));
@@ -2136,15 +2138,24 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return true;
   }
 
-  /** Chips that share a transform gesture (group pick, multi-select, or one solo body). */
+  /**
+   * Chips that share a transform gesture.
+   * Amount copies of one slot are independent (soloBodyId) unless Shift multi-select
+   * spans distinct slots — then every chip of each picked slot moves together.
+   */
   function xformTargets(slotId: string) {
-    if (soloBodyId != null) {
-      return chips.filter((chip) => chip.slotId === slotId && chip.body.id === soloBodyId);
-    }
-    if (pickedIds.size > 1 && pickedIds.has(slotId)) {
+    if (pickedIds.size > 1 && pickedIds.has(slotId) && soloBodyId == null) {
       return chips.filter((chip) => pickedIds.has(chip.slotId));
     }
-    return chips.filter((chip) => chip.slotId === slotId);
+    if (soloBodyId != null) {
+      const solo = chips.find(
+        (chip) => chip.slotId === slotId && chip.body.id === soloBodyId,
+      );
+      if (solo) return [solo];
+    }
+    // Single-slot fallback: one body only (never every Amount copy).
+    const match = chips.find((chip) => chip.slotId === slotId);
+    return match ? [match] : [];
   }
 
   function ensureXformFrame(host: HTMLElement) {
@@ -2738,7 +2749,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         if (scaleChanged) Body.scale(chip.body, delta, delta);
         if (angleChanged) {
           // Multi-select: rotate each chip by the same delta so relative poses stay.
-          // Single-slot group: snap all copies to the dragged chip's absolute angle.
+          // Single instance (or solo Amount copy): snap to the dragged chip's absolute angle.
           Body.setAngle(chip.body, multi ? chip.body.angle + dAngle : nextAngle);
         }
         syncWallCollision(chip);
@@ -2809,15 +2820,37 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       pickedIds.clear();
     } else {
       const next = opts?.ids?.length ? opts.ids : [slotId];
-      const same =
-        next.length === pickedIds.size && next.every((id) => pickedIds.has(id)) && pickedId === slotId;
-      if (!same) soloBodyId = null;
       pickedIds.clear();
       for (const id of next) pickedIds.add(id);
       pickedIds.add(slotId);
       pickedId = slotId;
+      if (pickedIds.size > 1) {
+        // Shift multi-select: group transform across slots (all Amount copies of each).
+        soloBodyId = null;
+      } else {
+        // Keep a canvas-armed instance; otherwise outline one chip (not every Amount copy).
+        const soloStillValid =
+          soloBodyId != null &&
+          chips.some((chip) => chip.slotId === slotId && chip.body.id === soloBodyId);
+        if (!soloStillValid) {
+          soloBodyId = chips.find((chip) => chip.slotId === slotId)?.body.id ?? null;
+        }
+      }
     }
     paintPicked();
+  }
+
+  /** Pose tools target the clicked Amount instance; multi-slot drags keep a group. */
+  function armSoloForPointer(chip: DroppedChip, shiftKey: boolean) {
+    if (shiftKey) {
+      soloBodyId = null;
+      return;
+    }
+    if (pickedIds.size > 1 && pickedIds.has(chip.slotId)) {
+      soloBodyId = null;
+      return;
+    }
+    soloBodyId = chip.body.id;
   }
 
   function chipEl(slotId: string): HTMLElement | null {
@@ -2998,6 +3031,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       clickChip = null;
       cancelPending();
       dropPin();
+      armSoloForPointer(chip, event.shiftKey);
       beginXformDrag(chip, event, xformHandle);
       return;
     }
@@ -3025,6 +3059,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       originX: event.clientX,
       originY: event.clientY,
     };
+    armSoloForPointer(chip, event.shiftKey);
     // Already selected → grab right away so drag isn't fighting click-to-dismiss.
     // Layout: same for any piece — click-without-move still selects via !drag.moved.
     if (layoutMode || pickedIds.has(chip.slotId)) {
@@ -3160,31 +3195,32 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (event.detail >= 2) {
       const slot = chip.look?.slot;
       if (slot?.kind === "text") {
-        soloBodyId = null;
+        soloBodyId = chip.body.id;
         onEdit?.(chip.slotId);
         return;
       }
-      const group = chips.filter((item) => item.slotId === chip.slotId);
-      if (group.length > 1) {
-        soloBodyId = chip.body.id;
-        pickedIds.clear();
-        pickedIds.add(chip.slotId);
-        pickedId = chip.slotId;
-        paintPicked();
-        onPick?.(chip.slotId, { force: true });
-        return;
-      }
-      onEdit?.(chip.slotId);
-      return;
-    }
-    // Solo mode: click the same chip to return to group pick; click a sibling to switch.
-    if (!event.shiftKey && soloBodyId != null && chip.slotId === pickedId) {
-      if (chip.body.id === soloBodyId) soloBodyId = null;
-      else soloBodyId = chip.body.id;
+      // Non-text: force-pick this Amount instance (poses stay per-body).
+      soloBodyId = chip.body.id;
+      onPick?.(chip.slotId, { force: true });
       paintPicked();
       return;
     }
+    // Same slot, different Amount copy → switch the active instance without dismissing.
+    if (
+      !event.shiftKey &&
+      chip.slotId === pickedId &&
+      pickedIds.size <= 1 &&
+      soloBodyId != null &&
+      chip.body.id !== soloBodyId
+    ) {
+      soloBodyId = chip.body.id;
+      paintPicked();
+      return;
+    }
+    if (event.shiftKey) soloBodyId = null;
+    else soloBodyId = chip.body.id;
     onPick?.(chip.slotId, event.shiftKey ? { additive: true } : undefined);
+    paintPicked();
   }
 
   function onPointerCancel(event: PointerEvent) {
