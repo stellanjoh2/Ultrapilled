@@ -3,7 +3,7 @@ import { isColorMask } from "./chipKinds";
 import { rasterRing, textLookFlags } from "./chipLook";
 import { measureTextInk, paintTextInk, TEXT_INK_PAD } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
-import { applyTextAnim, stopTextAnim } from "./textAnim";
+import { applyTextAnim, stopTextAnim, stopTextAnimIn } from "./textAnim";
 import { inkOn } from "./theme";
 import { peekTrim } from "./trim";
 import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type Slot, type TextSlot } from "./types";
@@ -270,21 +270,21 @@ function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: num
   label.style.height = "100%";
   label.style.overflow = "visible";
   label.style.display = "block";
-  label.style.lineHeight = "1";
+  label.style.lineHeight = "0";
   label.style.boxSizing = "border-box";
   label.style.margin = "0";
   label.style.padding = "0";
 
   const clip = label.querySelector<HTMLElement>(":scope > .text-anim-clip");
   if (clip) {
-    // Same top pad as measureTextInk / paintTextInk.
+    // Match canvas fillText alphabetic baseline (not em-box top — that sat lower).
     clip.style.position = "absolute";
     clip.style.left = `${ink.originX}px`;
-    clip.style.top = `${TEXT_INK_PAD}px`;
+    clip.style.top = `${ink.baseline}px`;
     clip.style.width = `${Math.max(1, ink.width - ink.originX - TEXT_INK_PAD)}px`;
-    clip.style.height = `${Math.ceil(slot.fontSize)}px`;
+    clip.style.height = "0";
     clip.style.overflow = "visible";
-    clip.style.lineHeight = "1";
+    clip.style.lineHeight = "0";
   }
   for (const word of label.querySelectorAll<HTMLElement>(".text-anim-word")) {
     word.style.position = "relative";
@@ -294,11 +294,13 @@ function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: num
     word.style.display = "block";
     word.style.textAlign = "left";
     word.style.width = "max-content";
-    word.style.height = "100%";
+    word.style.height = "auto";
+    word.style.lineHeight = "0";
   }
   for (const char of label.querySelectorAll<HTMLElement>(".char")) {
-    // Top-align so the em box shares the canvas ink top (baseline align sits lower).
-    char.style.verticalAlign = "top";
+    // Baseline aligns with the clip's top edge (== ink.baseline), matching canvas.
+    char.style.verticalAlign = "baseline";
+    char.style.lineHeight = `${slot.fontSize}px`;
   }
 }
 
@@ -464,6 +466,10 @@ export function applyVisual(
 
     // Live edit / text anim need a DOM label — never the ink canvas.
     if (bare && !bareCss && !liveEdit) {
+      // Tear down letter-cycle BEFORE stripLookChildren — otherwise is-text-anim-host
+      // stays on the chip and the context menu keeps offering "Stop Animation".
+      stopTextAnimIn(el);
+      el.classList.remove("is-text-anim-host");
       // Solid or static-gradient ink canvas (tight AABB).
       paintBareText(el, slot, width, height, tracking, textGradient ? fill : ink, shiftEm, textGradient ? gradientTo : "");
       return;
@@ -521,6 +527,7 @@ export function applyVisual(
         })
       ) {
         clearBareTextAnimSeat(label);
+        label.style.lineHeight = "1";
         label.textContent = slot.text;
       } else if (bare) {
         // Timeline reused (early return) — prepare was skipped; reseat + repaint.

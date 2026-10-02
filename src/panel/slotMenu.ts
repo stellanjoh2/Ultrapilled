@@ -664,10 +664,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     });
   }
   if (slot?.kind === "text") {
-    // Prefer the live flag; also treat an on-stage letter cycle as animating
-    // so the menu never offers "Animate" while letters are still moving.
-    const chipAnimating = Boolean(H.world.chipEl(id)?.classList.contains("is-text-anim-host"));
-    const animating = Boolean(slot.textAnim) || chipAnimating;
+    // Authoritative slot flag only — a stale is-text-anim-host after Stop used to
+    // keep the menu stuck on "Stop Animation" even though textAnim was cleared.
+    const animating = Boolean(slot.textAnim);
     actions.push({
       id: animating ? "stop-animation" : "animate",
       label: animating ? "Stop Animation" : "Animate",

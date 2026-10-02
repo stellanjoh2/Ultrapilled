@@ -128,6 +128,8 @@ function clearInline(label: HTMLElement) {
   gsap.killTweensOf(label.querySelectorAll(".char, .text-anim-word, .text-anim-clip"));
   label.classList.remove("is-text-anim");
   label.parentElement?.classList.remove("is-text-anim-host");
+  // Closest chip in case the label was already reparented/detached mid-teardown.
+  label.closest(".chip")?.classList.remove("is-text-anim-host");
   label.replaceChildren();
 }
 
@@ -207,16 +209,21 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
 
   opts.prepare?.(label);
 
+  // Start at resting pose so enabling Animate does not fly letters in from below
+  // (fromTo's default immediateRender was shifting the word on the first frame).
   gsap.set(rows, { autoAlpha: 0 });
+  const first = rows[0];
+  if (first) {
+    gsap.set(first, { autoAlpha: 1 });
+    gsap.set(first.querySelectorAll<HTMLElement>(".char"), { y: 0, autoAlpha: 1 });
+  }
   const tl = gsap.timeline({ repeat: -1 });
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
     const chars = row.querySelectorAll<HTMLElement>(".char");
-    tl.set(row, { autoAlpha: 1 });
-    tl.fromTo(
-      chars,
-      { y: travel, autoAlpha: 0 },
-      { y: 0, autoAlpha: 1, duration: timing.letter, stagger: timing.stagger, ease: "power2.out" },
-    );
+    const next = rows[(i + 1) % rows.length]!;
+    const nextChars = next.querySelectorAll<HTMLElement>(".char");
+    // Hold at rest, then exit upward.
     tl.to(chars, {
       y: -travel,
       autoAlpha: 0,
@@ -226,6 +233,20 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
       delay: timing.pause,
     });
     tl.set(row, { autoAlpha: 0 });
+    // Enter the next row from below (wraps to first so the loop stays continuous).
+    tl.set(next, { autoAlpha: 1 });
+    tl.fromTo(
+      nextChars,
+      { y: travel, autoAlpha: 0 },
+      {
+        y: 0,
+        autoAlpha: 1,
+        duration: timing.letter,
+        stagger: timing.stagger,
+        ease: "power2.out",
+        immediateRender: false,
+      },
+    );
   }
 
   timelines.add(tl);
