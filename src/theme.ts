@@ -20,11 +20,12 @@ export function fillLuminance(hex: string): number {
 }
 
 /**
- * Post bloom ignores near-black fills so dark shapes stay hard-edged.
- * Rec.709 luma floor; peak-channel escape so deep neon blues/purples still glow.
+ * Post bloom only on bright fills so mid/dark grays stay hard-edged.
+ * Rec.709 luma floor (aligned with inkOn bright bar); peak-channel escape
+ * so deep neon blues/purples/pinks still glow without letting mid-gray sneak through.
  */
-export const BLOOM_MIN_LUMINANCE = 0.18;
-export const BLOOM_MIN_PEAK = 0.5;
+export const BLOOM_MIN_LUMINANCE = 0.55;
+export const BLOOM_MIN_PEAK = 0.75;
 
 /** True when a solid fill is bright enough to contribute to bloom. */
 export function fillBlooms(hex: string): boolean {
