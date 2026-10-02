@@ -164,21 +164,17 @@ export function paintBareText(
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = Math.max(1, Math.ceil(width * dpr));
   const h = Math.max(1, Math.ceil(height * dpr));
-  // Grow-only backing store avoids clear-flashes on expand. When CSS size shrinks,
-  // draw in logical coords across the full bitmap so the browser's CSS scale does
-  // not squash glyphs (setting canvas.width clears and used to flicker on scrub).
-  if (canvas.width < w) canvas.width = w;
-  if (canvas.height < h) canvas.height = h;
+  // Exact buffer (same as bare Animate). Grow-only left sx≠sy after tracking/scale
+  // changed the CSS aspect, which looked like massive minus tracking.
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.style.display = "block";
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const sx = canvas.width / Math.max(1, width);
-  const sy = canvas.height / Math.max(1, height);
-  ctx.setTransform(sx, 0, 0, sy, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
   const ink = measureTextInk(slot, tracking);
   const fill =
     slot.gradient && gradientTo

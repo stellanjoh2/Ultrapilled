@@ -329,6 +329,22 @@ export function stopBareCanvasTextAnimIn(root: ParentNode) {
   });
 }
 
+/** Keep the letter-cycle clip as wide as the live word after tracking/scale remesh. */
+function refreshAnimClipWidth(label: HTMLElement) {
+  const clip = label.querySelector(":scope > .text-anim-clip");
+  if (!(clip instanceof HTMLElement)) return;
+  const rows = [...clip.querySelectorAll<HTMLElement>(".text-anim-word")];
+  let maxW = 0;
+  for (const row of rows) {
+    const prev = row.style.position;
+    row.style.position = "relative";
+    maxW = Math.max(maxW, row.getBoundingClientRect().width);
+    row.style.position = prev;
+  }
+  if (maxW > 0) clip.style.width = `${Math.ceil(maxW)}px`;
+  else clip.style.removeProperty("width");
+}
+
 /** Looping letter motion (same engine as pill text anim). */
 export function applyRollingText(label: HTMLElement, text: string, opts: RollingTextOpts = {}): boolean {
   const speed = textAnimSpeedOf(opts.speed);
@@ -336,15 +352,17 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
     opts.fontSize ?? (Number.parseFloat(getComputedStyle(label).fontSize) || 14);
   const travel = travelPx(label, fontSize);
   const asPhrase = Boolean(opts.asPhrase);
-  // Omit travel from the signature — pill height changes every tracking/scale tick and
-  // would otherwise tear down + rebuild the GSAP cycle (hard on/off flicker).
-  const sig = `cycle|${speed}|${text}|${asPhrase ? "phrase" : "words"}`;
+  // Rebuild when font size changes (scale remesh) so travel + glyph boxes match.
+  // Tracking stays out of the sig — CSS letter-spacing updates live; we only
+  // refresh the clip width so a stale maxW cannot crush letters after scrub/scale.
+  const sig = `cycle|${speed}|${text}|${asPhrase ? "phrase" : "words"}|fs:${Math.round(fontSize)}`;
   const prev = running.get(label);
   const host = label.parentElement;
   if (prev?.sig === sig) {
     // Repaints must keep host/label markers even when the timeline is reused.
     label.classList.add("is-text-anim");
     host?.classList.add("is-text-anim-host");
+    refreshAnimClipWidth(label);
     return true;
   }
 
@@ -379,15 +397,9 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
     clip.append(row);
   }
   label.replaceChildren(clip);
+  refreshAnimClipWidth(label);
 
   const rows = [...clip.querySelectorAll<HTMLElement>(".text-anim-word")];
-  let maxW = 0;
-  for (const row of rows) {
-    row.style.position = "relative";
-    maxW = Math.max(maxW, row.getBoundingClientRect().width);
-    row.style.position = "";
-  }
-  if (maxW > 0) clip.style.width = `${Math.ceil(maxW)}px`;
 
   // Start at resting pose (identity) BEFORE prepare/seat so ink measurement matches
   // the first visible frame — no travel offset, no fly-in on Animate.
