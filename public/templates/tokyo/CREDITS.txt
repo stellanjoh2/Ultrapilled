@@ -1,20 +1,25 @@
-Tokyo template photos: historical Tokyo street life, Edo ukiyo-e print culture, and Hokusai manga sketches.
+Tokyo template photos: 1990s / early-2000s Tokyo street life with one Edo print accent.
 From Wikimedia Commons, resized to 960 px on the long edge.
+
+akihabara-1993.jpg
+  "Akihabara pedestrian zone, 1993" by Danny Choo
+  Akihabara Electric Town pedestrian street in 1993.
+  License: CC BY-SA 2.0
+  https://commons.wikimedia.org/wiki/File:Akihabara_pedestrian_zone,_1993_(by_Danny_Choo).jpg
+  https://creativecommons.org/licenses/by-sa/2.0/
+
+shinjuku-street.jpg
+  "Hot dog van without customers in street of Shinjuku"
+  circa late-1970s or early-1980s, by Jun Shiraishi (白石准) / Photozou
+  Shinjuku street scene with food van — era-adjacent city texture.
+  License: CC BY-SA 2.5
+  https://commons.wikimedia.org/wiki/File:Hot_dog_van_without_customers_in_street_of_Shinjuku,_circa_late-1970s_or_early-1980s_(by_Jun_Shiraishi_@Photozou_218980731).jpg
+  https://creativecommons.org/licenses/by-sa/2.5/
 
 asukayama-hanami.jpg
   "Cherry-Blossom Viewing at Asuka Hill (Asukayama hanami)" (c. 1830–1843)
   by Utagawa Hiroshige; published by Sanoya Kihei
   From the series Famous Places in Edo (Kōto meisho). Woodblock print.
+  Kept as a historical art accent beside modern street photos.
   License: Public domain (author died 1858; PD-Art reproduction)
   https://commons.wikimedia.org/wiki/File:Cherry-Blossom_Viewing_at_Asuka_Hill_(Asukayama_hanami).jpg
-
-tokyo-street.jpg
-  "Crowded Tokyo Street" (1905), Underwood & Underwood / Library of Congress
-  Crowds on a Tokyo street during Admiral Tōgō's visit celebrations.
-  License: Public domain (Japan old photograph; U.S. PD)
-  https://commons.wikimedia.org/wiki/File:Crowded_Tokyo_Street_1905.jpg
-
-hokusai-manga.jpg
-  Page from Hokusai Manga (early 19th century) by Katsushika Hokusai
-  License: Public domain (author died 1849)
-  https://commons.wikimedia.org/wiki/File:Hokusai_Manga_04.jpg
