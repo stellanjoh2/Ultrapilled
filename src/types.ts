@@ -98,6 +98,14 @@ export type ImageSlot = {
   stroke?: number;
   /** Pixel invert for raster uploads (JPG/PNG/GIF). Ignored when the image is color-masked. */
   inverted?: boolean;
+  /** Per-image exposure (−100…100). 0 is neutral; maps to CSS brightness. Raster uploads only. */
+  exposure?: number;
+  /** Per-image contrast (−100…100). 0 is neutral. Raster uploads only. */
+  contrast?: number;
+  /** Per-image saturation (−100…100). 0 is neutral. Raster uploads only. */
+  saturation?: number;
+  /** Per-image hue-rotate degrees (−180…180). 0 is neutral. Raster uploads only. */
+  hue?: number;
   /** Recolor an uploaded SVG with theme ink. Off keeps the file’s original colors. */
   tint?: boolean;
   /** Upload hitbox: `block` (default) or `sphere`. Unset uses a box. */
@@ -165,6 +173,28 @@ export function dropShadowCssColor(color: string | undefined, opacity: number | 
   const g = Number.parseInt(hex.slice(3, 5), 16);
   const b = Number.parseInt(hex.slice(5, 7), 16);
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+
+export const DEFAULT_IMAGE_EXPOSURE = 0;
+export const DEFAULT_IMAGE_CONTRAST = 0;
+export const DEFAULT_IMAGE_SATURATION = 0;
+export const DEFAULT_IMAGE_HUE = 0;
+
+export function imageExposureOf(value: number | undefined): number {
+  return Math.max(-100, Math.min(100, Math.round(value ?? DEFAULT_IMAGE_EXPOSURE)));
+}
+
+export function imageContrastOf(value: number | undefined): number {
+  return Math.max(-100, Math.min(100, Math.round(value ?? DEFAULT_IMAGE_CONTRAST)));
+}
+
+export function imageSaturationOf(value: number | undefined): number {
+  return Math.max(-100, Math.min(100, Math.round(value ?? DEFAULT_IMAGE_SATURATION)));
+}
+
+export function imageHueOf(value: number | undefined): number {
+  return Math.max(-180, Math.min(180, Math.round(value ?? DEFAULT_IMAGE_HUE)));
 }
 
 export const PHYSICS_COMPLEXITY = [

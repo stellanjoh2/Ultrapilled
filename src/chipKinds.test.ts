@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isColorMask, isSvgSource } from "./chipKinds";
-import { rasterRing, textLookFlags } from "./chipLook";
+import { imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
 import { ICON_PRESETS } from "./icons";
 import { defaultImageSlot, defaultTextSlot, defaultTypeSlot } from "./types";
 
@@ -51,5 +51,32 @@ describe("rasterRing", () => {
     expect(rasterRing(defaultImageSlot({ name: "a.png", stroked: true }))).toBe(true);
     expect(rasterRing(defaultImageSlot({ name: "a.svg", stroked: true }))).toBe(false);
     expect(rasterRing(defaultImageSlot({ name: "a.png", stroked: false }))).toBe(false);
+  });
+});
+
+describe("imageRasterFilter", () => {
+  it("keeps invert explicit and omits neutral adjusts", () => {
+    expect(imageRasterFilter(defaultImageSlot())).toBe("invert(0)");
+    expect(imageRasterFilter(defaultImageSlot({ inverted: true }))).toBe("invert(1)");
+  });
+
+  it("maps Figma-style ranges onto CSS filter functions", () => {
+    expect(
+      imageRasterFilter(
+        defaultImageSlot({ exposure: 50, contrast: -25, saturation: 100, hue: -90 }),
+      ),
+    ).toBe("invert(0) brightness(1.5) contrast(0.75) saturate(2) hue-rotate(-90deg)");
+  });
+
+  it("composes drop-shadow after color adjusts", () => {
+    expect(
+      imageRasterFilter(defaultImageSlot({ inverted: true, exposure: -50 }), "drop-shadow(0 8px 16px rgba(0,0,0,0.4))"),
+    ).toBe("invert(1) brightness(0.5) drop-shadow(0 8px 16px rgba(0,0,0,0.4))");
+  });
+
+  it("reports active adjusts", () => {
+    expect(imageAdjustActive(defaultImageSlot())).toBe(false);
+    expect(imageAdjustActive(defaultImageSlot({ saturation: 1 }))).toBe(true);
+    expect(imageAdjustActive(defaultImageSlot({ hue: 0, exposure: 0 }))).toBe(false);
   });
 });

@@ -5,7 +5,7 @@ import { EMOJI_FONT } from "../emojis";
 import { measureTextInk, paintTextInk } from "../measure";
 import { peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
-import { rasterRing, textLookFlags } from "../chipLook";
+import { imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags } from "../chipLook";
 import { textAnimCharPose, textAnimTravel } from "../textAnim";
 import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 
@@ -416,15 +416,16 @@ function drawChip(
         drawMask(ctx, img, chip.fill, width, height, slot.gradient ? gradientEnd(theme, slot) : "", slot.gradientAngle, phase, slot.gradientScale);
       } else {
         const radius = chip.radius * scale;
-        const invert = Boolean(slot.inverted);
         const ring = rasterRing(slot);
+        const adjust = Boolean(slot.inverted) || imageAdjustActive(slot);
+        const filter = adjust ? imageRasterFilter(slot) : "";
         if (radius > 0 || ring) {
           ctx.save();
           round(ctx, width, height, radius);
           ctx.clip();
-          if (invert) ctx.filter = "invert(1)";
+          if (filter) ctx.filter = filter;
           drawContain(ctx, img, width, height);
-          if (invert) ctx.filter = "none";
+          if (filter) ctx.filter = "none";
           if (ring) {
             round(ctx, width, height, radius);
             ctx.lineWidth = Math.max(1, slot.stroke ?? 4) * scale * 2;
@@ -432,9 +433,9 @@ function drawChip(
             ctx.stroke();
           }
           ctx.restore();
-        } else if (invert) {
+        } else if (filter) {
           ctx.save();
-          ctx.filter = "invert(1)";
+          ctx.filter = filter;
           drawContain(ctx, img, width, height);
           ctx.restore();
         } else {

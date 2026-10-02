@@ -1,6 +1,6 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
-import { rasterRing, textLookFlags } from "./chipLook";
+import { imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
 import { measureTextInk, paintTextInk } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
 import {
@@ -116,8 +116,8 @@ export function paintDropShadow(el: HTMLElement, slot: Slot, enabled: boolean) {
       el.style.removeProperty("--drop-y");
       el.style.removeProperty("--drop-color");
       const img = el.querySelector(":scope > img");
-      if (img instanceof HTMLImageElement) {
-        img.style.filter = slot.kind === "image" && slot.inverted ? "invert(1)" : "invert(0)";
+      if (img instanceof HTMLImageElement && slot.kind === "image") {
+        img.style.filter = imageRasterFilter(slot);
       }
     }
     return;
@@ -137,9 +137,8 @@ export function paintDropShadow(el: HTMLElement, slot: Slot, enabled: boolean) {
   el.style.setProperty("--drop-color", color);
   // Img invert is inline — compose drop-shadow here so it isn't overwritten.
   const img = el.querySelector(":scope > img");
-  if (img instanceof HTMLImageElement) {
-    const invert = slot.kind === "image" && slot.inverted ? "invert(1)" : "invert(0)";
-    img.style.filter = `${invert} drop-shadow(0 ${y}px ${blur}px ${color})`;
+  if (img instanceof HTMLImageElement && slot.kind === "image") {
+    img.style.filter = imageRasterFilter(slot, `drop-shadow(0 ${y}px ${blur}px ${color})`);
   }
 }
 
@@ -741,8 +740,8 @@ export function applyVisual(
     img.draggable = false;
     // Keep radius on the img so xform handles outside the chip stay visible.
     img.style.borderRadius = `${radius}px`;
-    // Explicit invert(0) so filter can fade to/from invert(1).
-    img.style.filter = slot.inverted ? "invert(1)" : "invert(0)";
+    // Invert always explicit; color adjusts compose when non-default.
+    img.style.filter = imageRasterFilter(slot);
     mountLookChild(el, img);
     // Raster inner stroke sits in a ring overlay so the img doesn't cover it.
     if (rasterRing(slot)) {
