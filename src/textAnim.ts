@@ -1,5 +1,5 @@
 import gsap from "gsap";
-import { measureTextInk, paintTextInk } from "./measure";
+import { measureTextInk } from "./measure";
 import { textGradientFill } from "./pillFill";
 import type { TextSlot } from "./types";
 
@@ -220,42 +220,32 @@ function paintBareRollingFrame(
   // Match live GSAP: begin at resting hold (skip the export-style enter-from-below).
   const poseMs = timeMs + wave * 1000;
 
-  // While every glyph is at rest, use the exact static painter so Animate
-  // never changes a single pixel versus the pre-Animate ink canvas.
-  let resting = n === 0;
-  if (n > 0) {
-    resting = true;
-    for (let i = 0; i < n; i++) {
-      const pose = textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel);
-      if (Math.abs(pose.y) > 0.05 || pose.alpha < 0.999) {
-        resting = false;
-        break;
-      }
-    }
-  }
-  if (resting) {
-    paintTextInk(ctx, slot, tracking, fill, shiftEm, ink);
-    return;
-  }
-
   ctx.font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
+  // Same spacing model every frame (rest + motion). Never swap to fillText(full
+  // string) mid-cycle — that kerning/letterSpacing path made tracking pop.
   ctx.letterSpacing = "0px";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = fill;
 
-  const widths = chars.map((ch) => ctx.measureText(ch === " " ? "\u00a0" : ch).width);
-  let x = ink.originX;
   const baselineY = ink.baseline + shiftEm * fontSize;
+  // Prefix widths keep in-word kerning; tracking gaps match paintTextInk's em spacing.
+  const starts: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const prefix = chars.slice(0, i).join("");
+    const kerned = prefix ? ctx.measureText(prefix).width : 0;
+    starts.push(ink.originX + kerned + fontSize * tracking * i);
+  }
+
   for (let i = 0; i < n; i++) {
     const pose = textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel);
     if (pose.alpha > 0.001) {
+      const ch = chars[i] === " " ? "\u00a0" : chars[i]!;
       ctx.save();
       ctx.globalAlpha *= pose.alpha;
-      ctx.fillText(chars[i] === " " ? "\u00a0" : chars[i]!, x, baselineY + pose.y);
+      ctx.fillText(ch, starts[i]!, baselineY + pose.y);
       ctx.restore();
     }
-    x += widths[i]! + fontSize * tracking;
   }
 }
 
