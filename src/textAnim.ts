@@ -1,5 +1,5 @@
 import gsap from "gsap";
-import { measureTextInk } from "./measure";
+import { measureTextInk, paintTextInk, type GlyphPose } from "./measure";
 import { textGradientFill } from "./pillFill";
 import type { TextSlot } from "./types";
 
@@ -220,33 +220,12 @@ function paintBareRollingFrame(
   // Match live GSAP: begin at resting hold (skip the export-style enter-from-below).
   const poseMs = timeMs + wave * 1000;
 
-  ctx.font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
-  // Same spacing model every frame (rest + motion). Never swap to fillText(full
-  // string) mid-cycle — that kerning/letterSpacing path made tracking pop.
-  ctx.letterSpacing = "0px";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = fill;
-
-  const baselineY = ink.baseline + shiftEm * fontSize;
-  // Prefix widths keep in-word kerning; tracking gaps match paintTextInk's em spacing.
-  const starts: number[] = [];
+  const poses: GlyphPose[] = [];
   for (let i = 0; i < n; i++) {
-    const prefix = chars.slice(0, i).join("");
-    const kerned = prefix ? ctx.measureText(prefix).width : 0;
-    starts.push(ink.originX + kerned + fontSize * tracking * i);
+    poses.push(textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel));
   }
-
-  for (let i = 0; i < n; i++) {
-    const pose = textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel);
-    if (pose.alpha > 0.001) {
-      const ch = chars[i] === " " ? "\u00a0" : chars[i]!;
-      ctx.save();
-      ctx.globalAlpha *= pose.alpha;
-      ctx.fillText(ch, starts[i]!, baselineY + pose.y);
-      ctx.restore();
-    }
-  }
+  // Same painter as static bare type — clipped full-string keeps kerning (e.g. "re" in Lorem).
+  paintTextInk(ctx, slot, tracking, fill, shiftEm, ink, poses);
 }
 
 /** Bare type: animate on the ink canvas so resting glyphs never leave static paint. */

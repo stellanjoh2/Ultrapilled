@@ -119,6 +119,43 @@ export function measureTextEditSize(slot: TextSlot, pad = 1, tracking = 0.02): C
   };
 }
 
+/** Per-glyph pose for bare letter-cycle (y in CSS px, alpha 0..1). */
+export type GlyphPose = { y: number; alpha: number };
+
+/**
+ * Horizontal caret starts for each glyph, matching fillText + letterSpacing + kerning.
+ * Canvas measureText ignores letterSpacing, so gaps are added explicitly; pair kerning
+ * is recovered from measureText(a+b) - measureText(a) - measureText(b).
+ */
+export function textInkGlyphStarts(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  fontSize: number,
+  tracking: number,
+  originX: number,
+): number[] {
+  const chars = [...text];
+  const spacing = fontSize * tracking;
+  ctx.letterSpacing = "0px";
+  const starts: number[] = [];
+  let x = originX;
+  for (let i = 0; i < chars.length; i++) {
+    starts.push(x);
+    const ch = chars[i] === " " ? "\u00a0" : chars[i]!;
+    const w = ctx.measureText(ch).width;
+    if (i < chars.length - 1) {
+      const next = chars[i + 1] === " " ? "\u00a0" : chars[i + 1]!;
+      const pairW = ctx.measureText(ch + next).width;
+      const nextW = ctx.measureText(next).width;
+      const kern = pairW - w - nextW;
+      x += w + kern + spacing;
+    } else {
+      x += w;
+    }
+  }
+  return starts;
+}
+
 /** Paint glyphs into an ink-tight box. Origin matches measureTextInk. */
 export function paintTextInk(
   ctx: CanvasRenderingContext2D,
@@ -127,13 +164,60 @@ export function paintTextInk(
   color: string | CanvasGradient,
   shiftEm: number,
   ink: TextInk = measureTextInk(slot, tracking),
+  /** When set, each glyph is clipped from a full-string draw so kerning stays put. */
+  poses?: GlyphPose[] | null,
 ) {
-  ctx.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
-  ctx.letterSpacing = `${tracking}em`;
+  const text = slot.text || "";
+  const chars = [...text];
+  const n = chars.length;
+  const fontSize = slot.fontSize;
+  const baselineY = ink.baseline + shiftEm * fontSize;
+
+  ctx.font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
   ctx.fillStyle = color;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(slot.text || "", ink.originX, ink.baseline + shiftEm * slot.fontSize);
+  ctx.letterSpacing = `${tracking}em`;
+
+  const resting =
+    !poses ||
+    n === 0 ||
+    poses.length < n ||
+    poses.every((p) => Math.abs(p.y) < 0.05 && p.alpha >= 0.999);
+
+  if (resting) {
+    // Identical to static bare paint — no per-glyph layout drift.
+    if (n > 0) ctx.fillText(text, ink.originX, baselineY);
+    return;
+  }
+
+  const starts = textInkGlyphStarts(ctx, text, fontSize, tracking, ink.originX);
+  ctx.letterSpacing = "0px";
+  const endX =
+    starts.length > 0
+      ? starts[n - 1]! +
+        ctx.measureText(chars[n - 1] === " " ? "\u00a0" : chars[n - 1]!).width +
+        TEXT_INK_PAD
+      : ink.originX;
+  const edges = [...starts, endX];
+
+  ctx.letterSpacing = `${tracking}em`;
+  const clipTop = -fontSize * 2;
+  const clipH = fontSize * 5;
+  for (let i = 0; i < n; i++) {
+    const pose = poses![i]!;
+    if (pose.alpha < 0.001) continue;
+    const left = edges[i]! - (i === 0 ? TEXT_INK_PAD : 0);
+    const right = edges[i + 1]! + (i === n - 1 ? TEXT_INK_PAD : 0);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, clipTop, Math.max(1, right - left), clipH);
+    ctx.clip();
+    ctx.translate(0, pose.y);
+    ctx.globalAlpha *= pose.alpha;
+    ctx.fillText(text, ink.originX, baselineY);
+    ctx.restore();
+  }
 }
 
 function measureLineWidth(text: string, fontSize: number, tracking: number): number {
