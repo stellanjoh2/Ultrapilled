@@ -1,7 +1,7 @@
 import Matter from "matter-js";
 import handGrabbing from "@phosphor-icons/core/assets/regular/hand-grabbing.svg?raw";
 import { imageColliderId } from "./icons";
-import { isColorMask, isSvgSource, type ChipDraw, type ChipPose } from "./chipKinds";
+import { isColorMask, type ChipDraw, type ChipPose } from "./chipKinds";
 import {
   applyVisual,
   paintBareText,
@@ -21,6 +21,7 @@ import {
   trackingEm,
   trackingOf,
 } from "./measure";
+import { SCALE_FREE_BASE, SCALE_MIN } from "./slotScale";
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
 import { stopTextAnimIn } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
@@ -66,10 +67,7 @@ const SETTLED_SPEED = 0.06;
 const SETTLED_SPIN = 0.01;
 const CLICK_SLOP = 6;
 const HOLD_DRAG_MS = 220;
-/** Floor for canvas / panel scale. Uploaded images cap lower so they can't swamp the frame. */
-const SCALE_MIN = 0.1;
-const SCALE_MAX = 100;
-const SCALE_MAX_UPLOAD = 4;
+/** Free-transform floor/base from ./slotScale; upper bound via setFreeScaleMax. */
 /** Closing speed along the contact normal before an impact sound plays. */
 const IMPACT_SPEED = 3.2;
 /** Closing speed that maps to full impact volume. */
@@ -238,6 +236,8 @@ export type WorldHandle = {
     opts?: { quiet?: boolean },
   ) => void;
   setSimulationScale: (scale: number) => void;
+  /** Corner free-transform hard max (from composition masterScale). */
+  setFreeScaleMax: (max: number) => void;
   /** Scale pulse per slot id (1 = normal). Grows dig out overlaps. */
   setAudioScales: (scales: ReadonlyMap<string, number> | null) => void;
   /** Upward hop for matching slot ids (sharp / icon hits). */
@@ -474,6 +474,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let layoutMode = false;
   let quality = PHYSICS_QUALITY.normal;
   let simScale = 1;
+  /** Corner free-transform hard max; main updates from masterScale. */
+  let freeScaleMax = SCALE_FREE_BASE;
   let audioScaleBySlot = new Map<string, number>();
   let sides: Matter.Body[] = [];
   let roof: Matter.Body | null = null;
@@ -2633,17 +2635,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (rotating) onGradientWheel?.(slotId, { angle: lastAngle, scale: lastScale }, "end");
   }
 
-  function scaleMaxFor(slot: Slot | undefined) {
-    const rasterUpload =
-      slot?.kind === "image" &&
-      Boolean(slot.src) &&
-      !slot.emoji &&
-      !presetIdForSrc(slot.src) &&
-      !isSvgSource(slot);
-    return rasterUpload ? SCALE_MAX_UPLOAD : SCALE_MAX;
+  function scaleMaxFor(_slot: Slot | undefined) {
+    // Free-transform only — panel slider soft max lives in main/slotCards.
+    // No raster-upload special case: tiny chips must be recoverable after masterScale downs.
+    return freeScaleMax;
   }
 
-  function clampScale(value: number, max = SCALE_MAX) {
+  function clampScale(value: number, max = freeScaleMax) {
     return Math.min(max, Math.max(SCALE_MIN, Math.round(value * 100) / 100));
   }
 
@@ -2689,7 +2687,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     if (solo) {
       // Keep slot.scale shared; bake the gesture into this chip only, then remesh.
-      chip.scaleMul = Math.min(SCALE_MAX, Math.max(0.1, chip.scaleMul * factor));
+      chip.scaleMul = Math.min(freeScaleMax, Math.max(SCALE_MIN, chip.scaleMul * factor));
       onScale?.(slotId, scaleOf?.(slotId) ?? startScale, "end");
     } else if (startScales.size > 0) {
       for (const [id, base] of startScales) {
@@ -3486,6 +3484,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     engine.velocityIterations = contactSteps > 1 ? quality.velocityMulti : quality.velocitySingle;
   }
 
+  function setFreeScaleMax(max: number) {
+    const safe = Number.isFinite(max) && max > 0 ? max : SCALE_FREE_BASE;
+    freeScaleMax = Math.max(SCALE_MIN, safe);
+  }
+
   function setAudioScales(scales: ReadonlyMap<string, number> | null) {
     audioScaleBySlot = scales && scales.size > 0 ? new Map(scales) : new Map();
     let woke = false;
@@ -3639,6 +3642,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     chipEl,
     refreshSlot,
     setSimulationScale,
+    setFreeScaleMax,
     setAudioScales,
     impulseAudioJump,
     sync,
