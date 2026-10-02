@@ -3886,7 +3886,8 @@ input.slot-live:focus {
   height: auto;
   padding: 0;
   border: none;
-  border-radius: 0;
+  /* Soften sharp picker tiles + white/ink selection ring together. */
+  border-radius: calc(4px * var(--ui-scale));
   background: var(--field);
   color: var(--ink);
   box-shadow: inset 0 0 0 2px transparent;

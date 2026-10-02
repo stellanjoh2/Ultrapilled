@@ -3066,7 +3066,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
                   : key === "pillPad"
                     ? "Shape padding"
                     : key === "tracking"
-                      ? "Tracking"
+                      ? "Letter spacing"
                       : key === "radius"
                         ? "Corner radius"
                         : key === "dropShadowRadius"
