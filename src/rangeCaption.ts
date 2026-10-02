@@ -93,14 +93,19 @@ function beginRangeValueEdit(_caption: Element, input: HTMLInputElement, valueEl
   edit.autocomplete = "off";
   edit.spellcheck = false;
   edit.setAttribute("aria-label", "Edit value");
-  // Size to content so the row doesn't jump; tabular nums keep width stable.
-  edit.style.width = `${Math.max(previous.length + 1, 3)}ch`;
+  // Fallback when field-sizing:content is unsupported; grow as the user types.
+  const syncEditWidth = () => {
+    edit.style.width = `${Math.max(edit.value.length + 1, 5)}ch`;
+  };
+  syncEditWidth();
 
   valueEl.replaceWith(edit);
 
   const abort = new AbortController();
   const { signal } = abort;
   let finished = false;
+
+  edit.addEventListener("input", syncEditWidth, { signal });
 
   const finish = (commit: boolean) => {
     if (finished) return;

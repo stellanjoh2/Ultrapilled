@@ -2431,26 +2431,49 @@ button.pill.smash-btn.is-on::after {
   cursor: default;
 }
 
-.field-caption-input {
+/* Beat global input[type=text] (min-height 40px, width 100%, padding) —
+   that combo + border-box + Nch width left ~0 content width and a tall pill. */
+input[type="text"].field-caption-input {
   box-sizing: border-box;
+  field-sizing: content;
+  width: auto;
+  min-width: 4.5ch; /* typical 1.00× / 0 / 45°; Kelvin grows via field-sizing / JS */
+  max-width: none;
+  height: auto;
+  min-height: 0;
   margin: 0;
-  padding: 0;
+  /* Horizontal only — keep height = caption line (no vertical padding). */
+  padding: 0 0.2em;
   border: none;
   border-radius: calc(4px * var(--ui-scale));
   background: var(--field);
   color: var(--ink);
   font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum", "ss01";
   line-height: inherit;
   letter-spacing: inherit;
-  min-width: 3ch;
-  max-width: 100%;
+  flex-shrink: 0;
+  appearance: none;
+  -webkit-appearance: none;
   outline: none;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
 }
 
-.field-caption-input:focus {
+input[type="text"].field-caption-input:focus {
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
+html[data-theme="day"] input[type="text"].field-caption-input,
+html[data-theme="day"] input[type="text"].field-caption-input:focus {
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
+}
+
+html[data-theme="day"] input[type="text"].field-caption-input:focus {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent);
 }
 
