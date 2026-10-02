@@ -22,6 +22,12 @@ import {
   trackingOf,
 } from "./measure";
 import { SCALE_FREE_BASE, SCALE_MIN, clampScaleContinuous } from "./slotScale";
+import {
+  oppositeXformCorner,
+  reanchorStartDist,
+  scaleFromPivotRatio,
+  type XformCorner,
+} from "./xformAnchor";
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
 import { stopTextAnimIn } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
@@ -45,6 +51,25 @@ function flipBodyAxis(body: Matter.Body, axis: "x" | "y") {
     part.vertices.reverse();
     part.axes = Axes.fromVertices(part.vertices);
   }
+}
+
+/** Matter runtime accepts a world-space pivot; @types/matter-js omits it. */
+function rotateBodyAround(
+  body: Matter.Body,
+  rotation: number,
+  point?: { x: number; y: number },
+) {
+  if (!point) {
+    Body.rotate(body, rotation);
+    return;
+  }
+  (
+    Body.rotate as (
+      b: Matter.Body,
+      r: number,
+      p?: { x: number; y: number },
+    ) => void
+  )(body, rotation, point);
 }
 
 const WALL = 120;
@@ -535,14 +560,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   } | null = null;
   /**
    * Combined scale+rotate: radial drag scales, angular drag rotates (like the gradient wheel).
-   * Shift locks rotation (scale-only). Shift+Alt also snaps that lock to 45° steps.
+   * Default pivot = opposite corner (Figma-style). Shift = center-anchored scale only.
+   * Shift+Alt also snaps the locked angle to 45° steps.
    */
   let xformDrag: {
     chip: DroppedChip;
     slotId: string;
     pointerId: number;
     /** Which corner handle started the gesture (stays large while dragging). */
-    corner: "se" | "ne" | "nw" | "sw";
+    corner: XformCorner;
+    /** World-space opposite-corner anchor (default mode). */
+    anchorX: number;
+    anchorY: number;
+    /** True while Shift holds center-anchored uniform scale. */
+    centerAnchored: boolean;
     startDist: number;
     startScale: number;
     /** Per-slot scale at drag start (multi-select keeps relative sizes). */
@@ -2169,8 +2200,6 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
   }
 
-  type XformCorner = "se" | "ne" | "nw" | "sw";
-
   const XFORM_CORNERS: { id: XformCorner; sx: 1 | -1; sy: 1 | -1 }[] = [
     { id: "se", sx: 1, sy: 1 },
     { id: "ne", sx: 1, sy: -1 },
@@ -2736,8 +2765,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return xformDrag.bodyFactor;
   }
 
-  /** Grow/shrink + rotate the held chip from one polar gesture (radial = scale, angular = rotate). */
-  function applyLiveXform(nextScale: number, nextAngle: number) {
+  /** Grow/shrink + rotate from one polar gesture (radial = scale, angular = rotate). */
+  function applyLiveXform(
+    nextScale: number,
+    nextAngle: number,
+    pivot: { x: number; y: number } | null,
+  ) {
     if (!xformDrag) return;
     const nextFactor = nextScale / xformDrag.startScale;
     const delta = nextFactor / xformDrag.bodyFactor;
@@ -2746,12 +2779,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (scaleChanged || angleChanged) {
       const dAngle = nextAngle - xformDrag.lastAngle;
       const multi = xformDrag.startScales.size > 1;
+      const point = pivot ?? undefined;
       for (const chip of xformTargets(xformDrag.slotId)) {
-        if (scaleChanged) Body.scale(chip.body, delta, delta);
+        // Corner pivot: Matter scales/rotates about the fixed world anchor so the
+        // opposite corner stays put. Center mode omits `point` (body centre).
+        if (scaleChanged) Body.scale(chip.body, delta, delta, point);
         if (angleChanged) {
-          // Multi-select: rotate each chip by the same delta so relative poses stay.
-          // Single instance (or solo Amount copy): snap to the dragged chip's absolute angle.
-          Body.setAngle(chip.body, multi ? chip.body.angle + dAngle : nextAngle);
+          if (point || multi) {
+            // Shared world pivot (or multi delta) keeps relative poses stable.
+            rotateBodyAround(chip.body, dAngle, point);
+          } else {
+            // Solo center-anchored: absolute angle about the body centre.
+            Body.setAngle(chip.body, nextAngle);
+          }
         }
         syncWallCollision(chip);
         pinInsideWalls(chip);
@@ -2770,8 +2810,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     endXformDrag();
     endGradAngleDrag();
     const point = stagePoint(event);
-    const dx = point.x - chip.body.position.x;
-    const dy = point.y - chip.body.position.y;
+    const corner = readXformHandleCorner(handle);
+    // Shift at gesture start → legacy center-anchored scale; else opposite corner.
+    const centerAnchored = event.shiftKey;
+    const anchor = xformCornerWorld(chip, oppositeXformCorner(corner), 1);
+    const pivotX = centerAnchored ? chip.body.position.x : anchor.x;
+    const pivotY = centerAnchored ? chip.body.position.y : anchor.y;
+    const dx = point.x - pivotX;
+    const dy = point.y - pivotY;
     const startDist = Math.max(8, Math.hypot(dx, dy));
     const startScales = new Map<string, number>();
     for (const item of xformTargets(chip.slotId)) {
@@ -2790,13 +2836,15 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const startScale = startScales.get(chip.slotId) ?? 1;
     const startPointerAngle = Math.atan2(dy, dx);
     const startBodyAngle = chip.body.angle;
-    const corner = readXformHandleCorner(handle);
     xformHover = { bodyId: chip.body.id, corner, phase: "hot" };
     xformDrag = {
       chip,
       slotId: chip.slotId,
       pointerId: event.pointerId,
       corner,
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      centerAnchored,
       startDist,
       startScale,
       startScales,
@@ -3085,18 +3133,56 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function onPointerMove(event: PointerEvent) {
     if (xformDrag && event.pointerId === xformDrag.pointerId) {
       const point = stagePoint(event);
-      const dx = point.x - xformDrag.chip.body.position.x;
-      const dy = point.y - xformDrag.chip.body.position.y;
+      const centerAnchored = event.shiftKey;
+      // Mid-gesture Shift toggles corner ↔ center pivot without a scale jump.
+      if (centerAnchored !== xformDrag.centerAnchored) {
+        if (centerAnchored) {
+          const cdx = point.x - xformDrag.chip.body.position.x;
+          const cdy = point.y - xformDrag.chip.body.position.y;
+          const cdist = Math.max(1, Math.hypot(cdx, cdy));
+          xformDrag.startDist = reanchorStartDist(
+            xformDrag.startScale,
+            xformDrag.lastScale,
+            cdist,
+          );
+        } else {
+          const anchor = xformCornerWorld(
+            xformDrag.chip,
+            oppositeXformCorner(xformDrag.corner),
+            xformDrag.bodyFactor,
+          );
+          xformDrag.anchorX = anchor.x;
+          xformDrag.anchorY = anchor.y;
+          const cdx = point.x - anchor.x;
+          const cdy = point.y - anchor.y;
+          const cdist = Math.max(1, Math.hypot(cdx, cdy));
+          xformDrag.startDist = reanchorStartDist(
+            xformDrag.startScale,
+            xformDrag.lastScale,
+            cdist,
+          );
+          xformDrag.startPointerAngle = Math.atan2(cdy, cdx);
+          xformDrag.startBodyAngle = xformDrag.lastAngle;
+        }
+        xformDrag.centerAnchored = centerAnchored;
+      }
+      const pivot = centerAnchored
+        ? null
+        : { x: xformDrag.anchorX, y: xformDrag.anchorY };
+      const pivotX = pivot ? pivot.x : xformDrag.chip.body.position.x;
+      const pivotY = pivot ? pivot.y : xformDrag.chip.body.position.y;
+      const dx = point.x - pivotX;
+      const dy = point.y - pivotY;
       const dist = Math.max(1, Math.hypot(dx, dy));
       // Continuous while dragging — 0.01 rounding here stair-steps slow gestures.
       const nextScale = clampScaleContinuous(
-        xformDrag.startScale * (dist / xformDrag.startDist),
+        scaleFromPivotRatio(xformDrag.startScale, xformDrag.startDist, dist),
         scaleMaxFor(xformDrag.chip.look?.slot),
       );
       const pointerAngle = Math.atan2(dy, dx);
-      // Shift = scale only. Shift+Alt also snaps to 45°. Re-anchor so releasing doesn't jump.
+      // Shift = center scale only. Shift+Alt also snaps to 45°. Re-anchor on release.
       let nextAngle: number;
-      if (event.shiftKey) {
+      if (centerAnchored) {
         const step = Math.PI / 4;
         nextAngle = event.altKey
           ? Math.round(xformDrag.lastAngle / step) * step
@@ -3109,7 +3195,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const scaleChanged = Math.abs(nextScale - xformDrag.lastScale) >= 0.0005;
       const angleChanged = Math.abs(nextAngle - xformDrag.lastAngle) >= 0.0005;
       if (!scaleChanged && !angleChanged) return;
-      applyLiveXform(nextScale, nextAngle);
+      applyLiveXform(nextScale, nextAngle, pivot);
       if (scaleChanged && (soloBodyId == null || soloBodyId !== xformDrag.chip.body.id)) {
         const factor = nextScale / xformDrag.startScale;
         for (const [id, base] of xformDrag.startScales) {
