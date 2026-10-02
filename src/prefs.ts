@@ -10,6 +10,7 @@ export type AppPrefs = {
   rememberLast: boolean;
   theme: ChromeTheme;
   performance: boolean;
+  subtleSelect: boolean;
 };
 
 const STORAGE_KEY = "falldown.prefs";
@@ -24,6 +25,7 @@ const DEFAULTS: AppPrefs = {
   rememberLast: true,
   theme: "night",
   performance: true,
+  subtleSelect: false,
 };
 
 function clampVolume(value: number): number {
@@ -45,6 +47,7 @@ function read(): AppPrefs {
       rememberLast: parsed.rememberLast !== false,
       theme: parsed.theme === "day" ? "day" : "night",
       performance: typeof parsed.performance === "boolean" ? parsed.performance : DEFAULTS.performance,
+      subtleSelect: parsed.subtleSelect === true,
     };
   } catch {
     return { ...DEFAULTS };
@@ -83,15 +86,24 @@ export function setPrefs(patch: Partial<AppPrefs>) {
     soundVolume:
       patch.soundVolume != null ? clampVolume(patch.soundVolume) : prefs.soundVolume,
     theme: patch.theme === "day" || patch.theme === "night" ? patch.theme : prefs.theme,
+    subtleSelect: patch.subtleSelect != null ? Boolean(patch.subtleSelect) : prefs.subtleSelect,
   };
   persist();
   const themeChanged = patch.theme != null && patch.theme !== prevTheme;
   applyChromeTheme(prefs.theme, { animate: themeChanged });
+  applySubtleSelect(prefs.subtleSelect);
   notify();
 }
 
 const THEME_ANIM_MS = 320;
 let themeAnimTimer = 0;
+
+/** Solid accent selection outline vs animated Loop-style stroke. */
+export function applySubtleSelect(on: boolean = prefs.subtleSelect) {
+  const root = document.documentElement;
+  if (on) root.dataset.subtleSelect = "true";
+  else delete root.dataset.subtleSelect;
+}
 
 /** Applies night/day chrome before first paint and after changes. */
 export function applyChromeTheme(theme: ChromeTheme = prefs.theme, options?: { animate?: boolean }) {
@@ -114,3 +126,4 @@ export function applyChromeTheme(theme: ChromeTheme = prefs.theme, options?: { a
 }
 
 applyChromeTheme();
+applySubtleSelect();

@@ -856,26 +856,35 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     <label class="field">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
     </label>
-    <label class="field" data-tip="Brighten or darken this image">${H.settingLabel(slot, "Exposure", "exposure", String(imageExposureOf(slot.exposure)))}
-      <input type="range" data-key="exposure" min="-100" max="100" step="1" value="${imageExposureOf(slot.exposure)}" />
-    </label>
-    <label class="field" data-tip="Boost or flatten tonal range">${H.settingLabel(slot, "Contrast", "contrast", String(imageContrastOf(slot.contrast)))}
-      <input type="range" data-key="contrast" min="-100" max="100" step="1" value="${imageContrastOf(slot.contrast)}" />
-    </label>
-    <label class="field" data-tip="Color intensity for this image">${H.settingLabel(slot, "Saturation", "saturation", String(imageSaturationOf(slot.saturation)))}
-      <input type="range" data-key="saturation" min="-100" max="100" step="1" value="${imageSaturationOf(slot.saturation)}" />
-    </label>
-    <label class="field" data-tip="Shift colors around the wheel">${H.settingLabel(slot, "Hue", "hue", `${imageHueOf(slot.hue)}°`)}
-      <input type="range" data-key="hue" min="-180" max="180" step="1" value="${imageHueOf(slot.hue)}" />
-    </label>`
-        : `${H.dropShadowField(slot)}`
-    }
     <label class="field">${H.settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>
+    <div class="slot-group">
+      <p class="slot-label">Visual tweaks</p>
+      <label class="field" data-tip="Brighten or darken this image">${H.settingLabel(slot, "Exposure", "exposure", String(imageExposureOf(slot.exposure)))}
+        <input type="range" data-key="exposure" min="-100" max="100" step="1" value="${imageExposureOf(slot.exposure)}" />
+      </label>
+      <label class="field" data-tip="Boost or flatten tonal range">${H.settingLabel(slot, "Contrast", "contrast", String(imageContrastOf(slot.contrast)))}
+        <input type="range" data-key="contrast" min="-100" max="100" step="1" value="${imageContrastOf(slot.contrast)}" />
+      </label>
+      <label class="field" data-tip="Color intensity for this image">${H.settingLabel(slot, "Saturation", "saturation", String(imageSaturationOf(slot.saturation)))}
+        <input type="range" data-key="saturation" min="-100" max="100" step="1" value="${imageSaturationOf(slot.saturation)}" />
+      </label>
+      <label class="field" data-tip="Shift colors around the wheel">${H.settingLabel(slot, "Hue", "hue", `${imageHueOf(slot.hue)}°`)}
+        <input type="range" data-key="hue" min="-180" max="180" step="1" value="${imageHueOf(slot.hue)}" />
+      </label>
+    </div>`
+        : `${H.dropShadowField(slot)}
+    <label class="field">${H.settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
+      <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
+    </label>
+    <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
+      <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
+    </label>`
+    }
   `;
   placeFold(wrap, editor, open);
 
