@@ -65,3 +65,11 @@ Bundled under `public/templates/<id>/`. Full per-file notes also live in each fo
 | `moma-queue.jpg` | [MoMa Ausstellung in Berlin 2004 RIMG0457](https://commons.wikimedia.org/wiki/File:MoMa_Ausstellung_in_Berlin_2004_RIMG0457.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `balloon.jpg` | [Potsdamer Platz Berlin RIMG0463](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0463.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `towers.jpg` | [Potsdamer Platz Berlin RIMG0464](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0464.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+
+**Tokyo** (Edo print / historical street / Hokusai manga; public domain)
+
+| File | Work | Source | License |
+|------|------|--------|---------|
+| `asukayama-hanami.jpg` | [Cherry-Blossom Viewing at Asuka Hill](https://commons.wikimedia.org/wiki/File:Cherry-Blossom_Viewing_at_Asuka_Hill_(Asukayama_hanami).jpg) (c. 1830–1843) | Utagawa Hiroshige | Public domain |
+| `tokyo-street.jpg` | [Crowded Tokyo Street](https://commons.wikimedia.org/wiki/File:Crowded_Tokyo_Street_1905.jpg) (1905) | Underwood & Underwood / Library of Congress | Public domain |
+| `hokusai-manga.jpg` | [Hokusai Manga page](https://commons.wikimedia.org/wiki/File:Hokusai_Manga_04.jpg) | Katsushika Hokusai | Public domain |
