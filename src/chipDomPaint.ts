@@ -260,12 +260,26 @@ function syncCharWordGradient(word: HTMLElement) {
 
 /**
  * Pin bare letter-cycle DOM so resting glyph ink matches the static canvas paint.
- * Primary seat uses font em-ascent vs canvas baseline; a live Range nudge kills residual delta.
+ *
+ * Canvas paintTextInk already bakes shiftEm into the baseline. We seat in the same
+ * coordinate space and must NOT also apply label translateY(shiftEm) afterward
+ * (that was shoving the word below the selection frame).
  */
-function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: number) {
+function seatBareTextAnimLabel(
+  label: HTMLElement,
+  slot: TextSlot,
+  tracking: number,
+  shiftEm = 0,
+) {
   const ink = measureTextInk(slot, tracking);
   const fontAscent = measureTextFontAscent(slot);
+  // Same y as paintTextInk: alphabetic baseline + optical shift.
+  const paintBaseline = ink.baseline + shiftEm * slot.fontSize;
+  const expectL = TEXT_INK_PAD;
+  const expectT = TEXT_INK_PAD + shiftEm * slot.fontSize;
 
+  // Identity while seating — shift is baked into clip.top via paintBaseline/expectT.
+  label.style.transform = "none";
   label.classList.add("is-bare-text-anim");
   label.style.position = "absolute";
   label.style.left = "0";
@@ -282,10 +296,9 @@ function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: num
   const clip = label.querySelector<HTMLElement>(":scope > .text-anim-clip");
   if (!clip) return;
 
-  // Place the em-box so its alphabetic baseline lands on ink.baseline (canvas fillText y).
   clip.style.position = "absolute";
   clip.style.left = `${ink.originX}px`;
-  clip.style.top = `${ink.baseline - fontAscent}px`;
+  clip.style.top = `${paintBaseline - fontAscent}px`;
   clip.style.width = `${Math.max(1, ink.width - ink.originX - TEXT_INK_PAD)}px`;
   clip.style.height = `${Math.ceil(slot.fontSize)}px`;
   clip.style.overflow = "visible";
@@ -310,17 +323,37 @@ function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: num
     char.style.transform = "none";
   }
 
-  // Fine-nudge: Range ink box → canvas ink AABB (TEXT_INK_PAD, TEXT_INK_PAD).
-  void label.offsetWidth;
-  const inkBox = measureLabelInkLocal(label);
-  if (!inkBox) return;
-  const dx = TEXT_INK_PAD - inkBox.left;
-  const dy = TEXT_INK_PAD - inkBox.top;
-  if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return;
-  const curL = Number.parseFloat(clip.style.left) || 0;
-  const curT = Number.parseFloat(clip.style.top) || 0;
-  clip.style.left = `${curL + dx}px`;
-  clip.style.top = `${curT + dy}px`;
+  // Nudge letter-ink AABB onto the canvas ink AABB (iterate — Range can settle after move).
+  const host = label.parentElement;
+  const canvas =
+    host instanceof HTMLElement ? host.querySelector(":scope > canvas") : null;
+  for (let i = 0; i < 4; i++) {
+    void label.offsetWidth;
+    const inkBox = measureLabelInkLocal(label);
+    if (!inkBox) break;
+
+    let targetL = expectL;
+    let targetT = expectT;
+    // Prefer live canvas element origin when present (full-bleed ink surface).
+    if (canvas instanceof HTMLCanvasElement) {
+      const labelRect = label.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      const sx = labelRect.width / Math.max(1, label.offsetWidth);
+      const sy = labelRect.height / Math.max(1, label.offsetHeight);
+      if (sx > 0 && sy > 0) {
+        targetL = (canvasRect.left - labelRect.left) / sx + expectL;
+        targetT = (canvasRect.top - labelRect.top) / sy + expectT;
+      }
+    }
+
+    const dx = targetL - inkBox.left;
+    const dy = targetT - inkBox.top;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) break;
+    const curL = Number.parseFloat(clip.style.left) || 0;
+    const curT = Number.parseFloat(clip.style.top) || 0;
+    clip.style.left = `${curL + dx}px`;
+    clip.style.top = `${curT + dy}px`;
+  }
 }
 
 /** Resting text ink in label-local CSS px (Range quads — tighter than span boxes). */
@@ -600,7 +633,7 @@ export function applyVisual(
       } else if (
         !applyTextAnim(label, slot, (lbl) => {
           // Seat while glyphs are still at rest — before the GSAP timeline starts.
-          if (bare) seatBareTextAnimLabel(lbl, slot, tracking);
+          if (bare) seatBareTextAnimLabel(lbl, slot, tracking, shiftEm);
           if (textGradient) paintGrad();
         })
       ) {
@@ -609,7 +642,7 @@ export function applyVisual(
         label.textContent = slot.text;
       } else if (bare) {
         // Timeline reused (early return) — prepare was skipped; reseat + repaint.
-        seatBareTextAnimLabel(label, slot, tracking);
+        seatBareTextAnimLabel(label, slot, tracking, shiftEm);
       } else {
         clearBareTextAnimSeat(label);
       }
@@ -635,7 +668,13 @@ export function applyVisual(
     } else {
       label.style.removeProperty("caret-color");
     }
-    label.style.transform = `translateY(${shiftEm}em)`;
+    // Bare letter-cycle already baked shiftEm into seatBareTextAnimLabel (canvas-matched).
+    // Re-applying translateY here double-shifted glyphs below the selection frame.
+    if (bare && slot.textAnim && !liveEdit) {
+      label.style.transform = "none";
+    } else {
+      label.style.transform = `translateY(${shiftEm}em)`;
+    }
     return;
   }
 
