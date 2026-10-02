@@ -78,6 +78,8 @@ function ensureTemperatureFilter(kelvin: number): string | undefined {
  * Invert is always explicit so live paint can fade invert on/off.
  * Color adjusts are omitted at neutral so export can skip when unused.
  * Temperature uses Orby's Kelvin→R/B white-balance matrix via an SVG filter.
+ * Compose order stays WB (Temperature) before exposure/contrast/sat/hue —
+ * independent of CREATE panel slider order (Exposure→…→Temperature→Hue).
  */
 export function imageRasterFilter(slot: ImageAdjustSlot, dropShadowCss?: string): string {
   const parts: string[] = [slot.inverted ? "invert(1)" : "invert(0)"];
