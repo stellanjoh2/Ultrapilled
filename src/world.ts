@@ -539,6 +539,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     chip: DroppedChip;
     slotId: string;
     pointerId: number;
+    /** Which corner handle started the gesture (stays large while dragging). */
+    corner: "se" | "ne" | "nw" | "sw";
     startDist: number;
     startScale: number;
     /** Per-slot scale at drag start (multi-select keeps relative sizes). */
@@ -1981,7 +1983,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (on) {
         const frameHost = ensureChrome(chip);
         const needFrame = !frameHost.querySelector(":scope > .chip-xform-frame");
-        const needHandles = !frameHost.querySelector(":scope > .chip-xform-handle");
+        const needHandles = frameHost.querySelectorAll(":scope > .chip-xform-handle").length !== 4;
         const hadWheel = Boolean(chip.el.querySelector(":scope > .chip-grad-wheel"));
         ensureXformFrame(frameHost);
         ensureXformHandle(frameHost);
@@ -2000,9 +2002,6 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       } else {
         chip.el.classList.remove("is-picked");
         const host = chip.chrome;
-        clearXformHandleCorner(
-          (host ?? chip.el).querySelector(":scope > .chip-xform-handle"),
-        );
         if (host && host !== chip.el) {
           host.classList.remove("is-picked", "is-scaling", "is-rotating", "is-grad-angling");
         }
@@ -2155,39 +2154,6 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
   }
 
-  function ensureXformHandle(el: HTMLElement) {
-    for (const old of el.querySelectorAll(":scope > .chip-scale-handle, :scope > .chip-rotate-handle")) {
-      old.remove();
-    }
-
-    // One SE handle (older builds had NW rotate + SE scale).
-    const handles = [...el.querySelectorAll(":scope > .chip-xform-handle")];
-    const sole = handles.length === 1 ? handles[0] : null;
-    const legacy = handles.some(
-      (node) =>
-        node.classList.contains("chip-xform-handle--rotate") ||
-        node.classList.contains("chip-xform-handle--scale"),
-    );
-    if (sole instanceof HTMLElement && !legacy) {
-      if (sole.dataset.icon !== "out-simple") {
-        sole.innerHTML = arrowsOutSimple;
-        sole.dataset.icon = "out-simple";
-        sole.setAttribute("aria-label", "Rotate and scale");
-      }
-      return;
-    }
-    for (const node of handles) node.remove();
-
-    const handle = document.createElement("button");
-    handle.type = "button";
-    handle.className = "chip-xform-handle";
-    handle.tabIndex = -1;
-    handle.setAttribute("aria-label", "Rotate and scale");
-    handle.dataset.icon = "out-simple";
-    handle.innerHTML = arrowsOutSimple;
-    el.append(handle);
-  }
-
   type XformCorner = "se" | "ne" | "nw" | "sw";
 
   const XFORM_CORNERS: { id: XformCorner; sx: 1 | -1; sy: 1 | -1 }[] = [
@@ -2197,19 +2163,15 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     { id: "sw", sx: -1, sy: 1 },
   ];
 
-  const XFORM_CORNER_CLASS: Record<Exclude<XformCorner, "se">, string> = {
+  const XFORM_CORNER_CLASS: Record<XformCorner, string> = {
+    se: "chip-xform-handle--se",
     ne: "chip-xform-handle--ne",
     nw: "chip-xform-handle--nw",
     sw: "chip-xform-handle--sw",
   };
 
-  /** Solo handle follows the nearest hovered corner; null → SE (with clip flip). */
+  /** Nearest corner within proximity; that handle morphs mini → large. */
   let xformHover: { bodyId: number; corner: XformCorner } | null = null;
-
-  function clearXformHandleCorner(handle: Element | null) {
-    if (!(handle instanceof HTMLElement)) return;
-    handle.classList.remove("chip-xform-handle--ne", "chip-xform-handle--nw", "chip-xform-handle--sw");
-  }
 
   function readXformHandleCorner(handle: HTMLElement): XformCorner {
     if (handle.classList.contains("chip-xform-handle--nw")) return "nw";
@@ -2218,9 +2180,50 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return "se";
   }
 
-  function setXformHandleCorner(handle: HTMLElement, corner: XformCorner) {
-    clearXformHandleCorner(handle);
-    if (corner !== "se") handle.classList.add(XFORM_CORNER_CLASS[corner]);
+  function ensureXformHandle(el: HTMLElement) {
+    for (const old of el.querySelectorAll(":scope > .chip-scale-handle, :scope > .chip-rotate-handle")) {
+      old.remove();
+    }
+
+    // Four corner handles (older builds: solo SE, or NW rotate + SE scale).
+    const handles = [...el.querySelectorAll(":scope > .chip-xform-handle")];
+    const legacy = handles.some(
+      (node) =>
+        node.classList.contains("chip-xform-handle--rotate") ||
+        node.classList.contains("chip-xform-handle--scale"),
+    );
+    const byCorner = new Map<XformCorner, HTMLElement>();
+    if (!legacy) {
+      for (const node of handles) {
+        if (!(node instanceof HTMLElement)) continue;
+        byCorner.set(readXformHandleCorner(node), node);
+      }
+    }
+    if (legacy || byCorner.size !== XFORM_CORNERS.length) {
+      for (const node of handles) node.remove();
+      byCorner.clear();
+    }
+
+    for (const { id } of XFORM_CORNERS) {
+      let handle = byCorner.get(id);
+      if (!handle) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `chip-xform-handle ${XFORM_CORNER_CLASS[id]}`;
+        btn.tabIndex = -1;
+        btn.setAttribute("aria-label", "Rotate and scale");
+        btn.dataset.icon = "out-simple";
+        btn.innerHTML = arrowsOutSimple;
+        el.append(btn);
+      } else {
+        handle.className = `chip-xform-handle ${XFORM_CORNER_CLASS[id]}`;
+        if (handle.dataset.icon !== "out-simple") {
+          handle.innerHTML = arrowsOutSimple;
+          handle.dataset.icon = "out-simple";
+          handle.setAttribute("aria-label", "Rotate and scale");
+        }
+      }
+    }
   }
 
   /** Frame-corner world position (pad inset), scaled by live CSS mul. */
@@ -2236,39 +2239,22 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     };
   }
 
-  /** Handle tip past the frame corner: pad (12) + size (76) + translate gap (6). */
-  function xformHandleTipWorld(chip: DroppedChip, corner: XformCorner, mul: number) {
-    return xformCornerWorld(chip, corner, mul, 94);
-  }
-
   /**
-   * Prefer hovered corner; else SE, flipping to NE when SE would clip the stage.
-   * Hysteresis on the SE↔NE clip path. Locked during an active xform drag.
+   * Mark the proximity (or drag) corner as `--hot` so it grows; others stay mini.
+   * `mul` kept for call-site compatibility with seat()/paintPicked.
    */
-  function syncXformHandleSide(chip: DroppedChip, mul = 1) {
-    if (!isPickPainted(chip) || bounds.height < 8) return;
-    if (xformDrag && xformDrag.chip.body.id === chip.body.id) return;
-    const handle = xformChromeOf(chip).querySelector(":scope > .chip-xform-handle");
-    if (!(handle instanceof HTMLElement)) return;
-
-    const hover =
-      xformHover && xformHover.bodyId === chip.body.id ? xformHover.corner : null;
-    if (hover) {
-      setXformHandleCorner(handle, hover);
-      return;
+  function syncXformHandleSide(chip: DroppedChip, _mul = 1) {
+    if (!isPickPainted(chip)) return;
+    const hot: XformCorner | null =
+      xformDrag && xformDrag.chip.body.id === chip.body.id
+        ? xformDrag.corner
+        : xformHover && xformHover.bodyId === chip.body.id
+          ? xformHover.corner
+          : null;
+    for (const node of xformChromeOf(chip).querySelectorAll(":scope > .chip-xform-handle")) {
+      if (!(node instanceof HTMLElement)) continue;
+      node.classList.toggle("chip-xform-handle--hot", readXformHandleCorner(node) === hot);
     }
-
-    // Default home: SE, with NE escape when SE sticks past the stage edge.
-    const current = readXformHandleCorner(handle);
-    const seTip = xformHandleTipWorld(chip, "se", mul);
-    const seClipped = seTip.y > bounds.height - 1 || seTip.x > bounds.width - 1;
-    const seClear = seTip.y < bounds.height - 28 && seTip.x < bounds.width - 28;
-    if (current !== "ne" && current !== "se") {
-      setXformHandleCorner(handle, seClipped ? "ne" : "se");
-      return;
-    }
-    if (current === "se" && seClipped) setXformHandleCorner(handle, "ne");
-    else if (current === "ne" && seClear) setXformHandleCorner(handle, "se");
   }
 
   /** Enter / stick radii (stage px) from the selection-frame corner. */
@@ -2298,7 +2284,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function updateXformHandleHover(event: PointerEvent) {
     if (xformDrag || drag || gradAngleDrag || editingId) return;
     if (pickedIds.size === 0) {
-      xformHover = null;
+      if (xformHover) {
+        xformHover = null;
+        for (const chip of chips) {
+          if (!isPickPainted(chip)) continue;
+          syncXformHandleSide(chip);
+        }
+      }
       return;
     }
     const point = stagePoint(event);
@@ -2314,7 +2306,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         if (changed) {
           for (const item of chips) {
             if (!isPickPainted(item)) continue;
-            syncXformHandleSide(item, chipCssMul(item));
+            syncXformHandleSide(item);
           }
         }
         return;
@@ -2325,13 +2317,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     let bestDist = Infinity;
     for (const chip of chips) {
       if (!isPickPainted(chip)) continue;
-      const handle = xformChromeOf(chip).querySelector(":scope > .chip-xform-handle");
-      const current =
-        xformHover?.bodyId === chip.body.id
-          ? xformHover.corner
-          : handle instanceof HTMLElement
-            ? readXformHandleCorner(handle)
-            : null;
+      const current = xformHover?.bodyId === chip.body.id ? xformHover.corner : null;
       const corner = hoverCornerNear(chip, point, current);
       if (!corner) continue;
       const mul = chipCssMul(chip);
@@ -2355,7 +2341,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     for (const chip of chips) {
       if (!isPickPainted(chip)) continue;
-      syncXformHandleSide(chip, chipCssMul(chip));
+      syncXformHandleSide(chip);
     }
   }
 
@@ -2747,10 +2733,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const startScale = startScales.get(chip.slotId) ?? 1;
     const startPointerAngle = Math.atan2(dy, dx);
     const startBodyAngle = chip.body.angle;
+    const corner = readXformHandleCorner(handle);
+    xformHover = { bodyId: chip.body.id, corner };
     xformDrag = {
       chip,
       slotId: chip.slotId,
       pointerId: event.pointerId,
+      corner,
       startDist,
       startScale,
       startScales,
@@ -2761,6 +2750,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       lastAngle: startBodyAngle,
     };
     lockHandle(chip.slotId, "xforming");
+    syncXformHandleSide(chip);
     handle.setPointerCapture(event.pointerId);
     // One undo snapshot for the combined gesture (scale key covers rotate too).
     beginScrub();
@@ -3360,6 +3350,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (isPickPainted(chip)) {
       ensureXformFrame(ensureChrome(chip));
       ensureXformHandle(xformChromeOf(chip));
+      syncXformHandleSide(chip, chipCssMul(chip));
       syncGradWheel(chip);
       syncChromeSeat(chip);
       // Selection chrome tracks the painted box immediately; body remesh may follow.
