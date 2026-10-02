@@ -183,18 +183,17 @@ function paintBareRollingFrame(
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = Math.max(1, Math.ceil(width * dpr));
   const h = Math.max(1, Math.ceil(height * dpr));
-  if (canvas.width < w) canvas.width = w;
-  if (canvas.height < h) canvas.height = h;
+  // Exact buffer (not grow-only): after scale-up a leftover larger bitmap made
+  // sx≠sy and tracking looked non-uniform. Anim already redraws every frame.
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.style.display = "block";
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const sx = canvas.width / Math.max(1, width);
-  const sy = canvas.height / Math.max(1, height);
-  ctx.setTransform(sx, 0, 0, sy, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
 
   const ink = measureTextInk(slot, tracking);
   const fill =
@@ -224,7 +223,7 @@ function paintBareRollingFrame(
   for (let i = 0; i < n; i++) {
     poses.push(textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel));
   }
-  // Same painter as static bare type — clipped full-string keeps kerning (e.g. "re" in Lorem).
+  // Same painter as static bare type (per-glyph starts + pair kerning).
   paintTextInk(ctx, slot, tracking, fill, shiftEm, ink, poses);
 }
 

@@ -471,6 +471,9 @@ export function applyVisual(
           child.remove();
         }
         mountLookChild(el, found);
+        // Match chip box immediately (anim frame will set the bitmap).
+        found.style.width = `${width}px`;
+        found.style.height = `${height}px`;
       }
       const canvas = el.querySelector(":scope > canvas");
       if (canvas instanceof HTMLCanvasElement) {
