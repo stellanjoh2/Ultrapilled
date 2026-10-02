@@ -1,4 +1,6 @@
 import gsap from "gsap";
+import { measureTextInk, paintTextInk } from "./measure";
+import { textGradientFill } from "./pillFill";
 import type { TextSlot } from "./types";
 
 export const DEFAULT_TEXT_ANIM_SPEED = 50;
@@ -145,6 +147,218 @@ export function stopTextAnim(label: HTMLElement) {
 
 export function stopTextAnimIn(root: ParentNode) {
   root.querySelectorAll<HTMLElement>(".chip-label").forEach(stopTextAnim);
+}
+
+
+type BareCanvasRun = {
+  sig: string;
+  kill: () => void;
+  slot: TextSlot;
+  width: number;
+  height: number;
+  tracking: number;
+  shiftEm: number;
+  color: string;
+  gradientTo: string;
+  angle?: number;
+  scale?: number;
+};
+
+const bareCanvasRuns = new WeakMap<HTMLCanvasElement, BareCanvasRun>();
+const bareCanvasTickers = new Set<() => void>();
+
+function paintBareRollingFrame(
+  canvas: HTMLCanvasElement,
+  slot: TextSlot,
+  width: number,
+  height: number,
+  tracking: number,
+  color: string,
+  shiftEm: number,
+  gradientTo: string,
+  timeMs: number,
+  angle?: number,
+  scale?: number,
+) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.ceil(width * dpr));
+  const h = Math.max(1, Math.ceil(height * dpr));
+  if (canvas.width < w) canvas.width = w;
+  if (canvas.height < h) canvas.height = h;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.style.display = "block";
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const sx = canvas.width / Math.max(1, width);
+  const sy = canvas.height / Math.max(1, height);
+  ctx.setTransform(sx, 0, 0, sy, 0, 0);
+
+  const ink = measureTextInk(slot, tracking);
+  const fill =
+    slot.gradient && gradientTo
+      ? textGradientFill(
+          ctx,
+          width,
+          height,
+          color,
+          gradientTo,
+          angle ?? slot.gradientAngle,
+          scale ?? slot.gradientScale,
+        )
+      : color;
+
+  const fontSize = slot.fontSize;
+  const travel = textAnimTravel(0, fontSize);
+  const text = slot.text || "";
+  const chars = [...text];
+  const n = chars.length;
+  const { letter, stagger } = pace(slot.textAnimSpeed);
+  const wave = letter + Math.max(0, n - 1) * stagger;
+  // Match live GSAP: begin at resting hold (skip the export-style enter-from-below).
+  const poseMs = timeMs + wave * 1000;
+
+  // While every glyph is at rest, use the exact static painter so Animate
+  // never changes a single pixel versus the pre-Animate ink canvas.
+  let resting = n === 0;
+  if (n > 0) {
+    resting = true;
+    for (let i = 0; i < n; i++) {
+      const pose = textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel);
+      if (Math.abs(pose.y) > 0.05 || pose.alpha < 0.999) {
+        resting = false;
+        break;
+      }
+    }
+  }
+  if (resting) {
+    paintTextInk(ctx, slot, tracking, fill, shiftEm, ink);
+    return;
+  }
+
+  ctx.font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
+  ctx.letterSpacing = "0px";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = fill;
+
+  const widths = chars.map((ch) => ctx.measureText(ch === " " ? "\u00a0" : ch).width);
+  let x = ink.originX;
+  const baselineY = ink.baseline + shiftEm * fontSize;
+  for (let i = 0; i < n; i++) {
+    const pose = textAnimCharPose(poseMs, slot.textAnimSpeed, i, n, travel);
+    if (pose.alpha > 0.001) {
+      ctx.save();
+      ctx.globalAlpha *= pose.alpha;
+      ctx.fillText(chars[i] === " " ? "\u00a0" : chars[i]!, x, baselineY + pose.y);
+      ctx.restore();
+    }
+    x += widths[i]! + fontSize * tracking;
+  }
+}
+
+/** Bare type: animate on the ink canvas so resting glyphs never leave static paint. */
+export function applyBareCanvasTextAnim(
+  canvas: HTMLCanvasElement,
+  host: HTMLElement,
+  slot: TextSlot,
+  width: number,
+  height: number,
+  tracking: number,
+  color: string,
+  shiftEm: number,
+  gradientTo = "",
+  angle?: number,
+  scale?: number,
+): void {
+  const speed = textAnimSpeedOf(slot.textAnimSpeed);
+  const sig = `bare-canvas|${speed}|${slot.text}|${slot.fontFamily}|${slot.fontWeight}|${slot.fontSize}|${tracking}|${shiftEm}|${width}|${height}|${color}|${gradientTo}|${angle ?? ""}|${scale ?? ""}`;
+  const prev = bareCanvasRuns.get(canvas);
+  if (prev?.sig === sig) {
+    host.classList.add("is-text-anim-host");
+    return;
+  }
+  stopBareCanvasTextAnim(canvas);
+
+  host.classList.add("is-text-anim-host");
+  let start = performance.now();
+  let pausedAt: number | null = textAnimsPaused ? start : null;
+
+  const tick = () => {
+    if (textAnimsPaused) {
+      if (pausedAt == null) pausedAt = performance.now();
+      return;
+    }
+    if (pausedAt != null) {
+      start += performance.now() - pausedAt;
+      pausedAt = null;
+    }
+    const run = bareCanvasRuns.get(canvas);
+    if (!run) return;
+    paintBareRollingFrame(
+      canvas,
+      run.slot,
+      run.width,
+      run.height,
+      run.tracking,
+      run.color,
+      run.shiftEm,
+      run.gradientTo,
+      performance.now() - start,
+      run.angle,
+      run.scale,
+    );
+  };
+
+  // Resting first frame (time 0 + wave offset) matches static paintTextInk.
+  paintBareRollingFrame(
+    canvas,
+    slot,
+    width,
+    height,
+    tracking,
+    color,
+    shiftEm,
+    gradientTo,
+    0,
+    angle,
+    scale,
+  );
+
+  gsap.ticker.add(tick);
+  bareCanvasTickers.add(tick);
+
+  bareCanvasRuns.set(canvas, {
+    sig,
+    slot,
+    width,
+    height,
+    tracking,
+    shiftEm,
+    color,
+    gradientTo,
+    angle,
+    scale,
+    kill: () => {
+      gsap.ticker.remove(tick);
+      bareCanvasTickers.delete(tick);
+      host.classList.remove("is-text-anim-host");
+      bareCanvasRuns.delete(canvas);
+    },
+  });
+}
+
+export function stopBareCanvasTextAnim(canvas: HTMLCanvasElement) {
+  const prev = bareCanvasRuns.get(canvas);
+  if (prev) prev.kill();
+}
+
+export function stopBareCanvasTextAnimIn(root: ParentNode) {
+  root.querySelectorAll("canvas").forEach((node) => {
+    if (node instanceof HTMLCanvasElement) stopBareCanvasTextAnim(node);
+  });
 }
 
 /** Looping letter motion (same engine as pill text anim). */
