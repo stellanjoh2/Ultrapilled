@@ -3118,6 +3118,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
               moved: true,
               rotating: true,
             };
+            // Ring path sets rotating up-front — must scrub now or fill `background`
+            // transitions (0.15s) fight every live angle paint and direction looks stuck.
+            beginScrub();
             lockHandle(chip.slotId, "grad-angling");
             const svg = gradHit.closest("svg");
             const capture = svg ?? (gradHit instanceof HTMLElement ? gradHit : null);
