@@ -14,14 +14,13 @@ import {
   type TextSlot,
 } from "./types";
 
-export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | "tokyo" | typeof MODE_SELECT_THEME_ID;
+export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | typeof MODE_SELECT_THEME_ID;
 
 export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }[] = [
   { id: "acid", label: "London", build: acidState },
   { id: "new-york", label: "New York", build: newYorkState },
   { id: "miami", label: "Miami", build: miamiState },
   { id: "berlin", label: "Berlin", build: berlinState },
-  { id: "tokyo", label: "Tokyo", build: tokyoState },
   { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
 ];
 
@@ -489,94 +488,6 @@ export function berlinState(): AppState {
     post: { bloom: 0, bloomOpacity: 77, grain: 99, vignette: 52, saturate: 120, hue: 0, blend: "normal" },
     physics: { ...DEFAULT_PHYSICS },
     template: "berlin",
-    slots,
-  };
-}
-
-/** City Pop / 90s cyber signage: cyan field, vermilion + canary + navy/teal, mixed badge ink. */
-export function tokyoState(): AppState {
-  const ORANGE = 0; // vermilion jacket
-  const NAVY = 1; // dark badge → white ink
-  const CYAN = 2; // sky energy → dark ink
-  const YELLOW = 3; // canary → dark ink
-  const TEAL = 4; // teal accent → white ink
-  const bare = "none" as const;
-  const sharp = { shape: "box" as const, radius: 0 };
-  const plate = { shape: "box" as const, radius: 2 };
-  const soft = { shape: "box" as const, radius: 22 };
-  const pill = { shape: "pill" as const };
-  const gothic = (weight: number) => ({ fontFamily: "Noto Sans JP", fontWeight: weight });
-  const kaku = (weight: number) => ({ fontFamily: "Zen Kaku Gothic New", fontWeight: weight });
-  const display = { fontFamily: "Dela Gothic One", fontWeight: 400 };
-  const latin = { fontFamily: "Bebas Neue", fontWeight: 400 };
-  const grotesk = (weight: number) => ({ fontFamily: "Space Grotesk", fontWeight: weight });
-  const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
-  const WHITE = "#ffffff";
-  const INK = "#111111";
-  const slots = [
-    // Hero — English + kanji city headers
-    text({ text: "TOKYO", ...latin, textHeight: 48, shape: bare, colorIndex: YELLOW, scale: 3.4, tracking: -40 }),
-    text({ text: "東京", ...display, shape: bare, colorIndex: ORANGE, scale: 2.8, tracking: -40 }),
-    emoji("🏮", "Chōchin", 2, 0.7),
-    // Sharp kanji tiles — white-on-dark AND dark-on-light
-    text({ text: "東", ...gothic(900), ...sharp, colorIndex: ORANGE, textColor: WHITE, scale: 1.5, pillPad: 36 }),
-    text({ text: "京", ...gothic(900), ...sharp, colorIndex: YELLOW, textColor: INK, scale: 1.5, pillPad: 36 }),
-    text({ text: "夜", ...gothic(900), ...soft, colorIndex: NAVY, textColor: WHITE, scale: 1.5, pillPad: 36 }),
-    text({ text: "駅", ...kaku(900), ...plate, colorIndex: TEAL, textColor: WHITE, scale: 1.8, pillPad: 48, tracking: -20 }),
-    photo("tokyo", "akihabara-1993.jpg", "Akihabara 1993", 115, 0, 1.1),
-    // District names — English + Japanese
-    text({ text: "SHIBUYA", ...latin, textHeight: 36, ...sharp, colorIndex: NAVY, textColor: WHITE, scale: 1.2, pillPad: 32, tracking: -20 }),
-    text({ text: "渋谷", ...gothic(900), ...pill, colorIndex: CYAN, textColor: INK, scale: 1.1, pillPad: 40 }),
-    text({ text: "入口", ...gothic(800), ...plate, colorIndex: ORANGE, textColor: WHITE, scale: 1.35, pillPad: 40 }),
-    presetIcon("Tiles", 2, CYAN, { scale: 0.55 }),
-    text({ text: "出口", ...gothic(800), ...soft, colorIndex: YELLOW, textColor: INK, scale: 1.35, pillPad: 40 }),
-    photo("tokyo", "asukayama-hanami.jpg", "Asukayama Hanami", 115, 10, 1.15),
-    // Train departure boards — tracks, times, platforms
-    text({ text: "TRACK 2", ...grotesk(700), ...sharp, colorIndex: NAVY, textColor: WHITE, scale: 0.85, pillPad: 36, tracking: -40 }),
-    text({ text: "18:42", ...latin, textHeight: 40, ...pill, colorIndex: YELLOW, textColor: INK, scale: 1.3, pillPad: 44 }),
-    text({ text: "PLATFORM 3", ...grotesk(700), ...plate, colorIndex: TEAL, textColor: WHITE, scale: 0.7, pillPad: 32, tracking: -30 }),
-    text({ text: "DEP 19:05", ...grotesk(700), ...pill, colorIndex: CYAN, textColor: INK, scale: 0.75, pillPad: 36 }),
-    text({ text: "新宿", ...gothic(900), ...sharp, colorIndex: ORANGE, textColor: WHITE, scale: 1.0, pillPad: 36, tracking: -30 }),
-    text({ text: "SHINJUKU", ...latin, textHeight: 32, ...pill, colorIndex: YELLOW, textColor: INK, scale: 0.95, pillPad: 40, tracking: -20 }),
-    presetIcon("Gates", 1, ORANGE, { scale: 0.85 }),
-    text({ text: "夢", ...gothic(900), ...pill, colorIndex: NAVY, textColor: WHITE, scale: 1.4, pillPad: 36, textAnim: true }),
-    emoji("🚇", "Metro", 2, 0.65),
-    text({ text: "開", ...kaku(700), ...sharp, stroked: true, stroke: 3, colorIndex: CYAN, textColor: INK, scale: 1.1, pillPad: 40 }),
-    photo("tokyo", "shinjuku-street.jpg", "Shinjuku Street", 110, 6),
-    text({ text: "AKIHABARA", ...latin, textHeight: 30, ...soft, colorIndex: TEAL, textColor: WHITE, scale: 0.9, pillPad: 36, tracking: -20 }),
-    text({ text: "秋葉原", ...kaku(900), ...plate, colorIndex: YELLOW, textColor: INK, scale: 1.0, pillPad: 36 }),
-    presetIcon("Boxes", 2, YELLOW, { scale: 0.5 }),
-    text({ text: "北", ...kaku(900), ...sharp, colorIndex: YELLOW, textColor: INK, scale: 1.2, pillPad: 44 }),
-    text({ text: "南", ...kaku(900), ...soft, colorIndex: NAVY, textColor: WHITE, scale: 1.2, pillPad: 44 }),
-    text({ text: "ASAKUSA", ...latin, textHeight: 30, ...pill, colorIndex: CYAN, textColor: INK, scale: 0.85, pillPad: 36 }),
-    text({ text: "浅草", ...kaku(700), ...sharp, stroked: true, stroke: 2, colorIndex: ORANGE, scale: 0.7, pillPad: 32 }),
-    text({ text: "注意", ...gothic(700), ...plate, colorIndex: YELLOW, textColor: INK, scale: 0.85, pillPad: 36, tracking: -40 }),
-    emoji("➡️", "Arrow", 2, 0.55),
-    text({ text: "西", ...kaku(900), ...pill, colorIndex: TEAL, textColor: WHITE, scale: 1.15, pillPad: 40 }),
-    text({ text: "東", ...kaku(900), ...sharp, colorIndex: ORANGE, textColor: WHITE, scale: 1.15, pillPad: 40 }),
-    presetIcon("Chevrons", 1, TEAL, { scale: 0.7 }),
-    text({ text: "夜", ...display, shape: bare, colorIndex: NAVY, scale: 2.2 }),
-    text({ text: "LINE 山手", ...grotesk(700), ...soft, colorIndex: ORANGE, textColor: WHITE, scale: 0.65, pillPad: 34 }),
-  ].filter((slot): slot is Slot => slot != null);
-  return {
-    ...demoState(),
-    stageColor: "#3ec8ff",
-    background: {
-      ...defaultBackground(),
-      kind: "solid",
-      shape: "radial",
-      stops: [
-        { id: uid(), color: "#5ad4ff", at: 0 },
-        { id: uid(), color: "#3ec8ff", at: 100 },
-      ],
-      grid: true,
-      gridColor: "#0a2f4a",
-      gridOpacity: 12,
-    },
-    theme: ["#ff451a", "#0a2f4a", "#3ec8ff", "#ffe014", "#0d7a72"],
-    post: { bloom: 0, bloomOpacity: 80, grain: 12, vignette: 14, saturate: 120, hue: 0, blend: "normal" },
-    physics: { ...DEFAULT_PHYSICS },
-    template: "tokyo",
     slots,
   };
 }

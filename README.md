@@ -65,11 +65,3 @@ Bundled under `public/templates/<id>/`. Full per-file notes also live in each fo
 | `moma-queue.jpg` | [MoMa Ausstellung in Berlin 2004 RIMG0457](https://commons.wikimedia.org/wiki/File:MoMa_Ausstellung_in_Berlin_2004_RIMG0457.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `balloon.jpg` | [Potsdamer Platz Berlin RIMG0463](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0463.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `towers.jpg` | [Potsdamer Platz Berlin RIMG0464](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0464.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-
-**Tokyo** (1990s street / City Pop; CC BY-SA + PD accent)
-
-| File | Work | Author | License |
-|------|------|--------|---------|
-| `akihabara-1993.jpg` | [Akihabara pedestrian zone, 1993](https://commons.wikimedia.org/wiki/File:Akihabara_pedestrian_zone,_1993_(by_Danny_Choo).jpg) | Danny Choo | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) |
-| `shinjuku-street.jpg` | [Hot dog van, Shinjuku](https://commons.wikimedia.org/wiki/File:Hot_dog_van_without_customers_in_street_of_Shinjuku,_circa_late-1970s_or_early-1980s_(by_Jun_Shiraishi_@Photozou_218980731).jpg) (late-1970s / early-1980s) | Jun Shiraishi | [CC BY-SA 2.5](https://creativecommons.org/licenses/by-sa/2.5/) |
-| `asukayama-hanami.jpg` | [Cherry-Blossom Viewing at Asuka Hill](https://commons.wikimedia.org/wiki/File:Cherry-Blossom_Viewing_at_Asuka_Hill_(Asukayama_hanami).jpg) (c. 1830–1843) | Utagawa Hiroshige | Public domain |
