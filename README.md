@@ -66,10 +66,10 @@ Bundled under `public/templates/<id>/`. Full per-file notes also live in each fo
 | `balloon.jpg` | [Potsdamer Platz Berlin RIMG0463](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0463.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `towers.jpg` | [Potsdamer Platz Berlin RIMG0464](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0464.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
-**Tokyo** (Edo print / historical street / Hokusai manga; public domain)
+**Tokyo** (1990s street / City Pop; CC BY-SA + PD accent)
 
-| File | Work | Source | License |
+| File | Work | Author | License |
 |------|------|--------|---------|
+| `akihabara-1993.jpg` | [Akihabara pedestrian zone, 1993](https://commons.wikimedia.org/wiki/File:Akihabara_pedestrian_zone,_1993_(by_Danny_Choo).jpg) | Danny Choo | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) |
+| `shinjuku-street.jpg` | [Hot dog van, Shinjuku](https://commons.wikimedia.org/wiki/File:Hot_dog_van_without_customers_in_street_of_Shinjuku,_circa_late-1970s_or_early-1980s_(by_Jun_Shiraishi_@Photozou_218980731).jpg) (late-1970s / early-1980s) | Jun Shiraishi | [CC BY-SA 2.5](https://creativecommons.org/licenses/by-sa/2.5/) |
 | `asukayama-hanami.jpg` | [Cherry-Blossom Viewing at Asuka Hill](https://commons.wikimedia.org/wiki/File:Cherry-Blossom_Viewing_at_Asuka_Hill_(Asukayama_hanami).jpg) (c. 1830–1843) | Utagawa Hiroshige | Public domain |
-| `tokyo-street.jpg` | [Crowded Tokyo Street](https://commons.wikimedia.org/wiki/File:Crowded_Tokyo_Street_1905.jpg) (1905) | Underwood & Underwood / Library of Congress | Public domain |
-| `hokusai-manga.jpg` | [Hokusai Manga page](https://commons.wikimedia.org/wiki/File:Hokusai_Manga_04.jpg) | Katsushika Hokusai | Public domain |
