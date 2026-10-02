@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TEXT_INK_PAD, measureTextInk } from "./measure";
+import { TEXT_INK_PAD, measureTextInk, textGlyphSideOverhangs } from "./measure";
 import { defaultTypeSlot } from "./types";
 
 describe("measureTextInk", () => {
@@ -14,5 +14,21 @@ describe("measureTextInk", () => {
     // Box is at least pad*2 larger than a zero-bleed ceil of the font size fallback.
     expect(ink.width).toBeGreaterThanOrEqual(TEXT_INK_PAD * 2);
     expect(ink.height).toBeGreaterThanOrEqual(TEXT_INK_PAD * 2);
+  });
+});
+
+describe("textGlyphSideOverhangs", () => {
+  it("returns non-negative finite overhangs for typical glyphs", () => {
+    const { left, right } = textGlyphSideOverhangs('700 69px "Inter", sans-serif', "L", "m");
+    expect(Number.isFinite(left)).toBe(true);
+    expect(Number.isFinite(right)).toBe(true);
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(right).toBeGreaterThanOrEqual(0);
+  });
+
+  it("treats empty chars as a measuring space", () => {
+    const { left, right } = textGlyphSideOverhangs("700 28px sans-serif", "", "");
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(right).toBeGreaterThanOrEqual(0);
   });
 });

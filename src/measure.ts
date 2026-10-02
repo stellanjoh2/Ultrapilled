@@ -20,6 +20,28 @@ export function trackingEm(slider: number): number {
   return (slider / 100) * 0.04;
 }
 
+/**
+ * How far a glyph’s ink sticks past its advance box (CSS px, identity CTM).
+ * Negative letter-spacing tightens layout width to advances; last/first stems still
+ * paint outside that box — callers pad clip/layout so overflow:hidden won’t crop.
+ */
+export function textGlyphSideOverhangs(
+  font: string,
+  firstChar: string,
+  lastChar: string = firstChar,
+): { left: number; right: number } {
+  if (!measureCtx) return { left: 0, right: 0 };
+  measureCtx.font = font;
+  measureCtx.letterSpacing = "0px";
+  const first = !firstChar || firstChar === " " ? "\u00a0" : firstChar;
+  const last = !lastChar || lastChar === " " ? "\u00a0" : lastChar;
+  const fm = measureCtx.measureText(first);
+  const lm = last === first ? fm : measureCtx.measureText(last);
+  const left = Math.max(0, fm.actualBoundingBoxLeft ?? 0);
+  const right = Math.max(0, (lm.actualBoundingBoxRight ?? 0) - (lm.width || 0));
+  return { left, right };
+}
+
 /** A word's own pill padding, or the global slider while it still follows that. */
 export function pillPadOf(slot: Slot, globalPad: number): number {
   return slot.kind === "text" && slot.pillPad != null ? slot.pillPad : globalPad;

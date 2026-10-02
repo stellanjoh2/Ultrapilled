@@ -1,7 +1,7 @@
 import gsap from "gsap";
-import { measureTextInk, paintTextInk, type GlyphPose } from "./measure";
+import { measureTextInk, paintTextInk, TEXT_INK_PAD, textGlyphSideOverhangs, type GlyphPose } from "./measure";
 import { textGradientFill } from "./pillFill";
-import type { TextSlot } from "./types";
+import { defaultTypeSlot, type TextSlot } from "./types";
 
 export const DEFAULT_TEXT_ANIM_SPEED = 50;
 
@@ -346,11 +346,25 @@ export function stopBareCanvasTextAnimIn(root: ParentNode) {
  * carries CSS rotate/scale from seat(), and after scale-drag remesh the preview scale
  * is often still on the transform until the next seat(). Visual rects inflate the clip
  * so flex+overflow:hidden on the label crushes tracking; rotated chips do the same.
+ *
+ * offsetWidth is advance-tight under negative letter-spacing; glyph ink (esp. the last
+ * stem) overhangs that box. Pad both sides by the max side-bearing so centered rows
+ * still clear overflow:hidden on .text-anim-clip / .is-text-anim. Also take the
+ * canvas ink width (same metrics as bare type) so we never undershoot painted bounds.
  */
 function refreshAnimClipWidth(label: HTMLElement) {
   const clip = label.querySelector(":scope > .text-anim-clip");
   if (!(clip instanceof HTMLElement)) return;
   const rows = [...clip.querySelectorAll<HTMLElement>(".text-anim-word")];
+  const cs = getComputedStyle(label);
+  // Prefer the serialized shorthand; fall back when the browser leaves font empty.
+  const font = cs.font?.trim() || `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const fontSize = Number.parseFloat(cs.fontSize) || 14;
+  const spacingPx = Number.parseFloat(cs.letterSpacing);
+  const tracking = Number.isFinite(spacingPx) ? spacingPx / fontSize : 0;
+  const fontWeight = Number.parseFloat(cs.fontWeight) || 700;
+  const fontFamily =
+    cs.fontFamily.split(",")[0]?.trim().replace(/^["']|["']$/g, "") || "sans-serif";
   let maxW = 0;
   for (const row of rows) {
     const prev = {
@@ -368,7 +382,19 @@ function refreshAnimClipWidth(label: HTMLElement) {
     row.style.right = "auto";
     row.style.width = "max-content";
     row.style.textAlign = "left";
-    maxW = Math.max(maxW, row.offsetWidth);
+    const layoutW = row.offsetWidth;
+    const chars = [...row.querySelectorAll(".char")];
+    const first = chars[0]?.textContent ?? "";
+    const last = chars.length > 1 ? (chars[chars.length - 1]?.textContent ?? first) : first;
+    const word = chars.map((c) => c.textContent ?? "").join("") || " ";
+    const { left, right } = textGlyphSideOverhangs(font, first, last);
+    // text-align:center on absolute rows — equal side room so asymmetric bearings still fit.
+    const side = Math.max(left, right, 0);
+    const ink = measureTextInk(
+      defaultTypeSlot({ text: word, fontFamily, fontWeight, fontSize }),
+      tracking,
+    );
+    maxW = Math.max(maxW, layoutW + side * 2 + TEXT_INK_PAD * 2, ink.width);
     row.style.position = prev.position;
     row.style.inset = prev.inset;
     row.style.left = prev.left;
