@@ -3,6 +3,8 @@ import {
   oppositeXformCorner,
   reanchorStartDist,
   scaleFromPivotRatio,
+  scaleXformReleaseImpulse,
+  XFORM_RELEASE_IMPULSE,
   type XformCorner,
 } from "./xformAnchor";
 
@@ -45,3 +47,16 @@ describe("reanchorStartDist", () => {
     expect(reanchorStartDist(1, 1, 2, 8)).toBe(8);
   });
 });
+
+describe("scaleXformReleaseImpulse", () => {
+  it("keeps 25% of the release impulse by default", () => {
+    expect(XFORM_RELEASE_IMPULSE).toBe(0.25);
+    expect(scaleXformReleaseImpulse(40)).toBeCloseTo(10, 10);
+    expect(scaleXformReleaseImpulse(-8)).toBeCloseTo(-2, 10);
+  });
+
+  it("accepts an explicit keep-factor", () => {
+    expect(scaleXformReleaseImpulse(40, 0.5)).toBeCloseTo(20, 10);
+  });
+});
+
