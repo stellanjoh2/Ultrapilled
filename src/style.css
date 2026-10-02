@@ -905,8 +905,8 @@ html[data-theme="day"] .stage.is-portrait .playfield {
    Polar drag — radial = scale, angular = rotate. */
 .chip-xform-handle {
   --xform-pop: 0.92;
-  --xform-size: 24px;
-  --xform-icon: 12px;
+  --xform-size: 38px;
+  --xform-icon: 20px;
   --xform-radius: 7px;
   position: absolute;
   z-index: 5;
