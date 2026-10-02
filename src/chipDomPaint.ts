@@ -1,7 +1,7 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { rasterRing, textLookFlags } from "./chipLook";
-import { measureTextInk, paintTextInk, TEXT_INK_PAD } from "./measure";
+import { measureTextFontAscent, measureTextInk, paintTextInk, TEXT_INK_PAD } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
 import { applyTextAnim, stopTextAnim, stopTextAnimIn } from "./textAnim";
 import { inkOn } from "./theme";
@@ -258,9 +258,13 @@ function syncCharWordGradient(word: HTMLElement) {
   }
 }
 
-/** Pin bare letter-cycle DOM to the same ink origin as the canvas paint path. */
+/**
+ * Pin bare letter-cycle DOM so resting glyph ink matches the static canvas paint.
+ * Primary seat uses font em-ascent vs canvas baseline; a live Range nudge kills residual delta.
+ */
 function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: number) {
   const ink = measureTextInk(slot, tracking);
+  const fontAscent = measureTextFontAscent(slot);
 
   label.classList.add("is-bare-text-anim");
   label.style.position = "absolute";
@@ -270,22 +274,24 @@ function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: num
   label.style.height = "100%";
   label.style.overflow = "visible";
   label.style.display = "block";
-  label.style.lineHeight = "0";
+  label.style.lineHeight = "1";
   label.style.boxSizing = "border-box";
   label.style.margin = "0";
   label.style.padding = "0";
 
   const clip = label.querySelector<HTMLElement>(":scope > .text-anim-clip");
-  if (clip) {
-    // Match canvas fillText alphabetic baseline (not em-box top — that sat lower).
-    clip.style.position = "absolute";
-    clip.style.left = `${ink.originX}px`;
-    clip.style.top = `${ink.baseline}px`;
-    clip.style.width = `${Math.max(1, ink.width - ink.originX - TEXT_INK_PAD)}px`;
-    clip.style.height = "0";
-    clip.style.overflow = "visible";
-    clip.style.lineHeight = "0";
-  }
+  if (!clip) return;
+
+  // Place the em-box so its alphabetic baseline lands on ink.baseline (canvas fillText y).
+  clip.style.position = "absolute";
+  clip.style.left = `${ink.originX}px`;
+  clip.style.top = `${ink.baseline - fontAscent}px`;
+  clip.style.width = `${Math.max(1, ink.width - ink.originX - TEXT_INK_PAD)}px`;
+  clip.style.height = `${Math.ceil(slot.fontSize)}px`;
+  clip.style.overflow = "visible";
+  clip.style.lineHeight = "1";
+  clip.style.transform = "";
+
   for (const word of label.querySelectorAll<HTMLElement>(".text-anim-word")) {
     word.style.position = "relative";
     word.style.inset = "auto";
@@ -294,14 +300,52 @@ function seatBareTextAnimLabel(label: HTMLElement, slot: TextSlot, tracking: num
     word.style.display = "block";
     word.style.textAlign = "left";
     word.style.width = "max-content";
-    word.style.height = "auto";
-    word.style.lineHeight = "0";
+    word.style.height = "100%";
+    word.style.lineHeight = "1";
+    word.style.transform = "";
   }
   for (const char of label.querySelectorAll<HTMLElement>(".char")) {
-    // Baseline aligns with the clip's top edge (== ink.baseline), matching canvas.
-    char.style.verticalAlign = "baseline";
-    char.style.lineHeight = `${slot.fontSize}px`;
+    char.style.verticalAlign = "top";
+    char.style.lineHeight = "1";
+    char.style.transform = "none";
   }
+
+  // Fine-nudge: Range ink box → canvas ink AABB (TEXT_INK_PAD, TEXT_INK_PAD).
+  void label.offsetWidth;
+  const inkBox = measureLabelInkLocal(label);
+  if (!inkBox) return;
+  const dx = TEXT_INK_PAD - inkBox.left;
+  const dy = TEXT_INK_PAD - inkBox.top;
+  if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return;
+  const curL = Number.parseFloat(clip.style.left) || 0;
+  const curT = Number.parseFloat(clip.style.top) || 0;
+  clip.style.left = `${curL + dx}px`;
+  clip.style.top = `${curT + dy}px`;
+}
+
+/** Resting text ink in label-local CSS px (Range quads — tighter than span boxes). */
+function measureLabelInkLocal(
+  label: HTMLElement,
+): { left: number; top: number; right: number; bottom: number } | null {
+  const word = label.querySelector<HTMLElement>(".text-anim-word");
+  if (!word || !word.firstChild) return null;
+  const labelRect = label.getBoundingClientRect();
+  const ow = Math.max(1, label.offsetWidth);
+  const oh = Math.max(1, label.offsetHeight);
+  const sx = labelRect.width / ow;
+  const sy = labelRect.height / oh;
+  if (!(sx > 0) || !(sy > 0)) return null;
+
+  const range = document.createRange();
+  range.selectNodeContents(word);
+  const r = range.getBoundingClientRect();
+  if (r.width <= 0 && r.height <= 0) return null;
+  return {
+    left: (r.left - labelRect.left) / sx,
+    top: (r.top - labelRect.top) / sy,
+    right: (r.right - labelRect.left) / sx,
+    bottom: (r.bottom - labelRect.top) / sy,
+  };
 }
 
 function clearBareTextAnimSeat(label: HTMLElement) {
@@ -319,10 +363,32 @@ function clearBareTextAnimSeat(label: HTMLElement) {
     "box-sizing",
     "margin",
     "padding",
+    "z-index",
   ] as const) {
     label.style.removeProperty(prop);
   }
+  for (const node of label.querySelectorAll<HTMLElement>(".text-anim-clip, .text-anim-word, .char")) {
+    for (const prop of [
+      "position",
+      "left",
+      "top",
+      "right",
+      "bottom",
+      "inset",
+      "width",
+      "height",
+      "overflow",
+      "display",
+      "line-height",
+      "text-align",
+      "vertical-align",
+      "transform",
+    ] as const) {
+      node.style.removeProperty(prop);
+    }
+  }
 }
+
 export function paintBareTextCss(
   label: HTMLElement,
   from: string,
@@ -475,15 +541,27 @@ export function applyVisual(
       return;
     }
 
-    if (liveEdit || bareCss) el.querySelector(":scope > canvas")?.remove();
+    // Keep the ink canvas under a new letter-cycle until seating finishes so we can
+    // match its glyph box (removed right after applyTextAnim / seat below).
+    const keepInkCanvas = Boolean(bare && slot.textAnim && !liveEdit && !hideText);
+    if ((liveEdit || bareCss) && !keepInkCanvas) {
+      el.querySelector(":scope > canvas")?.remove();
+    }
 
     const label = textLabel(el, liveEdit);
     if (label.parentElement !== el) {
       mountLookChild(el, label);
     }
+    // Letter-cycle sits above the ink canvas while we measure/nudge, then canvas goes.
+    if (keepInkCanvas) {
+      label.style.zIndex = "2";
+      const inkCanvas = el.querySelector(":scope > canvas");
+      if (inkCanvas instanceof HTMLCanvasElement) inkCanvas.style.zIndex = "1";
+    }
     for (const child of [...el.children]) {
       if (
         child === label ||
+        (keepInkCanvas && child instanceof HTMLCanvasElement) ||
         child.classList.contains("chip-fill") ||
         child.classList.contains("chip-ring") ||
         isChipChrome(child)
@@ -540,6 +618,7 @@ export function applyVisual(
       if (textGradient) paintGrad();
       else paintBareTextCss(label, "", "");
       if (textGradient) el.style.color = "transparent";
+      if (keepInkCanvas) el.querySelector(":scope > canvas")?.remove();
     } else if (label.classList.contains("is-text-anim")) {
       stopTextAnim(label);
       clearBareTextAnimSeat(label);

@@ -41,6 +41,19 @@ export function textShiftEm(slider: number): number {
  */
 export const TEXT_INK_PAD = 2;
 
+/** CSS em-box ascent (top → alphabetic baseline) for matching DOM to canvas paint. */
+export function measureTextFontAscent(slot: TextSlot): number {
+  if (!measureCtx) return slot.fontSize * 0.8;
+  measureCtx.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
+  measureCtx.letterSpacing = "0px";
+  const metrics = measureCtx.measureText(slot.text || "M");
+  return (
+    metrics.fontBoundingBoxAscent ??
+    metrics.actualBoundingBoxAscent ??
+    slot.fontSize * 0.8
+  );
+}
+
 /** Tight letterform bounds for free-standing type (no holding shape). */
 export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
   const fallback = Math.max(8, Math.ceil(slot.fontSize) + TEXT_INK_PAD * 2);

@@ -207,16 +207,16 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
   }
   if (maxW > 0) clip.style.width = `${Math.ceil(maxW)}px`;
 
-  opts.prepare?.(label);
-
-  // Start at resting pose so enabling Animate does not fly letters in from below
-  // (fromTo's default immediateRender was shifting the word on the first frame).
+  // Start at resting pose (identity) BEFORE prepare/seat so ink measurement matches
+  // the first visible frame — no travel offset, no fly-in on Animate.
   gsap.set(rows, { autoAlpha: 0 });
   const first = rows[0];
   if (first) {
     gsap.set(first, { autoAlpha: 1 });
-    gsap.set(first.querySelectorAll<HTMLElement>(".char"), { y: 0, autoAlpha: 1 });
+    gsap.set(first.querySelectorAll<HTMLElement>(".char"), { y: 0, autoAlpha: 1, x: 0 });
   }
+  opts.prepare?.(label);
+
   const tl = gsap.timeline({ repeat: -1 });
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!;
