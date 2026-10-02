@@ -1,5 +1,5 @@
 import Matter from "matter-js";
-import arrowsOutSimple from "@phosphor-icons/core/assets/regular/arrows-out-simple.svg?raw";
+import handGrabbing from "@phosphor-icons/core/assets/regular/hand-grabbing.svg?raw";
 import { imageColliderId } from "./icons";
 import { isColorMask, isSvgSource, type ChipDraw, type ChipPose } from "./chipKinds";
 import {
@@ -2213,14 +2213,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         btn.className = `chip-xform-handle ${XFORM_CORNER_CLASS[id]}`;
         btn.tabIndex = -1;
         btn.setAttribute("aria-label", "Rotate and scale");
-        btn.dataset.icon = "out-simple";
-        btn.innerHTML = arrowsOutSimple;
+        btn.dataset.icon = "hand-grabbing";
+        btn.innerHTML = handGrabbing;
         el.append(btn);
       } else {
         handle.className = `chip-xform-handle ${XFORM_CORNER_CLASS[id]}`;
-        if (handle.dataset.icon !== "out-simple") {
-          handle.innerHTML = arrowsOutSimple;
-          handle.dataset.icon = "out-simple";
+        if (handle.dataset.icon !== "hand-grabbing") {
+          handle.innerHTML = handGrabbing;
+          handle.dataset.icon = "hand-grabbing";
           handle.setAttribute("aria-label", "Rotate and scale");
         }
       }

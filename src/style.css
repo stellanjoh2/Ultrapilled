@@ -905,9 +905,9 @@ html[data-theme="day"] .stage.is-portrait .playfield {
    Polar drag — radial = scale, angular = rotate. */
 .chip-xform-handle {
   --xform-pop: 0.92;
-  --xform-size: 28px;
-  --xform-icon: 14px;
-  --xform-radius: 8px;
+  --xform-size: 31px;
+  --xform-icon: 16px;
+  --xform-radius: 9px;
   position: absolute;
   z-index: 5;
   left: auto;
@@ -1056,26 +1056,11 @@ html[data-theme="day"] .chip-xform-handle {
   height: var(--xform-icon);
   display: block;
   pointer-events: none;
-  transform: scaleX(-1);
+  /* Grab hand stays upright on every corner (not directional like arrows-out). */
+  transform: none;
   transition:
     width 0.14s ease,
     height 0.14s ease;
-}
-
-.chip-xform-handle--ne svg {
-  transform: scale(-1);
-}
-
-.chip-xform-handle--nw svg {
-  transform: scaleX(-1);
-}
-
-.chip-xform-handle--sw svg {
-  transform: none;
-}
-
-.chip-xform-handle--se svg {
-  transform: scaleX(-1);
 }
 
 @media (prefers-reduced-motion: no-preference) {
