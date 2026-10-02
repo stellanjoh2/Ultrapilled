@@ -164,12 +164,13 @@ export function paintTextInk(
   color: string | CanvasGradient,
   shiftEm: number,
   ink: TextInk = measureTextInk(slot, tracking),
-  /** When set, each glyph is clipped from a full-string draw so kerning stays put. */
+  /** Per-glyph y/alpha for bare letter-cycle. Omit (or all rest) for static ink. */
   poses?: GlyphPose[] | null,
 ) {
   const text = slot.text || "";
   const chars = [...text];
   const n = chars.length;
+  if (n === 0) return;
   const fontSize = slot.fontSize;
   const baselineY = ink.baseline + shiftEm * fontSize;
 
@@ -177,45 +178,18 @@ export function paintTextInk(
   ctx.fillStyle = color;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.letterSpacing = `${tracking}em`;
-
-  const resting =
-    !poses ||
-    n === 0 ||
-    poses.length < n ||
-    poses.every((p) => Math.abs(p.y) < 0.05 && p.alpha >= 0.999);
-
-  if (resting) {
-    // Identical to static bare paint — no per-glyph layout drift.
-    if (n > 0) ctx.fillText(text, ink.originX, baselineY);
-    return;
-  }
-
+  // Always glyph-by-glyph with the same starts — static and Animate share layout
+  // (pair kerning + tracking). Never clip a full-string draw (that shredded letters).
   const starts = textInkGlyphStarts(ctx, text, fontSize, tracking, ink.originX);
   ctx.letterSpacing = "0px";
-  const endX =
-    starts.length > 0
-      ? starts[n - 1]! +
-        ctx.measureText(chars[n - 1] === " " ? "\u00a0" : chars[n - 1]!).width +
-        TEXT_INK_PAD
-      : ink.originX;
-  const edges = [...starts, endX];
 
-  ctx.letterSpacing = `${tracking}em`;
-  const clipTop = -fontSize * 2;
-  const clipH = fontSize * 5;
   for (let i = 0; i < n; i++) {
-    const pose = poses![i]!;
+    const pose = poses?.[i] ?? { y: 0, alpha: 1 };
     if (pose.alpha < 0.001) continue;
-    const left = edges[i]! - (i === 0 ? TEXT_INK_PAD : 0);
-    const right = edges[i + 1]! + (i === n - 1 ? TEXT_INK_PAD : 0);
+    const ch = chars[i] === " " ? "\u00a0" : chars[i]!;
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(left, clipTop, Math.max(1, right - left), clipH);
-    ctx.clip();
-    ctx.translate(0, pose.y);
     ctx.globalAlpha *= pose.alpha;
-    ctx.fillText(text, ink.originX, baselineY);
+    ctx.fillText(ch, starts[i]!, baselineY + pose.y);
     ctx.restore();
   }
 }
