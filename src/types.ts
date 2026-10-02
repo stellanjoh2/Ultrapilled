@@ -106,6 +106,8 @@ export type ImageSlot = {
   saturation?: number;
   /** Per-image hue-rotate degrees (−180…180). 0 is neutral. Raster uploads only. */
   hue?: number;
+  /** Per-image color temperature in Kelvin (2000…10000). 6000 is neutral (Orby). Raster uploads only. */
+  temperature?: number;
   /** Recolor an uploaded SVG with theme ink. Off keeps the file’s original colors. */
   tint?: boolean;
   /** Upload hitbox: `block` (default) or `sphere`. Unset uses a box. */
@@ -181,6 +183,12 @@ export const DEFAULT_IMAGE_CONTRAST = 0;
 export const DEFAULT_IMAGE_SATURATION = 0;
 export const DEFAULT_IMAGE_HUE = 0;
 
+/** Orby Color & Tone Kelvin range — blue (cool) at min, peach (warm) at max. */
+export const IMAGE_TEMPERATURE_MIN_K = 2000;
+export const IMAGE_TEMPERATURE_MAX_K = 10000;
+export const IMAGE_TEMPERATURE_NEUTRAL_K = 6000;
+export const IMAGE_TEMPERATURE_STEP_K = 50;
+
 export function imageExposureOf(value: number | undefined): number {
   return Math.max(-100, Math.min(100, Math.round(value ?? DEFAULT_IMAGE_EXPOSURE)));
 }
@@ -195,6 +203,29 @@ export function imageSaturationOf(value: number | undefined): number {
 
 export function imageHueOf(value: number | undefined): number {
   return Math.max(-180, Math.min(180, Math.round(value ?? DEFAULT_IMAGE_HUE)));
+}
+
+/** Clamp Kelvin to Orby's range and snap to the 50K slider step. */
+export function imageTemperatureOf(value: number | undefined): number {
+  const raw = Number.isFinite(value) ? Number(value) : IMAGE_TEMPERATURE_NEUTRAL_K;
+  const stepped = Math.round(raw / IMAGE_TEMPERATURE_STEP_K) * IMAGE_TEMPERATURE_STEP_K;
+  return Math.max(IMAGE_TEMPERATURE_MIN_K, Math.min(IMAGE_TEMPERATURE_MAX_K, stepped));
+}
+
+/**
+ * Orby-normalized temperature (−1…1) for white-balance.
+ * Above neutral → warm (more R / less B); below → cool.
+ */
+export function imageTemperatureNormalized(kelvin: number): number {
+  const k = imageTemperatureOf(kelvin);
+  if (k >= IMAGE_TEMPERATURE_NEUTRAL_K) {
+    return (k - IMAGE_TEMPERATURE_NEUTRAL_K) / (IMAGE_TEMPERATURE_MAX_K - IMAGE_TEMPERATURE_NEUTRAL_K);
+  }
+  return (k - IMAGE_TEMPERATURE_NEUTRAL_K) / (IMAGE_TEMPERATURE_NEUTRAL_K - IMAGE_TEMPERATURE_MIN_K);
+}
+
+export function imageTemperatureLabel(kelvin: number): string {
+  return `${imageTemperatureOf(kelvin)}K`;
 }
 
 export const PHYSICS_COMPLEXITY = [

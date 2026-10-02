@@ -16,10 +16,15 @@ import {
 import { textAnimSpeedOf } from "../textAnim";
 import { playCreate, playTransition } from "../uiSounds";
 import {
+  IMAGE_TEMPERATURE_MAX_K,
+  IMAGE_TEMPERATURE_MIN_K,
+  IMAGE_TEMPERATURE_STEP_K,
   imageContrastOf,
   imageExposureOf,
   imageHueOf,
   imageSaturationOf,
+  imageTemperatureLabel,
+  imageTemperatureOf,
   type AppState,
   type ImageSlot,
   type Slot,
@@ -863,6 +868,9 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>
     <div class="slot-group slot-group--ruled">
+      <label class="field field--temperature" data-tip="Warm or cool this image (Kelvin)">${H.settingLabel(slot, "Temperature", "temperature", imageTemperatureLabel(imageTemperatureOf(slot.temperature)))}
+        <input type="range" data-key="temperature" min="${IMAGE_TEMPERATURE_MIN_K}" max="${IMAGE_TEMPERATURE_MAX_K}" step="${IMAGE_TEMPERATURE_STEP_K}" value="${imageTemperatureOf(slot.temperature)}" />
+      </label>
       <label class="field" data-tip="Brighten or darken this image">${H.settingLabel(slot, "Exposure", "exposure", String(imageExposureOf(slot.exposure)))}
         <input type="range" data-key="exposure" min="-100" max="100" step="1" value="${imageExposureOf(slot.exposure)}" />
       </label>

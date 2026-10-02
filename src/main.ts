@@ -16,6 +16,8 @@ import {
   imageExposureOf,
   imageHueOf,
   imageSaturationOf,
+  imageTemperatureLabel,
+  imageTemperatureOf,
   physicsComplexity,
   normalizeBackground,
   defaultImageSlot,
@@ -1704,6 +1706,7 @@ function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
   slot.contrast = undefined;
   slot.saturation = undefined;
   slot.hue = undefined;
+  slot.temperature = undefined;
   if (svg) {
     slot.radius = 0;
     slot.stroked = undefined;
@@ -1762,6 +1765,7 @@ function assignVideoFile(slot: ImageSlot, file: File): Promise<void> {
   slot.contrast = undefined;
   slot.saturation = undefined;
   slot.hue = undefined;
+  slot.temperature = undefined;
   slot.collider = undefined;
   if (slot.radius == null) slot.radius = 12;
   slot.size = DEFAULT_YOUTUBE_SIZE;
@@ -2416,6 +2420,7 @@ type ImageBaseline = Pick<
   | "contrast"
   | "saturation"
   | "hue"
+  | "temperature"
   | "tint"
   | "collider"
   | "blend"
@@ -2497,6 +2502,7 @@ function captureBaseline(slot: Slot) {
     contrast: slot.contrast,
     saturation: slot.saturation,
     hue: slot.hue,
+    temperature: slot.temperature,
     tint: slot.tint,
     collider: slot.collider,
     blend: slot.blend,
@@ -2574,6 +2580,7 @@ function imageBaseline(slot: ImageSlot): ImageBaseline {
     contrast: seed.contrast,
     saturation: seed.saturation,
     hue: seed.hue,
+    temperature: seed.temperature,
     tint: seed.tint,
     collider: seed.collider,
     blend: seed.blend,
@@ -2680,6 +2687,8 @@ function fieldDirty(slot: Slot, key: string): boolean {
       return imageSaturationOf(slot.saturation) !== imageSaturationOf(base.saturation);
     case "hue":
       return imageHueOf(slot.hue) !== imageHueOf(base.hue);
+    case "temperature":
+      return imageTemperatureOf(slot.temperature) !== imageTemperatureOf(base.temperature);
     case "tint":
       return Boolean(slot.tint) !== Boolean(base.tint);
     case "color":
@@ -2837,6 +2846,7 @@ function applyFieldReset(slot: Slot, key: string) {
     else if (key === "contrast") slot.contrast = base.contrast;
     else if (key === "saturation") slot.saturation = base.saturation;
     else if (key === "hue") slot.hue = base.hue;
+    else if (key === "temperature") slot.temperature = base.temperature;
     else if (key === "tint") {
       slot.tint = base.tint;
       if (!slot.tint) {
@@ -2979,6 +2989,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       if (slot.kind === "image" && key === "contrast") slot.contrast = imageContrastOf(Number(value));
       if (slot.kind === "image" && key === "saturation") slot.saturation = imageSaturationOf(Number(value));
       if (slot.kind === "image" && key === "hue") slot.hue = imageHueOf(Number(value));
+      if (slot.kind === "image" && key === "temperature") slot.temperature = imageTemperatureOf(Number(value));
       if (slot.kind === "image" && key === "amount") {
         slot.amount = Math.max(1, Math.min(AMOUNT_SOFT_CAP, Math.round(Number(value))));
         recountShapes();
@@ -3041,37 +3052,41 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) caption.textContent = `Text anim speed ${Math.round(Number(input.value))}`;
       }
-      if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius" || key === "dropShadowRadius" || key === "dropShadowDistance" || key === "dropShadowOpacity" || key === "exposure" || key === "contrast" || key === "saturation" || key === "hue") {
+      if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius" || key === "dropShadowRadius" || key === "dropShadowDistance" || key === "dropShadowOpacity" || key === "exposure" || key === "contrast" || key === "saturation" || key === "hue" || key === "temperature") {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
-          const name =
-            key === "textHeight"
-              ? "Text height"
-              : key === "stroke"
-                ? "Stroke"
-                : key === "pillPad"
-                  ? "Shape padding"
-                  : key === "tracking"
-                    ? "Tracking"
-                    : key === "radius"
-                      ? "Corner radius"
-                      : key === "dropShadowRadius"
-                        ? "Shadow radius"
-                        : key === "dropShadowDistance"
-                          ? "Shadow distance"
-                          : key === "dropShadowOpacity"
-                            ? "Shadow opacity"
-                            : key === "exposure"
-                              ? "Exposure"
-                              : key === "contrast"
-                                ? "Contrast"
-                                : key === "saturation"
-                                  ? "Saturation"
-                                  : key === "hue"
-                                    ? "Hue"
-                                    : "Amount";
-          const suffix = key === "hue" ? "°" : "";
-          caption.textContent = `${name} ${Math.round(Number(input.value))}${suffix}`;
+          if (key === "temperature") {
+            caption.textContent = `Temperature ${imageTemperatureLabel(Number(input.value))}`;
+          } else {
+            const name =
+              key === "textHeight"
+                ? "Text height"
+                : key === "stroke"
+                  ? "Stroke"
+                  : key === "pillPad"
+                    ? "Shape padding"
+                    : key === "tracking"
+                      ? "Tracking"
+                      : key === "radius"
+                        ? "Corner radius"
+                        : key === "dropShadowRadius"
+                          ? "Shadow radius"
+                          : key === "dropShadowDistance"
+                            ? "Shadow distance"
+                            : key === "dropShadowOpacity"
+                              ? "Shadow opacity"
+                              : key === "exposure"
+                                ? "Exposure"
+                                : key === "contrast"
+                                  ? "Contrast"
+                                  : key === "saturation"
+                                    ? "Saturation"
+                                    : key === "hue"
+                                      ? "Hue"
+                                      : "Amount";
+            const suffix = key === "hue" ? "°" : "";
+            caption.textContent = `${name} ${Math.round(Number(input.value))}${suffix}`;
+          }
         }
       }
       if (key === "scale" && input instanceof HTMLInputElement) {
@@ -3863,6 +3878,7 @@ function copySlotStyle(slot: Slot) {
         contrast: slot.contrast,
         saturation: slot.saturation,
         hue: slot.hue,
+        temperature: slot.temperature,
         tint: slot.tint,
         blend: slot.blend,
         dropShadow: slot.dropShadow,
@@ -3946,6 +3962,7 @@ function pasteSlotStyle(id: string) {
     slot.contrast = style.contrast;
     slot.saturation = style.saturation;
     slot.hue = style.hue;
+    slot.temperature = style.temperature;
     slot.tint = style.tint;
     slot.blend = style.blend;
     slot.dropShadow = style.dropShadow;
