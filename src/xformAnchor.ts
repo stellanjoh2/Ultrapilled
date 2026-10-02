@@ -42,3 +42,14 @@ export function scaleFromPivotRatio(
   const safeStart = Math.max(1e-6, startDist);
   return startScale * (Math.max(1, dist) / safeStart);
 }
+
+/** Keep this fraction of free-transform release fling (Matter positionPrev lag). */
+export const XFORM_RELEASE_IMPULSE = 0.25;
+
+/** Scale a release linear/angular velocity by the keep-factor (default 25%). */
+export function scaleXformReleaseImpulse(
+  value: number,
+  factor = XFORM_RELEASE_IMPULSE,
+): number {
+  return value * factor;
+}

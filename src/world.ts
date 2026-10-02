@@ -26,6 +26,7 @@ import {
   oppositeXformCorner,
   reanchorStartDist,
   scaleFromPivotRatio,
+  scaleXformReleaseImpulse,
   type XformCorner,
 } from "./xformAnchor";
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
@@ -2828,6 +2829,18 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         Body.setVelocity(item.body, { x: 0, y: 0 });
         Body.setAngularVelocity(item.body, 0);
         Sleeping.set(item.body, true);
+      } else {
+        // Body.scale about a corner moves position but not positionPrev while static.
+        // Unlocking would turn the full COM drift into a bow-shot; keep ~25%.
+        const v = Body.getVelocity(item.body);
+        Body.setVelocity(item.body, {
+          x: scaleXformReleaseImpulse(v.x),
+          y: scaleXformReleaseImpulse(v.y),
+        });
+        Body.setAngularVelocity(
+          item.body,
+          scaleXformReleaseImpulse(Body.getAngularVelocity(item.body)),
+        );
       }
       // Live Body.scale is only a preview — clear the mesh key so refresh remeshes to the final size.
       if (bodyFactor !== 1) item.meshKey = "";
