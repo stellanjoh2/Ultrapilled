@@ -42,16 +42,16 @@ import { backgroundImage, backgroundPaint, gridDivisions, logoBackdropColor, log
 import { mountColorPicker } from "./colorPicker";
 import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
 import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
-import { inkOn, logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
+import { logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import {
   LOGOTYPE_REVEAL_EASE,
   LOGOTYPE_REVEAL_MASK_S,
   LOGOTYPE_REVEAL_STAGGER_S,
   logotypeRevealMarkup,
-  loopLogotypeReveal,
   playLogotypeReveal,
   settleLogotypeReveal,
 } from "./logotypeReveal";
+import { logotypeInk, mountHeaderLogotype } from "./logotypeLive";
 import { mountProTip, releaseProTips, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
@@ -331,6 +331,7 @@ const themeShelf = createThemeShelf({
   onApply(colors, stage) {
     remember();
     state.theme = [...colors];
+    headerLogotype.retarget();
     if (stage) {
       state.stageColor = stage;
       state.background.kind = "solid";
@@ -4420,18 +4421,21 @@ const INTRO_LOGO_SCALE_EASE = "expo.inOut";
 let introActive = true;
 /** Flips true when boot finishes and the main UI is revealed — logo stays white until then. */
 let logotypeLive = false;
+/** Header wordmark colors. No-op until the topbar mark is mounted. */
+let headerLogotype: { refresh(): void; retarget(): void } = { refresh() {}, retarget() {} };
 
 /**
  * Pill → readable theme accent once live (skips fills that match the backdrop).
- * Glyphs → white/black via inkOn (luminance > 0.55 → dark) against the stage/backdrop.
+ * Glyphs → white/black against the canvas fill (luminance gap, never the same colour).
  * Load sequence keeps everything white.
  */
 function syncLogotypeAccent() {
   const backdrop = logoBackdropColor(state.background, state.stageColor);
   const pill = logotypeLive ? logotypePillColor(state.theme, backdrop) : "#ffffff";
-  const ink = logotypeLive ? inkOn(backdrop) : "#ffffff";
+  const ink = logotypeLive ? logotypeInk(backdrop) : "#ffffff";
   document.documentElement.style.setProperty("--logotype-pill", pill);
   document.documentElement.style.setProperty("--logotype-ink", ink);
+  headerLogotype.refresh();
 }
 
 /** Resolves when the intro animation has finished (overlay may still cover). */
@@ -5658,18 +5662,13 @@ async function resetToModeSelect() {
   const logo = shell.querySelector<HTMLElement>(".topbar .logotype");
   if (logo) {
     settleLogotypeReveal(logo);
-    let stopLoop: (() => void) | null = null;
-    const endLoop = () => {
-      stopLoop?.();
-      stopLoop = null;
-    };
-    logo.addEventListener("pointerenter", () => {
-      if (stopLoop) return;
-      stopLoop = loopLogotypeReveal(logo);
-    });
-    logo.addEventListener("pointerleave", endLoop);
+    const live = mountHeaderLogotype(logo, () => ({
+      theme: state.theme,
+      backdrop: logoBackdropColor(state.background, state.stageColor),
+    }));
+    headerLogotype = live;
+    headerLogotype.refresh();
     logo.addEventListener("click", () => {
-      endLoop();
       void resetToModeSelect();
     });
   }
