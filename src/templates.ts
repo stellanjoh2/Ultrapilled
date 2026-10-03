@@ -1,3 +1,4 @@
+import { storeBackgroundImage } from "./background";
 import { ICON_PRESETS } from "./icons";
 import { modeSelectPreviewState, MODE_SELECT_THEME_ID } from "./modeSelectTheme";
 import { DEFAULT_THEME } from "./theme";
@@ -568,9 +569,14 @@ export function ultrapilledState(): AppState {
         { id: uid(), color: "#07060c", at: 100 },
       ],
       imageId: "",
-      logoId: "",
+      logoId: storeBackgroundImage("/ultrapiled-logo.svg", "ultrapiled-logo.svg", 276.31, 76.32),
+      // Intro mark is 50vw, and the opening frame scales it by 1.5, so 75% of the frame width.
+      logoScale: 8 / 3,
+      logoOriginal: "#ffffff",
+      logoTint: null,
+      logoColor: "#ffffff",
       grid: true,
-      gridDensity: "base",
+      gridDensity: "fine",
       gridColor: "#ffffff",
       gridOpacity: 20,
     },
@@ -581,7 +587,7 @@ export function ultrapilledState(): AppState {
     textTracking: 0,
     shapeAmount: 18,
     theme: ["#ffffff", "#c4ff00", "#3b00ff", "#00e5ff", "#ff3ec8"],
-    post: { bloom: 0, bloomOpacity: 80, grain: 18, vignette: 28, saturate: 110, hue: 0, blend: "normal" },
+    post: { bloom: 0, bloomOpacity: 80, grain: 18, vignette: 28, saturate: 110, hue: 0, blend: "difference" },
     physics: { ...DEFAULT_PHYSICS },
     template: "ultrapilled",
     slots,
