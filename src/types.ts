@@ -360,6 +360,10 @@ export type BackgroundSettings = {
   logoTint: number | null;
   /** Custom color from the picker. Empty follows logoTint or the original. */
   logoColor: string;
+  /** When true, the logo draws above falling assets. */
+  logoFront: boolean;
+  /** Mix blend for the centered logo. */
+  logoBlend: BlendMode;
   grid: boolean;
   gridDensity: GridDensity;
   gridColor: string;
@@ -381,6 +385,8 @@ export function defaultBackground(): BackgroundSettings {
     logoOriginal: "",
     logoTint: null,
     logoColor: "",
+    logoFront: false,
+    logoBlend: "normal",
     grid: true,
     gridDensity: "base",
     gridColor: "#ffffff",
@@ -395,6 +401,8 @@ export function normalizeBackground(raw: Partial<BackgroundSettings> | null | un
     ...base,
     ...raw,
     stops: Array.isArray(raw.stops) && raw.stops.length >= 2 ? raw.stops : base.stops,
+    logoFront: Boolean(raw.logoFront),
+    logoBlend: blendMode(typeof raw.logoBlend === "string" ? raw.logoBlend : undefined),
     grid: Boolean(raw.grid),
     gridDensity: raw.gridDensity === "finest" || raw.gridDensity === "fine" ? raw.gridDensity : "base",
     gridColor: typeof raw.gridColor === "string" && raw.gridColor ? raw.gridColor : base.gridColor,

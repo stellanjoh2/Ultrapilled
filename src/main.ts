@@ -55,7 +55,7 @@ import { logotypeInk, mountHeaderLogotype } from "./logotypeLive";
 import { mountProTip, releaseProTips, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
-import { blankPrefabText, blankState, templateLabel } from "./templates";
+import { blankPrefabText, blankState, preloadUltrapilledLogo, ultrapilledLogoAsset, templateLabel } from "./templates";
 import {
   customTemplateLabel,
   deleteCustomTemplate,
@@ -133,6 +133,7 @@ import { createPlaySession, type PlaySession } from "./playSession";
 
 syncUiScale();
 preloadModeSelectMedia();
+preloadUltrapilledLogo();
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (!appRoot) throw new Error("#app missing");
@@ -968,6 +969,7 @@ function bootRevealGrid() {
   gridHoldForHandoff = false;
   if (!layer || !state.background.grid) {
     applyGrid();
+    if (state.background.logoId) applyLogo();
     releaseProTips();
     return;
   }
@@ -997,11 +999,78 @@ function bootRevealGrid() {
       },
     },
   );
+  if (state.background.logoId) applyLogo();
 }
 
 const logoImages = new Map<string, HTMLImageElement>();
+/** Decode warm by src so the Ultrapilled mark is ready before first mask paint. */
+const logoSrcReady = new Map<string, Promise<HTMLImageElement | null>>();
 let logoNode: HTMLElement | null = null;
 let logoGlow: HTMLElement | null = null;
+const LOGO_REVEAL_S = 0.5;
+const LOGO_REVEAL_EASE = "circ.out";
+/** logoId last revealed — skip replay on resize/tint. */
+let logoRevealKey = "";
+
+function warmLogoSrc(src: string): Promise<HTMLImageElement | null> {
+  const hit = logoSrcReady.get(src);
+  if (hit) return hit;
+  const pending = new Promise<HTMLImageElement | null>((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+    void image.decode?.().catch(() => {});
+  });
+  logoSrcReady.set(src, pending);
+  return pending;
+}
+
+// Same cache applyLogo waits on — bake + decode during boot/intro.
+void warmLogoSrc(ultrapilledLogoAsset().dataUrl);
+
+function logoRevealNodes(): HTMLElement[] {
+  return [logoNode, logoGlow].filter((node): node is HTMLElement => Boolean(node));
+}
+
+function logoWantsReveal(): boolean {
+  return state.template === "ultrapilled" && Boolean(state.background.logoId);
+}
+
+function holdLogoReveal(): boolean {
+  // Boot / Mode Select handoff only — `h` also toggles ui-hidden, but the stage logo is artwork.
+  return !logotypeLive || gridHoldForHandoff;
+}
+
+function playLogoReveal(nodes: HTMLElement[], key: string) {
+  logoRevealKey = key;
+  gsap.killTweensOf(nodes);
+  if (reducedMotion()) {
+    gsap.set(nodes, { scale: 1 });
+    return;
+  }
+  gsap.fromTo(nodes, { scale: 0 }, { scale: 1, duration: LOGO_REVEAL_S, ease: LOGO_REVEAL_EASE });
+}
+
+function syncLogoReveal() {
+  const nodes = logoRevealNodes();
+  if (!nodes.length) return;
+  if (!logoWantsReveal()) {
+    gsap.killTweensOf(nodes);
+    gsap.set(nodes, { scale: 1 });
+    logoRevealKey = "";
+    return;
+  }
+  if (holdLogoReveal()) {
+    gsap.killTweensOf(nodes);
+    gsap.set(nodes, { scale: 0 });
+    logoRevealKey = "";
+    return;
+  }
+  const key = state.background.logoId;
+  if (logoRevealKey === key) return;
+  playLogoReveal(nodes, key);
+}
 
 function applyLogo() {
   const layer = playfield.querySelector<HTMLElement>("#logo-layer");
@@ -1010,12 +1079,17 @@ function applyLogo() {
   const background = state.background;
   const file = backgroundImage(background.logoId ?? "");
   const clearGlow = () => {
+    if (logoGlow) gsap.killTweensOf(logoGlow);
     if (!glowLayer) return;
     glowLayer.hidden = true;
     glowLayer.replaceChildren();
     logoGlow = null;
   };
+  stage.style.setProperty("--logo-blend", blendMode(background.logoBlend));
+  layer.classList.toggle("is-front", Boolean(background.logoFront));
   if (!file) {
+    gsap.killTweensOf(logoRevealNodes());
+    logoRevealKey = "";
     layer.hidden = true;
     layer.replaceChildren();
     logoNode = null;
@@ -1033,6 +1107,7 @@ function applyLogo() {
     const place = (host: HTMLElement, node: HTMLElement | null) => {
       host.hidden = false;
       if (!node || node.dataset.mode !== mode || node.dataset.id !== background.logoId) {
+        if (node) gsap.killTweensOf(node);
         const next = document.createElement(fill ? "div" : "img");
         next.className = "logo-mark";
         next.dataset.mode = mode;
@@ -1058,10 +1133,16 @@ function applyLogo() {
     logoNode = place(layer, logoNode);
     if (svg && glowLayer) logoGlow = place(glowLayer, logoGlow);
     else clearGlow();
+    syncLogoReveal();
   };
-  // Masked SVGs only need stored dimensions — don't block paint on <img> decode.
+  // Wait for SVG decode before reveal — first mask paint otherwise pops mid-scale.
   if (file.width > 0 && file.height > 0 && isSvgLogo(file.name, file.src) && logoFill(state.background, state.theme)) {
-    draw(null);
+    const logoId = background.logoId;
+    void warmLogoSrc(file.src).then((image) => {
+      if (logoId !== state.background.logoId) return;
+      if (image) logoImages.set(logoId, image);
+      draw(image);
+    });
     return;
   }
   const cached = logoImages.get(background.logoId);
@@ -1069,16 +1150,12 @@ function applyLogo() {
     draw(cached);
     return;
   }
-  const image = new Image();
-  image.onload = () => {
-    logoImages.set(background.logoId, image);
-    draw(image);
-  };
-  image.onerror = () => {
-    // Still place a masked mark when dimensions are known (broken SVG-as-image decode).
-    if (file.width > 0 && file.height > 0) draw(null);
-  };
-  image.src = file.src;
+  const logoId = background.logoId;
+  void warmLogoSrc(file.src).then((image) => {
+    if (logoId !== state.background.logoId) return;
+    if (image) logoImages.set(logoId, image);
+    if (image || (file.width > 0 && file.height > 0)) draw(image);
+  });
 }
 
 function applyPost() {
@@ -4479,7 +4556,10 @@ function finishIntro() {
     syncLogotypeAccent();
     shell.classList.remove("ui-hidden");
     applyGrid(); // held at --grid-reveal 0 while gridHoldForHandoff
-    if (!modeSelectContinuity) releaseProTips();
+    if (!modeSelectContinuity) {
+      if (state.background.logoId) applyLogo();
+      releaseProTips();
+    }
     resize();
     if (!intro) return;
     intro.classList.add("is-done");

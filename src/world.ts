@@ -841,7 +841,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function purgeFallen(limitY: number) {
     chips = chips.filter((chip) => {
       const reach = Math.hypot(chip.width, chip.height) / 2;
-      if (chip.body.position.y - reach < limitY + Math.max(480, reach + 240)) return true;
+      // During a dump, drop as soon as the chip is fully under the playfield.
+      // The long grace exists so live piles don't pop when they clip the bottom.
+      const grace = floorOpen ? Math.min(64, Math.max(16, reach * 0.1)) : Math.max(480, reach + 240);
+      if (chip.body.position.y - reach < limitY + grace) {
+        if (floorOpen && chip.body.isSleeping) Sleeping.set(chip.body, false);
+        return true;
+      }
       if (pending?.chip === chip) cancelPending();
       if (drag?.pins.some((entry) => entry.chip === chip)) dropPin();
       Composite.remove(engine.world, chip.body);

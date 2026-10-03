@@ -514,12 +514,16 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
   const logoFile = backgroundImage(scene.background.logoId);
   const logo = logoFile ? await loadImage(logoFile.src) : null;
   const blend = canvasBlend(scene.post.blend);
-  if (logo) {
-    ctx.save();
-    ctx.globalCompositeOperation = blend;
-    paintLogo(ctx, scene.width, scene.height, scene.background, scene.theme, logo);
-    ctx.restore();
-  }
+  const logoBlend = canvasBlend(blendMode(scene.background.logoBlend));
+  const logoFront = Boolean(scene.background.logoFront);
+  const paintStageLogo = (target: CanvasRenderingContext2D) => {
+    if (!logo) return;
+    target.save();
+    target.globalCompositeOperation = logoBlend;
+    paintLogo(target, scene.width, scene.height, scene.background, scene.theme, logo);
+    target.restore();
+  };
+  if (logo && !logoFront) paintStageLogo(ctx);
 
   const isolate = blend !== "source-over";
   const pile = isolate ? buffer(chipBuffer, scene.width, scene.height) : ctx;
@@ -568,6 +572,8 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
     ctx.drawImage(chipBuffer, 0, 0);
     ctx.restore();
   }
+
+  if (logo && logoFront) paintStageLogo(ctx);
 
   if (!scene.transparent && scene.post.grain > 0) {
     const grain = await grainImage();

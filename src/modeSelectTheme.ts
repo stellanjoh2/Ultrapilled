@@ -146,6 +146,8 @@ export function modeSelectPreviewState(): AppState {
       logoOriginal: "",
       logoTint: null,
       logoColor: "",
+      logoFront: false,
+      logoBlend: "normal",
       grid: false,
       gridDensity: "fine",
       gridColor: "#ffffff",

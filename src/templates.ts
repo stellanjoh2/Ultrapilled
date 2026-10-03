@@ -495,9 +495,12 @@ export function berlinState(): AppState {
   };
 }
 
-/** Wordmark letters (public/logotype) are the drop; pills, shapes, and a lab photo fill in. */
-export function ultrapilledState(): AppState {
-  // Same bake path as a real logo upload: comments/scripts stripped, width/height set, data URL.
+/** Baked Ultrapilled stage mark — reused so preload and template share one data URL. */
+let ultrapilledLogoBake: { dataUrl: string; width: number; height: number } | null = null;
+
+/** Same bake path as a real logo upload: comments/scripts stripped, width/height set, data URL. */
+export function ultrapilledLogoAsset(): { dataUrl: string; width: number; height: number } {
+  if (ultrapilledLogoBake) return ultrapilledLogoBake;
   // XML comments cannot contain "--"; the source once had "--logotype-pill" and Chromium refused <img> load.
   const logoSvg = ultrapilledLogoRaw
     .replace(/<!--[\s\S]*?-->/g, "")
@@ -507,12 +510,36 @@ export function ultrapilledState(): AppState {
     .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
     .replace(/javascript:/gi, "");
   const viewBoxMatch = logoSvg.match(/viewBox\s*=\s*["']\s*[-\d.]+\s+[-\d.]+\s+([-\d.]+)\s+([-\d.]+)/i);
-  const logoWidth = viewBoxMatch ? Number(viewBoxMatch[1]) : 276.31;
-  const logoHeight = viewBoxMatch ? Number(viewBoxMatch[2]) : 76.32;
+  const width = viewBoxMatch ? Number(viewBoxMatch[1]) : 276.31;
+  const height = viewBoxMatch ? Number(viewBoxMatch[2]) : 76.32;
   const logoWithSize = /\bwidth\s*=/i.test(logoSvg) && /\bheight\s*=/i.test(logoSvg)
     ? logoSvg
-    : logoSvg.replace(/<svg\b/i, `<svg width="${logoWidth}" height="${logoHeight}"`);
-  const logoDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoWithSize)}`;
+    : logoSvg.replace(/<svg\b/i, `<svg width="${width}" height="${height}"`);
+  ultrapilledLogoBake = {
+    dataUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoWithSize)}`,
+    width,
+    height,
+  };
+  return ultrapilledLogoBake;
+}
+
+/** Decode the stage mark early so the first Ultrapilled reveal doesn't hitch. */
+export function preloadUltrapilledLogo(): Promise<void> {
+  const { dataUrl } = ultrapilledLogoAsset();
+  const img = new Image();
+  img.decoding = "async";
+  img.src = dataUrl;
+  if (img.decode) return img.decode().catch(() => {});
+  if (img.complete) return Promise.resolve();
+  return new Promise((resolve) => {
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+  });
+}
+
+/** Wordmark letters (public/logotype) are the drop; pills, shapes, and a lab photo fill in. */
+export function ultrapilledState(): AppState {
+  const logo = ultrapilledLogoAsset();
 
   const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
   const letter = (file: string, name: string, colorIndex: number, scale: number): ImageSlot =>
@@ -587,12 +614,14 @@ export function ultrapilledState(): AppState {
         { id: uid(), color: "#07060c", at: 100 },
       ],
       imageId: "",
-      logoId: storeBackgroundImage(logoDataUrl, "ultrapiled-logo.svg", logoWidth, logoHeight),
+      logoId: storeBackgroundImage(logo.dataUrl, "ultrapiled-logo.svg", logo.width, logo.height),
       // Intro mark is 50vw, and the opening frame scales it by 1.5, so 75% of the frame width.
       logoScale: 8 / 3,
       logoOriginal: "#ffffff",
       logoTint: null,
       logoColor: "#ffffff",
+      logoFront: false,
+      logoBlend: "difference",
       grid: true,
       gridDensity: "fine",
       gridColor: "#ffffff",
