@@ -1,8 +1,14 @@
-Ultrapilled template photos: medical research labs, 1980s, CC0 only.
-From Wikimedia Commons. This file is the Commons original (821 px wide); it was not upscaled.
+Ultrapilled template photos. From Wikimedia Commons. Files are the Commons originals; they were not upscaled.
 
-project-sida.jpg
-  "Laboratory Image from Project SIDA" (1985), Project SIDA laboratory, Kinshasa
-  Creator: Thomas C. Quinn
+carters-little-liver-pills.jpg
+  Carter's Little Liver Pills advertisement (sick headache, biliousness, constipation, bad complexion)
+  Boston Public Library, via the Digital Public Library of America and Digital Commonwealth
+  DPLA identifier: 204db79788c8a8197f2682cccbb91f98
+  License: Public domain (United States)
+  https://commons.wikimedia.org/wiki/File:Carter%27s_Little_Liver_Pills_-_sick_headache._Biliousness._Constipation._Bad_complexion._-_DPLA_-_204db79788c8a8197f2682cccbb91f98.jpg
+
+pills-blister-pack.jpg
+  Pills in blister pack (2016-10-10)
+  Artist: unknown. Source photo: https://www.pexels.com/photo/20-mg-label-blister-pack-208512/
   License: CC0 1.0
-  https://commons.wikimedia.org/wiki/File:Laboratory_Image_from_Project_SIDA.jpg
+  https://commons.wikimedia.org/wiki/File:Pills_in_blister_pack.jpg

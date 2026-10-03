@@ -533,7 +533,8 @@ export function ultrapilledState(): AppState {
     presetIcon("Stars", 1, 1, { scale: 0.45 }),
     letter("a", "a", 0, 1.8),
     letter("p", "p", 1, 1.85),
-    photo("ultrapilled", "project-sida.jpg", "Project SIDA", 115, 8),
+    photo("ultrapilled", "carters-little-liver-pills.jpg", "Carter's Little Liver Pills", 115, 8),
+    photo("ultrapilled", "pills-blister-pack.jpg", "Pills", 115, 8),
     letter("i", "i", 2, 1.9),
     letter("l2", "l", 0, 2.15),
     text({
