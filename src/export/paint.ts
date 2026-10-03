@@ -513,9 +513,14 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
   }
   const logoFile = backgroundImage(scene.background.logoId);
   const logo = logoFile ? await loadImage(logoFile.src) : null;
-  paintLogo(ctx, scene.width, scene.height, scene.background, scene.theme, logo);
-
   const blend = canvasBlend(scene.post.blend);
+  if (logo) {
+    ctx.save();
+    ctx.globalCompositeOperation = blend;
+    paintLogo(ctx, scene.width, scene.height, scene.background, scene.theme, logo);
+    ctx.restore();
+  }
+
   const isolate = blend !== "source-over";
   const pile = isolate ? buffer(chipBuffer, scene.width, scene.height) : ctx;
 

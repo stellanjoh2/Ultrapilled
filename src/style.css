@@ -541,6 +541,8 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   display: grid;
   place-items: center;
   pointer-events: none;
+  /* Same Create blend as the pile so the mark picks up the grid (and stage) underneath. */
+  mix-blend-mode: var(--post-blend);
 }
 
 .logo-mark {
