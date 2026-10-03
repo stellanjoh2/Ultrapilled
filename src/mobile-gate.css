@@ -50,3 +50,28 @@ html:has(.mobile-gate) #app {
   line-height: 0.98;
   letter-spacing: -0.045em;
 }
+
+/* Mobile overlay message */
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 999999;
+}
+
+.mobile-overlay__message {
+  margin: 0;
+  padding: 0 24px;
+  color: #ffffff;
+  font-family: "Mattone Regular", Inter, "SF Pro Display", system-ui, -apple-system, sans-serif;
+  font-size: clamp(32px, 10vw, 64px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  mix-blend-mode: difference;
+}
