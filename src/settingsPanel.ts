@@ -393,7 +393,8 @@ export function openSettings(controller: SettingsController): void {
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    // SVG icon clicks are SVGElement, not HTMLElement — use Element so Back works.
+    if (!(target instanceof Element)) return;
     if (target.closest("[data-settings-close]")) closeSettings();
   });
 

@@ -1,7 +1,7 @@
 import { mountColorPicker } from "./colorPicker";
 import { backgroundImage, gridDivisions, isSvgLogo, logoFill, sampleStopColor, stopBarGradient, storeBackgroundImage, svgOriginalColor, svgSize } from "./background";
 import type { AppState, GradientStop, GridDensity } from "./types";
-import { uid } from "./types";
+import { BLEND_MODES, blendMode, uid } from "./types";
 import { playCreate, playRemove } from "./uiSounds";
 
 const MAX_STOPS = 6;
@@ -376,13 +376,15 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
   const svg = file ? isSvgLogo(file.name, file.src) : false;
   const theme = controller.state().theme;
   const scale = background.logoScale ?? 1;
+  const front = Boolean(background.logoFront);
+  const logoBlend = blendMode(background.logoBlend);
   const original = background.logoOriginal || "#000000";
   const current = background.logoColor || (background.logoTint == null ? original : theme[background.logoTint % theme.length] || original);
   const originalOn = svg && !background.logoColor && background.logoTint == null;
   const section = document.createElement("section");
   section.className = "section";
   section.innerHTML = `
-    <h2 data-tip="Centered mark that stays behind what falls">Logotype</h2>
+    <h2 data-tip="Centered mark on the stage">Logotype</h2>
     <button type="button" class="pill" id="logo-upload" data-tip="Upload an SVG or PNG logo">${file ? "Replace logo" : "Upload logo"}</button>
     <input class="bg-file" id="logo-file" type="file" accept="image/svg+xml,image/png,.svg,.png" />
     ${
@@ -391,6 +393,15 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
           <p class="hint" id="logo-name"></p>
           <label class="field"><span id="logo-scale-label">Scale ${scale.toFixed(2)}</span>
             <input type="range" id="logo-scale" min="0.25" max="4" step="0.05" value="${scale}" />
+          </label>
+          <div class="segment" role="group" aria-label="Logo layer">
+            <button type="button" class="pill${!front ? " is-on" : ""}" data-logo-front="0" aria-pressed="${!front}" data-tip="Draw the logo under falling assets">Behind</button>
+            <button type="button" class="pill${front ? " is-on" : ""}" data-logo-front="1" aria-pressed="${front}" data-tip="Draw the logo over falling assets">In front</button>
+          </div>
+          <label class="field" data-tip="How the logo mixes with layers behind it">Blend mode
+            <select id="logo-blend">
+              ${BLEND_MODES.map((mode) => `<option value="${mode.id}"${logoBlend === mode.id ? " selected" : ""}>${mode.label}</option>`).join("")}
+            </select>
           </label>
           ${
             svg
@@ -406,13 +417,13 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
                     })
                     .join("")}
                 </div>
-                <p class="hint">The first swatch is the file's own color. The rest follow the Create theme.</p>`
+                <p class="hint">Pick a color or theme swatch to recolor the SVG. The first swatch restores the file's own color.</p>`
               : ""
           }
           <button type="button" class="pill" id="logo-clear">Remove logo</button>`
         : ""
     }
-    <p class="hint" id="logo-note">SVG or PNG. It stays in the center, behind what falls.</p>
+    <p class="hint" id="logo-note">SVG or PNG. Centered on the stage — choose whether it sits behind or in front of what falls.</p>
   `;
   panel.append(section);
 
@@ -423,10 +434,6 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
     const fill = svg ? logoFill(background, theme) : null;
     const mark = document.createElement(fill ? "div" : "img");
     mark.className = "logo-mark";
-    const box = 72;
-    const ratio = file.width > 0 && file.height > 0 ? file.width / file.height : 1;
-    mark.style.width = `${ratio >= 1 ? box : box * ratio}px`;
-    mark.style.height = `${ratio >= 1 ? box / ratio : box}px`;
     if (mark instanceof HTMLImageElement) {
       mark.src = file.src;
       mark.alt = "";
@@ -451,6 +458,24 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
     controller.apply();
   });
 
+  section.querySelectorAll<HTMLButtonElement>("[data-logo-front]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextFront = button.dataset.logoFront === "1";
+      const next = backgroundOf(controller);
+      if (next.logoFront === nextFront) return;
+      controller.remember();
+      next.logoFront = nextFront;
+      controller.apply();
+      controller.refresh();
+    });
+  });
+
+  section.querySelector<HTMLSelectElement>("#logo-blend")?.addEventListener("change", (e) => {
+    controller.remember();
+    backgroundOf(controller).logoBlend = blendMode((e.target as HTMLSelectElement).value);
+    controller.apply();
+  });
+
   const colorBtn = section.querySelector<HTMLButtonElement>("#logo-color");
   colorBtn?.addEventListener("click", () => {
     const next = backgroundOf(controller);
@@ -467,13 +492,8 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
       if (preview && file) {
         let mark = preview.querySelector<HTMLElement>(".logo-mark");
         if (!(mark instanceof HTMLElement) || mark instanceof HTMLImageElement) {
-          const previous = mark;
           mark = document.createElement("div");
           mark.className = "logo-mark";
-          if (previous) {
-            mark.style.width = previous.style.width;
-            mark.style.height = previous.style.height;
-          }
           preview.replaceChildren(mark);
         }
         mark.style.background = hex;

@@ -7,6 +7,8 @@ const MIN_CYCLE_MS = 1200;
 /** Extra ease time after motion is low before locking the hold pose. */
 const SETTLE_CONFIRM_MS = 1600;
 const PLAY_IDLE_MS = 3000;
+/** Sleeping leftovers after the floor opens — don't wait forever to loop. */
+const DUMP_STUCK_MS = 1500;
 
 export type PlaySessionHost = {
   world: WorldHandle;
@@ -50,6 +52,7 @@ export type PlaySession = {
   holdStarted: number;
   droppedAt: number;
   lastInteractAt: number;
+  dumpStarted: number;
   clearingDump: boolean;
 };
 
@@ -58,6 +61,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
   let settledSince = 0;
   let holdStarted = 0;
   let lastInteractAt = 0;
+  let dumpStarted = 0;
   let phase: PlayPhase = "idle";
   let dropTicket = 0;
   /** Floor-dump from Clear canvas — finish idle instead of looping a new drop. */
@@ -109,6 +113,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     settledSince = 0;
     holdStarted = 0;
     lastInteractAt = 0;
+    dumpStarted = 0;
     if (state.physics.layoutMode) {
       host.world.freezePile();
       host.world.sync();
@@ -207,7 +212,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     const running = host.getRunning();
     const state = host.getState();
 
-    if (running && playing) {
+    if (running && playing && phase !== "dumping") {
       holdSequenceClock(dt);
       if (state.physics.layoutMode) {
         // Rigid layout: never leave leftover throw / coast after a grab.
@@ -230,7 +235,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
       return requestAnimationFrame(frame);
     }
 
-    if (running && state.physics.layoutMode) {
+    if (running && state.physics.layoutMode && phase !== "dumping") {
       if (phase !== "holding" && phase !== "preparing") {
         phase = "holding";
         holdStarted = now;
@@ -270,15 +275,26 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
         } else {
           host.world.setFloorOpen(true);
           phase = "dumping";
+          dumpStarted = now;
           host.world.sync();
         }
-      } else if (phase === "dumping" && host.world.chipCount() === 0) {
-        if (clearingDump) {
-          clearingDump = false;
-          host.world.setFloorOpen(false);
-          finishRun();
-        } else if (!host.getRepeat()) finishRun();
-        else void drop();
+      } else if (phase === "dumping") {
+        if (!dumpStarted) dumpStarted = now;
+        if (host.world.chipCount() > 0) {
+          // Sleeping bodies ignore gravity — keep a dump awake so chips can leave.
+          host.world.setFloorOpen(true);
+          if (now - dumpStarted >= DUMP_STUCK_MS && host.world.isQuiet()) {
+            host.world.discardAll();
+          }
+        }
+        if (host.world.chipCount() === 0) {
+          if (clearingDump) {
+            clearingDump = false;
+            host.world.setFloorOpen(false);
+            finishRun();
+          } else if (!host.getRepeat()) finishRun();
+          else void drop();
+        }
       }
     }
 
@@ -328,6 +344,12 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     },
     set lastInteractAt(value: number) {
       lastInteractAt = value;
+    },
+    get dumpStarted() {
+      return dumpStarted;
+    },
+    set dumpStarted(value: number) {
+      dumpStarted = value;
     },
     get clearingDump() {
       return clearingDump;
