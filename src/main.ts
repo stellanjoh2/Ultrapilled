@@ -42,7 +42,7 @@ import { backgroundImage, backgroundPaint, gridDivisions, logoBackdropColor, log
 import { mountColorPicker } from "./colorPicker";
 import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
 import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
-import { inkOn, logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
+import { logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import {
   LOGOTYPE_REVEAL_EASE,
   LOGOTYPE_REVEAL_MASK_S,
@@ -51,7 +51,7 @@ import {
   playLogotypeReveal,
   settleLogotypeReveal,
 } from "./logotypeReveal";
-import { mountHeaderLogotype } from "./logotypeLive";
+import { logotypeInk, mountHeaderLogotype } from "./logotypeLive";
 import { mountProTip, releaseProTips, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
@@ -4426,13 +4426,13 @@ let headerLogotype: { refresh(): void; retarget(): void } = { refresh() {}, reta
 
 /**
  * Pill → readable theme accent once live (skips fills that match the backdrop).
- * Glyphs → white/black via inkOn (luminance > 0.55 → dark) against the stage/backdrop.
+ * Glyphs → white/black against the canvas fill (luminance gap, never the same colour).
  * Load sequence keeps everything white.
  */
 function syncLogotypeAccent() {
   const backdrop = logoBackdropColor(state.background, state.stageColor);
   const pill = logotypeLive ? logotypePillColor(state.theme, backdrop) : "#ffffff";
-  const ink = logotypeLive ? inkOn(backdrop) : "#ffffff";
+  const ink = logotypeLive ? logotypeInk(backdrop) : "#ffffff";
   document.documentElement.style.setProperty("--logotype-pill", pill);
   document.documentElement.style.setProperty("--logotype-ink", ink);
   headerLogotype.refresh();

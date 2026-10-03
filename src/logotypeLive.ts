@@ -1,7 +1,14 @@
-import { fillLuminance, logotypePillColor, type ColorTheme } from "./theme";
+import { fillLuminance, type ColorTheme } from "./theme";
 
-/** How many wordmark letterforms take a theme color at once. */
+/** How many wordmark letterforms take a theme color at rest. */
 const LIT_COUNT = 5;
+/** Hover reassigns theme colors across the letterforms twice a second. */
+const HOVER_MS = 500;
+/**
+ * Minimum Rec.709 luminance gap against the canvas fill.
+ * Below this a letter is treated as the same colour as the background.
+ */
+export const LOGOTYPE_MIN_LUM_GAP = 0.3;
 
 export type HeaderLogotypeSource = {
   theme: ColorTheme;
@@ -41,45 +48,65 @@ function normHex(hex: string): string {
   return `#${hexByte(r)}${hexByte(g)}${hexByte(b)}`;
 }
 
-function channelPeak(hex: string): number {
-  const [r, g, b] = parseHex(hex);
-  return Math.max(r, g, b) / 255;
+function lumGap(hex: string, backdrop: string): number {
+  return Math.abs(fillLuminance(hex) - fillLuminance(backdrop));
 }
 
-/** Still reads on the black canvas — bright enough, or a neon with a strong channel. */
-function readableOnBlack(hex: string): boolean {
-  const lum = fillLuminance(hex);
-  if (lum >= 0.2) return true;
-  return lum >= 0.08 && channelPeak(hex) >= 0.55;
+function contrasts(hex: string, backdrop: string): boolean {
+  return lumGap(hex, backdrop) >= LOGOTYPE_MIN_LUM_GAP;
 }
 
 /**
- * Second hover color: a mid/darker swatch from the same theme.
- * Falls back to a darker mix of the accent when the palette has no usable stop,
- * kept light enough to stay visible on black.
+ * Ink for uncolored letters and the TM. White on a dark canvas, near-black on a
+ * light one — whichever clears the luminance gap.
  */
-export function logotypeShadeColor(theme: ColorTheme, accent: string): string {
-  const accentKey = normHex(accent);
-  const accentLum = fillLuminance(accent);
-  const others = theme.filter((c) => normHex(c) !== accentKey);
-  const visible = others.filter(readableOnBlack);
-  const darker = visible.filter((c) => fillLuminance(c) < accentLum - 0.06);
-  const pool = (darker.length ? darker : visible).filter((c) => fillLuminance(c) <= 0.82);
-  if (pool.length) {
-    return pool.slice().sort((a, b) => Math.abs(fillLuminance(a) - 0.34) - Math.abs(fillLuminance(b) - 0.34))[0]!;
-  }
-  let mixed = mixHex(accent, "#000000", accentLum > 0.45 ? 0.46 : 0.28);
-  if (!readableOnBlack(mixed) || Math.abs(fillLuminance(mixed) - accentLum) < 0.08) {
-    mixed = mixHex(accent, "#3a3a3a", accentLum < 0.3 ? 0.4 : 0.55);
-  }
-  if (normHex(mixed) === accentKey) mixed = mixHex(accent, "#000000", 0.35);
-  return mixed;
+export function logotypeInk(backdrop: string): string {
+  const ink = fillLuminance(backdrop) > 0.55 ? "#111111" : "#ffffff";
+  if (contrasts(ink, backdrop)) return ink;
+  const other = ink === "#ffffff" ? "#111111" : "#ffffff";
+  return contrasts(other, backdrop) ? other : ink;
 }
 
-/** First five swatches, repeating if the theme is shorter. */
-function paletteFive(theme: readonly string[]): string[] {
+/** Darken on a light canvas, lighten on a dark one, until the gap clears. */
+function shiftUntil(hex: string, backdrop: string): string {
+  if (contrasts(hex, backdrop)) return hex;
+  const toward = fillLuminance(backdrop) >= 0.5 ? "#000000" : "#ffffff";
+  for (let step = 1; step <= 12; step++) {
+    const next = mixHex(hex, toward, step / 12);
+    if (contrasts(next, backdrop)) return next;
+  }
+  return fillLuminance(backdrop) >= 0.5 ? "#111111" : "#ffffff";
+}
+
+/**
+ * Keep a theme swatch when it clears the canvas. Otherwise another swatch that
+ * does, or a luminance shift of the original. `used` avoids collapsing every
+ * letter onto the same remaining swatch.
+ */
+function resolveSwatch(
+  preferred: string,
+  theme: readonly string[],
+  backdrop: string,
+  used?: Set<string>,
+): string {
+  if (contrasts(preferred, backdrop)) {
+    used?.add(normHex(preferred));
+    return preferred;
+  }
+  const alt = theme.find((swatch) => contrasts(swatch, backdrop) && !used?.has(normHex(swatch)));
+  if (alt) {
+    used?.add(normHex(alt));
+    return alt;
+  }
+  const shifted = shiftUntil(preferred, backdrop);
+  used?.add(normHex(shifted));
+  return shifted;
+}
+
+function paletteFive(theme: readonly string[], backdrop: string): string[] {
   const src = theme.length ? theme : ["#ffffff"];
-  return Array.from({ length: LIT_COUNT }, (_, i) => src[i % src.length]!);
+  const used = new Set<string>();
+  return Array.from({ length: LIT_COUNT }, (_, i) => resolveSwatch(src[i % src.length]!, src, backdrop, used));
 }
 
 function sameSet(a: readonly number[], b: readonly number[]): boolean {
@@ -108,6 +135,10 @@ function pickIndices(count: number, take: number, avoid: readonly number[]): num
   return next;
 }
 
+function reducedMotion(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 /** Header wordmark letters only — not the intro or mode-select copies, not the TM. */
 function letterPaths(root: HTMLElement): SVGPathElement[] {
   const layer = root.querySelector(".logotype-reveal__layer--white");
@@ -117,36 +148,62 @@ function letterPaths(root: HTMLElement): SVGPathElement[] {
   );
 }
 
+function tmPaths(root: HTMLElement): SVGPathElement[] {
+  const layer = root.querySelector(".logotype-reveal__layer--white");
+  if (!layer) return [];
+  return [...layer.querySelectorAll<SVGPathElement>(".logotype__tm")];
+}
+
 /**
  * Header wordmark. Five letterforms (Ultrapilled, including the pill, excluding TM)
- * take the active theme's first five swatches. The set is chosen once, when the
- * mark mounts, and again only when the color theme changes — not on a timer.
- * Hover paints the unlit letters in the theme accent and the lit ones in a
- * mid/darker theme color. Reduced motion still shows the colors, with no shuffle.
+ * take the active theme once on mount and again when the color theme changes.
+ * Every fill is checked against the canvas backdrop: a swatch within
+ * LOGOTYPE_MIN_LUM_GAP is replaced by another theme color or luminance-shifted.
+ * Hover reassigns a random theme color on every letterform every 500ms, then
+ * the resting five return. Reduced motion does not run the hover cycle.
  */
 export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotypeSource): HeaderLogotype {
   const letters = letterPaths(root);
+  const tms = tmPaths(root);
   if (!letters.length) return { refresh() {}, retarget() {}, stop() {} };
 
   let lit = pickIndices(letters.length, LIT_COUNT, []);
   let hovering = false;
+  /** Raw theme index per letter during hover, re-resolved when the backdrop changes. */
+  let hoverPicks: number[] = [];
+  let timer = 0;
+
+  const paintInk = (backdrop: string) => {
+    const ink = logotypeInk(backdrop);
+    for (const el of tms) el.style.fill = ink;
+  };
 
   const applyRest = () => {
-    const colors = paletteFive(read().theme);
+    const { theme, backdrop } = read();
+    const colors = paletteFive(theme, backdrop);
+    const ink = logotypeInk(backdrop);
     letters.forEach((el, index) => {
       const slot = lit.indexOf(index);
-      el.style.fill = slot >= 0 ? colors[slot]! : "var(--logotype-ink)";
+      el.style.fill = slot >= 0 ? colors[slot]! : ink;
     });
+    paintInk(backdrop);
   };
 
   const applyHover = () => {
     const { theme, backdrop } = read();
-    const accent = logotypePillColor(theme, backdrop);
-    const shade = logotypeShadeColor(theme, accent);
-    const litSet = new Set(lit);
+    const src = theme.length ? theme : ["#ffffff"];
     letters.forEach((el, index) => {
-      el.style.fill = litSet.has(index) ? shade : accent;
+      const preferred = src[(hoverPicks[index] ?? 0) % src.length]!;
+      el.style.fill = resolveSwatch(preferred, src, backdrop);
     });
+    paintInk(backdrop);
+  };
+
+  const rollHover = () => {
+    const { theme } = read();
+    const n = Math.max(1, theme.length);
+    hoverPicks = letters.map(() => Math.floor(Math.random() * n));
+    applyHover();
   };
 
   const paint = () => {
@@ -154,29 +211,54 @@ export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotyp
     else applyRest();
   };
 
+  const stopTimer = () => {
+    if (!timer) return;
+    window.clearInterval(timer);
+    timer = 0;
+  };
+
+  const startTimer = () => {
+    if (timer || reducedMotion()) return;
+    timer = window.setInterval(() => {
+      if (!hovering || reducedMotion()) return;
+      rollHover();
+    }, HOVER_MS);
+  };
+
   const onEnter = () => {
     hovering = true;
-    applyHover();
+    rollHover();
+    startTimer();
   };
   const onLeave = () => {
     hovering = false;
+    stopTimer();
     applyRest();
+  };
+
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const onMq = () => {
+    if (mq.matches) stopTimer();
+    else if (hovering) startTimer();
   };
 
   root.addEventListener("pointerenter", onEnter);
   root.addEventListener("pointerleave", onLeave);
-  paint();
+  mq.addEventListener("change", onMq);
+  applyRest();
 
   return {
     refresh: paint,
     retarget() {
       lit = pickIndices(letters.length, LIT_COUNT, lit);
-      paint();
+      if (!hovering) applyRest();
     },
     stop() {
+      stopTimer();
       root.removeEventListener("pointerenter", onEnter);
       root.removeEventListener("pointerleave", onLeave);
-      for (const el of letters) el.style.removeProperty("fill");
+      mq.removeEventListener("change", onMq);
+      for (const el of [...letters, ...tms]) el.style.removeProperty("fill");
     },
   };
 }
