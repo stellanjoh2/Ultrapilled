@@ -2,8 +2,6 @@ import { fillLuminance, logotypePillColor, type ColorTheme } from "./theme";
 
 /** How many wordmark letterforms take a theme color at once. */
 const LIT_COUNT = 5;
-/** How often the lit letterforms are reassigned. */
-export const LOGOTYPE_RESHUFFLE_MS = 2400;
 
 export type HeaderLogotypeSource = {
   theme: ColorTheme;
@@ -11,14 +9,12 @@ export type HeaderLogotypeSource = {
 };
 
 type HeaderLogotype = {
-  /** Repaint from the current theme without picking new letters. */
+  /** Repaint the current letters from the active theme. Does not pick new ones. */
   refresh(): void;
+  /** Pick a new set of letterforms. Used when the color theme changes. */
+  retarget(): void;
   stop(): void;
 };
-
-function reducedMotion(): boolean {
-  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
 
 function parseHex(hex: string): [number, number, number] {
   const raw = hex.replace("#", "").trim();
@@ -92,7 +88,7 @@ function sameSet(a: readonly number[], b: readonly number[]): boolean {
   return true;
 }
 
-/** `take` distinct indices, sorted. Retries once so a tick doesn't repeat the same set. */
+/** `take` distinct indices, sorted. Avoids repeating the previous set when the theme changes. */
 function pickIndices(count: number, take: number, avoid: readonly number[]): number[] {
   const n = Math.min(take, count);
   const bag = Array.from({ length: count }, (_, i) => i);
@@ -122,18 +118,18 @@ function letterPaths(root: HTMLElement): SVGPathElement[] {
 }
 
 /**
- * Living header wordmark. Five letterforms (Ultrapilled, including the pill, excluding TM)
- * take the active theme's first five swatches and reshuffle on a timer.
- * Hover replaces that with the theme accent plus one mid/darker theme color.
- * Reduced motion keeps a single assignment and does not reshuffle.
+ * Header wordmark. Five letterforms (Ultrapilled, including the pill, excluding TM)
+ * take the active theme's first five swatches. The set is chosen once, when the
+ * mark mounts, and again only when the color theme changes — not on a timer.
+ * Hover paints the unlit letters in the theme accent and the lit ones in a
+ * mid/darker theme color. Reduced motion still shows the colors, with no shuffle.
  */
 export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotypeSource): HeaderLogotype {
   const letters = letterPaths(root);
-  if (!letters.length) return { refresh() {}, stop() {} };
+  if (!letters.length) return { refresh() {}, retarget() {}, stop() {} };
 
   let lit = pickIndices(letters.length, LIT_COUNT, []);
   let hovering = false;
-  let timer = 0;
 
   const applyRest = () => {
     const colors = paletteFive(read().theme);
@@ -158,23 +154,6 @@ export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotyp
     else applyRest();
   };
 
-  const reshuffle = () => {
-    if (hovering || reducedMotion()) return;
-    lit = pickIndices(letters.length, LIT_COUNT, lit);
-    applyRest();
-  };
-
-  const start = () => {
-    if (timer || reducedMotion()) return;
-    timer = window.setInterval(reshuffle, LOGOTYPE_RESHUFFLE_MS);
-  };
-
-  const stopTimer = () => {
-    if (!timer) return;
-    window.clearInterval(timer);
-    timer = 0;
-  };
-
   const onEnter = () => {
     hovering = true;
     applyHover();
@@ -184,26 +163,19 @@ export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotyp
     applyRest();
   };
 
-  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const onMq = () => {
-    if (mq.matches) stopTimer();
-    else start();
-    paint();
-  };
-
   root.addEventListener("pointerenter", onEnter);
   root.addEventListener("pointerleave", onLeave);
-  mq.addEventListener("change", onMq);
   paint();
-  start();
 
   return {
     refresh: paint,
+    retarget() {
+      lit = pickIndices(letters.length, LIT_COUNT, lit);
+      paint();
+    },
     stop() {
-      stopTimer();
       root.removeEventListener("pointerenter", onEnter);
       root.removeEventListener("pointerleave", onLeave);
-      mq.removeEventListener("change", onMq);
       for (const el of letters) el.style.removeProperty("fill");
     },
   };

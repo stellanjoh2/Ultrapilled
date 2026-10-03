@@ -376,7 +376,7 @@ body:has(.app.ui-hidden) .ui-tip {
 }
 
 /* Idle topbar: themed white layer visible; purple/lime stay clipped.
-   Letter fills on this layer are driven by logotypeLive (theme cycle + hover). */
+   Letter fills on this layer are driven by logotypeLive (one theme set + hover). */
 .topbar .logotype-reveal__layer--white {
   clip-path: inset(0% 0% 0% 0%);
 }

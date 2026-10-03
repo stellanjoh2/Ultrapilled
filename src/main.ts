@@ -331,6 +331,7 @@ const themeShelf = createThemeShelf({
   onApply(colors, stage) {
     remember();
     state.theme = [...colors];
+    headerLogotype.retarget();
     if (stage) {
       state.stageColor = stage;
       state.background.kind = "solid";
@@ -4420,8 +4421,8 @@ const INTRO_LOGO_SCALE_EASE = "expo.inOut";
 let introActive = true;
 /** Flips true when boot finishes and the main UI is revealed — logo stays white until then. */
 let logotypeLive = false;
-/** Repaint the header wordmark's theme colors. No-op until the topbar mark is mounted. */
-let refreshHeaderLogotype = () => {};
+/** Header wordmark colors. No-op until the topbar mark is mounted. */
+let headerLogotype: { refresh(): void; retarget(): void } = { refresh() {}, retarget() {} };
 
 /**
  * Pill → readable theme accent once live (skips fills that match the backdrop).
@@ -4434,7 +4435,7 @@ function syncLogotypeAccent() {
   const ink = logotypeLive ? inkOn(backdrop) : "#ffffff";
   document.documentElement.style.setProperty("--logotype-pill", pill);
   document.documentElement.style.setProperty("--logotype-ink", ink);
-  refreshHeaderLogotype();
+  headerLogotype.refresh();
 }
 
 /** Resolves when the intro animation has finished (overlay may still cover). */
@@ -5665,8 +5666,8 @@ async function resetToModeSelect() {
       theme: state.theme,
       backdrop: logoBackdropColor(state.background, state.stageColor),
     }));
-    refreshHeaderLogotype = live.refresh;
-    refreshHeaderLogotype();
+    headerLogotype = live;
+    headerLogotype.refresh();
     logo.addEventListener("click", () => {
       void resetToModeSelect();
     });
