@@ -14,13 +14,14 @@ import {
   type TextSlot,
 } from "./types";
 
-export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | typeof MODE_SELECT_THEME_ID;
+export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | "ultrapilled" | typeof MODE_SELECT_THEME_ID;
 
 export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }[] = [
   { id: "acid", label: "London", build: acidState },
   { id: "new-york", label: "New York", build: newYorkState },
   { id: "miami", label: "Miami", build: miamiState },
   { id: "berlin", label: "Berlin", build: berlinState },
+  { id: "ultrapilled", label: "Ultrapilled", build: ultrapilledState },
   { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
 ];
 
@@ -488,6 +489,73 @@ export function berlinState(): AppState {
     post: { bloom: 0, bloomOpacity: 77, grain: 99, vignette: 52, saturate: 120, hue: 0, blend: "normal" },
     physics: { ...DEFAULT_PHYSICS },
     template: "berlin",
+    slots,
+  };
+}
+
+/** Wordmark letters (public/logotype) are the drop; pills, shapes, and a few words fill in. */
+export function ultrapilledState(): AppState {
+  const INK = 0;
+  const LIME = 1;
+  const VIOLET = 2;
+  const CYAN = 3;
+  const PINK = 4;
+  const text = (slot: Partial<TextSlot>) =>
+    defaultTextSlot({ fontFamily: "Syne", fontWeight: 800, tracking: -40, ...slot });
+  const letter = (file: string, scale: number, colorIndex: number, amount = 1): ImageSlot =>
+    defaultImageSlot({
+      src: `/logotype/${file}.svg`,
+      name: file.replace(/\d+$/, ""),
+      size: 88,
+      amount,
+      colorIndex,
+      scale,
+      tint: true,
+    });
+  const slots = [
+    letter("u", 1.85, INK, 2),
+    letter("l", 2.05, LIME),
+    text({ text: "PHYSICS", colorIndex: VIOLET, textColorIndex: INK, scale: 1.15, pillPad: 28 }),
+    letter("t", 1.7, CYAN),
+    letter("r", 1.75, PINK),
+    presetIcon("Stars", 1, LIME, { scale: 0.45 }),
+    letter("a", 1.8, INK),
+    letter("p", 1.85, LIME),
+    emoji("💊", "Pill", 2, 0.7),
+    letter("i", 1.9, VIOLET, 2),
+    letter("l2", 2.15, INK),
+    text({ text: "ULTRA", fontFamily: "Anton", fontWeight: 400, shape: "none", colorIndex: LIME, scale: 2.4, tracking: -80 }),
+    letter("l3", 1.9, CYAN),
+    letter("e", 1.7, PINK),
+    presetIcon("Rings", 1, CYAN, { scale: 0.55 }),
+    letter("d", 1.85, LIME),
+    text({ text: "DROP", colorIndex: PINK, scale: 0.85, pillPad: 36 }),
+    presetIcon("Spheres", 1, VIOLET, { scale: 0.4 }),
+    text({ text: "PILL", shape: "box", radius: 4, colorIndex: LIME, textColor: "#07060c", scale: 0.7, tracking: -20 }),
+  ].filter((slot): slot is Slot => slot != null);
+  return {
+    ...demoState(),
+    stageColor: "#07060c",
+    background: {
+      ...defaultBackground(),
+      kind: "solid",
+      shape: "radial",
+      stops: [
+        { id: uid(), color: "#1a0560", at: 0 },
+        { id: uid(), color: "#07060c", at: 100 },
+      ],
+      grid: false,
+    },
+    canvas: "16:9",
+    masterScale: 3.5,
+    sizeRandom: 55,
+    pillPad: 22,
+    textTracking: 0,
+    shapeAmount: 18,
+    theme: ["#ffffff", "#c4ff00", "#3b00ff", "#00e5ff", "#ff3ec8"],
+    post: { bloom: 0, bloomOpacity: 80, grain: 18, vignette: 28, saturate: 110, hue: 0, blend: "normal" },
+    physics: { ...DEFAULT_PHYSICS },
+    template: "ultrapilled",
     slots,
   };
 }
