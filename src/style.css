@@ -1168,12 +1168,12 @@ html[data-theme="day"] .chip-xform-handle {
   cursor: grab;
 }
 
-.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__hit-ring {
-  pointer-events: stroke;
-}
-
+/* Angle lives on the color chips only. This stroke used to grab angle from
+   anywhere near the scale ring, which rotated the fill while aiming at the asset. */
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__hit-ring,
 .chip.is-grad-angling .chip-grad-wheel__hit-ring {
-  cursor: grabbing;
+  pointer-events: none;
+  cursor: inherit;
 }
 
 /* Outer guide = max gradient scale (SVG so dash gaps are controllable). */
@@ -1204,6 +1204,27 @@ html[data-theme="day"] .chip-grad-wheel__ring {
 
 html[data-theme="day"] .chip-grad-wheel__ring-path {
   stroke: rgba(0, 0, 0, 0.4);
+}
+
+/* Closest the width ring can sit. Visual only — quieter than the dashed max ring. */
+.chip-grad-wheel__min {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.chip-grad-wheel__min-path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.32);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+html[data-theme="day"] .chip-grad-wheel__min-path {
+  stroke: rgba(0, 0, 0, 0.28);
 }
 
 /* Active scale ring — radius tracks gradientScale.

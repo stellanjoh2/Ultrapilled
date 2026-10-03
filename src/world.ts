@@ -2591,13 +2591,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       !(wheel instanceof HTMLElement) ||
       !wheel.querySelector(":scope > .chip-grad-wheel__scale") ||
       !wheel.querySelector(".chip-grad-wheel__ring-path") ||
+      !wheel.querySelector(".chip-grad-wheel__min-path") ||
       !wheel.querySelector(".chip-grad-wheel__stop-dot")
     ) {
       wheel?.remove();
       wheel = document.createElement("div");
       wheel.className = "chip-grad-wheel";
       wheel.setAttribute("aria-hidden", "true");
-      // SVG annulus hit-target so the open center still receives chip drag.
+      // Legacy annulus. Pointer events stay off — angle/width grab is the color chips only.
       const hit = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       hit.setAttribute("class", "chip-grad-wheel__hit");
       hit.setAttribute("viewBox", "0 0 100 100");
@@ -2619,6 +2620,17 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       ringPath.setAttribute("r", "43");
       ringPath.setAttribute("fill", "none");
       ring.append(ringPath);
+      const min = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      min.setAttribute("class", "chip-grad-wheel__min");
+      min.setAttribute("viewBox", "0 0 100 100");
+      min.setAttribute("aria-hidden", "true");
+      const minPath = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      minPath.setAttribute("class", "chip-grad-wheel__min-path");
+      minPath.setAttribute("cx", "50");
+      minPath.setAttribute("cy", "50");
+      minPath.setAttribute("r", "18");
+      minPath.setAttribute("fill", "none");
+      min.append(minPath);
       const scaleRing = document.createElement("div");
       scaleRing.className = "chip-grad-wheel__scale";
       const arm = document.createElement("div");
@@ -2645,7 +2657,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       toDot.className = "chip-grad-wheel__stop-dot";
       toDot.setAttribute("aria-hidden", "true");
       to.append(toDot);
-      wheel.append(hit, ring, scaleRing, arm, hub, from, to);
+      wheel.append(hit, ring, min, scaleRing, arm, hub, from, to);
       host.append(wheel);
     }
     const { mul, span, size, maxR, chipR } = chipWheelMetrics(chip);
@@ -2659,6 +2671,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (ringPath instanceof SVGCircleElement) {
       const rVb = Math.min(48.5, Math.max(20, (chipRLocal / Math.max(1, size / 2)) * 50 + 1.2));
       ringPath.setAttribute("r", String(rVb));
+    }
+    const minPath = wheelEl.querySelector(".chip-grad-wheel__min-path");
+    if (minPath instanceof SVGCircleElement) {
+      const minLocal = radiusForGradScale(1, maxR, chipR) / mul;
+      const rVb = Math.max(4, Math.min(46, (minLocal / Math.max(1, size / 2)) * 50));
+      minPath.setAttribute("r", String(rVb));
     }
     const hitRing = wheelEl.querySelector(".chip-grad-wheel__hit-ring");
     if (hitRing instanceof SVGCircleElement) {
@@ -3245,58 +3263,6 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       lockHandle(chip.slotId, "grad-angling");
       gradStop.setPointerCapture(event.pointerId);
       return;
-    }
-
-    const gradHit = target?.closest?.(".chip-grad-wheel__hit-ring, .chip-grad-wheel__hit, .chip-grad-wheel__scale, .chip-grad-wheel__ring");
-    if (gradHit instanceof Element) {
-      const el = gradHit.closest(".chip");
-      if (el instanceof HTMLElement && !el.closest(".bloom-layer")) {
-        const chip = chipFromEl(el);
-        const info = chip && chip.slotId !== editingId ? gradientOf?.(chip.slotId) : null;
-        if (chip && info) {
-          const polar = localPolar(chip, stagePoint(event));
-          // Keep the chip body center for grab/move — wheel only owns the outer annulus.
-          const bodyR = Math.min(chip.width, chip.height) / 2;
-          const grabHole = Math.max(12, Math.min(bodyR * 0.72, bodyR - 4));
-          if (polar.dist >= grabHole) {
-            event.preventDefault();
-            event.stopPropagation();
-            blank = null;
-            clickChip = null;
-            cancelPending();
-            dropPin();
-            endXformDrag();
-            endGradAngleDrag();
-            const metrics = chipWheelMetrics(chip);
-            gradAngleDrag = {
-              chip,
-              slotId: chip.slotId,
-              pointerId: event.pointerId,
-              startPointerAngle: polar.angle,
-              startGradAngle: info.angle,
-              lastAngle: info.angle,
-              lastScale: info.scale,
-              wheelMaxR: metrics.maxR,
-              chipR: metrics.chipR,
-              stop: null,
-              stopEl: null,
-              originX: event.clientX,
-              originY: event.clientY,
-              moved: true,
-              rotating: true,
-            };
-            // Ring path sets rotating up-front — must scrub now or fill `background`
-            // transitions (0.15s) fight every live angle paint and direction looks stuck.
-            beginScrub();
-            lockHandle(chip.slotId, "grad-angling");
-            const svg = gradHit.closest("svg");
-            const capture = svg ?? (gradHit instanceof HTMLElement ? gradHit : null);
-            capture?.setPointerCapture?.(event.pointerId);
-            onGradientWheel?.(chip.slotId, { angle: info.angle, scale: info.scale }, "start");
-            return;
-          }
-        }
-      }
     }
 
     const xformHandle = target?.closest?.(".chip-xform-handle");
