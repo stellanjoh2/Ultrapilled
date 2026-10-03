@@ -239,6 +239,8 @@ function readLogoFile(file: File): Promise<{ src: string; name: string; width: n
     return file.text().then((text) => {
       if (!/<svg[\s>]/i.test(text)) throw new Error("type");
       const clean = text
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<\?xml[\s\S]*?\?>/gi, "")
         .replace(/<script[\s\S]*?<\/script>/gi, "")
         .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
         .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
@@ -248,7 +250,7 @@ function readLogoFile(file: File): Promise<{ src: string; name: string; width: n
         ? clean
         : clean.replace(/<svg\b/i, `<svg width="${size.width}" height="${size.height}"`);
       return {
-        src: `data:image/svg+xml;utf8,${encodeURIComponent(sized)}`,
+        src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sized)}`,
         name: file.name || "logo.svg",
         width: size.width,
         height: size.height,

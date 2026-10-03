@@ -1022,10 +1022,10 @@ function applyLogo() {
     clearGlow();
     return;
   }
-  const draw = (image: HTMLImageElement) => {
+  const draw = (image: HTMLImageElement | null) => {
     if (background.logoId !== state.background.logoId) return;
-    const imgW = file.width || image.naturalWidth || image.width || 1;
-    const imgH = file.height || image.naturalHeight || image.height || 1;
+    const imgW = file.width || image?.naturalWidth || image?.width || 1;
+    const imgH = file.height || image?.naturalHeight || image?.height || 1;
     const size = logoSize(playfield.clientWidth, playfield.clientHeight, imgW, imgH, background.logoScale || 1);
     const svg = isSvgLogo(file.name, file.src);
     const fill = svg ? logoFill(state.background, state.theme) : null;
@@ -1059,6 +1059,11 @@ function applyLogo() {
     if (svg && glowLayer) logoGlow = place(glowLayer, logoGlow);
     else clearGlow();
   };
+  // Masked SVGs only need stored dimensions — don't block paint on <img> decode.
+  if (file.width > 0 && file.height > 0 && isSvgLogo(file.name, file.src) && logoFill(state.background, state.theme)) {
+    draw(null);
+    return;
+  }
   const cached = logoImages.get(background.logoId);
   if (cached?.complete) {
     draw(cached);
@@ -1068,6 +1073,10 @@ function applyLogo() {
   image.onload = () => {
     logoImages.set(background.logoId, image);
     draw(image);
+  };
+  image.onerror = () => {
+    // Still place a masked mark when dimensions are known (broken SVG-as-image decode).
+    if (file.width > 0 && file.height > 0) draw(null);
   };
   image.src = file.src;
 }
@@ -5582,6 +5591,7 @@ world.attach(
 const resize = () => {
   syncUiScale();
   if (syncCanvas(world.chipCount() > 0) && world.chipCount() > 0) relayout();
+  if (state.background.logoId) applyLogo();
 };
 const frameObserver = new ResizeObserver(() => resize());
 frameObserver.observe(stage);
