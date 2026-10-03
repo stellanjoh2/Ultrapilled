@@ -502,18 +502,18 @@ export function ultrapilledState(): AppState {
   const PINK = 4;
   const text = (slot: Partial<TextSlot>) =>
     defaultTextSlot({ fontFamily: "Syne", fontWeight: 800, tracking: -40, ...slot });
-  const letter = (file: string, scale: number, colorIndex: number, amount = 1): ImageSlot =>
+  const letter = (file: string, scale: number, colorIndex: number): ImageSlot =>
     defaultImageSlot({
       src: `/logotype/${file}.svg`,
       name: file.replace(/\d+$/, ""),
       size: 88,
-      amount,
+      amount: 1,
       colorIndex,
       scale,
       tint: true,
     });
   const slots = [
-    letter("u", 1.85, INK, 2),
+    letter("u", 1.85, INK),
     letter("l", 2.05, LIME),
     text({ text: "PHYSICS", colorIndex: VIOLET, textColorIndex: INK, scale: 1.15, pillPad: 28 }),
     letter("t", 1.7, CYAN),
@@ -521,17 +521,28 @@ export function ultrapilledState(): AppState {
     presetIcon("Stars", 1, LIME, { scale: 0.45 }),
     letter("a", 1.8, INK),
     letter("p", 1.85, LIME),
-    emoji("💊", "Pill", 2, 0.7),
-    letter("i", 1.9, VIOLET, 2),
+    photo("ultrapilled", "project-sida.jpg", "Project SIDA", 115, 8),
+    letter("i", 1.9, VIOLET),
     letter("l2", 2.15, INK),
     text({ text: "ULTRA", fontFamily: "Anton", fontWeight: 400, shape: "none", colorIndex: LIME, scale: 2.4, tracking: -80 }),
     letter("l3", 1.9, CYAN),
     letter("e", 1.7, PINK),
     presetIcon("Rings", 1, CYAN, { scale: 0.55 }),
+    presetIcon("Waves", 1, PINK, { scale: 0.5 }),
     letter("d", 1.85, LIME),
-    text({ text: "DROP", colorIndex: PINK, scale: 0.85, pillPad: 36 }),
+    text({
+      text: "DROP",
+      colorIndex: PINK,
+      textColorIndex: INK,
+      stroked: true,
+      stroke: 2,
+      scale: 0.85,
+      pillPad: 36,
+    }),
     presetIcon("Spheres", 1, VIOLET, { scale: 0.4 }),
+    presetIcon("Arches", 1, LIME, { scale: 0.7 }),
     text({ text: "PILL", shape: "box", radius: 4, colorIndex: LIME, textColor: "#07060c", scale: 0.7, tracking: -20 }),
+    presetIcon("Clovers", 1, CYAN, { scale: 0.5 }),
   ].filter((slot): slot is Slot => slot != null);
   return {
     ...demoState(),
@@ -544,7 +555,7 @@ export function ultrapilledState(): AppState {
         { id: uid(), color: "#1a0560", at: 0 },
         { id: uid(), color: "#07060c", at: 100 },
       ],
-      grid: false,
+      grid: true,
     },
     canvas: "16:9",
     masterScale: 3.5,
