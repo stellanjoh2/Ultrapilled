@@ -236,7 +236,7 @@ app.innerHTML = `
     </aside>
     <aside class="panel">
       <div class="panel-actions">
-        <button type="button" class="pill play-btn" id="play" data-tip="Run the fall — press again to restart">
+        <button type="button" class="pill play-btn" id="play" data-tip="Run the fall — press again to restart — shortcut P">
           <span class="play-btn__label">
             <svg class="play-btn__bolt" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
@@ -5298,6 +5298,12 @@ window.addEventListener("keydown", (event) => {
     if (event.repeat) return;
     playClick();
     session.togglePause();
+    return;
+  }
+  if (event.key === "p" || event.key === "P") {
+    if (meta || event.altKey || event.repeat) return;
+    event.preventDefault();
+    void session.triggerPhysics();
     return;
   }
   if (event.key === "Escape") {

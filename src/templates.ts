@@ -14,13 +14,14 @@ import {
   type TextSlot,
 } from "./types";
 
-export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | typeof MODE_SELECT_THEME_ID;
+export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | "ultrapilled" | typeof MODE_SELECT_THEME_ID;
 
 export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }[] = [
   { id: "acid", label: "London", build: acidState },
   { id: "new-york", label: "New York", build: newYorkState },
   { id: "miami", label: "Miami", build: miamiState },
   { id: "berlin", label: "Berlin", build: berlinState },
+  { id: "ultrapilled", label: "Ultrapilled", build: ultrapilledState },
   { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
 ];
 
@@ -488,6 +489,101 @@ export function berlinState(): AppState {
     post: { bloom: 0, bloomOpacity: 77, grain: 99, vignette: 52, saturate: 120, hue: 0, blend: "normal" },
     physics: { ...DEFAULT_PHYSICS },
     template: "berlin",
+    slots,
+  };
+}
+
+/** Wordmark letters (public/logotype) are the drop; pills, shapes, and a lab photo fill in. */
+export function ultrapilledState(): AppState {
+  const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
+  const letter = (file: string, name: string, colorIndex: number, scale: number): ImageSlot =>
+    defaultImageSlot({
+      src: `/logotype/${file}.svg`,
+      name,
+      size: 88,
+      amount: 1,
+      colorIndex,
+      scale,
+      radius: 0,
+      stroked: false,
+      stroke: 4,
+      tint: true,
+    });
+  const slots = [
+    letter("u", "u", 0, 1.85),
+    letter("l", "l", 1, 2.05),
+    text({
+      text: "PHYSICS",
+      fontFamily: "Syne",
+      fontWeight: 800,
+      fontSize: 28,
+      textHeight: 50,
+      shape: "pill",
+      radius: 12,
+      stroked: false,
+      stroke: 4,
+      colorIndex: 2,
+      scale: 1.15,
+      tracking: -40,
+      textColorIndex: 0,
+      pillPad: 28,
+    }),
+    letter("t", "t", 3, 1.7),
+    letter("r", "r", 4, 1.75),
+    presetIcon("Stars", 1, 1, { scale: 0.45 }),
+    letter("a", "a", 0, 1.8),
+    letter("p", "p", 1, 1.85),
+    photo("ultrapilled", "carters-little-liver-pills.jpg", "Carter's Little Liver Pills", 115, 8),
+    photo("ultrapilled", "pills-blister-pack.jpg", "Pills", 115, 8),
+    letter("i", "i", 2, 1.9),
+    letter("l2", "l", 0, 2.15),
+    text({
+      text: "ULTRA",
+      fontFamily: "Anton",
+      fontWeight: 400,
+      fontSize: 28,
+      textHeight: 50,
+      shape: "none",
+      radius: 12,
+      stroked: false,
+      colorIndex: 1,
+      scale: 2.4,
+      tracking: -80,
+    }),
+    letter("l3", "l", 3, 1.9),
+    letter("e", "e", 4, 1.7),
+    presetIcon("Rings", 1, 3, { scale: 0.55 }),
+    presetIcon("Waves", 1, 4, { scale: 0.5 }),
+    letter("d", "d", 1, 1.85),
+  ].filter((slot): slot is Slot => slot != null);
+  return {
+    ...demoState(),
+    stageColor: "#07060c",
+    background: {
+      ...defaultBackground(),
+      kind: "solid",
+      shape: "radial",
+      stops: [
+        { id: uid(), color: "#1a0560", at: 0 },
+        { id: uid(), color: "#07060c", at: 100 },
+      ],
+      imageId: "",
+      logoId: "",
+      grid: true,
+      gridDensity: "base",
+      gridColor: "#ffffff",
+      gridOpacity: 20,
+    },
+    canvas: "16:9",
+    masterScale: 3.5,
+    sizeRandom: 55,
+    pillPad: 22,
+    textTracking: 0,
+    shapeAmount: 18,
+    theme: ["#ffffff", "#c4ff00", "#3b00ff", "#00e5ff", "#ff3ec8"],
+    post: { bloom: 0, bloomOpacity: 80, grain: 18, vignette: 28, saturate: 110, hue: 0, blend: "normal" },
+    physics: { ...DEFAULT_PHYSICS },
+    template: "ultrapilled",
     slots,
   };
 }
