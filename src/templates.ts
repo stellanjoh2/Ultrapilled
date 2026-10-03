@@ -14,6 +14,7 @@ import {
   type Slot,
   type TextSlot,
 } from "./types";
+import ultrapilledLogoRaw from "../public/ultrapiled-logo.svg?raw";
 
 export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | "ultrapilled" | typeof MODE_SELECT_THEME_ID;
 
@@ -496,6 +497,22 @@ export function berlinState(): AppState {
 
 /** Wordmark letters (public/logotype) are the drop; pills, shapes, and a lab photo fill in. */
 export function ultrapilledState(): AppState {
+  // Process the Ultrapilled logo SVG into a data URL with width/height
+  const logoSvg = ultrapilledLogoRaw
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/javascript:/gi, "");
+  // The SVG already has width and height in the viewBox, extract them
+  const viewBoxMatch = logoSvg.match(/viewBox\s*=\s*["']\s*[-\d.]+\s+[-\d.]+\s+([-\d.]+)\s+([-\d.]+)/i);
+  const logoWidth = viewBoxMatch ? Number(viewBoxMatch[1]) : 276.31;
+  const logoHeight = viewBoxMatch ? Number(viewBoxMatch[2]) : 76.32;
+  // Add width and height attributes if not present
+  const logoWithSize = /\bwidth\s*=/i.test(logoSvg) && /\bheight\s*=/i.test(logoSvg)
+    ? logoSvg
+    : logoSvg.replace(/<svg\b/i, `<svg width="${logoWidth}" height="${logoHeight}"`);
+  const logoDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(logoWithSize)}`;
+
   const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
   const letter = (file: string, name: string, colorIndex: number, scale: number): ImageSlot =>
     defaultImageSlot({
@@ -569,7 +586,7 @@ export function ultrapilledState(): AppState {
         { id: uid(), color: "#07060c", at: 100 },
       ],
       imageId: "",
-      logoId: storeBackgroundImage("/ultrapiled-logo.svg", "ultrapiled-logo.svg", 276.31, 76.32),
+      logoId: storeBackgroundImage(logoDataUrl, "ultrapiled-logo.svg", logoWidth, logoHeight),
       // Intro mark is 50vw, and the opening frame scales it by 1.5, so 75% of the frame width.
       logoScale: 8 / 3,
       logoOriginal: "#ffffff",

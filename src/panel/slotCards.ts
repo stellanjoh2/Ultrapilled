@@ -1,4 +1,5 @@
 import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
+import fileSvg from "@phosphor-icons/core/assets/regular/file-svg.svg?raw";
 import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?raw";
 import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
 import playIcon from "@phosphor-icons/core/assets/regular/play.svg?raw";
@@ -265,7 +266,7 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
       mark.textContent = slot.emoji;
     } else if (H.uploadedShape(slot)) {
       mark.classList.add("slot-mark--image");
-      mark.innerHTML = imageIcon;
+      mark.innerHTML = isSvgSource(slot) ? fileSvg : imageIcon;
     } else if (slot.src) {
       mark.append(H.shapeSwatch(H.iconSrc(slot), H.iconPreviewFill(slot)));
     }
