@@ -2,7 +2,7 @@ import { backgroundImage, isSvgLogo, paintBackdrop, paintGrid, paintLogo } from 
 import { gradientEnd, gradientLine, gradientPhase, pillGradientStops, pillSweepStops, textGradientFill } from "../pillFill";
 import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
-import { measureTextInk, paintTextInk } from "../measure";
+import { measureTextInk, measureTrackedTextWidth, paintTextInk, textInkGlyphStarts } from "../measure";
 import { peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
 import { chipContributesBloom, imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags } from "../chipLook";
@@ -344,12 +344,22 @@ function drawText(
     return;
   }
 
-  ctx.font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
+  const font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
+  ctx.font = font;
   ctx.fillStyle = chip.ink;
-  ctx.textAlign = "center";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.letterSpacing = `${chip.tracking}em`;
-  ctx.fillText(slot.text || "", width / 2, height / 2 + chip.shiftEm * fontSize);
+  // Same rule as the live pill: no trailing letter-spacing, or the last glyph
+  // is clipped when tracking is negative and a phantom gap appears when it is positive.
+  ctx.letterSpacing = "0px";
+  const text = slot.text || "";
+  const lineW = measureTrackedTextWidth(text, fontSize, chip.tracking, font);
+  const starts = textInkGlyphStarts(ctx, text, fontSize, chip.tracking, (width - lineW) / 2);
+  const chars = [...text];
+  const baseline = height / 2 + chip.shiftEm * fontSize;
+  for (let i = 0; i < chars.length; i++) {
+    ctx.fillText(chars[i] === " " ? "\u00a0" : chars[i]!, starts[i] ?? 0, baseline);
+  }
 }
 
 function drawChip(

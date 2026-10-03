@@ -6,6 +6,7 @@ import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSwe
 import {
   applyBareCanvasTextAnim,
   applyTextAnim,
+  layoutShapedLabel,
   stopBareCanvasTextAnimIn,
   stopTextAnim,
   stopTextAnimIn,
@@ -581,7 +582,7 @@ export function applyVisual(
       ) {
         clearBareTextAnimSeat(label);
         label.style.lineHeight = "1";
-        label.textContent = slot.text;
+        layoutShapedLabel(label, slot.text);
       } else {
         clearBareTextAnimSeat(label);
       }
@@ -590,10 +591,17 @@ export function applyVisual(
       if (textGradient) paintGrad();
       else paintBareTextCss(label, "", "");
       if (textGradient) el.style.color = "transparent";
-    } else if (label.classList.contains("is-text-anim")) {
-      stopTextAnim(label);
-      clearBareTextAnimSeat(label);
-      label.textContent = slot.text;
+    } else {
+      if (label.classList.contains("is-text-anim")) {
+        stopTextAnim(label);
+        clearBareTextAnimSeat(label);
+      }
+      // Caret wants one text node. Flatten the tracking split once; later paints
+      // must not clobber what the user has typed.
+      label.style.removeProperty("letter-spacing");
+      if (label.children.length > 0 && label.textContent === slot.text) {
+        label.textContent = slot.text;
+      }
     }
     if (liveEdit) {
       // Gradient clip hides the native caret — use solid ink while typing.

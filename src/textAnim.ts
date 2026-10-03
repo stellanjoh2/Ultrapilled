@@ -117,11 +117,36 @@ export function textAnimCharPose(
   return { y: -travel, alpha: 0 };
 }
 
+/**
+ * Chrome adds letter-spacing onto every inline box, including the last.
+ * Negative tracking shrinks that box and overflow:hidden clips the last glyph's
+ * ink (the right side of the M). Positive tracking leaves an empty tail.
+ * The gap before the last glyph is the previous glyph's spacing, so the last
+ * one must not carry any.
+ */
+export function layoutShapedLabel(label: HTMLElement, text: string) {
+  const chars = [...text];
+  if (chars.length <= 1) {
+    label.style.letterSpacing = "0px";
+    label.textContent = text;
+    return;
+  }
+  label.style.removeProperty("letter-spacing");
+  const head = document.createElement("span");
+  head.textContent = chars.slice(0, -1).join("");
+  const tail = document.createElement("span");
+  tail.textContent = chars[chars.length - 1] ?? "";
+  tail.style.letterSpacing = "0px";
+  label.replaceChildren(head, tail);
+}
+
 function splitChars(word: string): HTMLElement[] {
-  return [...word].map((ch) => {
+  const chars = [...word];
+  return chars.map((ch, i) => {
     const span = document.createElement("span");
     span.className = "char";
     span.textContent = ch === " " ? "\u00a0" : ch;
+    if (i === chars.length - 1) span.style.letterSpacing = "0px";
     return span;
   });
 }
@@ -347,10 +372,10 @@ export function stopBareCanvasTextAnimIn(root: ParentNode) {
  * is often still on the transform until the next seat(). Visual rects inflate the clip
  * so flex+overflow:hidden on the label crushes tracking; rotated chips do the same.
  *
- * offsetWidth is advance-tight under negative letter-spacing; glyph ink (esp. the last
- * stem) overhangs that box. Pad both sides by the max side-bearing so centered rows
- * still clear overflow:hidden on .text-anim-clip / .is-text-anim. Also take the
- * canvas ink width (same metrics as bare type) so we never undershoot painted bounds.
+ * The last .char has letter-spacing: 0 so offsetWidth includes its full advance
+ * (negative tracking no longer shrinks the last box; positive tracking adds no tail).
+ * Pad any remaining side-bearing so centered rows still clear overflow:hidden.
+ * Also take the canvas ink width so we never undershoot painted bounds.
  */
 function refreshAnimClipWidth(label: HTMLElement) {
   const clip = label.querySelector(":scope > .text-anim-clip");
@@ -433,7 +458,7 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
 
   if (reducedMotion()) {
     label.classList.add("is-text-anim");
-    label.textContent = asPhrase ? text.trim() || " " : (textAnimWords(text)[0] ?? text);
+    layoutShapedLabel(label, asPhrase ? text.trim() || " " : (textAnimWords(text)[0] ?? text));
     running.set(label, {
       sig,
       kill: () => {
