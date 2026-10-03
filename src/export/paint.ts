@@ -289,7 +289,8 @@ function drawText(
             gradientEnd(theme, slot),
             slot.gradientAngle,
             slot.gradientScale,
-            slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined,
+            // Letter-cycle used to bake a static from→to (hard stop). Sweep with the letters.
+            rolling || slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined,
           )
         : chip.ink;
     if (rolling) {

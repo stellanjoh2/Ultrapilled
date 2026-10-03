@@ -1372,10 +1372,16 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   caret-color: currentColor;
 }
 
-.chip-label.is-text-gradient.is-gradient-animated,
-.chip-edit.is-text-gradient.is-gradient-animated,
 .mode-select__vibe.is-text-gradient.is-gradient-animated {
   background-size: 200% 200%;
+}
+
+/* Text sweep: repeating tile, shifted one period along --grad-angle. 200% + no-repeat
+   ran the image off the glyphs (hard cutoff) instead of looping. */
+.chip-label.is-text-gradient.is-gradient-animated,
+.chip-edit.is-text-gradient.is-gradient-animated {
+  background-size: auto;
+  background-repeat: repeat;
 }
 
 .chip-label .char.is-text-gradient,
@@ -1533,11 +1539,14 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 
   .slot-chip.is-gradient-animated,
   .shape-swatch.is-gradient-animated,
-  .chip-label.is-text-gradient.is-gradient-animated,
-  .chip-edit.is-text-gradient.is-gradient-animated,
   .mode-select__vibe.is-text-gradient.is-gradient-animated {
     background-size: 200% 200%;
     animation: pill-gradient-preview var(--sweep-duration, 3s) linear infinite;
+  }
+
+  .chip-label.is-text-gradient.is-gradient-animated,
+  .chip-edit.is-text-gradient.is-gradient-animated {
+    animation: text-gradient-sweep var(--sweep-duration, 3s) linear infinite;
   }
 }
 
@@ -1562,6 +1571,13 @@ html.is-asset-anims-frozen .mode-select__vibe.is-text-gradient.is-gradient-anima
     background-position:
       calc(sin(var(--grad-angle, 90) * 1deg) * 100%)
       calc(cos(var(--grad-angle, 90) * 1deg) * -100%);
+  }
+}
+
+/* One textSweepImage period along the gradient axis. End position matches the start. */
+@keyframes text-gradient-sweep {
+  to {
+    background-position: var(--sweep-dx, 100%) var(--sweep-dy, 0px);
   }
 }
 

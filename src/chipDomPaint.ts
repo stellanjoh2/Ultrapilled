@@ -2,7 +2,7 @@ import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { chipContributesBloom, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
 import { measureTextInk, paintTextInk } from "./measure";
-import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
+import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, sweepBandMetrics, textGradientFill, textSweepImage, textSweepShift } from "./pillFill";
 import {
   applyBareCanvasTextAnim,
   applyTextAnim,
@@ -212,6 +212,8 @@ export function clearBareTextCss(el: HTMLElement) {
   el.style.removeProperty("-webkit-text-fill-color");
   el.style.removeProperty("--sweep-duration");
   el.style.removeProperty("--grad-angle");
+  el.style.removeProperty("--sweep-dx");
+  el.style.removeProperty("--sweep-dy");
 }
 
 export function styleBareTextCss(
@@ -222,21 +224,38 @@ export function styleBareTextCss(
   scale?: number,
   animated = false,
   speed?: number,
+  width = 0,
+  height = 0,
 ) {
   el.classList.add("is-text-gradient");
   if (animated) {
+    // Repeating from→to→from tile. background-size:200% + no-repeat slid a finite
+    // image off the glyphs (hard cutoff) and the duplicated from→to join was a seam.
+    const boxW = width > 0 ? width : el.offsetWidth || 64;
+    const boxH = height > 0 ? height : el.offsetHeight || 24;
+    const { tilePx } = sweepBandMetrics(boxW, boxH, angle, scale);
+    const shift = textSweepShift(angle, tilePx);
     el.classList.add("is-gradient-animated");
-    el.style.backgroundImage = pillSweepGradient(from, to, angle, scale);
+    el.style.backgroundImage = textSweepImage(from, to, angle, tilePx);
+    el.style.backgroundRepeat = "repeat";
+    el.style.backgroundSize = "auto";
+    el.style.backgroundPosition = "0px 0px";
     setSweepDuration(el, speed);
     el.style.setProperty("--grad-angle", String(gradientAngleOf(angle)));
+    el.style.setProperty("--sweep-dx", `${shift.x.toFixed(2)}px`);
+    el.style.setProperty("--sweep-dy", `${shift.y.toFixed(2)}px`);
   } else {
     el.classList.remove("is-gradient-animated");
     el.style.backgroundImage = pillGradient(from, to, angle, scale);
+    el.style.backgroundRepeat = "no-repeat";
+    el.style.backgroundSize = "100% 100%";
+    el.style.backgroundPosition = "0px 0px";
     el.style.removeProperty("--sweep-duration");
     el.style.removeProperty("--grad-angle");
+    el.style.removeProperty("--sweep-dx");
+    el.style.removeProperty("--sweep-dy");
   }
   el.style.backgroundColor = "transparent";
-  el.style.backgroundRepeat = "no-repeat";
   el.style.webkitBackgroundClip = "text";
   el.style.backgroundClip = "text";
   el.style.color = "transparent";
@@ -316,6 +335,8 @@ export function paintBareTextCss(
   scale?: number,
   animated = false,
   speed?: number,
+  width = 0,
+  height = 0,
 ) {
   const words = [...label.querySelectorAll<HTMLElement>(".text-anim-word")];
   const chars = [...label.querySelectorAll<HTMLElement>(".char")];
@@ -332,12 +353,12 @@ export function paintBareTextCss(
     for (const word of words) {
       clearBareTextCss(word);
       const wordChars = [...word.querySelectorAll<HTMLElement>(".char")];
-      for (const char of wordChars) styleBareTextCss(char, from, to, angle, scale, false, speed);
+      for (const char of wordChars) styleBareTextCss(char, from, to, angle, scale, false, speed, width, height);
       syncCharWordGradient(word);
     }
     return;
   }
-  styleBareTextCss(label, from, to, angle, scale, animated, speed);
+  styleBareTextCss(label, from, to, angle, scale, animated, speed, width, height);
 }
 
 export function textLabel(el: HTMLElement, editing: boolean): HTMLElement {
@@ -448,11 +469,13 @@ export function applyVisual(
     const textGradient = wantsTextGradient && Boolean(gradientTo);
     const hideText = bloom && !bare;
     const liveEdit = editing && !bloom;
-    // Pill letter-cycle + animated CSS gradients need a DOM label.
-    // Bare letter-cycle stays on the ink canvas (seamless with static paint).
+    // Pill letter-cycle needs a DOM label. Bare letter-cycle stays on the ink canvas.
+    // Static/animated text gradients are CSS (background-clip) so the angle gizmo
+    // updates the same way shape fills do — a one-shot canvas redraw under the
+    // chip's transform can keep a stale bitmap, which made the angle look stuck.
     const bareCss =
       (Boolean(slot.textAnim) && !bare) ||
-      (textGradient && (liveEdit || Boolean(slot.animatedGradient)));
+      (textGradient && (!slot.textAnim || liveEdit));
     el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video");
     el.classList.toggle("chip-bare", bare || ring);
     el.classList.toggle("is-editing", liveEdit);
@@ -569,6 +592,8 @@ export function applyVisual(
           slot.gradientScale,
           Boolean(slot.animatedGradient),
           slot.gradientSpeed,
+          width,
+          height,
         );
       };
       if (hideText) {
@@ -582,7 +607,15 @@ export function applyVisual(
       ) {
         clearBareTextAnimSeat(label);
         label.style.lineHeight = "1";
-        layoutShapedLabel(label, slot.text);
+        // Bare gradient is one background-clip box. Splitting the last glyph
+        // restarts that clip per fragment (hard edge, angle looks frozen).
+        // Overflow is visible on bare type, so the last letter still isn't clipped.
+        if (bare && textGradient) {
+          label.style.removeProperty("letter-spacing");
+          label.textContent = slot.text;
+        } else {
+          layoutShapedLabel(label, slot.text);
+        }
       } else {
         clearBareTextAnimSeat(label);
       }

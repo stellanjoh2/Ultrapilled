@@ -196,6 +196,27 @@ export function pillSweepBand(from: string, to: string): string {
   return `linear-gradient(90deg, ${stopList(seamlessLoopStops(from, to))})`;
 }
 
+/**
+ * One from→to→from tile for clipped text. Repeating it and shifting background-position
+ * by `textSweepShift` (one period along the gradient axis) loops with no seam.
+ * Percent stops can't do this: a 200% background shift on a finite image runs off the
+ * glyphs (hard cutoff) unless the tile itself repeats.
+ */
+export function textSweepImage(from: string, to: string, angle?: number, periodPx = 200): string {
+  const period = Math.max(2, periodPx);
+  const stops = seamlessLoopStops(from, to)
+    .map((stop) => `${stop.color} ${(stop.at * period).toFixed(2)}px`)
+    .join(", ");
+  return `repeating-linear-gradient(${gradientAngleOf(angle)}deg, ${stops})`;
+}
+
+/** Pixel shift for one seamless text-sweep period. CSS 0° is up, 90° is right. */
+export function textSweepShift(angle: number | undefined, periodPx: number): { x: number; y: number } {
+  const period = Math.max(2, periodPx);
+  const rad = (gradientAngleOf(angle) * Math.PI) / 180;
+  return { x: Math.sin(rad) * period, y: -Math.cos(rad) * period };
+}
+
 /** Angled seamless fill for small UI previews (two periods for a 200% background shift). */
 export function pillSweepGradient(from: string, to: string, angle?: number, scale?: number): string {
   const one = pillSweepStops(from, to, 0, scale);
