@@ -1206,8 +1206,8 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
   stroke: rgba(0, 0, 0, 0.4);
 }
 
-/* Closest the width ring can sit. Same contrast halo as the dashed max ring
-   so a white stage doesn't swallow it; 1px so it stays quieter than that guide. */
+/* Closest the width ring can sit. Same dash and contrast halo as the max ring
+   so a white stage doesn't swallow it. Visual only. */
 .chip-grad-wheel__min {
   position: absolute;
   inset: 0;
@@ -1221,7 +1221,9 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
 .chip-grad-wheel__min-path {
   fill: none;
   stroke: rgba(255, 255, 255, 0.5);
-  stroke-width: 1;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 5 9;
   vector-effect: non-scaling-stroke;
 }
 
