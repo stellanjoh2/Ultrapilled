@@ -1,6 +1,6 @@
 import gsap from "gsap";
 import { measureTextInk, paintTextInk, TEXT_INK_PAD, textGlyphSideOverhangs, type GlyphPose } from "./measure";
-import { textGradientFill } from "./pillFill";
+import { gradientPhase, textGradientFill } from "./pillFill";
 import { defaultTypeSlot, type TextSlot } from "./types";
 
 export const DEFAULT_TEXT_ANIM_SPEED = 50;
@@ -117,11 +117,36 @@ export function textAnimCharPose(
   return { y: -travel, alpha: 0 };
 }
 
+/**
+ * Chrome adds letter-spacing onto every inline box, including the last.
+ * Negative tracking shrinks that box and overflow:hidden clips the last glyph's
+ * ink (the right side of the M). Positive tracking leaves an empty tail.
+ * The gap before the last glyph is the previous glyph's spacing, so the last
+ * one must not carry any.
+ */
+export function layoutShapedLabel(label: HTMLElement, text: string) {
+  const chars = [...text];
+  if (chars.length <= 1) {
+    label.style.letterSpacing = "0px";
+    label.textContent = text;
+    return;
+  }
+  label.style.removeProperty("letter-spacing");
+  const head = document.createElement("span");
+  head.textContent = chars.slice(0, -1).join("");
+  const tail = document.createElement("span");
+  tail.textContent = chars[chars.length - 1] ?? "";
+  tail.style.letterSpacing = "0px";
+  label.replaceChildren(head, tail);
+}
+
 function splitChars(word: string): HTMLElement[] {
-  return [...word].map((ch) => {
+  const chars = [...word];
+  return chars.map((ch, i) => {
     const span = document.createElement("span");
     span.className = "char";
     span.textContent = ch === " " ? "\u00a0" : ch;
+    if (i === chars.length - 1) span.style.letterSpacing = "0px";
     return span;
   });
 }
@@ -153,6 +178,8 @@ export function stopTextAnimIn(root: ParentNode) {
 type BareCanvasRun = {
   sig: string;
   kill: () => void;
+  /** Redraw the current frame (angle/scale drags must not wait for the next tick). */
+  repaint: () => void;
   slot: TextSlot;
   width: number;
   height: number;
@@ -163,6 +190,12 @@ type BareCanvasRun = {
   angle?: number;
   scale?: number;
 };
+
+function bareCanvasSig(run: Pick<BareCanvasRun, "slot" | "width" | "height" | "tracking" | "shiftEm" | "color" | "gradientTo" | "angle" | "scale">): string {
+  const speed = textAnimSpeedOf(run.slot.textAnimSpeed);
+  const { slot } = run;
+  return `bare-canvas|${speed}|${slot.text}|${slot.fontFamily}|${slot.fontWeight}|${slot.fontSize}|${run.tracking}|${run.shiftEm}|${run.width}|${run.height}|${run.color}|${run.gradientTo}|${run.angle ?? ""}|${run.scale ?? ""}`;
+}
 
 const bareCanvasRuns = new WeakMap<HTMLCanvasElement, BareCanvasRun>();
 const bareCanvasTickers = new Set<() => void>();
@@ -216,6 +249,8 @@ function paintBareRollingFrame(
           gradientTo,
           angle ?? slot.gradientAngle,
           scale ?? slot.gradientScale,
+          // Static from→to dead-ends (hard cutoff). Phase walks from→to→from.
+          gradientPhase(slot.gradientSpeed, timeMs),
         )
       : color;
 
@@ -252,8 +287,9 @@ export function applyBareCanvasTextAnim(
   angle?: number,
   scale?: number,
 ): void {
-  const speed = textAnimSpeedOf(slot.textAnimSpeed);
-  const sig = `bare-canvas|${speed}|${slot.text}|${slot.fontFamily}|${slot.fontWeight}|${slot.fontSize}|${tracking}|${shiftEm}|${width}|${height}|${color}|${gradientTo}|${angle ?? ""}|${scale ?? ""}`;
+  const sig = bareCanvasSig({
+    slot, width, height, tracking, shiftEm, color, gradientTo, angle, scale,
+  });
   const prev = bareCanvasRuns.get(canvas);
   if (prev?.sig === sig) {
     host.classList.add("is-text-anim-host");
@@ -265,17 +301,11 @@ export function applyBareCanvasTextAnim(
   let start = performance.now();
   let pausedAt: number | null = textAnimsPaused ? start : null;
 
-  const tick = () => {
-    if (textAnimsPaused) {
-      if (pausedAt == null) pausedAt = performance.now();
-      return;
-    }
-    if (pausedAt != null) {
-      start += performance.now() - pausedAt;
-      pausedAt = null;
-    }
+  const paintNow = () => {
     const run = bareCanvasRuns.get(canvas);
     if (!run) return;
+    const now = performance.now();
+    const timeMs = Math.max(0, (pausedAt ?? now) - start);
     paintBareRollingFrame(
       canvas,
       run.slot,
@@ -285,10 +315,22 @@ export function applyBareCanvasTextAnim(
       run.color,
       run.shiftEm,
       run.gradientTo,
-      performance.now() - start,
+      timeMs,
       run.angle,
       run.scale,
     );
+  };
+
+  const tick = () => {
+    if (textAnimsPaused) {
+      if (pausedAt == null) pausedAt = performance.now();
+      return;
+    }
+    if (pausedAt != null) {
+      start += performance.now() - pausedAt;
+      pausedAt = null;
+    }
+    paintNow();
   };
 
   // Resting first frame (time 0 + wave offset) matches static paintTextInk.
@@ -320,6 +362,7 @@ export function applyBareCanvasTextAnim(
     gradientTo,
     angle,
     scale,
+    repaint: paintNow,
     kill: () => {
       gsap.ticker.remove(tick);
       bareCanvasTickers.delete(tick);
@@ -332,6 +375,19 @@ export function applyBareCanvasTextAnim(
 export function stopBareCanvasTextAnim(canvas: HTMLCanvasElement) {
   const prev = bareCanvasRuns.get(canvas);
   if (prev) prev.kill();
+}
+
+/** Live gradient-wheel updates. The letter-cycle ticker owns the canvas; rewriting the bitmap from outside is overwritten next frame, and a missing label used to drop the angle entirely. */
+export function setBareCanvasGradient(canvas: HTMLCanvasElement, angle: number, scale: number): boolean {
+  const run = bareCanvasRuns.get(canvas);
+  if (!run) return false;
+  run.angle = angle;
+  run.scale = scale;
+  run.slot.gradientAngle = angle;
+  run.slot.gradientScale = scale;
+  run.sig = bareCanvasSig(run);
+  run.repaint();
+  return true;
 }
 
 export function stopBareCanvasTextAnimIn(root: ParentNode) {
@@ -347,10 +403,10 @@ export function stopBareCanvasTextAnimIn(root: ParentNode) {
  * is often still on the transform until the next seat(). Visual rects inflate the clip
  * so flex+overflow:hidden on the label crushes tracking; rotated chips do the same.
  *
- * offsetWidth is advance-tight under negative letter-spacing; glyph ink (esp. the last
- * stem) overhangs that box. Pad both sides by the max side-bearing so centered rows
- * still clear overflow:hidden on .text-anim-clip / .is-text-anim. Also take the
- * canvas ink width (same metrics as bare type) so we never undershoot painted bounds.
+ * The last .char has letter-spacing: 0 so offsetWidth includes its full advance
+ * (negative tracking no longer shrinks the last box; positive tracking adds no tail).
+ * Pad any remaining side-bearing so centered rows still clear overflow:hidden.
+ * Also take the canvas ink width so we never undershoot painted bounds.
  */
 function refreshAnimClipWidth(label: HTMLElement) {
   const clip = label.querySelector(":scope > .text-anim-clip");
@@ -433,7 +489,7 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
 
   if (reducedMotion()) {
     label.classList.add("is-text-anim");
-    label.textContent = asPhrase ? text.trim() || " " : (textAnimWords(text)[0] ?? text);
+    layoutShapedLabel(label, asPhrase ? text.trim() || " " : (textAnimWords(text)[0] ?? text));
     running.set(label, {
       sig,
       kill: () => {

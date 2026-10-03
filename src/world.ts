@@ -30,7 +30,7 @@ import {
   type XformCorner,
 } from "./xformAnchor";
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
-import { stopTextAnimIn } from "./textAnim";
+import { setBareCanvasGradient, stopTextAnimIn } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
 import { blendMode, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
 import { playImpact } from "./uiSounds";
@@ -2719,15 +2719,37 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (slot.shape === "none" && slot.gradient) {
         const tracking = chip.look?.tracking ?? 0.02;
         const shiftEm = chip.look?.shiftEm ?? 0;
-        const bareCss = Boolean(slot.textAnim) || Boolean(slot.animatedGradient) || chip.slotId === editingId;
-        if (bareCss) {
+        // Letter-cycle owns the canvas. Updating a label that isn't there dropped the angle.
+        if (slot.textAnim && chip.slotId !== editingId) {
+          let painted = false;
           for (const root of [chip.el, chip.glow]) {
-            const label = root.querySelector<HTMLElement>(":scope > .chip-label, :scope > .chip-edit");
-            if (label) {
-              paintBareTextCss(label, from, to, angle, scale, Boolean(slot.animatedGradient), slot.gradientSpeed);
+            const canvas = root.querySelector(":scope > canvas");
+            if (canvas instanceof HTMLCanvasElement && setBareCanvasGradient(canvas, angle, scale)) {
+              painted = true;
             }
           }
-        } else {
+          if (painted) return;
+        }
+        // Static and animated text gradients are background-clip labels (same live
+        // angle path as shape fills). Fall back to the ink canvas if the label is gone.
+        let paintedCss = false;
+        for (const root of [chip.el, chip.glow]) {
+          const label = root.querySelector<HTMLElement>(":scope > .chip-label, :scope > .chip-edit");
+          if (!label) continue;
+          paintBareTextCss(
+            label,
+            from,
+            to,
+            angle,
+            scale,
+            Boolean(slot.animatedGradient) && !slot.textAnim,
+            slot.gradientSpeed,
+            chip.width,
+            chip.height,
+          );
+          paintedCss = true;
+        }
+        if (!paintedCss) {
           paintBareText(chip.el, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
           paintBareText(chip.glow, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
         }

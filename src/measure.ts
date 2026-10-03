@@ -90,8 +90,8 @@ export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
   }
 
   measureCtx.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
-  // Measure unspaced — Chromium's measureText ignores canvas letterSpacing for both
-  // width and actualBoundingBox*. Apply tracking the same way as measureLineWidth.
+  // Measure unspaced, then add tracking per gap. Canvas letterSpacing (when honored)
+  // folds a trailing gap into width and would disagree with this ink box.
   measureCtx.letterSpacing = "0px";
   const text = slot.text || " ";
   const metrics = measureCtx.measureText(text);
@@ -223,13 +223,77 @@ export function paintTextInk(
   }
 }
 
+/**
+ * Ink width of a shaped run once the last glyph no longer carries letter-spacing.
+ *
+ * Chrome adds letter-spacing after every inline box, including the last. That
+ * shrinks the last box under negative tracking (its ink, which does not shrink,
+ * is what overflow:hidden clips) and leaves an empty tail under positive tracking.
+ * Gaps before the last glyph come from the previous glyph, so the width here is
+ * (n-1) gaps plus each glyph's ink — not a trailing gap.
+ *
+ * `measureCtx.font` must already be set. Letter-spacing on the probe is restored to 0.
+ */
+export type GlyphAdvance = {
+  advance: number;
+  /** Ink past the origin to the left. Negative means the ink starts inset. */
+  inkLeft: number;
+  /** Ink past the origin to the right. */
+  inkRight: number;
+  /** Pair kerning added before the next glyph. Ignored on the last glyph. */
+  kernAfter?: number;
+};
+
+/**
+ * Width of a run laid out with `spacingPx` between glyphs and none after the last.
+ * Includes ink that sticks past an advance. Does not include a trailing letter-spacing gap.
+ */
+export function trackedRunWidth(glyphs: readonly GlyphAdvance[], spacingPx: number): number {
+  let x = 0;
+  let minL = 0;
+  let maxR = 0;
+  for (let i = 0; i < glyphs.length; i++) {
+    const glyph = glyphs[i]!;
+    const inkLeft = Math.max(0, glyph.inkLeft);
+    const inkRight = Math.max(0, glyph.inkRight);
+    minL = Math.min(minL, x - inkLeft);
+    maxR = Math.max(maxR, x + Math.max(glyph.advance, inkRight));
+    if (i < glyphs.length - 1) x += glyph.advance + (glyph.kernAfter ?? 0) + spacingPx;
+  }
+  return Math.max(1, maxR - minL);
+}
+
+export function measureTrackedTextWidth(text: string, fontSize: number, tracking: number, font?: string): number {
+  if (!measureCtx) return Math.max(1, fontSize);
+  if (font) measureCtx.font = font;
+  measureCtx.letterSpacing = "0px";
+  const raw = text.length ? text : " ";
+  const chars = [...raw];
+  const spacing = fontSize * tracking;
+  const glyphs: GlyphAdvance[] = [];
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i] === " " ? "\u00a0" : chars[i]!;
+    const metrics = measureCtx.measureText(ch);
+    const advance = metrics.width || 0;
+    let kernAfter = 0;
+    if (i < chars.length - 1) {
+      const next = chars[i + 1] === " " ? "\u00a0" : chars[i + 1]!;
+      const nextW = measureCtx.measureText(next).width || 0;
+      const pairW = measureCtx.measureText(ch + next).width || 0;
+      kernAfter = pairW - advance - nextW;
+    }
+    glyphs.push({
+      advance,
+      inkLeft: metrics.actualBoundingBoxLeft ?? 0,
+      inkRight: metrics.actualBoundingBoxRight ?? advance,
+      kernAfter,
+    });
+  }
+  return trackedRunWidth(glyphs, spacing);
+}
+
 function measureLineWidth(text: string, fontSize: number, tracking: number): number {
-  if (!measureCtx) return fontSize;
-  const metrics = measureCtx.measureText(text);
-  const tracked = metrics.width + fontSize * tracking * Math.max(0, text.length - 1);
-  const bounds =
-    (metrics.actualBoundingBoxLeft ?? 0) + (metrics.actualBoundingBoxRight ?? 0);
-  return Math.max(tracked, bounds);
+  return measureTrackedTextWidth(text, fontSize, tracking);
 }
 
 export function measureTextSlot(slot: TextSlot, pad = 1, tracking = 0.02): ChipSize {

@@ -1,11 +1,12 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { chipContributesBloom, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
-import { measureTextInk, paintTextInk } from "./measure";
-import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, pillSweepGradient, sweepBandMetrics, textGradientFill } from "./pillFill";
+import { measureTextFontAscent, measureTextInk, paintTextInk, textInkGlyphStarts } from "./measure";
+import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, sweepBandMetrics, textGradientFill, textSweepImage, textSweepShift } from "./pillFill";
 import {
   applyBareCanvasTextAnim,
   applyTextAnim,
+  layoutShapedLabel,
   stopBareCanvasTextAnimIn,
   stopTextAnim,
   stopTextAnimIn,
@@ -195,6 +196,63 @@ export function paintBareText(
         )
       : color;
   paintTextInk(ctx, paintSlot, tracking, fill, shiftEm, ink);
+  // Read back one pixel so a transformed chip uploads the new bitmap. Without
+  // this, dragging the gradient angle redraws and the screen keeps the old frame.
+  ctx.getImageData(0, 0, 1, 1);
+}
+
+
+function clearBareGradientSeat(label: HTMLElement) {
+  for (const prop of ["position", "left", "top", "width", "height", "overflow"] as const) {
+    label.style.removeProperty(prop);
+  }
+}
+
+/**
+ * Bare gradient that isn't on the ink canvas (animated sweep) still has to use
+ * the canvas glyph origins. A flex label inherits letter-spacing, Chrome adds
+ * that gap after the last glyph, and background-clip then drops the overhang —
+ * the word jumps left and the end is cropped. Stopping text-anim stays on the
+ * canvas; this seats the sweep to the same starts.
+ */
+function seatBareGradientGlyphs(
+  label: HTMLElement,
+  slot: TextSlot,
+  tracking: number,
+  width: number,
+  height: number,
+) {
+  const ink = measureTextInk(slot, tracking);
+  const probe = document.createElement("canvas").getContext("2d");
+  label.style.position = "absolute";
+  label.style.left = "0px";
+  label.style.top = "0px";
+  label.style.width = `${width}px`;
+  label.style.height = `${height}px`;
+  label.style.letterSpacing = "0px";
+  label.style.lineHeight = "1";
+  label.style.overflow = "visible";
+  const value = slot.text || "";
+  if (!probe) {
+    label.textContent = value;
+    return;
+  }
+  probe.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
+  const starts = textInkGlyphStarts(probe, value, slot.fontSize, tracking, ink.originX);
+  // Vertical text-height shift is the label's translateY, same as other DOM labels.
+  const top = ink.baseline - measureTextFontAscent(slot);
+  label.replaceChildren(
+    ...[...value].map((ch, i) => {
+      const span = document.createElement("span");
+      span.textContent = ch === " " ? "\u00a0" : ch;
+      span.style.position = "absolute";
+      span.style.left = `${starts[i] ?? 0}px`;
+      span.style.top = `${top}px`;
+      span.style.letterSpacing = "0px";
+      span.style.lineHeight = "1";
+      return span;
+    }),
+  );
 }
 
 export function clearBareTextCss(el: HTMLElement) {
@@ -211,6 +269,8 @@ export function clearBareTextCss(el: HTMLElement) {
   el.style.removeProperty("-webkit-text-fill-color");
   el.style.removeProperty("--sweep-duration");
   el.style.removeProperty("--grad-angle");
+  el.style.removeProperty("--sweep-dx");
+  el.style.removeProperty("--sweep-dy");
 }
 
 export function styleBareTextCss(
@@ -221,21 +281,38 @@ export function styleBareTextCss(
   scale?: number,
   animated = false,
   speed?: number,
+  width = 0,
+  height = 0,
 ) {
   el.classList.add("is-text-gradient");
   if (animated) {
+    // Repeating from→to→from tile. background-size:200% + no-repeat slid a finite
+    // image off the glyphs (hard cutoff) and the duplicated from→to join was a seam.
+    const boxW = width > 0 ? width : el.offsetWidth || 64;
+    const boxH = height > 0 ? height : el.offsetHeight || 24;
+    const { tilePx } = sweepBandMetrics(boxW, boxH, angle, scale);
+    const shift = textSweepShift(angle, tilePx);
     el.classList.add("is-gradient-animated");
-    el.style.backgroundImage = pillSweepGradient(from, to, angle, scale);
+    el.style.backgroundImage = textSweepImage(from, to, angle, tilePx);
+    el.style.backgroundRepeat = "repeat";
+    el.style.backgroundSize = "auto";
+    el.style.backgroundPosition = "0px 0px";
     setSweepDuration(el, speed);
     el.style.setProperty("--grad-angle", String(gradientAngleOf(angle)));
+    el.style.setProperty("--sweep-dx", `${shift.x.toFixed(2)}px`);
+    el.style.setProperty("--sweep-dy", `${shift.y.toFixed(2)}px`);
   } else {
     el.classList.remove("is-gradient-animated");
     el.style.backgroundImage = pillGradient(from, to, angle, scale);
+    el.style.backgroundRepeat = "no-repeat";
+    el.style.backgroundSize = "100% 100%";
+    el.style.backgroundPosition = "0px 0px";
     el.style.removeProperty("--sweep-duration");
     el.style.removeProperty("--grad-angle");
+    el.style.removeProperty("--sweep-dx");
+    el.style.removeProperty("--sweep-dy");
   }
   el.style.backgroundColor = "transparent";
-  el.style.backgroundRepeat = "no-repeat";
   el.style.webkitBackgroundClip = "text";
   el.style.backgroundClip = "text";
   el.style.color = "transparent";
@@ -315,6 +392,8 @@ export function paintBareTextCss(
   scale?: number,
   animated = false,
   speed?: number,
+  width = 0,
+  height = 0,
 ) {
   const words = [...label.querySelectorAll<HTMLElement>(".text-anim-word")];
   const chars = [...label.querySelectorAll<HTMLElement>(".char")];
@@ -331,12 +410,12 @@ export function paintBareTextCss(
     for (const word of words) {
       clearBareTextCss(word);
       const wordChars = [...word.querySelectorAll<HTMLElement>(".char")];
-      for (const char of wordChars) styleBareTextCss(char, from, to, angle, scale, false, speed);
+      for (const char of wordChars) styleBareTextCss(char, from, to, angle, scale, false, speed, width, height);
       syncCharWordGradient(word);
     }
     return;
   }
-  styleBareTextCss(label, from, to, angle, scale, animated, speed);
+  styleBareTextCss(label, from, to, angle, scale, animated, speed, width, height);
 }
 
 export function textLabel(el: HTMLElement, editing: boolean): HTMLElement {
@@ -447,11 +526,13 @@ export function applyVisual(
     const textGradient = wantsTextGradient && Boolean(gradientTo);
     const hideText = bloom && !bare;
     const liveEdit = editing && !bloom;
-    // Pill letter-cycle + animated CSS gradients need a DOM label.
-    // Bare letter-cycle stays on the ink canvas (seamless with static paint).
+    // Pill letter-cycle needs a DOM label. Bare letter-cycle AND the resting
+    // gradient stay on the ink canvas — stopping animation must not swap to a
+    // CSS label (letter-spacing after the last glyph + flex center crops it).
     const bareCss =
       (Boolean(slot.textAnim) && !bare) ||
-      (textGradient && (liveEdit || Boolean(slot.animatedGradient)));
+      (textGradient && liveEdit) ||
+      (textGradient && Boolean(slot.animatedGradient) && !slot.textAnim);
     el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video");
     el.classList.toggle("chip-bare", bare || ring);
     el.classList.toggle("is-editing", liveEdit);
@@ -568,6 +649,8 @@ export function applyVisual(
           slot.gradientScale,
           Boolean(slot.animatedGradient),
           slot.gradientSpeed,
+          width,
+          height,
         );
       };
       if (hideText) {
@@ -581,7 +664,12 @@ export function applyVisual(
       ) {
         clearBareTextAnimSeat(label);
         label.style.lineHeight = "1";
-        label.textContent = slot.text;
+        if (bare && textGradient) {
+          seatBareGradientGlyphs(label, slot, tracking, width, height);
+        } else {
+          clearBareGradientSeat(label);
+          layoutShapedLabel(label, slot.text);
+        }
       } else {
         clearBareTextAnimSeat(label);
       }
@@ -590,10 +678,18 @@ export function applyVisual(
       if (textGradient) paintGrad();
       else paintBareTextCss(label, "", "");
       if (textGradient) el.style.color = "transparent";
-    } else if (label.classList.contains("is-text-anim")) {
-      stopTextAnim(label);
-      clearBareTextAnimSeat(label);
-      label.textContent = slot.text;
+    } else {
+      clearBareGradientSeat(label);
+      if (label.classList.contains("is-text-anim")) {
+        stopTextAnim(label);
+        clearBareTextAnimSeat(label);
+      }
+      // Caret wants one text node. Flatten the tracking split once; later paints
+      // must not clobber what the user has typed.
+      label.style.removeProperty("letter-spacing");
+      if (label.children.length > 0 && label.textContent === slot.text) {
+        label.textContent = slot.text;
+      }
     }
     if (liveEdit) {
       // Gradient clip hides the native caret — use solid ink while typing.
