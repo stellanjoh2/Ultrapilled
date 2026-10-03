@@ -4508,8 +4508,13 @@ async function playIntroLogotype(intro: HTMLElement): Promise<void> {
 }
 
 async function startIntro() {
+  // Check if we're on mobile
+  const isMobile = (window as any).__ULTRAPILLED_MOBILE__;
+  
   // Mode Select thumbs — start while the intro gif still has the screen.
-  preloadModeSelectMedia();
+  if (!isMobile) {
+    preloadModeSelectMedia();
+  }
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const intro = app.querySelector<HTMLElement>("#app-intro");
@@ -4521,7 +4526,10 @@ async function startIntro() {
   }
 
   // Shapes fall behind the gif; mode select later fades on top of the same scene.
-  warmModeSelectPreview();
+  // Skip preview on mobile since we load the template directly
+  if (!isMobile) {
+    warmModeSelectPreview();
+  }
 
   const img = intro.querySelector<HTMLImageElement>(".app-intro__gif");
   try {
