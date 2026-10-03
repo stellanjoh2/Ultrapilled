@@ -14,7 +14,7 @@ import {
   type Slot,
   type TextSlot,
 } from "./types";
-import ultrapilledLogoRaw from "../public/ultrapiled-logo.svg?raw";
+import ultrapilledLogoRaw from "./assets/ultrapiled-logo.svg?raw";
 
 export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | "ultrapilled" | typeof MODE_SELECT_THEME_ID;
 
