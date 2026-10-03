@@ -1,7 +1,7 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { chipContributesBloom, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
-import { measureTextInk, paintTextInk } from "./measure";
+import { measureTextFontAscent, measureTextInk, paintTextInk, textInkGlyphStarts } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, sweepBandMetrics, textGradientFill, textSweepImage, textSweepShift } from "./pillFill";
 import {
   applyBareCanvasTextAnim,
@@ -196,6 +196,63 @@ export function paintBareText(
         )
       : color;
   paintTextInk(ctx, paintSlot, tracking, fill, shiftEm, ink);
+  // Read back one pixel so a transformed chip uploads the new bitmap. Without
+  // this, dragging the gradient angle redraws and the screen keeps the old frame.
+  ctx.getImageData(0, 0, 1, 1);
+}
+
+
+function clearBareGradientSeat(label: HTMLElement) {
+  for (const prop of ["position", "left", "top", "width", "height", "overflow"] as const) {
+    label.style.removeProperty(prop);
+  }
+}
+
+/**
+ * Bare gradient that isn't on the ink canvas (animated sweep) still has to use
+ * the canvas glyph origins. A flex label inherits letter-spacing, Chrome adds
+ * that gap after the last glyph, and background-clip then drops the overhang —
+ * the word jumps left and the end is cropped. Stopping text-anim stays on the
+ * canvas; this seats the sweep to the same starts.
+ */
+function seatBareGradientGlyphs(
+  label: HTMLElement,
+  slot: TextSlot,
+  tracking: number,
+  width: number,
+  height: number,
+) {
+  const ink = measureTextInk(slot, tracking);
+  const probe = document.createElement("canvas").getContext("2d");
+  label.style.position = "absolute";
+  label.style.left = "0px";
+  label.style.top = "0px";
+  label.style.width = `${width}px`;
+  label.style.height = `${height}px`;
+  label.style.letterSpacing = "0px";
+  label.style.lineHeight = "1";
+  label.style.overflow = "visible";
+  const value = slot.text || "";
+  if (!probe) {
+    label.textContent = value;
+    return;
+  }
+  probe.font = `${slot.fontWeight} ${slot.fontSize}px "${slot.fontFamily}", sans-serif`;
+  const starts = textInkGlyphStarts(probe, value, slot.fontSize, tracking, ink.originX);
+  // Vertical text-height shift is the label's translateY, same as other DOM labels.
+  const top = ink.baseline - measureTextFontAscent(slot);
+  label.replaceChildren(
+    ...[...value].map((ch, i) => {
+      const span = document.createElement("span");
+      span.textContent = ch === " " ? "\u00a0" : ch;
+      span.style.position = "absolute";
+      span.style.left = `${starts[i] ?? 0}px`;
+      span.style.top = `${top}px`;
+      span.style.letterSpacing = "0px";
+      span.style.lineHeight = "1";
+      return span;
+    }),
+  );
 }
 
 export function clearBareTextCss(el: HTMLElement) {
@@ -469,13 +526,13 @@ export function applyVisual(
     const textGradient = wantsTextGradient && Boolean(gradientTo);
     const hideText = bloom && !bare;
     const liveEdit = editing && !bloom;
-    // Pill letter-cycle needs a DOM label. Bare letter-cycle stays on the ink canvas.
-    // Static/animated text gradients are CSS (background-clip) so the angle gizmo
-    // updates the same way shape fills do — a one-shot canvas redraw under the
-    // chip's transform can keep a stale bitmap, which made the angle look stuck.
+    // Pill letter-cycle needs a DOM label. Bare letter-cycle AND the resting
+    // gradient stay on the ink canvas — stopping animation must not swap to a
+    // CSS label (letter-spacing after the last glyph + flex center crops it).
     const bareCss =
       (Boolean(slot.textAnim) && !bare) ||
-      (textGradient && (!slot.textAnim || liveEdit));
+      (textGradient && liveEdit) ||
+      (textGradient && Boolean(slot.animatedGradient) && !slot.textAnim);
     el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video");
     el.classList.toggle("chip-bare", bare || ring);
     el.classList.toggle("is-editing", liveEdit);
@@ -607,13 +664,10 @@ export function applyVisual(
       ) {
         clearBareTextAnimSeat(label);
         label.style.lineHeight = "1";
-        // Bare gradient is one background-clip box. Splitting the last glyph
-        // restarts that clip per fragment (hard edge, angle looks frozen).
-        // Overflow is visible on bare type, so the last letter still isn't clipped.
         if (bare && textGradient) {
-          label.style.removeProperty("letter-spacing");
-          label.textContent = slot.text;
+          seatBareGradientGlyphs(label, slot, tracking, width, height);
         } else {
+          clearBareGradientSeat(label);
           layoutShapedLabel(label, slot.text);
         }
       } else {
@@ -625,6 +679,7 @@ export function applyVisual(
       else paintBareTextCss(label, "", "");
       if (textGradient) el.style.color = "transparent";
     } else {
+      clearBareGradientSeat(label);
       if (label.classList.contains("is-text-anim")) {
         stopTextAnim(label);
         clearBareTextAnimSeat(label);
