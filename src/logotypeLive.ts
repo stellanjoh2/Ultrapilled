@@ -81,7 +81,8 @@ function shiftUntil(hex: string, backdrop: string): string {
 /**
  * Keep a theme swatch when it clears the canvas. Otherwise another swatch that
  * does, or a luminance shift of the original. `used` avoids collapsing every
- * letter onto the same remaining swatch.
+ * letter onto the same remaining swatch. Resting paint only — hover uses
+ * `logotypeHoverFill`, which must not borrow a different swatch.
  */
 function resolveSwatch(
   preferred: string,
@@ -135,6 +136,18 @@ function pickIndices(count: number, take: number, avoid: readonly number[]): num
   return next;
 }
 
+/**
+ * Hover fill for one letter. Keeps the picked swatch. If it is within
+ * LOGOTYPE_MIN_LUM_GAP of the backdrop, shift that same hue until it clears.
+ * Borrowing another theme colour here collapsed Orby: purple and pink both
+ * failed the gap on a dark stage and became the first passing swatch (white),
+ * which is also header ink, so only lime and cyan ever read as colour.
+ */
+export function logotypeHoverFill(swatch: string, backdrop: string): string {
+  if (contrasts(swatch, backdrop)) return swatch;
+  return shiftUntil(swatch, backdrop);
+}
+
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
@@ -160,7 +173,10 @@ function tmPaths(root: HTMLElement): SVGPathElement[] {
  * Every fill is checked against the canvas backdrop: a swatch within
  * LOGOTYPE_MIN_LUM_GAP is replaced by another theme color or luminance-shifted.
  * Hover reassigns a random theme color on every letterform every 500ms, then
- * the resting five return. Reduced motion does not run the hover cycle.
+ * the resting five return. A swatch that sits too close to the backdrop is
+ * luminance-shifted in place so pinks and purples stay in the cycle instead of
+ * being replaced by the first swatch that already contrasts. Reduced motion
+ * does not run the hover cycle.
  */
 export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotypeSource): HeaderLogotype {
   const letters = letterPaths(root);
@@ -194,7 +210,7 @@ export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotyp
     const src = theme.length ? theme : ["#ffffff"];
     letters.forEach((el, index) => {
       const preferred = src[(hoverPicks[index] ?? 0) % src.length]!;
-      el.style.fill = resolveSwatch(preferred, src, backdrop);
+      el.style.fill = logotypeHoverFill(preferred, backdrop);
     });
     paintInk(backdrop);
   };
