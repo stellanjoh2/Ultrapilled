@@ -375,9 +375,17 @@ body:has(.app.ui-hidden) .ui-tip {
   color: #ffffff;
 }
 
-/* Idle topbar: themed white layer visible; purple/lime stay clipped. */
+/* Idle topbar: themed white layer visible; purple/lime stay clipped.
+   Letter fills on this layer are driven by logotypeLive (theme cycle + hover). */
 .topbar .logotype-reveal__layer--white {
   clip-path: inset(0% 0% 0% 0%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .topbar .logotype-reveal__layer--white .logotype__glyph:not(.logotype__tm),
+  .topbar .logotype-reveal__layer--white .logotype__pill {
+    transition: fill 0.55s ease;
+  }
 }
 
 .topbar .logotype-reveal__layer--white .logotype__glyph {
