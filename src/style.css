@@ -1206,7 +1206,8 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
   stroke: rgba(0, 0, 0, 0.4);
 }
 
-/* Closest the width ring can sit. Visual only — quieter than the dashed max ring. */
+/* Closest the width ring can sit. Same contrast halo as the dashed max ring
+   so a white stage doesn't swallow it; 1px so it stays quieter than that guide. */
 .chip-grad-wheel__min {
   position: absolute;
   inset: 0;
@@ -1214,17 +1215,22 @@ html[data-theme="day"] .chip-grad-wheel__ring-path {
   height: 100%;
   overflow: visible;
   pointer-events: none;
+  filter: drop-shadow(0 0 0.7px rgb(0 0 0 / 0.5));
 }
 
 .chip-grad-wheel__min-path {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.32);
+  stroke: rgba(255, 255, 255, 0.5);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
+html[data-theme="day"] .chip-grad-wheel__min {
+  filter: drop-shadow(0 0 0.7px rgb(255 255 255 / 0.55));
+}
+
 html[data-theme="day"] .chip-grad-wheel__min-path {
-  stroke: rgba(0, 0, 0, 0.28);
+  stroke: rgba(0, 0, 0, 0.4);
 }
 
 /* Active scale ring — radius tracks gradientScale.
