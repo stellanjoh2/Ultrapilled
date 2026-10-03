@@ -167,6 +167,18 @@ const world = createWorld();
 
 app.innerHTML = `
   <div class="app ui-hidden">
+    <svg class="post-grain-defs" width="0" height="0" aria-hidden="true" focusable="false">
+      <filter id="ultrapilled-grain" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" stitchTiles="stitch" result="noise" />
+        <feColorMatrix in="noise" type="matrix" result="mono" values="
+          0.33 0.33 0.33 0 0
+          0.33 0.33 0.33 0 0
+          0.33 0.33 0.33 0 0
+          0 0 0 0 1" />
+        <feComposite id="ultrapilled-grain-composite" in="SourceGraphic" in2="mono" operator="arithmetic"
+          k1="0" k2="1" k3="0" k4="0" />
+      </filter>
+    </svg>
     <div class="app-intro" id="app-intro" aria-hidden="true">
       <img class="app-intro__gif" alt="" width="300" height="300" />
       <div class="app-intro__logo" aria-hidden="true">
@@ -183,18 +195,21 @@ app.innerHTML = `
         <div class="playfield" id="playfield">
         <div class="grid-layer" id="grid-layer" hidden aria-hidden="true"></div>
         <div class="logo-layer" id="logo-layer" hidden></div>
+        <!-- Outside .pile so Create mix (e.g. Difference) can't invert the glow. -->
+        <div class="logo-bloom-layer" aria-hidden="true">
+          <div class="logo-bloom-blur">
+            <div class="logo-bloom-host" id="logo-bloom" hidden></div>
+          </div>
+        </div>
         <div class="pile">
           <div class="chip-layer"></div>
           <div class="bloom-layer" aria-hidden="true">
             <div class="bloom-blur">
-              <div class="bloom-inner">
-                <div class="logo-layer" id="logo-bloom" hidden></div>
-              </div>
+              <div class="bloom-inner"></div>
             </div>
           </div>
           <div class="chip-chrome-layer" aria-hidden="true"></div>
         </div>
-        <div class="post-grain" aria-hidden="true"><div class="post-grain-tex"></div></div>
         <div class="post-vignette" aria-hidden="true"></div>
         <canvas class="phys-debug" id="phys-debug" aria-hidden="true" hidden></canvas>
         <p class="canvas-welcome" id="canvas-welcome" hidden>Press spacebar to trigger physics</p>
@@ -1074,19 +1089,22 @@ function syncLogoReveal() {
 
 function applyLogo() {
   const layer = playfield.querySelector<HTMLElement>("#logo-layer");
-  const glowLayer = playfield.querySelector<HTMLElement>("#logo-bloom");
+  const glowHost = playfield.querySelector<HTMLElement>("#logo-bloom");
+  const glowLayer = playfield.querySelector<HTMLElement>(".logo-bloom-layer");
   if (!layer) return;
   const background = state.background;
   const file = backgroundImage(background.logoId ?? "");
   const clearGlow = () => {
     if (logoGlow) gsap.killTweensOf(logoGlow);
-    if (!glowLayer) return;
-    glowLayer.hidden = true;
-    glowLayer.replaceChildren();
+    if (!glowHost) return;
+    glowHost.hidden = true;
+    glowHost.replaceChildren();
     logoGlow = null;
   };
   stage.style.setProperty("--logo-blend", blendMode(background.logoBlend));
-  layer.classList.toggle("is-front", Boolean(background.logoFront));
+  const front = Boolean(background.logoFront);
+  layer.classList.toggle("is-front", front);
+  glowLayer?.classList.toggle("is-front", front);
   if (!file) {
     gsap.killTweensOf(logoRevealNodes());
     logoRevealKey = "";
@@ -1131,7 +1149,8 @@ function applyLogo() {
       return node;
     };
     logoNode = place(layer, logoNode);
-    if (svg && glowLayer) logoGlow = place(glowLayer, logoGlow);
+    // Bloom copy stays outside .pile so post blend (e.g. difference) can't invert it.
+    if (svg && glowHost) logoGlow = place(glowHost, logoGlow);
     else clearGlow();
     syncLogoReveal();
   };
@@ -1169,9 +1188,14 @@ function applyPost() {
   stage.style.setProperty("--bloom", `${bloom}px`);
   stage.style.setProperty("--bloom-opacity", bloomOpacity);
   stage.style.setProperty("--post-blend", state.post.blend);
-  const grain = state.post.grain / 100;
-  stage.style.setProperty("--post-grain", `${Math.min(1, grain)}`);
-  stage.style.setProperty("--post-grain-contrast", `${1 + Math.max(0, grain - 1) * 0.85}`);
+  // Zero-mean grain: result = source + a×(noise−0.5). Slider 100 → a=0.5, 200 → 1.0.
+  const grainA = (state.post.grain / 100) * 0.5;
+  const grainComp = app.querySelector("#ultrapilled-grain-composite");
+  if (grainComp) {
+    grainComp.setAttribute("k3", String(grainA));
+    grainComp.setAttribute("k4", String(-grainA / 2));
+  }
+  playfield.classList.toggle("has-grain", state.post.grain > 0);
   stage.style.setProperty("--post-vig", `${state.post.vignette / 140}`);
   stage.style.setProperty("--post-sat", `${state.post.saturate / 100}`);
   const hueDeg = Math.round(state.post.hue + audioHueOffset);

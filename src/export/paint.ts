@@ -9,8 +9,9 @@ import { chipContributesBloom, imageAdjustActive, imageRasterFilter, rasterRing,
 import { textAnimCharPose, textAnimTravel } from "../textAnim";
 import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 
+/** Mono fractal noise tile — used for zero-mean arithmetic grain in export. */
 const GRAIN_URL =
-  "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix type='saturate' values='0' in='t' result='m'/%3E%3CfeComponentTransfer in='m'%3E%3CfeFuncR type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncG type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncB type='linear' slope='2.2' intercept='-0.6'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
+  "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix type='matrix' values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1' in='t'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
 
 const images = new Map<string, Promise<HTMLImageElement | null>>();
 const maskCanvas = document.createElement("canvas");
@@ -471,6 +472,44 @@ async function grainImage(): Promise<HTMLImageElement | null> {
   return loadImage(GRAIN_URL);
 }
 
+/** Match live SVG grain: result = source + a×(noise−0.5). Slider 100 → a=0.5. */
+function paintGrainArithmetic(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  amount: number,
+  noise: CanvasImageSource,
+  tile: number,
+) {
+  if (amount <= 0 || tile <= 0) return;
+  grainTile.width = tile;
+  grainTile.height = tile;
+  const tileCtx = grainTile.getContext("2d");
+  if (!tileCtx) return;
+  tileCtx.clearRect(0, 0, tile, tile);
+  tileCtx.drawImage(noise, 0, 0, tile, tile);
+
+  const frame = ctx.getImageData(0, 0, width, height);
+  const noiseBuf = document.createElement("canvas");
+  noiseBuf.width = width;
+  noiseBuf.height = height;
+  const noiseCtx = noiseBuf.getContext("2d");
+  if (!noiseCtx) return;
+  const pattern = noiseCtx.createPattern(grainTile, "repeat");
+  if (!pattern) return;
+  noiseCtx.fillStyle = pattern;
+  noiseCtx.fillRect(0, 0, width, height);
+  const noiseData = noiseCtx.getImageData(0, 0, width, height).data;
+  const px = frame.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const delta = amount * (noiseData[i]! / 255 - 0.5) * 255;
+    px[i] = Math.min(255, Math.max(0, px[i]! + delta));
+    px[i + 1] = Math.min(255, Math.max(0, px[i + 1]! + delta));
+    px[i + 2] = Math.min(255, Math.max(0, px[i + 2]! + delta));
+  }
+  ctx.putImageData(frame, 0, 0);
+}
+
 function paintVignette(ctx: CanvasRenderingContext2D, width: number, height: number, amount: number) {
   if (amount <= 0) return;
   const alpha = amount / 140;
@@ -555,9 +594,6 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
   if (bloom > 0 && bloomOpacity > 0) {
     const layer = buffer(bloomBuffer, scene.width, scene.height);
     paintPile(layer, true);
-    if (logo && logoFile && isSvgLogo(logoFile.name, logoFile.src)) {
-      paintLogo(layer, scene.width, scene.height, scene.background, scene.theme, logo);
-    }
     pile.save();
     pile.filter = `blur(${bloom * 48 * scale}px)`;
     pile.globalAlpha = bloomOpacity;
@@ -575,29 +611,24 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
 
   if (logo && logoFront) paintStageLogo(ctx);
 
+  // Logo bloom after the pile's mix blend — same as live .logo-bloom-layer (plus-lighter).
+  if (bloom > 0 && bloomOpacity > 0 && logo && logoFile && isSvgLogo(logoFile.name, logoFile.src)) {
+    const layer = buffer(bloomBuffer, scene.width, scene.height);
+    paintLogo(layer, scene.width, scene.height, scene.background, scene.theme, logo);
+    ctx.save();
+    ctx.filter = `blur(${bloom * 48 * scale}px)`;
+    ctx.globalAlpha = bloomOpacity;
+    ctx.globalCompositeOperation = "lighter";
+    ctx.drawImage(bloomBuffer, 0, 0);
+    ctx.restore();
+  }
+
   if (!scene.transparent && scene.post.grain > 0) {
     const grain = await grainImage();
     if (grain) {
       const tile = Math.max(1, Math.round(180 * scale));
-      grainTile.width = tile;
-      grainTile.height = tile;
-      const tileCtx = grainTile.getContext("2d");
-      if (tileCtx) {
-        const strength = scene.post.grain / 100;
-        tileCtx.clearRect(0, 0, tile, tile);
-        tileCtx.filter = strength > 1 ? `contrast(${1 + (strength - 1) * 0.85})` : "none";
-        tileCtx.drawImage(grain, 0, 0, tile, tile);
-        tileCtx.filter = "none";
-        const sized = ctx.createPattern(grainTile, "repeat");
-        if (sized) {
-          ctx.save();
-          ctx.globalCompositeOperation = "soft-light";
-          ctx.globalAlpha = Math.min(1, strength);
-          ctx.fillStyle = sized;
-          ctx.fillRect(0, 0, scene.width, scene.height);
-          ctx.restore();
-        }
-      }
+      const amount = (scene.post.grain / 100) * 0.5;
+      paintGrainArithmetic(ctx, scene.width, scene.height, amount, grain, tile);
     }
   }
 
