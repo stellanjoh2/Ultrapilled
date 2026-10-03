@@ -493,56 +493,67 @@ export function berlinState(): AppState {
   };
 }
 
-/** Wordmark letters (public/logotype) are the drop; pills, shapes, and a few words fill in. */
+/** Wordmark letters (public/logotype) are the drop; pills, shapes, and a lab photo fill in. */
 export function ultrapilledState(): AppState {
-  const INK = 0;
-  const LIME = 1;
-  const VIOLET = 2;
-  const CYAN = 3;
-  const PINK = 4;
-  const text = (slot: Partial<TextSlot>) =>
-    defaultTextSlot({ fontFamily: "Syne", fontWeight: 800, tracking: -40, ...slot });
-  const letter = (file: string, scale: number, colorIndex: number): ImageSlot =>
+  const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
+  const letter = (file: string, name: string, colorIndex: number, scale: number): ImageSlot =>
     defaultImageSlot({
       src: `/logotype/${file}.svg`,
-      name: file.replace(/\d+$/, ""),
+      name,
       size: 88,
       amount: 1,
       colorIndex,
       scale,
+      radius: 0,
+      stroked: false,
+      stroke: 4,
       tint: true,
     });
   const slots = [
-    letter("u", 1.85, INK),
-    letter("l", 2.05, LIME),
-    text({ text: "PHYSICS", colorIndex: VIOLET, textColorIndex: INK, scale: 1.15, pillPad: 28 }),
-    letter("t", 1.7, CYAN),
-    letter("r", 1.75, PINK),
-    presetIcon("Stars", 1, LIME, { scale: 0.45 }),
-    letter("a", 1.8, INK),
-    letter("p", 1.85, LIME),
-    photo("ultrapilled", "project-sida.jpg", "Project SIDA", 115, 8),
-    letter("i", 1.9, VIOLET),
-    letter("l2", 2.15, INK),
-    text({ text: "ULTRA", fontFamily: "Anton", fontWeight: 400, shape: "none", colorIndex: LIME, scale: 2.4, tracking: -80 }),
-    letter("l3", 1.9, CYAN),
-    letter("e", 1.7, PINK),
-    presetIcon("Rings", 1, CYAN, { scale: 0.55 }),
-    presetIcon("Waves", 1, PINK, { scale: 0.5 }),
-    letter("d", 1.85, LIME),
+    letter("u", "u", 0, 1.85),
+    letter("l", "l", 1, 2.05),
     text({
-      text: "DROP",
-      colorIndex: PINK,
-      textColorIndex: INK,
-      stroked: true,
-      stroke: 2,
-      scale: 0.85,
-      pillPad: 36,
+      text: "PHYSICS",
+      fontFamily: "Syne",
+      fontWeight: 800,
+      fontSize: 28,
+      textHeight: 50,
+      shape: "pill",
+      radius: 12,
+      stroked: false,
+      stroke: 4,
+      colorIndex: 2,
+      scale: 1.15,
+      tracking: -40,
+      textColorIndex: 0,
+      pillPad: 28,
     }),
-    presetIcon("Spheres", 1, VIOLET, { scale: 0.4 }),
-    presetIcon("Arches", 1, LIME, { scale: 0.7 }),
-    text({ text: "PILL", shape: "box", radius: 4, colorIndex: LIME, textColor: "#07060c", scale: 0.7, tracking: -20 }),
-    presetIcon("Clovers", 1, CYAN, { scale: 0.5 }),
+    letter("t", "t", 3, 1.7),
+    letter("r", "r", 4, 1.75),
+    presetIcon("Stars", 1, 1, { scale: 0.45 }),
+    letter("a", "a", 0, 1.8),
+    letter("p", "p", 1, 1.85),
+    photo("ultrapilled", "project-sida.jpg", "Project SIDA", 115, 8),
+    letter("i", "i", 2, 1.9),
+    letter("l2", "l", 0, 2.15),
+    text({
+      text: "ULTRA",
+      fontFamily: "Anton",
+      fontWeight: 400,
+      fontSize: 28,
+      textHeight: 50,
+      shape: "none",
+      radius: 12,
+      stroked: false,
+      colorIndex: 1,
+      scale: 2.4,
+      tracking: -80,
+    }),
+    letter("l3", "l", 3, 1.9),
+    letter("e", "e", 4, 1.7),
+    presetIcon("Rings", 1, 3, { scale: 0.55 }),
+    presetIcon("Waves", 1, 4, { scale: 0.5 }),
+    letter("d", "d", 1, 1.85),
   ].filter((slot): slot is Slot => slot != null);
   return {
     ...demoState(),
@@ -555,7 +566,12 @@ export function ultrapilledState(): AppState {
         { id: uid(), color: "#1a0560", at: 0 },
         { id: uid(), color: "#07060c", at: 100 },
       ],
+      imageId: "",
+      logoId: "",
       grid: true,
+      gridDensity: "base",
+      gridColor: "#ffffff",
+      gridOpacity: 20,
     },
     canvas: "16:9",
     masterScale: 3.5,
