@@ -4517,8 +4517,13 @@ async function playIntroLogotype(intro: HTMLElement): Promise<void> {
 }
 
 async function startIntro() {
+  // Check if we're on mobile
+  const isMobile = (window as any).__ULTRAPILLED_MOBILE__;
+  
   // Mode Select thumbs — start while the intro gif still has the screen.
-  preloadModeSelectMedia();
+  if (!isMobile) {
+    preloadModeSelectMedia();
+  }
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const intro = app.querySelector<HTMLElement>("#app-intro");
@@ -4530,7 +4535,10 @@ async function startIntro() {
   }
 
   // Shapes fall behind the gif; mode select later fades on top of the same scene.
-  warmModeSelectPreview();
+  // Skip preview on mobile since we load the template directly
+  if (!isMobile) {
+    warmModeSelectPreview();
+  }
 
   const img = intro.querySelector<HTMLImageElement>(".app-intro__gif");
   try {
@@ -5690,6 +5698,36 @@ async function resetToModeSelect() {
   }
 }
 
+/** Mobile startup: load Ultrapilled template directly. */
+async function startMobile() {
+  await introAnimDone;
+  const intro = app.querySelector<HTMLElement>("#app-intro");
+  intro?.querySelector(".app-intro__gif")?.remove();
+  intro?.querySelector(".app-intro__logo")?.remove();
+  
+  // Load Ultrapilled template with mobile composition scale
+  const { ultrapilledState } = await import("./templates");
+  const templateState = ultrapilledState();
+  templateState.masterScale = 7.5; // Shows as 75 in UI (divided by 10 in the slider)
+  loadTemplate(templateState);
+  
+  // Start in physics mode
+  modeSelectContinuity = true;
+  await applyStartupMode("physics");
+  
+  // Add mobile overlay message
+  addMobileOverlay();
+}
+
+/** Add "Not intended for mobile screens" overlay. */
+function addMobileOverlay() {
+  const overlay = document.createElement("div");
+  overlay.className = "mobile-overlay";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML = `<div class="mobile-overlay__message">Not intended for mobile screens</div>`;
+  shell.appendChild(overlay);
+}
+
 /** Fresh start: keep black overlay, pick mode, then release UI. */
 async function gateModeSelect() {
   await introAnimDone;
@@ -5707,6 +5745,16 @@ void (async () => {
     resolveBootHold = null;
   };
   try {
+    // Check if we're on mobile
+    const isMobile = (window as any).__ULTRAPILLED_MOBILE__;
+    
+    if (isMobile) {
+      // Mobile path: load Ultrapilled template directly
+      draftReady = true;
+      await startMobile();
+      return;
+    }
+    
     if (!getPrefs().rememberLast) {
       draftReady = true;
       await gateModeSelect();
