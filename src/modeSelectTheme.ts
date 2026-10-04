@@ -179,3 +179,20 @@ export function modeSelectPreviewState(): AppState {
     template: MODE_SELECT_THEME_ID,
   };
 }
+
+export const MOBILE_LANDING_THEME_ID = "custom";
+
+/** Mobile gate backdrop — same pile as Mode Select, plus a few sad faces. */
+export function mobileLandingPreviewState(): AppState {
+  const state = modeSelectPreviewState();
+  return {
+    ...state,
+    template: MOBILE_LANDING_THEME_ID,
+    slots: [
+      ...state.slots,
+      defaultImageSlot({ src: "", name: "Crying Face", emoji: "😢", size: 56, amount: 1, colorIndex: 0, scale: 0.75 }),
+      defaultImageSlot({ src: "", name: "Frowning Face", emoji: "☹️", size: 56, amount: 1, colorIndex: 0, scale: 0.675 }),
+      defaultImageSlot({ src: "", name: "Disappointed Face", emoji: "😞", size: 56, amount: 1, colorIndex: 0, scale: 0.825 }),
+    ],
+  };
+}

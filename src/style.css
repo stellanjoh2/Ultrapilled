@@ -6473,6 +6473,16 @@ html[data-theme="day"] .bug-report__message {
   pointer-events: none;
 }
 
+.mode-select-host.is-mobile-gate.is-playing {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.mode-select-host.is-mobile-gate.is-playing .mode-select-preview {
+  pointer-events: auto;
+  touch-action: none;
+}
+
 .mode-select-preview {
   position: absolute;
   inset: 0;

@@ -3,13 +3,21 @@ import atomIcon from "@phosphor-icons/core/assets/regular/atom.svg?raw";
 import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
 import { backgroundPaint } from "./background";
 import { createPlaySession } from "./playSession";
-import { modeSelectPreviewState } from "./modeSelectTheme";
-import { logotypeRevealMarkup, playLogotypeReveal, settleLogotypeReveal } from "./logotypeReveal";
+import { mobileLandingPreviewState, modeSelectPreviewState } from "./modeSelectTheme";
+import {
+  githubRevealMarkup,
+  logotypeRevealMarkup,
+  playLogotypeReveal,
+  settleLogotypeReveal,
+  sLogotypeRevealMarkup,
+  xRevealMarkup,
+} from "./logotypeReveal";
 import { DEFAULT_THEME } from "./theme";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { playClick, playNotify } from "./uiSounds";
 import { createWorld } from "./world";
+import type { AppState } from "./types";
 
 export type AppMode = "physics" | "layout";
 
@@ -81,7 +89,7 @@ function fillHeadline(el: HTMLElement) {
   el.append(vibe, document.createTextNode(" "), rest);
 }
 
-function paintPreviewBackdrop(stage: HTMLElement, playfield: HTMLElement, state: ReturnType<typeof modeSelectPreviewState>) {
+function paintPreviewBackdrop(stage: HTMLElement, playfield: HTMLElement, state: AppState) {
   const paint = backgroundPaint(state.background, state.canvas, state.stageColor);
   stage.style.background = state.stageColor;
   playfield.style.backgroundColor = paint.color;
@@ -145,7 +153,9 @@ export function warmModeSelectPreview() {
   `;
   host.prepend(wrap);
 
-  const state = modeSelectPreviewState();
+  const state = host.classList.contains("is-mobile-gate")
+    ? mobileLandingPreviewState()
+    : modeSelectPreviewState();
   const stage = wrap.querySelector<HTMLElement>(".mode-select-preview__stage")!;
   const playfield = wrap.querySelector<HTMLElement>(".mode-select-preview__playfield")!;
   paintPreviewBackdrop(stage, playfield, state);
@@ -171,7 +181,8 @@ export function warmModeSelectPreview() {
     playfield,
     fitScale: () => {
       world.setSimulationScale(1);
-      return state.masterScale;
+      const mobileGate = host.classList.contains("is-mobile-gate");
+      return state.masterScale * (mobileGate ? 0.33 : 1);
     },
     syncCanvas: () => {
       paintPreviewBackdrop(stage, playfield, state);
@@ -210,6 +221,10 @@ export function warmModeSelectPreview() {
 
   previewWorld = world;
   previewSession = session;
+
+  if (host.classList.contains("is-mobile-gate")) {
+    world.attach(stage);
+  }
 
   const onResize = () => {
     if (!alive || world.chipCount() === 0) return;
@@ -307,20 +322,78 @@ export function handoffModeSelectPreview(onDone?: () => void) {
 
 /** Phone gate: keep the Orby loop running and sit the access message over it. */
 export function mountMobileAccessOverlay() {
-  warmModeSelectPreview();
   const host = ensureHost();
   host.classList.add("is-mobile-gate");
+  warmModeSelectPreview();
   if (host.querySelector(".mobile-overlay")) return;
   const overlay = document.createElement("div");
   overlay.className = "mobile-overlay";
-  overlay.setAttribute("role", "status");
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "mobile-overlay-title");
   overlay.innerHTML = `
+    <div class="mobile-overlay__s logotype" aria-hidden="true">${sLogotypeRevealMarkup()}</div>
     <div class="mobile-overlay__mark logotype" aria-hidden="true">${logotypeRevealMarkup()}</div>
-    <p class="mobile-overlay__message">Not available on mobile</p>
+    <p class="mobile-overlay__message" id="mobile-overlay-title"></p>
+    <button type="button" class="mobile-overlay__ok">I understand</button>
+    <div class="mobile-overlay__social">
+      <a class="mobile-overlay__x" href="https://x.com/johstell" target="_blank" rel="noopener noreferrer" aria-label="X">${xRevealMarkup()}</a>
+      <a class="mobile-overlay__github" href="https://github.com/stellanjoh2/Ultrapilled" target="_blank" rel="noopener noreferrer" aria-label="GitHub">${githubRevealMarkup()}</a>
+    </div>
   `;
+  const sMark = overlay.querySelector<HTMLElement>(".mobile-overlay__s")!;
+  const mark = overlay.querySelector<HTMLElement>(".mobile-overlay__mark")!;
+  const message = overlay.querySelector<HTMLElement>(".mobile-overlay__message")!;
+  appendWords(message, ["Not", "available", "on", "mobile"]);
+  const words = [...message.querySelectorAll<HTMLElement>(".mode-select__word")];
+  const ok = overlay.querySelector<HTMLButtonElement>(".mobile-overlay__ok")!;
+  const github = overlay.querySelector<HTMLElement>(".mobile-overlay__github")!;
+  const xMark = overlay.querySelector<HTMLElement>(".mobile-overlay__x")!;
+
+  const dismiss = () => {
+    host.classList.add("is-playing");
+    overlay.remove();
+  };
+  ok.addEventListener("click", dismiss);
+
+  const clearBlend = "opacity,visibility,transform";
+  if (!reducedMotion()) gsap.set([...words, ok], { autoAlpha: 0, y: 22 });
   host.append(overlay);
-  const mark = overlay.querySelector<HTMLElement>(".mobile-overlay__mark");
-  if (mark) settleLogotypeReveal(mark);
+
+  if (reducedMotion()) {
+    settleLogotypeReveal(sMark);
+    settleLogotypeReveal(mark);
+    settleLogotypeReveal(github);
+    settleLogotypeReveal(xMark);
+    return;
+  }
+
+  sMark.classList.add("is-revealing");
+  mark.classList.add("is-revealing");
+  void (async () => {
+    await Promise.all([
+      playLogotypeReveal(sMark),
+      playLogotypeReveal(mark, {
+        scaleFrom: 5,
+        scaleTo: 1,
+        scaleEase: "power3.out",
+      }),
+    ]);
+    if (!overlay.isConnected) return;
+    sMark.classList.remove("is-revealing");
+    mark.classList.remove("is-revealing");
+    const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend };
+    const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+    tl.to(words, reveal);
+    tl.to(ok, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, ">");
+    await tl;
+    if (!overlay.isConnected) return;
+    github.classList.add("is-revealing");
+    xMark.classList.add("is-revealing");
+    await Promise.all([playLogotypeReveal(github), playLogotypeReveal(xMark)]);
+    github.classList.remove("is-revealing");
+    xMark.classList.remove("is-revealing");
+  })();
 }
 
 /** First-run mode gate. Resolves with the chosen mode after the overlay exits. */
