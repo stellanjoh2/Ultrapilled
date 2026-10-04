@@ -5817,14 +5817,19 @@ button.pill.about-overlay__ok {
   margin: 1.6em 0 0;
   padding: var(--space-0) var(--space-2);
   border: calc(2px * var(--ui-scale)) solid #ffffff;
-  background: transparent;
+  background-color: rgb(255 255 255 / 0);
+  background-image: none;
   color: #ffffff;
   font-size: calc(15px * var(--ui-scale));
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 button.pill.about-overlay__ok:hover,
 button.pill.about-overlay__ok:active {
-  background: #ffffff;
+  background-color: #ffffff;
+  background-image: none;
   border-color: #ffffff;
   color: #111111;
 }
