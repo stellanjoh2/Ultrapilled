@@ -5553,7 +5553,7 @@ html[data-theme="day"] .shape-swatch {
 
 .settings-modal__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-1);
   flex-shrink: 0;
@@ -5577,7 +5577,6 @@ html[data-theme="day"] .shape-swatch {
   flex-shrink: 0;
   width: calc(32px * var(--ui-scale));
   height: calc(32px * var(--ui-scale));
-  margin-top: calc(6px * var(--ui-scale));
   padding: 0;
   border: none;
   border-radius: calc(9999px * var(--ui-scale));
@@ -5588,8 +5587,8 @@ html[data-theme="day"] .shape-swatch {
 .settings-modal__back-icon {
   display: grid;
   place-items: center;
-  width: calc(18px * var(--ui-scale));
-  height: calc(18px * var(--ui-scale));
+  width: calc(22.5px * var(--ui-scale));
+  height: calc(22.5px * var(--ui-scale));
 }
 
 .settings-modal__back-icon svg {
