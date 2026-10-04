@@ -5,19 +5,20 @@ import { EMOJI_FONT } from "../emojis";
 import { measureTextInk, measureTrackedTextWidth, paintTextInk, textInkGlyphStarts } from "../measure";
 import { peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
-import { chipContributesBloom, imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags } from "../chipLook";
+import { chipContributesBloom, applyWhiteBalance, imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags, whiteBalanceGains } from "../chipLook";
 import { textAnimCharPose, textAnimTravel } from "../textAnim";
-import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
+import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, grainArithmeticAmount, sanitizeTextMotion, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 
-/** Mono fractal noise tile — used for zero-mean arithmetic grain in export. */
+/** Grayscale stitched fractal — same generator as the live SVG grain filter. */
 const GRAIN_URL =
-  "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix type='matrix' values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1' in='t'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
+  "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix type='matrix' values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1' in='t'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
 
 const images = new Map<string, Promise<HTMLImageElement | null>>();
 const maskCanvas = document.createElement("canvas");
 const chipBuffer = document.createElement("canvas");
 const bloomBuffer = document.createElement("canvas");
 const grainTile = document.createElement("canvas");
+const wbCanvas = document.createElement("canvas");
 
 export type PaintScene = {
   width: number;
@@ -439,15 +440,12 @@ function drawChip(
       } else {
         const radius = chip.radius * scale;
         const ring = rasterRing(slot);
-        const adjust = Boolean(slot.inverted) || imageAdjustActive(slot);
-        const filter = adjust ? imageRasterFilter(slot) : "";
+        const paint = () => paintRasterPhoto(ctx, img, slot, width, height);
         if (radius > 0 || ring) {
           ctx.save();
           round(ctx, width, height, radius);
           ctx.clip();
-          if (filter) ctx.filter = filter;
-          drawContain(ctx, img, width, height);
-          if (filter) ctx.filter = "none";
+          paint();
           if (ring) {
             round(ctx, width, height, radius);
             ctx.lineWidth = Math.max(1, slot.stroke ?? 4) * scale * 2;
@@ -455,24 +453,69 @@ function drawChip(
             ctx.stroke();
           }
           ctx.restore();
-        } else if (filter) {
-          ctx.save();
-          ctx.filter = filter;
-          drawContain(ctx, img, width, height);
-          ctx.restore();
         } else {
-          drawContain(ctx, img, width, height);
+          paint();
         }
       }
     });
   });
 }
 
+function wbLayer(width: number, height: number): CanvasRenderingContext2D {
+  if (wbCanvas.width !== width || wbCanvas.height !== height) {
+    wbCanvas.width = width;
+    wbCanvas.height = height;
+  }
+  const ctx = wbCanvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Export failed");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  return ctx;
+}
+
+function paintRasterPhoto(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  slot: ImageSlot,
+  width: number,
+  height: number,
+) {
+  const wb = whiteBalanceGains(slot.temperature);
+  if (wb) {
+    const layer = wbLayer(width, height);
+    layer.filter = slot.inverted ? "invert(1)" : "none";
+    drawContain(layer, img, width, height);
+    layer.filter = "none";
+    applyWhiteBalance(layer, width, height, wb);
+    const rest = imageRasterFilter(slot, undefined, { skipInvert: true, skipTemperature: true });
+    if (rest) {
+      ctx.save();
+      ctx.filter = rest;
+      ctx.drawImage(wbCanvas, 0, 0, width, height);
+      ctx.restore();
+    } else {
+      ctx.drawImage(wbCanvas, 0, 0, width, height);
+    }
+    return;
+  }
+  const filter = slot.inverted || imageAdjustActive(slot) ? imageRasterFilter(slot) : "";
+  if (filter) {
+    ctx.save();
+    ctx.filter = filter;
+    drawContain(ctx, img, width, height);
+    ctx.restore();
+    return;
+  }
+  drawContain(ctx, img, width, height);
+}
+
 async function grainImage(): Promise<HTMLImageElement | null> {
   return loadImage(GRAIN_URL);
 }
 
-/** Match live SVG grain: result = source + a×(noise−0.5). Slider 100 → a=0.5. */
+/** Match live SVG arithmetic grain: src + a×(noise−0.5). */
 function paintGrainArithmetic(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -553,7 +596,9 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
   const logoFile = backgroundImage(scene.background.logoId);
   const logo = logoFile ? await loadImage(logoFile.src) : null;
   const blend = canvasBlend(scene.post.blend);
-  const logoBlend = canvasBlend(blendMode(scene.background.logoBlend));
+  const logoBlend = canvasBlend(
+    blendMode(scene.background.logoBlend === "normal" ? scene.post.blend : scene.background.logoBlend),
+  );
   const logoFront = Boolean(scene.background.logoFront);
   const paintStageLogo = (target: CanvasRenderingContext2D) => {
     if (!logo) return;
@@ -626,9 +671,8 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
   if (!scene.transparent && scene.post.grain > 0) {
     const grain = await grainImage();
     if (grain) {
-      const tile = Math.max(1, Math.round(180 * scale));
-      const amount = (scene.post.grain / 100) * 0.5;
-      paintGrainArithmetic(ctx, scene.width, scene.height, amount, grain, tile);
+      const tile = Math.max(1, Math.round(220 * scale));
+      paintGrainArithmetic(ctx, scene.width, scene.height, grainArithmeticAmount(scene.post.grain), grain, tile);
     }
   }
 

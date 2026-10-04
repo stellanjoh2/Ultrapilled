@@ -1,6 +1,6 @@
-html:has(.mobile-gate),
-html:has(.mobile-gate) body,
-html:has(.mobile-gate) #app {
+html.is-mobile-gate,
+html.is-mobile-gate body,
+html.is-mobile-gate #app {
   margin: 0;
   width: 100%;
   height: 100%;
@@ -8,6 +8,23 @@ html:has(.mobile-gate) #app {
   background: #000;
   color: #fff;
   font-family: Inter, system-ui, sans-serif;
+}
+
+html.is-mobile-gate .app {
+  pointer-events: none;
+}
+
+html.is-mobile-gate .app .topbar,
+html.is-mobile-gate .app .panel,
+html.is-mobile-gate .app .theme-shelf,
+html.is-mobile-gate .app .dev-panel,
+html.is-mobile-gate .app .pro-tip,
+html.is-mobile-gate .app .stage,
+html.is-mobile-gate .app .canvas-welcome,
+html.is-mobile-gate .app .canvas-nudge {
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
 }
 
 .mobile-gate {
@@ -51,15 +68,15 @@ html:has(.mobile-gate) #app {
   letter-spacing: -0.045em;
 }
 
-/* Mobile overlay message */
+/* Sit in the preview host so difference blend can see the Orby pieces. */
 .mobile-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 999999;
 }
 
 .mobile-overlay__message {

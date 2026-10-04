@@ -28,6 +28,7 @@ import {
   uid,
   FALLBACK_WEIGHTS,
   FONTS,
+  grainArithmeticAmount,
   type AppState,
   type ImageSlot,
   type Slot,
@@ -77,6 +78,7 @@ import eyeSlash from "@phosphor-icons/core/assets/regular/eye-slash.svg?raw";
 import trashSimple from "@phosphor-icons/core/assets/regular/trash-simple.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
 import { isAboutOpen } from "./aboutPanel";
+import { isBugReportOpen } from "./bugReport";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
 import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
 import { openYouTubeImport, isYouTubeOpen } from "./youtubePanel";
@@ -87,7 +89,7 @@ import {
 import { checkInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
-import { askModeSelect, handoffModeSelectPreview, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
+import { askModeSelect, handoffModeSelectPreview, mountMobileAccessOverlay, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
@@ -131,8 +133,10 @@ import {
 } from "./panel/slotMenu";
 import { createPlaySession, type PlaySession } from "./playSession";
 
+const isMobileGate = Boolean((window as any).__ULTRAPILLED_MOBILE__);
+
 syncUiScale();
-preloadModeSelectMedia();
+if (!isMobileGate) preloadModeSelectMedia();
 preloadUltrapilledLogo();
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
@@ -167,18 +171,6 @@ const world = createWorld();
 
 app.innerHTML = `
   <div class="app ui-hidden">
-    <svg class="post-grain-defs" width="0" height="0" aria-hidden="true" focusable="false">
-      <filter id="ultrapilled-grain" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" stitchTiles="stitch" result="noise" />
-        <feColorMatrix in="noise" type="matrix" result="mono" values="
-          0.33 0.33 0.33 0 0
-          0.33 0.33 0.33 0 0
-          0.33 0.33 0.33 0 0
-          0 0 0 0 1" />
-        <feComposite id="ultrapilled-grain-composite" in="SourceGraphic" in2="mono" operator="arithmetic"
-          k1="0" k2="1" k3="0" k4="0" />
-      </filter>
-    </svg>
     <div class="app-intro" id="app-intro" aria-hidden="true">
       <img class="app-intro__gif" alt="" width="300" height="300" />
       <div class="app-intro__logo" aria-hidden="true">
@@ -210,6 +202,15 @@ app.innerHTML = `
           </div>
           <div class="chip-chrome-layer" aria-hidden="true"></div>
         </div>
+        <svg class="post-grain-defs" width="0" height="0" aria-hidden="true" focusable="false">
+          <filter id="ultrapilled-grain" color-interpolation-filters="sRGB" x="0%" y="0%" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" result="noise" />
+            <feColorMatrix in="noise" type="matrix" result="mono" values="0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1" />
+            <feComposite id="ultrapilled-grain-composite" in="SourceGraphic" in2="mono" operator="arithmetic" k1="0" k2="1" k3="0" k4="0" />
+          </filter>
+        </svg>
+        <!-- Backdrop filter (not a playfield filter) so Difference still sees the grid. -->
+        <div class="post-grain" aria-hidden="true"></div>
         <div class="post-vignette" aria-hidden="true"></div>
         <canvas class="phys-debug" id="phys-debug" aria-hidden="true" hidden></canvas>
         <p class="canvas-welcome" id="canvas-welcome" hidden>Press spacebar to trigger physics</p>
@@ -1101,7 +1102,9 @@ function applyLogo() {
     glowHost.replaceChildren();
     logoGlow = null;
   };
-  stage.style.setProperty("--logo-blend", blendMode(background.logoBlend));
+  // Default "normal" follows Create mix so a white mark punches the grid like falling assets.
+  const logoMix = background.logoBlend === "normal" ? state.post.blend : background.logoBlend;
+  stage.style.setProperty("--logo-blend", blendMode(logoMix));
   const front = Boolean(background.logoFront);
   layer.classList.toggle("is-front", front);
   glowLayer?.classList.toggle("is-front", front);
@@ -1188,9 +1191,10 @@ function applyPost() {
   stage.style.setProperty("--bloom", `${bloom}px`);
   stage.style.setProperty("--bloom-opacity", bloomOpacity);
   stage.style.setProperty("--post-blend", state.post.blend);
-  // Zero-mean grain: result = source + a×(noise−0.5). Slider 100 → a=0.5, 200 → 1.0.
-  const grainA = (state.post.grain / 100) * 0.5;
-  const grainComp = app.querySelector("#ultrapilled-grain-composite");
+  const logoMix = state.background.logoBlend === "normal" ? state.post.blend : state.background.logoBlend;
+  stage.style.setProperty("--logo-blend", blendMode(logoMix));
+  const grainA = grainArithmeticAmount(state.post.grain);
+  const grainComp = playfield.querySelector("#ultrapilled-grain-composite");
   if (grainComp) {
     grainComp.setAttribute("k3", String(grainA));
     grainComp.setAttribute("k4", String(-grainA / 2));
@@ -4568,6 +4572,21 @@ function finishIntro() {
   resolveIntroAnim?.();
   resolveIntroAnim = null;
   void bootHold.then(() => {
+    const intro = app.querySelector<HTMLElement>("#app-intro");
+    const dismissIntro = () => {
+      if (!intro) return;
+      intro.classList.add("is-done");
+      const remove = () => intro.remove();
+      intro.addEventListener("transitionend", remove, { once: true });
+      window.setTimeout(remove, 500);
+    };
+
+    if (isMobileGate) {
+      // Phone: keep chrome hidden and leave the Orby loop running.
+      dismissIntro();
+      return;
+    }
+
     if (modeSelectContinuity) {
       // Fade finished under the dumping preview before — wait until it's gone, then 1s in.
       gridHoldForHandoff = true;
@@ -4575,7 +4594,6 @@ function finishIntro() {
     } else {
       stopModeSelectPreview();
     }
-    const intro = app.querySelector<HTMLElement>("#app-intro");
     logotypeLive = true;
     syncLogotypeAccent();
     shell.classList.remove("ui-hidden");
@@ -4585,11 +4603,7 @@ function finishIntro() {
       releaseProTips();
     }
     resize();
-    if (!intro) return;
-    intro.classList.add("is-done");
-    const remove = () => intro.remove();
-    intro.addEventListener("transitionend", remove, { once: true });
-    window.setTimeout(remove, 500);
+    dismissIntro();
   });
 }
 
@@ -4621,13 +4635,8 @@ async function playIntroLogotype(intro: HTMLElement): Promise<void> {
 }
 
 async function startIntro() {
-  // Check if we're on mobile
-  const isMobile = (window as any).__ULTRAPILLED_MOBILE__;
-  
   // Mode Select thumbs — start while the intro gif still has the screen.
-  if (!isMobile) {
-    preloadModeSelectMedia();
-  }
+  if (!isMobileGate) preloadModeSelectMedia();
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const intro = app.querySelector<HTMLElement>("#app-intro");
@@ -4638,11 +4647,8 @@ async function startIntro() {
     return;
   }
 
-  // Shapes fall behind the gif; mode select later fades on top of the same scene.
-  // Skip preview on mobile since we load the template directly
-  if (!isMobile) {
-    warmModeSelectPreview();
-  }
+  // Shapes fall behind the gif; desktop mode select later fades on top of the same scene.
+  warmModeSelectPreview();
 
   const img = intro.querySelector<HTMLImageElement>(".app-intro__gif");
   try {
@@ -5377,6 +5383,7 @@ copyBtn.addEventListener("click", async () => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if (isMobileGate) return;
   const meta = event.metaKey || event.ctrlKey;
   if (meta && !event.altKey && !editingText(event.target)) {
     const key = event.key.toLowerCase();
@@ -5412,7 +5419,7 @@ window.addEventListener("keydown", (event) => {
     }
   }
   if (typingInField(event.target)) return;
-  if (isSettingsOpen() || isAboutOpen() || isUnsplashOpen() || isYouTubeOpen()) return;
+  if (isSettingsOpen() || isAboutOpen() || isBugReportOpen() || isUnsplashOpen() || isYouTubeOpen()) return;
   if (document.querySelector(".reconnect[aria-modal='true']")) return;
   if (event.code === "Space") {
     event.preventDefault();
@@ -5802,34 +5809,10 @@ async function resetToModeSelect() {
   }
 }
 
-/** Mobile startup: load Ultrapilled template directly. */
+/** Phone: Orby fall loop + access copy. Editor chrome stays hidden. */
 async function startMobile() {
   await introAnimDone;
-  const intro = app.querySelector<HTMLElement>("#app-intro");
-  intro?.querySelector(".app-intro__gif")?.remove();
-  intro?.querySelector(".app-intro__logo")?.remove();
-  
-  // Load Ultrapilled template with mobile composition scale
-  const { ultrapilledState } = await import("./templates");
-  const templateState = ultrapilledState();
-  templateState.masterScale = 7.5; // Shows as 75 in UI (divided by 10 in the slider)
-  loadTemplate(templateState);
-  
-  // Start in physics mode
-  modeSelectContinuity = true;
-  await applyStartupMode("physics");
-  
-  // Add mobile overlay message
-  addMobileOverlay();
-}
-
-/** Add "Not intended for mobile screens" overlay. */
-function addMobileOverlay() {
-  const overlay = document.createElement("div");
-  overlay.className = "mobile-overlay";
-  overlay.setAttribute("aria-hidden", "true");
-  overlay.innerHTML = `<div class="mobile-overlay__message">Not intended for mobile screens</div>`;
-  shell.appendChild(overlay);
+  mountMobileAccessOverlay();
 }
 
 /** Fresh start: keep black overlay, pick mode, then release UI. */
@@ -5849,11 +5832,7 @@ void (async () => {
     resolveBootHold = null;
   };
   try {
-    // Check if we're on mobile
-    const isMobile = (window as any).__ULTRAPILLED_MOBILE__;
-    
-    if (isMobile) {
-      // Mobile path: load Ultrapilled template directly
+    if (isMobileGate) {
       draftReady = true;
       await startMobile();
       return;

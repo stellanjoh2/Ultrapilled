@@ -1,12 +1,14 @@
 import "./mobile-gate.css";
+import { isMobileAccessGate } from "./mobileGate";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("#app missing");
 
-const mobile = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+const mobile = isMobileAccessGate();
 
 // Store mobile flag globally so main.ts can access it
 (window as any).__ULTRAPILLED_MOBILE__ = mobile;
+if (mobile) document.documentElement.classList.add("is-mobile-gate");
 
 const intro = new Image();
 intro.src = "/images/intropill.gif";

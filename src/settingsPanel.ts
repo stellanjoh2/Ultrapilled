@@ -13,6 +13,7 @@ import moonIcon from "@phosphor-icons/core/assets/regular/moon.svg?raw";
 import speakerHighIcon from "@phosphor-icons/core/assets/regular/speaker-high.svg?raw";
 import sunIcon from "@phosphor-icons/core/assets/regular/sun.svg?raw";
 import { getPrefs, setPrefs, type AppPrefs, type ChromeTheme } from "./prefs";
+import { isBugReportOpen, openBugReport, reportCardHtml } from "./bugReport";
 import { checkInput } from "./checkBox";
 import { playRemove, playSwitch, playTransition } from "./uiSounds";
 import { bindRangeValueEdit, rangeCaptionHtml, setRangeCaptionValue } from "./rangeCaption";
@@ -250,6 +251,7 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
       </div>
     </section>
     ${shortcutsMarkup()}
+    ${reportCardHtml()}
   `;
 }
 
@@ -393,16 +395,20 @@ export function openSettings(controller: SettingsController): void {
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    // SVG icon clicks are SVGElement, not HTMLElement — use Element so Back works.
+    // SVG icon clicks are SVGElement, not HTMLElement — use Element so Back / report CTA work.
     if (!(target instanceof Element)) return;
+    if (target.closest("[data-open-bug-report]")) {
+      openBugReport();
+      return;
+    }
     if (target.closest("[data-settings-close]")) closeSettings();
   });
 
   onKey = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeSettings();
-    }
+    if (event.key !== "Escape") return;
+    if (isBugReportOpen()) return;
+    event.preventDefault();
+    closeSettings();
   };
   window.addEventListener("keydown", onKey);
 

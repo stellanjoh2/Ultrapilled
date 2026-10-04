@@ -334,6 +334,15 @@ export type PostSettings = {
   blend: BlendMode;
 };
 
+/**
+ * Signed additive grain: result = src + a×(noise−0.5).
+ * Overlay/soft-light/linear-light all lift shadows (screen the light specks).
+ * Slider 100 → a=0.22, 200 → a=0.44 — texture without a haze.
+ */
+export function grainArithmeticAmount(grain: number): number {
+  return 0.44 * Math.min(1, Math.max(0, grain) / 200);
+}
+
 export type BackgroundKind = "solid" | "gradient" | "image";
 export type GradientShape = "radial" | "linear";
 

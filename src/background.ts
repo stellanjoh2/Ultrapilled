@@ -35,6 +35,18 @@ export function isSvgLogo(name: string, src: string): boolean {
   return name.toLowerCase().endsWith(".svg") || src.startsWith("data:image/svg");
 }
 
+/** Strip comments/scripts/handlers before baking an SVG as a data URL or mask. */
+export function sanitizeSvgMarkup(svg: string): string {
+  return svg
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<\?xml[\s\S]*?\?>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
 /** Most common fill in the file, so the picker opens on the mark's own color. */
 export function svgOriginalColor(svg: string): string {
   const found: string[] = [];

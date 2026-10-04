@@ -16,6 +16,16 @@ export default defineConfig({
   optimizeDeps: {
     include: ["gsap"],
   },
+  // Production Orby CORS only allows ultrapilled.com / orby.studio — proxy so
+  // localhost POST stays same-origin and isn't blocked by the browser.
+  server: {
+    proxy: {
+      "/api/bug-report": {
+        target: "https://orby-gamma.vercel.app",
+        changeOrigin: true,
+      },
+    },
+  },
   test: {
     environment: "happy-dom",
     include: ["src/**/*.test.ts"],

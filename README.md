@@ -65,3 +65,19 @@ Bundled under `public/templates/<id>/`. Full per-file notes also live in each fo
 | `moma-queue.jpg` | [MoMa Ausstellung in Berlin 2004 RIMG0457](https://commons.wikimedia.org/wiki/File:MoMa_Ausstellung_in_Berlin_2004_RIMG0457.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `balloon.jpg` | [Potsdamer Platz Berlin RIMG0463](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0463.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `towers.jpg` | [Potsdamer Platz Berlin RIMG0464](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0464.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+
+## License
+
+Original Ultrapilled code and original assets are under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Full text is in [`LICENSE`](LICENSE).
+
+**What this means**
+
+- You can use, share, and adapt this project, including commercially, as long as you credit Ultrapilled and link to this project (or the license).
+- GIFs, videos, stills, and other files you export from the app are **yours**. You do not need to credit Ultrapilled on that work.
+- This covers **our** code and original assets only. Dependencies and bundled third-party files keep their own terms:
+  - [Matter.js](https://brm.io/matter-js/)
+  - [GSAP](https://gsap.com/standard-license/)
+  - [Phosphor Icons](https://github.com/phosphor-icons/core)
+  - Mattone (`public/fonts/Mattone-LICENSE.txt`, SIL Open Font License 1.1)
+  - Template photos (tables above / each folder’s `CREDITS.txt`)
+  - Sounds (see [Sounds](#sounds))

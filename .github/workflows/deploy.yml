@@ -33,6 +33,7 @@ jobs:
       - name: Build
         env:
           VITE_UNSPLASH_ACCESS_KEY: ${{ secrets.VITE_UNSPLASH_ACCESS_KEY }}
+          VITE_BUG_REPORT_API_URL: ${{ vars.VITE_BUG_REPORT_API_URL }}
         run: npm run build
       - name: Setup Pages
         uses: actions/configure-pages@v6

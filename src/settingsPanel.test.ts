@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { closeBugReport, isBugReportOpen } from "./bugReport";
 import { closeSettings, isSettingsOpen, openSettings } from "./settingsPanel";
 
 describe("settings panel close targets", () => {
   afterEach(() => {
+    closeBugReport();
     closeSettings();
     document.body.innerHTML = "";
     vi.restoreAllMocks();
   });
 
-  it("closes when clicking the SVG inside the Back button", () => {
+  function stubReducedMotion() {
     vi.stubGlobal(
       "matchMedia",
       vi.fn().mockReturnValue({
@@ -18,6 +20,10 @@ describe("settings panel close targets", () => {
         removeEventListener() {},
       }),
     );
+  }
+
+  it("closes when clicking the SVG inside the Back button", () => {
+    stubReducedMotion();
 
     openSettings({
       prefsChanged() {},
@@ -32,5 +38,25 @@ describe("settings panel close targets", () => {
     path!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     expect(isSettingsOpen()).toBe(false);
+  });
+
+  it("shows the report card at the bottom and opens the bug form", () => {
+    stubReducedMotion();
+
+    openSettings({
+      prefsChanged() {},
+      layoutMode: () => false,
+      setLayoutMode() {},
+    });
+
+    const card = document.querySelector(".report-card");
+    const body = document.querySelector("#settings-modal-body");
+    expect(card).toBeTruthy();
+    expect(body?.lastElementChild).toBe(card);
+
+    const openBtn = document.querySelector("[data-open-bug-report]");
+    openBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(isBugReportOpen()).toBe(true);
+    expect(isSettingsOpen()).toBe(true);
   });
 });

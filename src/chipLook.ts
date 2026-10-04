@@ -66,15 +66,41 @@ export type ImageAdjustSlot = Pick<
 
 const WB_ROOT_ID = "ultrapilled-wb-filters";
 
-/** Lazily register an Orby-style R/B white-balance feColorMatrix for canvas + CSS url(#id). */
-function ensureTemperatureFilter(kelvin: number): string | undefined {
+export type WhiteBalanceGains = { r: number; b: number };
+
+/** Orby Kelvin → per-channel gains. Null at 6000K. */
+export function whiteBalanceGains(kelvin: number | undefined): WhiteBalanceGains | null {
   const k = imageTemperatureOf(kelvin);
-  if (k === IMAGE_TEMPERATURE_NEUTRAL_K) return undefined;
+  if (k === IMAGE_TEMPERATURE_NEUTRAL_K) return null;
+  const offset = imageTemperatureNormalized(k) * 0.2;
+  return {
+    r: Number((1 + offset).toFixed(5)),
+    b: Number((1 - offset).toFixed(5)),
+  };
+}
+
+/** Pixel path for export — canvas `filter` ignores SVG `url(#id)`. */
+export function applyWhiteBalance(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  gains: WhiteBalanceGains,
+): void {
+  const frame = ctx.getImageData(0, 0, width, height);
+  const px = frame.data;
+  for (let i = 0; i < px.length; i += 4) {
+    px[i] = Math.min(255, px[i]! * gains.r);
+    px[i + 2] = Math.min(255, px[i + 2]! * gains.b);
+  }
+  ctx.putImageData(frame, 0, 0);
+}
+
+/** Lazily register an Orby-style R/B white-balance feColorMatrix for live CSS url(#id). */
+function ensureTemperatureFilter(kelvin: number): string | undefined {
+  const gains = whiteBalanceGains(kelvin);
+  if (!gains) return undefined;
+  const k = imageTemperatureOf(kelvin);
   const id = `ultrapilled-wb-${k}`;
-  const normalized = imageTemperatureNormalized(k);
-  const offset = normalized * 0.2;
-  const r = Number((1 + offset).toFixed(5));
-  const b = Number((1 - offset).toFixed(5));
   if (typeof document !== "undefined") {
     let root = document.getElementById(WB_ROOT_ID) as SVGSVGElement | null;
     if (!root) {
@@ -91,7 +117,7 @@ function ensureTemperatureFilter(kelvin: number): string | undefined {
       filter.setAttribute("color-interpolation-filters", "sRGB");
       const matrix = document.createElementNS("http://www.w3.org/2000/svg", "feColorMatrix");
       matrix.setAttribute("type", "matrix");
-      matrix.setAttribute("values", `${r} 0 0 0 0 0 1 0 0 0 0 0 ${b} 0 0 0 0 0 1 0`);
+      matrix.setAttribute("values", `${gains.r} 0 0 0 0 0 1 0 0 0 0 0 ${gains.b} 0 0 0 0 0 1 0`);
       filter.appendChild(matrix);
       root.appendChild(filter);
     }
@@ -99,18 +125,31 @@ function ensureTemperatureFilter(kelvin: number): string | undefined {
   return `url(#${id})`;
 }
 
+export type ImageRasterFilterOptions = {
+  skipInvert?: boolean;
+  skipTemperature?: boolean;
+};
+
 /**
  * CSS / canvas filter for raster image chips.
  * Invert is always explicit so live paint can fade invert on/off.
  * Color adjusts are omitted at neutral so export can skip when unused.
- * Temperature uses Orby's Kelvin→R/B white-balance matrix via an SVG filter.
+ * Temperature uses Orby's Kelvin→R/B white-balance matrix via an SVG filter on DOM;
+ * export applies the same gains in pixels (see applyWhiteBalance).
  * Compose order stays WB (Temperature) before exposure/contrast/sat/hue —
  * independent of CREATE panel slider order (Exposure→…→Temperature→Hue).
  */
-export function imageRasterFilter(slot: ImageAdjustSlot, dropShadowCss?: string): string {
-  const parts: string[] = [slot.inverted ? "invert(1)" : "invert(0)"];
-  const temperature = ensureTemperatureFilter(imageTemperatureOf(slot.temperature));
-  if (temperature) parts.push(temperature);
+export function imageRasterFilter(
+  slot: ImageAdjustSlot,
+  dropShadowCss?: string,
+  options?: ImageRasterFilterOptions,
+): string {
+  const parts: string[] = [];
+  if (!options?.skipInvert) parts.push(slot.inverted ? "invert(1)" : "invert(0)");
+  if (!options?.skipTemperature) {
+    const temperature = ensureTemperatureFilter(imageTemperatureOf(slot.temperature));
+    if (temperature) parts.push(temperature);
+  }
   const exposure = imageExposureOf(slot.exposure);
   if (exposure !== 0) parts.push(`brightness(${1 + exposure / 100})`);
   const contrast = imageContrastOf(slot.contrast);

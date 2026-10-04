@@ -1,5 +1,5 @@
 import { mountColorPicker } from "./colorPicker";
-import { backgroundImage, gridDivisions, isSvgLogo, logoFill, sampleStopColor, stopBarGradient, storeBackgroundImage, svgOriginalColor, svgSize } from "./background";
+import { backgroundImage, gridDivisions, isSvgLogo, logoFill, sampleStopColor, sanitizeSvgMarkup, stopBarGradient, storeBackgroundImage, svgOriginalColor, svgSize } from "./background";
 import type { AppState, GradientStop, GridDensity } from "./types";
 import { BLEND_MODES, blendMode, uid } from "./types";
 import { playCreate, playRemove } from "./uiSounds";
@@ -238,13 +238,7 @@ function readLogoFile(file: File): Promise<{ src: string; name: string; width: n
   if (svg) {
     return file.text().then((text) => {
       if (!/<svg[\s>]/i.test(text)) throw new Error("type");
-      const clean = text
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/<\?xml[\s\S]*?\?>/gi, "")
-        .replace(/<script[\s\S]*?<\/script>/gi, "")
-        .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
-        .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-        .replace(/javascript:/gi, "");
+      const clean = sanitizeSvgMarkup(text);
       const size = svgSize(clean);
       const sized = /\bwidth\s*=/i.test(clean) && /\bheight\s*=/i.test(clean)
         ? clean
@@ -398,7 +392,7 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
             <button type="button" class="pill${!front ? " is-on" : ""}" data-logo-front="0" aria-pressed="${!front}" data-tip="Draw the logo under falling assets">Behind</button>
             <button type="button" class="pill${front ? " is-on" : ""}" data-logo-front="1" aria-pressed="${front}" data-tip="Draw the logo over falling assets">In front</button>
           </div>
-          <label class="field" data-tip="How the logo mixes with layers behind it">Blend mode
+          <label class="field" data-tip="How the logo mixes with the stage and grid. Normal follows the Create mix mode, so Difference shows the grid through a white mark.">Blend mode
             <select id="logo-blend">
               ${BLEND_MODES.map((mode) => `<option value="${mode.id}"${logoBlend === mode.id ? " selected" : ""}>${mode.label}</option>`).join("")}
             </select>

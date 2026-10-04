@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { isColorMask, isSvgSource } from "./chipKinds";
-import { imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
+import { imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags, whiteBalanceGains } from "./chipLook";
 import { ICON_PRESETS } from "./icons";
 import {
   defaultImageSlot,
   defaultTextSlot,
   defaultTypeSlot,
+  grainArithmeticAmount,
   IMAGE_TEMPERATURE_NEUTRAL_K,
   imageTemperatureLabel,
   imageTemperatureNormalized,
@@ -116,5 +117,28 @@ describe("imageTemperature", () => {
     expect(imageTemperatureNormalized(10000)).toBe(1);
     expect(imageTemperatureNormalized(2000)).toBe(-1);
     expect(imageTemperatureLabel(8000)).toBe("8000K");
+  });
+
+  it("maps Kelvin to the same R/B gains as the live SVG filter", () => {
+    expect(whiteBalanceGains(6000)).toBeNull();
+    expect(whiteBalanceGains(8000)).toEqual({ r: 1.1, b: 0.9 });
+    expect(whiteBalanceGains(4000)).toEqual({ r: 0.9, b: 1.1 });
+  });
+
+  it("omits SVG url() when skipTemperature is set for the canvas path", () => {
+    expect(
+      imageRasterFilter(defaultImageSlot({ temperature: 8000, exposure: 50 }), undefined, {
+        skipInvert: true,
+        skipTemperature: true,
+      }),
+    ).toBe("brightness(1.5)");
+  });
+});
+
+describe("grain mix", () => {
+  it("uses signed additive amplitude so mid-gray noise does not lift the plate", () => {
+    expect(grainArithmeticAmount(0)).toBe(0);
+    expect(grainArithmeticAmount(100)).toBeCloseTo(0.22);
+    expect(grainArithmeticAmount(200)).toBeCloseTo(0.44);
   });
 });

@@ -90,7 +90,7 @@ export function openAbout(): void {
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
     if (target.closest("[data-about-close]")) closeAbout();
   });
 

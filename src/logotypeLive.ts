@@ -2,8 +2,8 @@ import { fillLuminance, type ColorTheme } from "./theme";
 
 /** How many wordmark letterforms take a theme color at rest. */
 const LIT_COUNT = 5;
-/** Hover reassigns theme colors across the letterforms twice a second. */
-const HOVER_MS = 500;
+/** Hover reassigns theme colors across the letterforms three times a second. */
+const HOVER_MS = 333;
 /**
  * Minimum Rec.709 luminance gap against the canvas fill.
  * Below this a letter is treated as the same colour as the background.
@@ -172,7 +172,7 @@ function tmPaths(root: HTMLElement): SVGPathElement[] {
  * take the active theme once on mount and again when the color theme changes.
  * Every fill is checked against the canvas backdrop: a swatch within
  * LOGOTYPE_MIN_LUM_GAP is replaced by another theme color or luminance-shifted.
- * Hover reassigns a random theme color on every letterform every 500ms, then
+ * Hover reassigns a random theme color on every letterform every 333ms, then
  * the resting five return. A swatch that sits too close to the backdrop is
  * luminance-shifted in place so pinks and purples stay in the cycle instead of
  * being replaced by the first swatch that already contrasts. Reduced motion

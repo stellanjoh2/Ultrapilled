@@ -1,4 +1,4 @@
-import { storeBackgroundImage } from "./background";
+import { putBackgroundImage, sanitizeSvgMarkup } from "./background";
 import { ICON_PRESETS } from "./icons";
 import { modeSelectPreviewState, MODE_SELECT_THEME_ID } from "./modeSelectTheme";
 import { DEFAULT_THEME } from "./theme";
@@ -14,7 +14,7 @@ import {
   type Slot,
   type TextSlot,
 } from "./types";
-import ultrapilledLogoRaw from "./assets/ultrapiled-logo.svg?raw";
+import ultrapilledLogoRaw from "./assets/ultrapilled-logo.svg?raw";
 
 export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | "ultrapilled" | typeof MODE_SELECT_THEME_ID;
 
@@ -495,6 +495,9 @@ export function berlinState(): AppState {
   };
 }
 
+/** Stable library id so switching to this template does not leak data URLs. */
+export const ULTRAPILLED_LOGO_ID = "ultrapilled-builtin-logo";
+
 /** Baked Ultrapilled stage mark — reused so preload and template share one data URL. */
 let ultrapilledLogoBake: { dataUrl: string; width: number; height: number } | null = null;
 
@@ -502,13 +505,7 @@ let ultrapilledLogoBake: { dataUrl: string; width: number; height: number } | nu
 export function ultrapilledLogoAsset(): { dataUrl: string; width: number; height: number } {
   if (ultrapilledLogoBake) return ultrapilledLogoBake;
   // XML comments cannot contain "--"; the source once had "--logotype-pill" and Chromium refused <img> load.
-  const logoSvg = ultrapilledLogoRaw
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<\?xml[\s\S]*?\?>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/javascript:/gi, "");
+  const logoSvg = sanitizeSvgMarkup(ultrapilledLogoRaw);
   const viewBoxMatch = logoSvg.match(/viewBox\s*=\s*["']\s*[-\d.]+\s+[-\d.]+\s+([-\d.]+)\s+([-\d.]+)/i);
   const width = viewBoxMatch ? Number(viewBoxMatch[1]) : 276.31;
   const height = viewBoxMatch ? Number(viewBoxMatch[2]) : 76.32;
@@ -540,6 +537,7 @@ export function preloadUltrapilledLogo(): Promise<void> {
 /** Wordmark letters (public/logotype) are the drop; pills, shapes, and a lab photo fill in. */
 export function ultrapilledState(): AppState {
   const logo = ultrapilledLogoAsset();
+  putBackgroundImage(ULTRAPILLED_LOGO_ID, logo.dataUrl, "ultrapilled-logo.svg", logo.width, logo.height);
 
   const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
   const letter = (file: string, name: string, colorIndex: number, scale: number): ImageSlot =>
@@ -614,7 +612,7 @@ export function ultrapilledState(): AppState {
         { id: uid(), color: "#07060c", at: 100 },
       ],
       imageId: "",
-      logoId: storeBackgroundImage(logo.dataUrl, "ultrapiled-logo.svg", logo.width, logo.height),
+      logoId: ULTRAPILLED_LOGO_ID,
       // Intro mark is 50vw, and the opening frame scales it by 1.5, so 75% of the frame width.
       logoScale: 8 / 3,
       logoOriginal: "#ffffff",
