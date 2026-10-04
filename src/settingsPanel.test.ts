@@ -40,6 +40,24 @@ describe("settings panel close targets", () => {
     expect(isSettingsOpen()).toBe(false);
   });
 
+  it("lists Shift+D for duplicate and backtick for Dev mode", () => {
+    stubReducedMotion();
+
+    openSettings({
+      prefsChanged() {},
+      layoutMode: () => false,
+      setLayoutMode() {},
+    });
+
+    const rows = [...document.querySelectorAll(".shortcut-list__row")];
+    const duplicate = rows.find((row) => row.querySelector(".shortcut-list__label")?.textContent === "Duplicate");
+    const dev = rows.find((row) => row.querySelector(".shortcut-list__label")?.textContent === "Dev mode");
+    expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toContain("⇧");
+    expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toContain("D");
+    expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toMatch(/⌘|Ctrl/);
+    expect(dev?.querySelector(".shortcut-list__keys")?.textContent).toContain("`");
+  });
+
   it("shows the report card at the bottom and opens the bug form", () => {
     stubReducedMotion();
 

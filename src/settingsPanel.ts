@@ -79,7 +79,7 @@ function shortcutsMarkup(): string {
     shortcutRow("Toggle Layout Mode", keycap("L")),
     shortcutRow("Invert selection", keycap("I"), "Selected piece"),
     shortcutRow("Delete selection", `${keycap("⌫")}${keycap("Del")}`),
-    shortcutRow("Duplicate", `${keycap(mod)}${keycap("D")}`),
+    shortcutRow("Duplicate", `${keycap("⇧")}${keycap("D")}${keycap(mod)}${keycap("D")}`),
     shortcutRow("Copy selection", `${keycap(mod)}${keycap("C")}`),
     shortcutRow("Paste selection", `${keycap(mod)}${keycap("V")}`),
     shortcutRow("Undo", `${keycap(mod)}${keycap("Z")}`),
@@ -93,7 +93,7 @@ function shortcutsMarkup(): string {
       "45° steps while scale-dragging",
     ),
     shortcutRow("Add to selection", `${keycap("⇧")}${keycap("Click")}`),
-    shortcutRow("Physics debug outlines", keycap("D")),
+    shortcutRow("Dev mode", keycap("`"), "Physics outlines and chrome radii"),
   ].join("");
   return `
     <section class="section shortcuts-section${shortcutsOpen ? " is-open" : ""}" data-shortcuts-fold>

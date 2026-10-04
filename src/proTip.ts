@@ -25,7 +25,7 @@ const HINTS: Hint[] = [
   { text: "Hide the UI for a clean canvas", key: "H" },
   { text: "Toggle the guide grid", key: "G" },
   { text: "Delete a selected piece with Backspace" },
-  { text: "Duplicate a selection with ⌘D or Ctrl+D" },
+  { text: "Duplicate a selection with Shift+D — or ⌘D / Ctrl+D" },
   { text: "Copy and paste assets with ⌘C / ⌘V or Ctrl+C / Ctrl+V" },
   { text: "Invert the selected piece", key: "I" },
   { text: "Click a piece to edit it" },

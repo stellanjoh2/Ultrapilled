@@ -51,3 +51,8 @@ export function isCanvasRatio(value: unknown): value is CanvasRatio {
 export function parseCanvasRatio(value: unknown): CanvasRatio {
   return isCanvasRatio(value) ? value : "16:9";
 }
+
+/** Prefabs ship with their own ratio; keep the user's selected frame when switching templates. */
+export function keepSelectedCanvas<T extends { canvas: CanvasRatio }>(next: T, selected: CanvasRatio): T {
+  return { ...next, canvas: selected };
+}

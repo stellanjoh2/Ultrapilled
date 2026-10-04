@@ -1,4 +1,4 @@
-import { canvasFrame, parseCanvasRatio, type CanvasFrame, type CanvasRatio } from "./canvas";
+import { canvasFrame, keepSelectedCanvas, parseCanvasRatio, type CanvasFrame, type CanvasRatio } from "./canvas";
 import { FEATURED_EMOJI } from "./emojis";
 import { ICON_PRESETS, imageColliderId } from "./icons";
 import { matchCollider, presetIdForSrc, simpleColliderKind } from "./iconMesh";
@@ -89,7 +89,7 @@ import {
 import { checkInput } from "./checkBox";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
-import { askModeSelect, handoffModeSelectPreview, mountMobileAccessOverlay, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
+import { askModeSelect, handoffModeSelectPreview, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
@@ -121,7 +121,7 @@ import {
   setRangeCaptionValue,
   wireRangeCaptions,
 } from "./rangeCaption";
-import { mountCreatePanel, RESET_ICON, setSectionOpen, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
+import { mountCreatePanel, paintSectionResets, RESET_ICON, setSectionOpen, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
 import { closeOtherSlots, setSlotOpen } from "./panel/slotCards";
 import {
   assignCloseSlotMenu,
@@ -133,10 +133,8 @@ import {
 } from "./panel/slotMenu";
 import { createPlaySession, type PlaySession } from "./playSession";
 
-const isMobileGate = Boolean((window as any).__ULTRAPILLED_MOBILE__);
-
 syncUiScale();
-if (!isMobileGate) preloadModeSelectMedia();
+preloadModeSelectMedia();
 preloadUltrapilledLogo();
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
@@ -1721,6 +1719,7 @@ function bindRange(
     paintRange(input);
     onChange(value);
     if (caption) setRangeCaptionValue(caption, format(value));
+    paintSectionResets(panel, state);
   });
   const finish = () => {
     stopScrub();
@@ -4505,6 +4504,7 @@ function live(opts?: { quiet?: boolean }) {
     if (state.physics.layoutMode) {
       world.syncLayerOrder(state.slots.map((slot) => slot.id));
     }
+    paintSectionResets(panel, state);
   };
   bump();
   void Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]).then(bump);
@@ -4581,12 +4581,6 @@ function finishIntro() {
       window.setTimeout(remove, 500);
     };
 
-    if (isMobileGate) {
-      // Phone: keep chrome hidden and leave the Orby loop running.
-      dismissIntro();
-      return;
-    }
-
     if (modeSelectContinuity) {
       // Fade finished under the dumping preview before — wait until it's gone, then 1s in.
       gridHoldForHandoff = true;
@@ -4636,7 +4630,7 @@ async function playIntroLogotype(intro: HTMLElement): Promise<void> {
 
 async function startIntro() {
   // Mode Select thumbs — start while the intro gif still has the screen.
-  if (!isMobileGate) preloadModeSelectMedia();
+  preloadModeSelectMedia();
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const intro = app.querySelector<HTMLElement>("#app-intro");
@@ -5345,7 +5339,7 @@ function loadTemplate(next: AppState) {
   pickedSlotIds.clear();
   world.setPicked(null);
   openSlots.clear();
-  adoptState(next);
+  adoptState(keepSelectedCanvas(next, state.canvas));
   for (const slot of state.slots) captureBaseline(slot);
   applyBackground();
   applyPost();
@@ -5383,7 +5377,6 @@ copyBtn.addEventListener("click", async () => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (isMobileGate) return;
   const meta = event.metaKey || event.ctrlKey;
   if (meta && !event.altKey && !editingText(event.target)) {
     const key = event.key.toLowerCase();
@@ -5463,7 +5456,14 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "d" || event.key === "D") {
-    if (event.repeat) return;
+    if (meta || event.altKey || event.repeat || !event.shiftKey || !pickedSlotId) return;
+    event.preventDefault();
+    duplicateSlot(pickedSlotId);
+    return;
+  }
+  if (event.key === "`") {
+    if (meta || event.altKey || event.shiftKey || event.repeat) return;
+    event.preventDefault();
     setPhysDebug(!physDebugOn);
     return;
   }
@@ -5809,12 +5809,6 @@ async function resetToModeSelect() {
   }
 }
 
-/** Phone: Orby fall loop + access copy. Editor chrome stays hidden. */
-async function startMobile() {
-  await introAnimDone;
-  mountMobileAccessOverlay();
-}
-
 /** Fresh start: keep black overlay, pick mode, then release UI. */
 async function gateModeSelect() {
   await introAnimDone;
@@ -5832,12 +5826,6 @@ void (async () => {
     resolveBootHold = null;
   };
   try {
-    if (isMobileGate) {
-      draftReady = true;
-      await startMobile();
-      return;
-    }
-    
     if (!getPrefs().rememberLast) {
       draftReady = true;
       await gateModeSelect();

@@ -4,7 +4,7 @@ import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw"
 import { backgroundPaint } from "./background";
 import { createPlaySession } from "./playSession";
 import { modeSelectPreviewState } from "./modeSelectTheme";
-import { logotypeRevealMarkup, playLogotypeReveal } from "./logotypeReveal";
+import { logotypeRevealMarkup, playLogotypeReveal, settleLogotypeReveal } from "./logotypeReveal";
 import { DEFAULT_THEME } from "./theme";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import { isBugReportOpen, openBugReport } from "./bugReport";
@@ -313,9 +313,14 @@ export function mountMobileAccessOverlay() {
   if (host.querySelector(".mobile-overlay")) return;
   const overlay = document.createElement("div");
   overlay.className = "mobile-overlay";
-  overlay.setAttribute("aria-hidden", "true");
-  overlay.innerHTML = `<p class="mobile-overlay__message">Not intended for mobile screens</p>`;
+  overlay.setAttribute("role", "status");
+  overlay.innerHTML = `
+    <div class="mobile-overlay__mark logotype" aria-hidden="true">${logotypeRevealMarkup()}</div>
+    <p class="mobile-overlay__message">Not available on mobile</p>
+  `;
   host.append(overlay);
+  const mark = overlay.querySelector<HTMLElement>(".mobile-overlay__mark");
+  if (mark) settleLogotypeReveal(mark);
 }
 
 /** First-run mode gate. Resolves with the chosen mode after the overlay exits. */

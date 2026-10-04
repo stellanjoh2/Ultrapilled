@@ -26,10 +26,13 @@ describe("mobile access overlay", () => {
     expect(host).toBeTruthy();
     expect(host?.classList.contains("is-mobile-gate")).toBe(true);
     expect(host?.querySelectorAll(".mobile-overlay")).toHaveLength(1);
+    expect(host?.querySelector(".mobile-overlay__mark")).toBeTruthy();
     expect(host?.querySelector(".mobile-overlay__message")?.textContent).toBe(
-      "Not intended for mobile screens",
+      "Not available on mobile",
     );
     expect(document.querySelector(".panel")).toBeNull();
     expect(document.querySelector(".topbar")).toBeNull();
+    expect(document.querySelector(".mode-select")).toBeNull();
+    expect(document.querySelector(".reconnect")).toBeNull();
   });
 });

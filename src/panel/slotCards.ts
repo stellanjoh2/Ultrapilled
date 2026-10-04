@@ -304,7 +304,7 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
   duplicate.type = "button";
   duplicate.className = "ghost icon-btn";
   duplicate.setAttribute("aria-label", "Duplicate");
-  duplicate.dataset.tip = "Duplicate this piece";
+  duplicate.dataset.tip = "Duplicate this piece — Shift+D";
   duplicate.innerHTML = DUPLICATE_ICON;
   duplicate.addEventListener("click", () => H.duplicateSlot(slot.id));
 

@@ -54,7 +54,7 @@
   --panel-width: calc(400px * var(--ui-scale));
   --panel-width-layout: var(--panel-width);
   --shelf-slide: 0.45s cubic-bezier(0.83, 0, 0.17, 1);
-  /* Chrome corner radii — live-tuned in Dev mode (D) */
+  /* Chrome corner radii — live-tuned in Dev mode (`) */
   --radius-panel: calc(44px * var(--ui-scale));
   --radius-settings: calc(44px * var(--ui-scale));
   --radius-reconnect: calc(16px * var(--ui-scale));
@@ -2573,6 +2573,11 @@ button.pill.smash-btn.is-on::after {
 
 .section-reset.is-on {
   color: var(--ink);
+}
+
+.section-reset[hidden] {
+  /* display:grid on .section-reset would otherwise keep [hidden] visible. */
+  display: none !important;
 }
 
 .field-label {

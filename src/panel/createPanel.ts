@@ -8,11 +8,14 @@ import { openAbout } from "../aboutPanel";
 import { openBugReport } from "../bugReport";
 import { bindSlotDrag } from "../slotDrag";
 import {
+  audioReactAtDefault,
   BLEND_MODES,
   blendMode,
+  compositionAtDefault,
   DEFAULT_AUDIO_REACT,
   DEFAULT_PHYSICS,
   PHYSICS_COMPLEXITY,
+  physicsAtDefault,
   physicsComplexity,
   type AppState,
 } from "../types";
@@ -107,18 +110,27 @@ export type CreatePanelHost = SlotCardHost & {
   demoState(): AppState;
 };
 
+export function paintSectionResets(root: ParentNode, state: AppState) {
+  const physics = root.querySelector<HTMLButtonElement>("#reset-physics");
+  if (physics) physics.hidden = physicsAtDefault(state.physics);
+  const audio = root.querySelector<HTMLButtonElement>("#reset-audio-react");
+  if (audio) audio.hidden = audioReactAtDefault(state.audioReact);
+  const composition = root.querySelector<HTMLButtonElement>("#reset-master");
+  if (composition) composition.hidden = compositionAtDefault(state);
+}
+
 function sectionMarkupImpl(
   openSections: Set<string>,
   id: string,
   title: string,
   tip: string,
   body: string,
-  options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string },
+  options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string; dirty?: boolean },
 ): string {
   const open = openSections.has(id);
   const reset =
     options?.resetId && options.resetLabel && options.resetTip
-      ? `<button type="button" class="section-reset" id="${options.resetId}" aria-label="${options.resetLabel}" data-tip="${options.resetTip}">${RESET_ICON}</button>`
+      ? `<button type="button" class="section-reset" id="${options.resetId}" aria-label="${options.resetLabel}" data-tip="${options.resetTip}"${options.dirty === false ? " hidden" : ""}>${RESET_ICON}</button>`
       : "";
   const domId = options?.sectionId ? ` id="${options.sectionId}"` : "";
   return `
@@ -182,7 +194,7 @@ export function mountCreatePanel(
     title: string,
     tip: string,
     bodyHtml: string,
-    options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string },
+    options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string; dirty?: boolean },
   ) => sectionMarkupImpl(openSections, id, title, tip, bodyHtml, options);
   const revealSlotId = host.consumeRevealSlotId();
 const shapes = H.shapeAmountRange();
@@ -229,7 +241,7 @@ panel.innerHTML = `
       <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${H.state.shapeAmount}" />
     </label>
     <p class="hint" id="amount-perf-hint"${H.state.shapeAmount >= H.SHAPE_PERF_WARN ? "" : " hidden"}>Many shapes can drop below 60 fps.</p>`,
-    { resetId: "reset-master", resetLabel: "Reset composition", resetTip: "Reset composition sliders" },
+    { resetId: "reset-master", resetLabel: "Reset composition", resetTip: "Reset composition sliders", dirty: !compositionAtDefault(H.state) },
   )}
   ${sectionMarkup(
     "color",
@@ -342,7 +354,7 @@ panel.innerHTML = `
       <input type="range" id="hold" min="0.2" max="4" step="0.05" value="${H.state.physics.hold}"${H.state.physics.layoutMode ? " disabled" : ""} />
     </label>
     </div>`,
-    { resetId: "reset-physics", resetLabel: "Reset physics", resetTip: "Reset physics sliders" },
+    { resetId: "reset-physics", resetLabel: "Reset physics", resetTip: "Reset physics sliders", dirty: !physicsAtDefault(H.state.physics) },
   )}
   ${sectionMarkup(
     "look",
@@ -396,7 +408,7 @@ panel.innerHTML = `
     <label class="field" data-tip="Small color-wheel kick on sharp hits that snaps back">${rangeCaptionHtml("audioHueNudge", "Hue nudge", `${Math.round(H.state.audioReact.hueNudge)}°`)}
       <input type="range" id="audioHueNudge" min="0" max="30" step="1" value="${H.state.audioReact.hueNudge}" />
     </label>`,
-    { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react" },
+    { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react", dirty: !audioReactAtDefault(H.state.audioReact) },
   )}
   <footer class="panel-credit">
     <span class="panel-credit__s" aria-hidden="true"></span>
@@ -687,6 +699,7 @@ if (H.consumeRevealTheme()) {
   }
 }
 panel.scrollTop = scroll;
+paintSectionResets(panel, H.state);
 if (revealSlotId) {
   const card = panel.querySelector<HTMLElement>(`[data-id="${revealSlotId}"]`);
   if (!inserted && card) {

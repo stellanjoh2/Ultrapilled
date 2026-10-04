@@ -1,6 +1,10 @@
-/** Phones: coarse primary pointer, no hover, no mouse/trackpad/pencil. */
+/**
+ * Phones and phone-sized viewports. Coarse pointer covers landscape phones
+ * (often >700px wide). Max-width covers DevTools / browsers that still report
+ * a fine pointer from a desktop mouse.
+ */
 export const MOBILE_ACCESS_GATE_QUERY =
-  "(hover: none) and (pointer: coarse) and (any-hover: none) and not (any-pointer: fine)";
+  "(max-width: 700px), (hover: none) and (pointer: coarse)";
 
 export function isMobileAccessGate(match = globalThis.matchMedia): boolean {
   if (typeof match !== "function") return false;

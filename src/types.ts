@@ -290,6 +290,38 @@ export const DEFAULT_AUDIO_REACT: AudioReactSettings = {
   hueNudge: 30,
 };
 
+function sameValues<T extends Record<string, unknown>>(a: T, b: T): boolean {
+  for (const key of Object.keys(b) as (keyof T)[]) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+export function physicsAtDefault(physics: PhysicsSettings): boolean {
+  return sameValues(physics, DEFAULT_PHYSICS);
+}
+
+export function audioReactAtDefault(audio: AudioReactSettings): boolean {
+  return sameValues(audio, DEFAULT_AUDIO_REACT);
+}
+
+/** Fields restored by the Composition section reset (demo defaults, not blank). */
+export function compositionAtDefault(state: {
+  masterScale: number;
+  sizeRandom: number;
+  pillPad: number;
+  textTracking: number;
+  shapeAmount: number;
+}): boolean {
+  return (
+    state.masterScale === 3.5 &&
+    state.sizeRandom === 100 &&
+    state.pillPad === 14 &&
+    state.textTracking === 0 &&
+    state.shapeAmount === 15
+  );
+}
+
 export const BLEND_MODES = [
   { id: "normal", label: "Normal" },
   { id: "plus-lighter", label: "Linear Dodge" },
