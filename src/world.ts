@@ -100,6 +100,10 @@ const IMPACT_SPEED = 3.2;
 const IMPACT_FULL_SPEED = 9;
 /** Min gap between impact sounds so pile settle doesn't chatter. */
 const IMPACT_COOLDOWN_MS = 90;
+/** Max upright tilt while pieces first drop (degrees). */
+const AIR_TILT_MAX_DEG = 30;
+/** Distance-based fall tilt — stretch in time with gravity, never finish early mid-air. */
+const AIR_TILT_MAX = (AIR_TILT_MAX_DEG * Math.PI) / 180;
 
 type PhysicsQuality = {
   separatePasses: number;
@@ -183,6 +187,11 @@ type DroppedChip = {
   popScale: number;
   /** While true, seat around the visual box center so pop doesn't drift. */
   popping: boolean;
+  /**
+   * Subtle in-air twist for the initial fall. Progress is distance to the floor
+   * (not time), so low gravity only slows the same motion — it won't stop mid-fall.
+   */
+  airTilt: { target: number; fromY: number; power: number } | null;
 };
 
 type ChipLook = {
@@ -486,6 +495,12 @@ function layerSpawnX(index: number, total: number, width: number, height: number
 /** Vertical half-extent of a rotated rectangle. Upright height underestimates a tilt. */
 function tiltedHalfHeight(width: number, height: number, angle: number): number {
   return (width * Math.abs(Math.sin(angle)) + height * Math.abs(Math.cos(angle))) / 2;
+}
+
+/** Ease that still ends at t=1 — power varies mid-fall speed without finishing early. */
+function airTiltEase(t: number, power: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return Math.pow(x, power);
 }
 
 /** Horizontal half-extent of a rotated rectangle. Upright width underestimates a tilt. */
@@ -924,6 +939,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const body = item.body;
       const ox = body.position.x - x;
       const oy = body.position.y - y;
+      endAirTilt(item);
       item.el.classList.add("is-held");
       if (layoutMode) {
         // Rigid follow — no spring, no leftover throw velocity.
@@ -1225,6 +1241,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   /** Bleed leftover motion once the pile is nearly still so sleep always arrives. */
   function dampTowardSleep() {
     if (drag || chips.length === 0) return;
+    // Don't brake a fresh drop — low gravity starts below the settle threshold.
+    if (chips.some((chip) => chip.airTilt)) return;
     let peak = 0;
     for (const chip of chips) {
       if (chip.body.isSleeping) continue;
@@ -1251,12 +1269,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (spinDrag > 0) {
       const keep = Math.pow(1 - spinDrag, 1 / contactSteps);
       for (const chip of chips) {
+        if (chip.airTilt) continue;
         if (!chip.body.isSleeping) Body.setAngularVelocity(chip.body, chip.body.angularVelocity * keep);
       }
     }
     // Once the pile is nearly still, bleed residual slide/spin so Matter sleep
     // (and the floor/loop settle gate) always arrives — even on low friction.
     dampTowardSleep();
+    driveAirTilts();
   });
 
   Events.on(engine, "collisionStart", (event) => {
@@ -1264,6 +1284,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     let bestBody: Matter.Body | null = null;
     for (const pair of event.pairs) {
       const { bodyA, bodyB, collision } = pair;
+      endAirTiltOnBody(bodyA);
+      endAirTiltOnBody(bodyB);
       const va = bodyA.isStatic ? { x: 0, y: 0 } : (prevVel.get(bodyA.id) ?? bodyA.velocity);
       const vb = bodyB.isStatic ? { x: 0, y: 0 } : (prevVel.get(bodyB.id) ?? bodyB.velocity);
       const closing = Math.abs((va.x - vb.x) * collision.normal.x + (va.y - vb.y) * collision.normal.y);
@@ -1514,6 +1536,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       audioMul: 1,
       popScale: 0,
       popping: true,
+      airTilt: null,
     };
     mountMirrors(chip);
     paint(chip, scaled, size, radius, theme, trackingEm(trackingOf(slot, tracking)), glyphShift(slot));
@@ -1877,6 +1900,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           Body.setAngularVelocity(chip.body, 0);
           Sleeping.set(chip.body, true);
         }
+      } else {
+        const chip = chips[chips.length - 1];
+        if (chip) armAirTilt(chip);
       }
     });
     paintPicked();
@@ -1942,6 +1968,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const targets = xformTargets(slotId);
     if (!targets.length) return;
     for (const chip of targets) {
+      endAirTilt(chip);
       Body.setAngle(chip.body, 0);
       Body.setVelocity(chip.body, { x: 0, y: 0 });
       Body.setAngularVelocity(chip.body, 0);
@@ -3171,6 +3198,60 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     for (const chip of chips) Sleeping.set(chip.body, false);
   }
 
+  /** Random 0–30° twist for a fresh drop; cleared on first contact. */
+  function armAirTilt(chip: DroppedChip) {
+    if (layoutMode) {
+      chip.airTilt = null;
+      return;
+    }
+    const mag = Math.random() * AIR_TILT_MAX;
+    if (mag < 1e-4) {
+      chip.airTilt = null;
+      return;
+    }
+    chip.airTilt = {
+      target: (Math.random() < 0.5 ? -1 : 1) * mag,
+      fromY: chip.body.position.y,
+      // <1 spins up earlier, >1 later — still only finishes as they near the floor.
+      power: 0.65 + Math.random() * 0.9,
+    };
+  }
+
+  function endAirTilt(chip: DroppedChip) {
+    chip.airTilt = null;
+  }
+
+  function endAirTiltOnBody(body: Matter.Body) {
+    if (body.isStatic) return;
+    const chip = chips.find((item) => item.body === body || item.body.id === body.id);
+    if (chip?.airTilt) endAirTilt(chip);
+  }
+
+  /**
+   * Drive spawn tilt from fall distance, not elapsed time — low gravity just
+   * stretches the same rotation across a longer fall instead of freezing mid-air.
+   */
+  function driveAirTilts() {
+    if (layoutMode) return;
+    for (const chip of chips) {
+      const tilt = chip.airTilt;
+      if (!tilt || chip.body.isStatic) continue;
+      const half = tiltedHalfHeight(chip.width, chip.height, tilt.target);
+      const landY = bounds.height - EDGE - half;
+      const span = Math.max(120, landY - tilt.fromY);
+      const t = (chip.body.position.y - tilt.fromY) / span;
+      if (t >= 1) {
+        Body.setAngle(chip.body, tilt.target);
+        Body.setAngularVelocity(chip.body, 0);
+        // Hold the pose until contact; don't clear early or long falls look frozen.
+        continue;
+      }
+      if (t <= 0) continue;
+      Body.setAngle(chip.body, tilt.target * airTiltEase(t, tilt.power));
+      Body.setAngularVelocity(chip.body, 0);
+    }
+  }
+
   /** Lock the pile in place for the floor-pause / end-of-run hold. */
   function freezePile() {
     dropPin();
@@ -3222,6 +3303,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       Body.setAngularVelocity(chip.body, 0);
       Sleeping.set(chip.body, false);
       syncWallCollision(chip);
+      armAirTilt(chip);
       seat(chip);
     }
     rememberFallStart();
