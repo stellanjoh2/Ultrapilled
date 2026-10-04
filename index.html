@@ -5,7 +5,19 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preload" href="/images/intropill.gif" as="image" />
     <link rel="preload" href="/media/Mode-Select-Static.webp" as="image" />
-    <link rel="preload" href="/media/Mode-Select-Physics.mp4" as="video" type="video/mp4" />
+    <script>
+      addEventListener(
+        "error",
+        (event) => {
+          const el = event.target;
+          if (!(el instanceof HTMLScriptElement) || !el.src.includes("/assets/")) return;
+          if (sessionStorage.getItem("up-js-retry")) return;
+          sessionStorage.setItem("up-js-retry", "1");
+          fetch("/", { cache: "reload" }).finally(() => location.reload());
+        },
+        true,
+      );
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ultrapilled</title>
     <meta name="description" content="A physics playground for text chips and icons." />
