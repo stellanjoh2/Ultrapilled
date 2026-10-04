@@ -498,6 +498,8 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
   editor.className = "slot-editor";
   editor.innerHTML = `
     <div class="pick-now">${pickPreview(slot)}${H.resetControl("Shape", "icon", H.fieldDirty(slot, "icon"))}</div>
+    <p class="slot-label">Shapes</p>
+    <div class="icon-grid" data-presets></div>
     <div class="field">${H.settingLabel(slot, slot.gradient && H.iconCanGradient(slot) ? "Start color" : "Color", "color")}
       ${H.tintRow(slot)}
     </div>
@@ -541,8 +543,6 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
     }
     ${H.blendField(slot)}
     ${H.dropShadowField(slot)}
-    <p class="slot-label">Shapes</p>
-    <div class="icon-grid" data-presets></div>
     <label class="field">${H.settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
@@ -587,14 +587,14 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
   editor.className = "slot-editor";
   editor.innerHTML = `
     <div class="pick-now">${pickPreview(slot)}${H.resetControl("Emoji", "icon", H.fieldDirty(slot, "icon"))}</div>
-    ${H.blendField(slot)}
-    ${H.dropShadowField(slot)}
     <p class="slot-label">Emoji</p>
     <div class="emoji-grid" data-emoji-featured></div>
     <label class="field">Search emoji
       <input type="search" data-emoji-search placeholder="heart, fire, cat…" />
     </label>
     <div class="emoji-grid" data-emoji-results></div>
+    ${H.blendField(slot)}
+    ${H.dropShadowField(slot)}
     <label class="field">${H.settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>

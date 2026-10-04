@@ -4220,7 +4220,51 @@ input.slot-live:focus {
 .icon-grid button.is-on,
 .emoji-grid button.is-on {
   background: var(--field);
-  box-shadow: inset 0 0 0 2px #fff;
+  box-shadow: none;
+}
+
+/* Same Orby angle-chase ring as stage / slot selection — not a white tile outline. */
+.icon-grid button.is-on::before,
+.emoji-grid button.is-on::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  box-sizing: border-box;
+  padding: 2px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    var(--stroke-rotate),
+    var(--loop-stroke-a) 0%,
+    var(--loop-stroke-b) 32%,
+    transparent 40%,
+    transparent 46%,
+    transparent 51%,
+    transparent 58%,
+    var(--loop-stroke-a) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .icon-grid button.is-on::before,
+  .emoji-grid button.is-on::before {
+    animation: smash-stroke-spin calc(16s / 3) linear infinite;
+  }
+}
+
+html[data-subtle-select="true"] .icon-grid button.is-on::before,
+html[data-subtle-select="true"] .emoji-grid button.is-on::before {
+  background: color-mix(in srgb, var(--loop-stroke-a) 80%, transparent);
+  animation: none;
 }
 
 /* Day: soft tiles + glyph edge so white/pale masks don't vanish on --field. */
@@ -4231,7 +4275,7 @@ html[data-theme="day"] .icon-grid button.is-on {
 
 html[data-theme="day"] .icon-grid button.is-on,
 html[data-theme="day"] .emoji-grid button.is-on {
-  box-shadow: inset 0 0 0 2px var(--ink);
+  box-shadow: none;
 }
 
 html[data-theme="day"] .shape-swatch {
