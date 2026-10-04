@@ -12,10 +12,11 @@ import {
   sLogotypeRevealMarkup,
   xRevealMarkup,
 } from "./logotypeReveal";
-import { DEFAULT_THEME } from "./theme";
+import { DEFAULT_STAGE, DEFAULT_THEME } from "./theme";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import { PRIVACY_HREF } from "./privacy";
 import { isBugReportOpen, openBugReport } from "./bugReport";
+import { mountHeaderLogotype } from "./logotypeLive";
 import { playClick, playNotify } from "./uiSounds";
 import { compositionScale } from "./uiScale";
 import { createWorld } from "./world";
@@ -135,6 +136,21 @@ function clearPreviewHandles() {
   previewPosePinned = false;
   previewRepeat = true;
   previewRunning = false;
+}
+
+let modeSelectLogotype: { stop(): void } | null = null;
+
+function startModeSelectLogotype(mark: HTMLElement) {
+  modeSelectLogotype?.stop();
+  modeSelectLogotype = mountHeaderLogotype(mark, () => ({
+    theme: DEFAULT_THEME,
+    backdrop: DEFAULT_STAGE,
+  }));
+}
+
+function stopModeSelectLogotype() {
+  modeSelectLogotype?.stop();
+  modeSelectLogotype = null;
 }
 
 /** Silent looping physics behind intro + mode gate. Idempotent. */
@@ -298,6 +314,7 @@ export function beginModeSelectExitDump() {
 
 /** Tear down the early preview immediately. */
 export function stopModeSelectPreview() {
+  stopModeSelectLogotype();
   previewCleanup?.();
   if (hostEl) {
     hostEl.remove();
@@ -597,6 +614,7 @@ export function askModeSelect(): Promise<AppMode> {
     if (reducedMotion()) {
       gsap.set(mark.querySelectorAll(".logotype-reveal__layer"), { clipPath: "inset(0% 0% 0% 0%)" });
       gsap.set([mark, ...words, ...cards, ...chrome], { clearProps: "all", autoAlpha: 1, y: 0 });
+      startModeSelectLogotype(mark);
       return;
     }
 
@@ -608,6 +626,7 @@ export function askModeSelect(): Promise<AppMode> {
         scaleEase: "power3.out",
       });
       mark.classList.remove("is-revealing");
+      startModeSelectLogotype(mark);
 
       const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend };
       const tl = gsap.timeline({ defaults: { ease: "power3.out" } });

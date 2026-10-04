@@ -152,7 +152,7 @@ function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Header wordmark letters only — not the intro or mode-select copies, not the TM. */
+/** Header / Mode Select wordmark letters only — not the intro copy, not the TM. */
 function letterPaths(root: HTMLElement): SVGPathElement[] {
   const layer = root.querySelector(".logotype-reveal__layer--white");
   if (!layer) return [];
@@ -168,8 +168,9 @@ function tmPaths(root: HTMLElement): SVGPathElement[] {
 }
 
 /**
- * Header wordmark. Five letterforms (Ultrapilled, including the pill, excluding TM)
- * take the active theme once on mount and again when the color theme changes.
+ * Header and Mode Select wordmarks. Five letterforms (Ultrapilled, including
+ * the pill, excluding TM) take the active theme once on mount and again when
+ * the color theme changes.
  * Every fill is checked against the canvas backdrop: a swatch within
  * LOGOTYPE_MIN_LUM_GAP is replaced by another theme color or luminance-shifted.
  * Hover reassigns a random theme color on every letterform every 333ms, then
