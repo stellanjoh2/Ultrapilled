@@ -29,13 +29,6 @@ function devicePixels(): number {
   return ratio > 0 && Number.isFinite(ratio) ? ratio : 1;
 }
 
-export function sizeLabel(preset: ImageSizePreset | GifPreset): string {
-  if (preset === "screen") return "Screen";
-  if (preset === "2160p") return "2160p (4K)";
-  if (preset === "4320p") return "4320p (8K)";
-  return preset;
-}
-
 export function frameSize(
   stageWidth: number,
   stageHeight: number,
@@ -65,4 +58,20 @@ export function frameSize(
   }
   const width = even(shortSide);
   return { width, height: even((stageHeight / stageWidth) * width) };
+}
+
+export function sizeLabel(
+  preset: ImageSizePreset | GifPreset,
+  stage?: { width: number; height: number },
+): string {
+  if (preset === "screen") {
+    if (stage && stage.width >= 2 && stage.height >= 2) {
+      const { width, height } = frameSize(stage.width, stage.height, "screen");
+      return `Screen (${width}×${height})`;
+    }
+    return "Screen";
+  }
+  if (preset === "2160p") return "2160p (4K)";
+  if (preset === "4320p") return "4320p (8K)";
+  return preset;
 }

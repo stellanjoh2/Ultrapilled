@@ -170,7 +170,7 @@ export function paintBareText(
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.style.display = "block";
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);

@@ -687,14 +687,25 @@ function openFontMenu(
     menu.style.top = `${shellRect.top}px`;
   };
 
+  let leaving = false;
   const closeCurrent = (restoreFocus = false) => {
     abort.abort();
-    menu.remove();
     if (trigger.isConnected) {
       trigger.setAttribute("aria-expanded", "false");
       if (restoreFocus) trigger.focus();
     }
-    if (closeFontMenu === closeCurrent) closeFontMenu = () => {};
+    const finish = () => {
+      gsap.killTweensOf(menu);
+      menu.remove();
+      if (closeFontMenu === closeCurrent) closeFontMenu = () => {};
+    };
+    if (leaving || reducedMotion()) {
+      finish();
+      return;
+    }
+    leaving = true;
+    menu.style.pointerEvents = "none";
+    gsap.to(menu, { autoAlpha: 0, duration: 0.22, ease: "power2.in", onComplete: finish });
   };
   closeFontMenu = closeCurrent;
 
@@ -711,7 +722,23 @@ function openFontMenu(
 
   place();
   paint();
-  search.focus();
+
+  const focusSearch = () => {
+    if (!search.isConnected) return;
+    search.focus({ preventScroll: true });
+  };
+  gsap.set(menu, { autoAlpha: 0 });
+  if (reducedMotion()) {
+    gsap.set(menu, { clearProps: "visibility,opacity", autoAlpha: 1 });
+    focusSearch();
+  } else {
+    gsap.to(menu, {
+      autoAlpha: 1,
+      duration: 0.28,
+      ease: "power3.out",
+      onStart: focusSearch,
+    });
+  }
 }
 
 function mountWeightPick(
@@ -1245,6 +1272,8 @@ const exportController = {
     return { width: frame.width, height: frame.height, scale: layoutScale(frame) };
   },
   draws: () => world.draws(),
+  poses: () => world.fallStartPoses() ?? (world.chipCount() > 0 ? world.poses() : []),
+  replayFall: () => world.fallStartPoses() != null,
   state: () => state,
   saveProject() {
     const json = serializePillProject(currentPillProject());
@@ -5421,6 +5450,7 @@ copyBtn.addEventListener("click", async () => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if (document.body.classList.contains("is-exporting")) return;
   const meta = event.metaKey || event.ctrlKey;
   if (meta && !event.altKey && !editingText(event.target)) {
     const key = event.key.toLowerCase();
@@ -5456,6 +5486,7 @@ window.addEventListener("keydown", (event) => {
     }
   }
   if (typingInField(event.target)) return;
+  if (document.body.classList.contains("is-exporting")) return;
   if (isSettingsOpen() || isAboutOpen() || isBugReportOpen() || isUnsplashOpen() || isYouTubeOpen()) return;
   if (document.querySelector(".reconnect[aria-modal='true']")) return;
   if (event.code === "Space") {

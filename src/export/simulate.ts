@@ -1,4 +1,5 @@
 import { canvasFrame } from "../canvas";
+import type { ChipPose } from "../chipKinds";
 import type { AppState } from "../types";
 import { paintFrame } from "./paint";
 import { createWorld, type ImpactHit } from "../world";
@@ -7,6 +8,9 @@ const STEP_MS = 1000 / 60;
 const MIN_CYCLE_MS = 1200;
 const SETTLE_CONFIRM_MS = 1600;
 const MAX_FRAMES = 7200;
+/** Sim-time cap so a pile that never sleeps cannot run for tens of minutes. */
+const MAX_FALL_MS = 20_000;
+const MAX_WALL_MS = 90_000;
 
 export class ExportCancelled extends Error {
   constructor() {
@@ -30,6 +34,11 @@ export async function renderLoop(options: {
   fps: 30 | 60;
   loops: 1 | 2;
   transparent: boolean;
+  /** Live chip poses. When set, the loop falls this scene instead of a fresh template spawn. */
+  poses?: ChipPose[];
+  /** When true with poses, wake in place (replay last fall start). When false, redeployFall. */
+  replayFall?: boolean;
+  frame?: { width: number; height: number };
   canvas?: HTMLCanvasElement;
   onFrame: (canvas: HTMLCanvasElement, index: number) => Promise<void | false> | void | false;
   shouldStop?: () => boolean;
@@ -82,16 +91,37 @@ export async function renderLoop(options: {
       sim.setImpactListener((hit) => {
         impacts.push({ ...hit, timeMs: loopStartMs + hit.timeMs });
       });
-      sim.play(
-        options.state.slots,
-        options.state.physics,
-        host,
-        options.state.masterScale,
-        options.state.theme,
-        options.state.pillPad,
-        options.state.textTracking,
-        options.state.sizeRandom,
-      );
+      const poses = options.poses;
+      const frame = options.frame ?? { width: options.stageWidth, height: options.stageHeight };
+      if (poses?.length) {
+        sim.restore(
+          options.state.slots,
+          options.state.physics,
+          host,
+          options.state.masterScale,
+          options.state.theme,
+          options.state.pillPad,
+          options.state.textTracking,
+          options.state.sizeRandom,
+          poses,
+          frame,
+        );
+        if (options.state.physics.layoutMode) sim.freezePile();
+        else if (options.replayFall) sim.wakeAll();
+        else sim.redeployFall();
+        sim.sync();
+      } else {
+        sim.play(
+          options.state.slots,
+          options.state.physics,
+          host,
+          options.state.masterScale,
+          options.state.theme,
+          options.state.pillPad,
+          options.state.textTracking,
+          options.state.sizeRandom,
+        );
+      }
 
       if (sim.chipCount() === 0) {
         await paintFrame(canvas, sim.draws(), scene, timeMs);
@@ -106,6 +136,7 @@ export async function renderLoop(options: {
       let elapsed = 0;
       let settledFor = 0;
       let holdFor = 0;
+      const wallStart = performance.now();
 
       while (true) {
         if (options.shouldStop?.()) throw new ExportCancelled();
@@ -124,10 +155,12 @@ export async function renderLoop(options: {
         elapsed += frameMs;
 
         if (phase === "falling") {
+          const timedOut = elapsed >= MAX_FALL_MS || performance.now() - wallStart >= MAX_WALL_MS;
           const settled = elapsed >= MIN_CYCLE_MS && sim.isSettled();
           const quietLongEnough =
             settledFor >= SETTLE_CONFIRM_MS && sim.isQuiet();
-          if (quietLongEnough) {
+          if (quietLongEnough || timedOut) {
+            if (timedOut) limited = true;
             phase = "holding";
             holdFor = 0;
           } else if (settled) {

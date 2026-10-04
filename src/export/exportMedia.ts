@@ -1,8 +1,9 @@
 import { zipSync } from "fflate";
-import type { ChipDraw } from "../chipKinds";
+import type { ChipDraw, ChipPose } from "../chipKinds";
 import { getPrefs } from "../prefs";
 import type { AppState } from "../types";
 import { AAC_PACKET_SAMPLES, mixBounceTrack } from "./bounceAudio";
+import { writeFrameFile } from "./frameFolder";
 import { paintFrame } from "./paint";
 import { ExportCancelled, renderLoop, yieldToUi } from "./simulate";
 import {
@@ -27,6 +28,9 @@ type LoopRequest = {
   fps: FrameRate;
   loops: LoopCount;
   transparent: boolean;
+  poses?: ChipPose[];
+  replayFall?: boolean;
+  frame?: { width: number; height: number };
   canvas?: HTMLCanvasElement;
   onFrame: (canvas: HTMLCanvasElement, index: number) => Promise<void | false> | void | false;
   shouldStop?: () => boolean;
@@ -117,6 +121,10 @@ export async function exportSequence(options: {
   transparent: boolean;
   fps: FrameRate;
   loops: LoopCount;
+  poses?: ChipPose[];
+  replayFall?: boolean;
+  frame?: { width: number; height: number };
+  folder?: FileSystemDirectoryHandle;
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
 }): Promise<LoopResult> {
@@ -124,6 +132,7 @@ export async function exportSequence(options: {
   const ext = options.kind === "jpg" ? "jpg" : "png";
   const type = options.kind === "jpg" ? "image/jpeg" : "image/png";
   const files: Record<string, Uint8Array> = {};
+  const toFolder = Boolean(options.folder);
   const result = await runLoop({
     state: options.state,
     stageWidth: options.stageWidth,
@@ -133,14 +142,23 @@ export async function exportSequence(options: {
     fps: options.fps,
     loops: options.loops,
     transparent: options.kind === "png" && options.transparent,
+    poses: options.poses,
+    replayFall: options.replayFall,
+    frame: options.frame,
     shouldStop: options.shouldStop,
     onProgress: options.onProgress,
     onFrame: async (canvas, index) => {
       const blob = await canvasBlob(canvas, type, options.kind === "jpg" ? 0.92 : undefined);
-      files[frameName(index, ext)] = new Uint8Array(await blob.arrayBuffer());
+      const name = frameName(index, ext);
+      if (options.folder) {
+        await writeFrameFile(options.folder, name, blob);
+        return;
+      }
+      files[name] = new Uint8Array(await blob.arrayBuffer());
     },
   });
   if (result.frames === 0) throw new Error("Export failed");
+  if (toFolder) return { ...result, truncated: false };
   options.onProgress?.("Packaging…");
   await yieldToUi();
   const zipped = zipSync(files, { level: 0 });
@@ -158,6 +176,9 @@ async function exportVideo(options: {
   loops: LoopCount;
   transparent: boolean;
   format: "mp4" | "mov";
+  poses?: ChipPose[];
+  replayFall?: boolean;
+  frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
 }): Promise<LoopResult> {
@@ -195,6 +216,9 @@ async function encodeVideoFile(options: {
   transparent: boolean;
   format: "mp4" | "mov";
   withAudio: boolean;
+  poses?: ChipPose[];
+  replayFall?: boolean;
+  frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
 }): Promise<LoopResult> {
@@ -234,6 +258,7 @@ async function encodeVideoFile(options: {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
+  canvas.getContext("2d", { alpha: true, willReadFrequently: true });
   const output = new Output({
     format:
       options.format === "mp4"
@@ -265,6 +290,9 @@ async function encodeVideoFile(options: {
       fps: options.fps,
       loops: options.loops,
       transparent: options.transparent,
+      poses: options.poses,
+      replayFall: options.replayFall,
+      frame: options.frame,
       canvas,
       shouldStop: options.shouldStop,
       onProgress: options.onProgress,
@@ -322,6 +350,9 @@ export function exportMp4(options: {
   preset: VideoSizePreset;
   fps: FrameRate;
   loops: LoopCount;
+  poses?: ChipPose[];
+  replayFall?: boolean;
+  frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
 }): Promise<LoopResult> {
@@ -336,6 +367,9 @@ export function exportMov(options: {
   fps: FrameRate;
   loops: LoopCount;
   transparent: boolean;
+  poses?: ChipPose[];
+  replayFall?: boolean;
+  frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
 }): Promise<LoopResult> {
@@ -372,6 +406,9 @@ export async function exportGif(options: {
   preset: GifPreset;
   fps: FrameRate;
   loops: LoopCount;
+  poses?: ChipPose[];
+  replayFall?: boolean;
+  frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
 }): Promise<LoopResult> {
@@ -386,6 +423,9 @@ export async function exportGif(options: {
     fps: options.fps,
     loops: options.loops,
     transparent: false,
+    poses: options.poses,
+    replayFall: options.replayFall,
+    frame: options.frame,
     shouldStop: options.shouldStop,
     onProgress: options.onProgress,
     onFrame: (canvas) => {

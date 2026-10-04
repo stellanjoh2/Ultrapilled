@@ -3436,16 +3436,20 @@ html[data-theme="day"] input[type="file"]::file-selector-button:hover {
 .file-replace__text {
   position: relative;
   z-index: 1;
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(40px * var(--ui-scale));
+  padding: var(--space-0) var(--space-1);
+  border-radius: calc(9999px * var(--ui-scale));
+  background: #fff;
+  color: #000;
   font-size: calc(13px * var(--ui-scale));
   font-weight: 500;
   line-height: 1;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   font-feature-settings: "ss01";
-  text-shadow:
-    0 1px 2px rgb(0 0 0 / 0.9),
-    0 0 14px rgb(0 0 0 / 0.65);
   pointer-events: none;
 }
 
@@ -5523,6 +5527,91 @@ html[data-theme="day"] .shape-swatch {
   transition:
     background-color 0.18s ease,
     color 0.18s ease;
+}
+
+body.is-exporting .app {
+  opacity: 0.38;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+.export-progress {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: grid;
+  place-items: center;
+  padding: var(--space-2);
+  pointer-events: auto;
+}
+
+.export-progress__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.export-progress__stack {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(445px, 100%);
+}
+
+.export-progress__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: calc(var(--space-3) * 1.15) calc(var(--space-3) * 1.15) var(--space-2);
+  border-radius: var(--radius-reconnect);
+  background: var(--canvas);
+  box-shadow: var(--shadow-2);
+  text-align: center;
+  transform-origin: 50% 50%;
+}
+
+.export-progress__title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.export-progress__n {
+  margin: var(--space-2) 0 var(--space-3);
+  color: #c4ff00;
+  font-family: var(--font-section);
+  font-size: 54px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.export-progress__cancel {
+  width: 100%;
+  min-height: calc(54px * var(--ui-scale));
+}
+
+.export-progress__note {
+  margin: var(--space-2) 0 0;
+  max-width: 38em;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.export-progress__note + .export-progress__note {
+  margin-top: var(--space-1);
 }
 
 .settings-modal {

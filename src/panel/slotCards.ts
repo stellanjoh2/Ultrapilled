@@ -949,7 +949,7 @@ function photoReplaceControl(slot: ImageSlot): string {
   return `<label class="field file-replace">
     <span class="field-label"><span>Replace image</span>${H.resetControl("Image", "icon", H.fieldDirty(slot, "icon"))}</span>
     <span class="file-replace__btn" style="background-image:url(&quot;${H.escapeAttr(src)}&quot;)" data-tip="${H.escapeAttr(slot.name)}">
-      <span class="file-replace__text">Replace</span>
+      <span class="file-replace__text">Browse</span>
     </span>
     <input type="file" class="file-replace__input" accept="${H.IMAGE_FILE_ACCEPT}" data-file />
   </label>`;
@@ -963,7 +963,7 @@ function videoReplaceControl(slot: ImageSlot): string {
   return `<label class="field file-replace">
     <span class="field-label"><span>Replace video</span></span>
     <span class="file-replace__btn${poster ? "" : " file-replace__btn--video"}"${thumb} data-tip="${H.escapeAttr(slot.name)}">
-      <span class="file-replace__text">Replace</span>
+      <span class="file-replace__text">Browse</span>
     </span>
     <input type="file" class="file-replace__input" accept="${H.IMAGE_FILE_ACCEPT}" data-file />
   </label>`;

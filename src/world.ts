@@ -273,6 +273,10 @@ export type WorldHandle = {
   freezePile: () => void;
   /** Lift existing chips above the stage and wake them for a fresh fall (keeps transforms). */
   redeployFall: () => void;
+  /** Spawn poses from the last play/redeploy, for export to replay that fall. */
+  fallStartPoses: () => ChipPose[] | null;
+  /** Wake sleeping chips in place (export replay after restore). */
+  wakeAll: () => void;
   purgeFallen: (limitY: number) => void;
   isSettled: () => boolean;
   isQuiet: () => boolean;
@@ -463,6 +467,22 @@ function sizeJitter(unit: number, amount: number): number {
   return 1 + unit * spread;
 }
 
+/** Stable size-random unit in [-1, 1] from layer index (same every trigger). */
+function stableSizeUnit(index: number, total: number): number {
+  if (total <= 1) return 0;
+  return (index / (total - 1)) * 2 - 1;
+}
+
+/** Horizontal spawn from layer index so back→front maps left→right every trigger. */
+function layerSpawnX(index: number, total: number, width: number, height: number, stageW: number): number {
+  const reach = Math.hypot(width, height) / 2;
+  const inset = Math.min(Math.max(reach + 12, 24), Math.max(24, stageW / 2 - 8));
+  const span = Math.max(0, stageW - inset * 2);
+  if (span <= 0) return stageW / 2;
+  if (total <= 1) return inset + span / 2;
+  return inset + ((index + 0.5) / total) * span;
+}
+
 /** Vertical half-extent of a rotated rectangle. Upright height underestimates a tilt. */
 function tiltedHalfHeight(width: number, height: number, angle: number): number {
   return (width * Math.abs(Math.sin(angle)) + height * Math.abs(Math.cos(angle))) / 2;
@@ -513,6 +533,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let bounds = { width: 0, height: 0 };
   let maxSpan = 0;
   let chips: DroppedChip[] = [];
+  /** Poses right after the last play/redeploy stack, before gravity runs. */
+  let fallStart: ChipPose[] | null = null;
   let layer: HTMLElement | null = null;
   let bloomLayer: HTMLElement | null = null;
   let chromeLayer: HTMLElement | null = null;
@@ -949,6 +971,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       }
     }
     chips = [];
+    fallStart = null;
     chromeLayer?.replaceChildren();
     bounceCount.clear();
     prevVel.clear();
@@ -1663,30 +1686,31 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       buildSides(bounds.width, bounds.height);
       setFloorOpen(floorOpen);
     }
-    // Wide chips must skip side walls before wake/separate, or dual-wall digs launch the pile.
-    for (const chip of chips) syncWallCollision(chip);
-    // Composition/slot scale remeshes colliders in place. Without a wake, a frozen or
-    // runner-stopped pile keeps the new meshes asleep mid-air (shrink gaps especially).
-    if (layoutMode) {
-      if (grown.length > 0) releaseGrowth(grown);
-      for (const chip of chips) {
-        Body.setVelocity(chip.body, { x: 0, y: 0 });
-        Body.setAngularVelocity(chip.body, 0);
-        Sleeping.set(chip.body, true);
-        pinInsideWalls(chip);
-      }
-    } else if (opts?.quiet && remeshed > 0) {
-      // Shape padding: update mesh, calm depenetrate — no releaseGrowth rocket.
-      for (const chip of grown) pinInsideWalls(chip);
-      settleQuietRemesh(remeshedSlotIds);
-    } else {
-      if (disturbed) {
+    // Theme / fill paint does not remesh. Pinning wide chips here woke a settled pile.
+    if (disturbed) {
+      // Wide chips must skip side walls before wake/separate, or dual-wall digs launch the pile.
+      for (const chip of chips) syncWallCollision(chip);
+      // Composition/slot scale remeshes colliders in place. Without a wake, a frozen or
+      // runner-stopped pile keeps the new meshes asleep mid-air (shrink gaps especially).
+      if (layoutMode) {
+        if (grown.length > 0) releaseGrowth(grown);
+        for (const chip of chips) {
+          Body.setVelocity(chip.body, { x: 0, y: 0 });
+          Body.setAngularVelocity(chip.body, 0);
+          Sleeping.set(chip.body, true);
+          pinInsideWalls(chip);
+        }
+      } else if (opts?.quiet && remeshed > 0) {
+        // Shape padding: update mesh, calm depenetrate — no releaseGrowth rocket.
+        for (const chip of grown) pinInsideWalls(chip);
+        settleQuietRemesh(remeshedSlotIds);
+      } else {
         wakeAll();
         if (!running) setRunning(true);
+        if (grown.length > 0) releaseGrowth(grown);
+        else if (remeshed > 0) separateOverlaps(true);
+        for (const chip of chips) pinInsideWalls(chip);
       }
-      if (grown.length > 0) releaseGrowth(grown);
-      else if (remeshed > 0) separateOverlaps(true);
-      for (const chip of chips) pinInsideWalls(chip);
     }
     // seat() alone is enough for the first paint; sync again so any body nudges show up
     // even when main's phase is idle and the frame loop skips sync.
@@ -1805,7 +1829,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const box = playfieldBox(stage, layer);
     const stageW = box.width;
     const stageH = box.height;
-    const sizeUnits = falling.map(() => Math.random() * 2 - 1);
+    const total = falling.length;
+    const sizeUnits = falling.map((_, index) => stableSizeUnit(index, total));
     const layouts = falling.map((slot, index) =>
       contained(slot, scale * sizeJitter(sizeUnits[index], sizeRandom), pillPad, tracking, stageW),
     );
@@ -1818,12 +1843,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
     falling.forEach((slot, index) => {
       const { size } = layouts[index];
-      const reach = Math.hypot(size.width, size.height) / 2;
-      const inset = Math.min(Math.max(reach + 12, 24), Math.max(24, stageW / 2 - 8));
-      const span = Math.max(0, stageW - inset * 2);
-      const x = inset + Math.random() * span;
-      const tight = size.width > stageW * 0.65;
-      const angle = layoutMode ? 0 : (Math.random() - 0.5) * (tight ? 0.12 : 0.8);
+      const angle = 0;
+      const x = layerSpawnX(index, total, size.width, size.height, stageW);
       const half = tiltedHalfHeight(size.width, size.height, angle);
       let y: number;
       if (layoutMode) {
@@ -1847,7 +1868,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         tracking,
         sizeRandom,
         index,
-        falling.length,
+        total,
       );
       if (layoutMode) {
         const chip = chips[chips.length - 1];
@@ -1859,6 +1880,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       }
     });
     paintPicked();
+    rememberFallStart();
   }
 
   function poses(): ChipPose[] {
@@ -1873,6 +1895,15 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       y: chip.body.position.y,
       angle: chip.body.angle,
     }));
+  }
+
+  function rememberFallStart() {
+    fallStart = poses();
+  }
+
+  function fallStartPoses(): ChipPose[] | null {
+    if (!fallStart?.length || fallStart.length !== chips.length) return null;
+    return fallStart;
   }
 
   /** Mirror Matter vertices to match visual flip. */
@@ -3155,9 +3186,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   /**
-   * Re-trigger fall without clear/respawn: keep each chip's scaleMul, sizeUnit,
-   * flips, angle, and horizontal place; stack them above the stage so gravity
-   * runs the normal tumble sequence from the user's current design.
+   * Re-trigger fall without clear/respawn: keep scaleMul, sizeUnit, and flips;
+   * restack by layer order (same hierarchy as play) so every trigger starts alike.
    */
   function redeployFall() {
     dropPin();
@@ -3167,29 +3197,24 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (!chips.length || bounds.width < 8) return;
 
     const stageW = bounds.width;
-    // Match play()'s above-canvas stack so the fall reads the same as a first drop.
     let spawnY = -160;
 
-    // Top-most first so relative vertical order stays roughly familiar after lift.
+    // Back → front (seqIndex), matching play()'s expandSlots order.
     const ordered = [...chips].sort(
-      (a, b) => a.body.position.y - b.body.position.y || a.body.position.x - b.body.position.x,
+      (a, b) => a.seqIndex - b.seqIndex || a.slotId.localeCompare(b.slotId),
     );
+    const total = ordered.length;
 
-    for (const chip of ordered) {
+    for (let index = 0; index < total; index++) {
+      const chip = ordered[index]!;
       if (chip.slotId !== editingId && chip.body.isStatic) Body.setStatic(chip.body, false);
 
-      const angle = chip.body.angle;
+      const angle = 0;
       const half = tiltedHalfHeight(chip.width, chip.height, angle);
       spawnY -= half + 16;
       const y = spawnY;
       spawnY -= half;
-
-      const reach = Math.hypot(chip.width, chip.height) / 2;
-      const inset = Math.min(Math.max(reach + 12, 24), Math.max(24, stageW / 2 - 8));
-      const x = Math.min(
-        Math.max(chip.body.position.x, inset),
-        Math.max(inset, stageW - inset),
-      );
+      const x = layerSpawnX(index, total, chip.width, chip.height, stageW);
 
       Body.setPosition(chip.body, { x, y });
       Body.setAngle(chip.body, angle);
@@ -3199,6 +3224,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       syncWallCollision(chip);
       seat(chip);
     }
+    rememberFallStart();
   }
 
   function stagePoint(event: { clientX: number; clientY: number }) {
@@ -3756,9 +3782,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (!seen.has(chip.slotId)) ordered.push(chip);
     }
 
-    if (ordered.length === chips.length && ordered.every((chip, i) => chip === chips[i])) return;
-
+    const sameOrder = ordered.length === chips.length && ordered.every((chip, i) => chip === chips[i]);
     chips = ordered;
+    for (let i = 0; i < chips.length; i++) chips[i]!.seqIndex = i;
+    if (sameOrder) return;
     for (const chip of chips) {
       layer.append(chip.el);
       bloomLayer.append(chip.glow);
@@ -3962,6 +3989,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     setFloorOpen,
     freezePile,
     redeployFall,
+    fallStartPoses,
+    wakeAll,
     purgeFallen,
     isSettled,
     isQuiet,

@@ -18,6 +18,7 @@ const maskCanvas = document.createElement("canvas");
 const chipBuffer = document.createElement("canvas");
 const bloomBuffer = document.createElement("canvas");
 const grainTile = document.createElement("canvas");
+const grainNoise = document.createElement("canvas");
 const wbCanvas = document.createElement("canvas");
 
 export type PaintScene = {
@@ -78,12 +79,16 @@ async function preload(draws: ChipDraw[], post: PostSettings): Promise<Map<strin
   return ready;
 }
 
+function scratchContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
+  return canvas.getContext("2d", { willReadFrequently: true });
+}
+
 function buffer(canvas: HTMLCanvasElement, width: number, height: number): CanvasRenderingContext2D {
   if (canvas.width !== width || canvas.height !== height) {
     canvas.width = width;
     canvas.height = height;
   }
-  const ctx = canvas.getContext("2d");
+  const ctx = scratchContext(canvas);
   if (!ctx) throw new Error("Export failed");
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, width, height);
@@ -527,16 +532,17 @@ function paintGrainArithmetic(
   if (amount <= 0 || tile <= 0) return;
   grainTile.width = tile;
   grainTile.height = tile;
-  const tileCtx = grainTile.getContext("2d");
+  const tileCtx = scratchContext(grainTile);
   if (!tileCtx) return;
   tileCtx.clearRect(0, 0, tile, tile);
   tileCtx.drawImage(noise, 0, 0, tile, tile);
 
   const frame = ctx.getImageData(0, 0, width, height);
-  const noiseBuf = document.createElement("canvas");
-  noiseBuf.width = width;
-  noiseBuf.height = height;
-  const noiseCtx = noiseBuf.getContext("2d");
+  if (grainNoise.width !== width || grainNoise.height !== height) {
+    grainNoise.width = width;
+    grainNoise.height = height;
+  }
+  const noiseCtx = scratchContext(grainNoise);
   if (!noiseCtx) return;
   const pattern = noiseCtx.createPattern(grainTile, "repeat");
   if (!pattern) return;
