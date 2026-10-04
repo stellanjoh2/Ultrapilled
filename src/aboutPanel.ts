@@ -96,7 +96,6 @@ export function openAbout(): void {
     </div>
   `;
 
-  const scroll = root.querySelector<HTMLElement>(".about-overlay__scroll")!;
   const bio = root.querySelector<HTMLElement>(".about-overlay__bio")!;
   const words = fillBio(bio);
   const links = root.querySelector<HTMLElement>(".about-overlay__links")!;
