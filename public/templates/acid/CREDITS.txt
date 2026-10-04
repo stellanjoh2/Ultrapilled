@@ -1,15 +1,15 @@
-Acid template photos: early–mid 1990s European rave / club culture, plus London night and a UK chippy.
-From Wikimedia Commons under CC BY / CC BY-SA / public domain. Photos resized to ~960 px wide where larger.
+Acid template photos: London night, a London bus, a UK chippy, and early–mid 1990s European rave / club culture.
+From Wikimedia Commons under CC BY / CC BY-SA / CC0 / public domain. Photos resized to ~960 px wide where larger.
 
 piccadilly.jpg
   "Piccadilly Circus at night in 1988" by Peter Shimmon
   License: CC BY-SA 2.0
   https://commons.wikimedia.org/wiki/File:Piccadilly_Circus_at_night_in_1988_-_geograph.org.uk_-_2687917.jpg
 
-yen-sung.jpg
-  "DJ Yen Sung in Lisbon, Portugal (1993)" by Ithaka Darin Pappas
-  License: CC BY 4.0
-  https://commons.wikimedia.org/wiki/File:DJ_Yen_Sung_in_Lisbon,_Portugal_(1993).jpg
+go-ahead-london.jpg
+  "Go Ahead London's 171, an Enviro 200 registered YX61 ENN" by Alex Noble
+  License: CC0 1.0
+  https://commons.wikimedia.org/wiki/File:20200914_Go_Ahead_London_171.jpg
 
 fish-chips.jpg
   "Anstruther Fish Supper" by Edinburgh Blog

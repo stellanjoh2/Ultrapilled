@@ -224,6 +224,7 @@ export function warmModeSelectPreview() {
 
   if (host.classList.contains("is-mobile-gate")) {
     world.attach(stage);
+    previewPosePinned = true;
   }
 
   const onResize = () => {
@@ -344,7 +345,7 @@ export function mountMobileAccessOverlay() {
   const sMark = overlay.querySelector<HTMLElement>(".mobile-overlay__s")!;
   const mark = overlay.querySelector<HTMLElement>(".mobile-overlay__mark")!;
   const message = overlay.querySelector<HTMLElement>(".mobile-overlay__message")!;
-  appendWords(message, ["Not", "available", "on", "mobile"]);
+  appendWords(message, ["Not", "available", "on mobile"]);
   const words = [...message.querySelectorAll<HTMLElement>(".mode-select__word")];
   const ok = overlay.querySelector<HTMLButtonElement>(".mobile-overlay__ok")!;
   const github = overlay.querySelector<HTMLElement>(".mobile-overlay__github")!;

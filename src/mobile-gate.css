@@ -149,6 +149,10 @@ html.is-mobile-gate #app {
   display: inline-block;
 }
 
+.mobile-overlay__message .mode-select__word:not(:last-child) {
+  margin-right: 0.22em;
+}
+
 .mobile-overlay__ok {
   appearance: none;
   margin: 0;

@@ -54,7 +54,7 @@
   --panel-width: calc(400px * var(--ui-scale));
   --panel-width-layout: var(--panel-width);
   --shelf-slide: 0.45s cubic-bezier(0.83, 0, 0.17, 1);
-  /* Chrome corner radii — live-tuned in Dev mode (`) */
+  /* Chrome corner radii — live-tuned in Dev mode (K) */
   --radius-panel: calc(44px * var(--ui-scale));
   --radius-settings: calc(44px * var(--ui-scale));
   --radius-reconnect: calc(16px * var(--ui-scale));
@@ -644,7 +644,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   mix-blend-mode: plus-lighter;
 }
 
-/* Selection chrome (frame + scale handle) — keeps assets at true layer order. */
+/* Selection chrome (frame + scale handle + gradient wheel) — keeps assets at true layer order. */
 .chip-chrome-layer {
   z-index: 3;
 }
@@ -1203,7 +1203,8 @@ html[data-theme="day"] .chip-xform-handle {
     visibility 0s linear 0.15s;
 }
 
-.chip.is-picked > .chip-grad-wheel {
+.chip.is-picked > .chip-grad-wheel,
+.chip-chrome.is-picked > .chip-grad-wheel {
   /* Dim until proximity / drag — mirrors xform-handle soft→hot feel. */
   opacity: 0.5;
   visibility: visible;
@@ -1216,7 +1217,9 @@ html[data-theme="day"] .chip-xform-handle {
 
 /* Near rings (pointer distance) or while dragging stops/ring: full strength. */
 .chip.is-picked > .chip-grad-wheel.chip-grad-wheel--near,
-.chip.is-grad-angling > .chip-grad-wheel {
+.chip-chrome.is-picked > .chip-grad-wheel.chip-grad-wheel--near,
+.chip.is-grad-angling > .chip-grad-wheel,
+.chip-chrome.is-grad-angling > .chip-grad-wheel {
   opacity: 1;
 }
 
@@ -1243,7 +1246,9 @@ html[data-theme="day"] .chip-xform-handle {
 /* Angle lives on the color chips only. This stroke used to grab angle from
    anywhere near the scale ring, which rotated the fill while aiming at the asset. */
 .chip.is-picked > .chip-grad-wheel .chip-grad-wheel__hit-ring,
-.chip.is-grad-angling .chip-grad-wheel__hit-ring {
+.chip-chrome.is-picked > .chip-grad-wheel .chip-grad-wheel__hit-ring,
+.chip.is-grad-angling .chip-grad-wheel__hit-ring,
+.chip-chrome.is-grad-angling .chip-grad-wheel__hit-ring {
   pointer-events: none;
   cursor: inherit;
 }
@@ -1389,7 +1394,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   place-items: center;
 }
 
-.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop {
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop,
+.chip-chrome.is-picked > .chip-grad-wheel .chip-grad-wheel__stop {
   pointer-events: auto;
 }
 
@@ -1408,12 +1414,19 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 
 /* Hover / drag: clean 1.5× on the dot. Hit box already matches max size — no flicker. */
 .chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover,
-.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop.chip-grad-wheel__stop--hot {
+.chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop.chip-grad-wheel__stop--hot,
+.chip-chrome.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover,
+.chip-chrome.is-picked > .chip-grad-wheel .chip-grad-wheel__stop.chip-grad-wheel__stop--hot {
   z-index: 2;
 }
 
 .chip.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover > .chip-grad-wheel__stop-dot,
 .chip.is-picked
+  > .chip-grad-wheel
+  .chip-grad-wheel__stop.chip-grad-wheel__stop--hot
+  > .chip-grad-wheel__stop-dot,
+.chip-chrome.is-picked > .chip-grad-wheel .chip-grad-wheel__stop:hover > .chip-grad-wheel__stop-dot,
+.chip-chrome.is-picked
   > .chip-grad-wheel
   .chip-grad-wheel__stop.chip-grad-wheel__stop--hot
   > .chip-grad-wheel__stop-dot {
@@ -1425,19 +1438,22 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   outline-offset: 2px;
 }
 
-.chip.is-grad-angling .chip-grad-wheel__stop {
+.chip.is-grad-angling .chip-grad-wheel__stop,
+.chip-chrome.is-grad-angling .chip-grad-wheel__stop {
   cursor: grabbing;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .chip-grad-wheel,
   .chip.is-picked > .chip-grad-wheel,
+  .chip-chrome.is-picked > .chip-grad-wheel,
   .chip-grad-wheel__stop-dot {
     transition: none;
   }
 
   .chip-grad-wheel,
-  .chip.is-picked > .chip-grad-wheel {
+  .chip.is-picked > .chip-grad-wheel,
+  .chip-chrome.is-picked > .chip-grad-wheel {
     scale: 1;
   }
 }
@@ -2940,6 +2956,9 @@ select {
 html[data-theme="day"] select {
   background-color: var(--field);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%23555555' d='M0 0h8L4 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-1) center;
+  background-size: 8px 5px;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
@@ -3138,6 +3157,88 @@ select:focus {
   font-size: calc(14px * var(--ui-scale));
   font-weight: 400;
   letter-spacing: -0.39px;
+}
+
+.font-menu--fonts {
+  isolation: isolate;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+}
+
+.font-menu-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-0);
+  min-height: calc(22px * var(--ui-scale));
+}
+
+.font-menu-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: calc(18px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.font-menu-close {
+  display: grid;
+  place-items: center;
+  width: calc(22px * var(--ui-scale));
+  height: calc(22px * var(--ui-scale));
+  padding: 0;
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
+  background: transparent;
+  color: var(--ink-mute);
+  font-size: calc(14px * var(--ui-scale));
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.font-menu-close:hover {
+  background: var(--field);
+  color: var(--ink);
+}
+
+.font-menu--fonts .font-menu-search {
+  width: 100%;
+}
+
+.font-menu--fonts .font-menu-list {
+  flex: 1;
+  min-height: 0;
+}
+
+.font-menu--fonts .font-menu-item {
+  min-height: max(44px, calc(48px * var(--ui-scale)));
+  padding: max(8px, calc(10px * var(--ui-scale))) var(--space-1);
+  overflow: visible;
+  font-size: max(18px, calc(24px * var(--ui-scale)));
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.font-menu--fonts .font-menu-item--plain {
+  min-height: calc(36px * var(--ui-scale));
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 300;
+}
+
+.font-menu--fonts .font-menu-item.is-on::before {
+  content: "";
+  flex: none;
+  width: 0.42em;
+  height: 0.22em;
+  margin-right: var(--space-0);
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg) translateY(-0.12em);
 }
 
 input[type="color"] {
@@ -4094,7 +4195,7 @@ input.slot-live:focus {
   min-height: calc(32px * var(--ui-scale));
   border: none;
   border-radius: calc(8px * var(--ui-scale));
-  background: var(--field);
+  background-color: var(--field);
   color: var(--ink);
   font: inherit;
   font-size: calc(14px * var(--ui-scale));
@@ -4111,7 +4212,7 @@ input.slot-live:focus {
 .color-pop-eye:hover,
 .color-pop-fields input:focus,
 .color-pop-scale:focus {
-  background: var(--field-hover);
+  background-color: var(--field-hover);
   outline: none;
 }
 
@@ -4128,7 +4229,21 @@ input.slot-live:focus {
 }
 
 .color-pop-scale {
-  padding: 0 var(--space-0);
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0 calc(var(--space-0) + 8px) 0 var(--space-0);
+  background-color: var(--field);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%238f8f8f' d='M0 0h8L4 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-0) center;
+  background-size: 8px 5px;
+}
+
+html[data-theme="day"] .color-pop-scale {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%23555555' d='M0 0h8L4 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-0) center;
+  background-size: 8px 5px;
 }
 
 .color-pop-recent {

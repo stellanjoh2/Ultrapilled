@@ -38,12 +38,12 @@ npx shadcn add https://soundcn.xyz/r/<sound-name>.json
 
 Bundled under `public/templates/<id>/`. Full per-file notes also live in each folder’s `CREDITS.txt`.
 
-**Acid** (early–mid 1990s European rave / club; **CC BY / CC BY-SA**)
+**Acid** (London night + 1990s rave / club; **CC BY / CC BY-SA / CC0**)
 
 | File | Work | Author | License |
 |------|------|--------|---------|
 | `piccadilly.jpg` | [Piccadilly Circus at night in 1988](https://commons.wikimedia.org/wiki/File:Piccadilly_Circus_at_night_in_1988_-_geograph.org.uk_-_2687917.jpg) | Peter Shimmon | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) |
-| `yen-sung.jpg` | [DJ Yen Sung in Lisbon, Portugal (1993)](https://commons.wikimedia.org/wiki/File:DJ_Yen_Sung_in_Lisbon,_Portugal_(1993).jpg) | Ithaka Darin Pappas | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `go-ahead-london.jpg` | [Go Ahead London's 171](https://commons.wikimedia.org/wiki/File:20200914_Go_Ahead_London_171.jpg) | Alex Noble | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `fish-chips.jpg` | [Anstruther Fish Supper](https://commons.wikimedia.org/wiki/File:Anstruther_Fish_Supper.jpg) | Edinburgh Blog | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
 
 **New York** (1960s B&W; public domain)

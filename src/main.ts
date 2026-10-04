@@ -495,6 +495,8 @@ function mountFontPick(
   trigger.append(value, chevron);
   const syncLabel = () => {
     value.textContent = fontTriggerLabel(current, emptyLabel);
+    value.style.fontFamily = current ? `"${current}", sans-serif` : "";
+    value.style.fontWeight = current ? "400" : "";
   };
   syncLabel();
   host.replaceChildren(trigger);
@@ -521,11 +523,24 @@ function openFontMenu(
   const abort = new AbortController();
   const { signal } = abort;
   const menu = document.createElement("div");
-  menu.className = "font-menu";
+  menu.className = "font-menu font-menu--fonts";
+  menu.setAttribute("role", "dialog");
+  menu.setAttribute("aria-label", "Fonts");
+  const head = document.createElement("div");
+  head.className = "font-menu-head";
+  const title = document.createElement("p");
+  title.className = "font-menu-title";
+  title.textContent = "Fonts";
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "font-menu-close";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.textContent = "✕";
+  head.append(title, closeBtn);
   const search = document.createElement("input");
   search.type = "search";
   search.className = "font-menu-search";
-  search.placeholder = "Search fonts";
+  search.placeholder = "Search fonts...";
   search.setAttribute("aria-label", "Search fonts");
   search.autocomplete = "off";
   search.spellcheck = false;
@@ -533,7 +548,7 @@ function openFontMenu(
   list.className = "font-menu-list";
   list.id = "font-menu-list";
   list.setAttribute("role", "listbox");
-  menu.append(search, list);
+  menu.append(head, search, list);
   document.body.append(menu);
   trigger.setAttribute("aria-expanded", "true");
   trigger.setAttribute("aria-controls", list.id);
@@ -577,6 +592,12 @@ function openFontMenu(
       btn.setAttribute("aria-selected", String(item.id === getValue()));
       if (item.id === getValue()) btn.classList.add("is-on");
       if (index === active) btn.classList.add("is-active");
+      if (item.id) {
+        btn.style.fontFamily = `"${item.id}", sans-serif`;
+        if (item.group === "local" || item.group === "extra") void activateFamily(item.id);
+      } else {
+        btn.classList.add("font-menu-item--plain");
+      }
       btn.textContent = item.label;
       btn.addEventListener("click", () => choose(item.id));
       list.append(btn);
@@ -646,21 +667,20 @@ function openFontMenu(
       closeFontMenu();
       return;
     }
-    const gap = 4;
+    const shellRect = panelShell.getBoundingClientRect();
     const s = uiScale();
-    const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
-    const spaceAbove = rect.top - gap - 8;
-    const openUp = spaceBelow < 160 * s && spaceAbove > spaceBelow;
-    menu.style.width = `${rect.width}px`;
-    menu.style.maxHeight = `${Math.max(120 * s, Math.min(280 * s, openUp ? spaceAbove : spaceBelow))}px`;
-    menu.style.left = `${Math.max(8, rect.left)}px`;
-    if (openUp) {
-      menu.style.top = "auto";
-      menu.style.bottom = `${window.innerHeight - rect.top + gap}px`;
-    } else {
-      menu.style.bottom = "auto";
-      menu.style.top = `${rect.bottom + gap}px`;
-    }
+    const gap = Math.max(16, 24 * s);
+    const preferred = Math.max(320, 400 * s);
+    const minWidth = 280;
+    const maxLeft = shellRect.left - gap;
+    const available = maxLeft - 8;
+    const width = available >= preferred ? preferred : Math.max(minWidth, available);
+    menu.style.width = `${width}px`;
+    menu.style.maxHeight = "none";
+    menu.style.height = `${shellRect.height}px`;
+    menu.style.left = `${Math.max(8, maxLeft - width)}px`;
+    menu.style.bottom = "auto";
+    menu.style.top = `${shellRect.top}px`;
   };
 
   const closeCurrent = (restoreFocus = false) => {
@@ -673,6 +693,8 @@ function openFontMenu(
     if (closeFontMenu === closeCurrent) closeFontMenu = () => {};
   };
   closeFontMenu = closeCurrent;
+
+  closeBtn.addEventListener("click", () => closeFontMenu(true), { signal });
 
   document.addEventListener("pointerdown", (event) => {
     const target = event.target;
@@ -3406,8 +3428,9 @@ function openCanvasMenu(x: number, y: number) {
       label: uiHidden ? "Show UI" : "Hide UI",
       icon: uiHidden ? eyeIcon : eyeSlash,
       run: () => {
-        shell.classList.toggle("ui-hidden");
-        playTransition(!shell.classList.contains("ui-hidden"));
+        const hidden = shell.classList.toggle("ui-hidden");
+        playTransition(!hidden);
+        if (hidden) closeFontMenu();
         resize();
       },
     },
@@ -5450,8 +5473,9 @@ window.addEventListener("keydown", (event) => {
   }
   if (event.key === "h" || event.key === "H") {
     if (introActive) return;
-    shell.classList.toggle("ui-hidden");
-    playTransition(!shell.classList.contains("ui-hidden"));
+    const hidden = shell.classList.toggle("ui-hidden");
+    playTransition(!hidden);
+    if (hidden) closeFontMenu();
     resize();
     return;
   }
@@ -5461,7 +5485,7 @@ window.addEventListener("keydown", (event) => {
     duplicateSlot(pickedSlotId);
     return;
   }
-  if (event.key === "`") {
+  if (event.key === "k" || event.key === "K") {
     if (meta || event.altKey || event.shiftKey || event.repeat) return;
     event.preventDefault();
     setPhysDebug(!physDebugOn);

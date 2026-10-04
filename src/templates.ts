@@ -179,7 +179,7 @@ export function acidState(): AppState {
       textAnim: true,
     }),
     defaultImageSlot({ src: "", name: "Musical Keyboard", emoji: "🎹", size: 72, amount: 1, colorIndex: 2, scale: 0.75 }),
-    photo("acid", "yen-sung.jpg", "Yen Sung", 110, 18),
+    photo("acid", "go-ahead-london.jpg", "Go Ahead London", 110, 18),
     text({
       text: "FREE PARTY",
       colorIndex: 1,

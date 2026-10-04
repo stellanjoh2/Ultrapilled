@@ -161,7 +161,7 @@ type DroppedChip = {
   body: Matter.Body;
   el: HTMLElement;
   glow: HTMLElement;
-  /** Selection chrome host in `.chip-chrome-layer` (frame / scale handle). */
+  /** Selection chrome host in `.chip-chrome-layer` (frame, scale handle, gradient wheel). */
   chrome: HTMLElement | null;
   mirrors: ChipMirror[];
   width: number;
@@ -2062,12 +2062,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         const frameHost = ensureChrome(chip);
         const needFrame = !frameHost.querySelector(":scope > .chip-xform-frame");
         const needHandles = frameHost.querySelectorAll(":scope > .chip-xform-handle").length !== 4;
-        const hadWheel = Boolean(chip.el.querySelector(":scope > .chip-grad-wheel"));
+        const hadWheel = Boolean(frameHost.querySelector(":scope > .chip-grad-wheel"));
         ensureXformFrame(frameHost);
         ensureXformHandle(frameHost);
         syncGradWheel(chip);
         const createdWheel =
-          !hadWheel && Boolean(chip.el.querySelector(":scope > .chip-grad-wheel"));
+          !hadWheel && Boolean(frameHost.querySelector(":scope > .chip-grad-wheel"));
         // Newly inserted nodes need a layout pass or the fade-in is skipped.
         if (!chip.el.classList.contains("is-picked") && (needFrame || needHandles || createdWheel)) {
           void chip.el.offsetWidth;
@@ -2086,7 +2086,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         }
         if (xformHover?.bodyId === chip.body.id) xformHover = null;
         if (gradWheelNearBodyId === chip.body.id) gradWheelNearBodyId = null;
-        releaseGradWheel(chip.el);
+        releaseGradWheel(host && host !== chip.el ? host : chip.el);
       }
     }
   }
@@ -2095,17 +2095,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   const CHROME_FADE_MS = 150;
 
   /**
-   * Overlay host for selection frame + scale handle (always on top).
-   * Gradient wheel stays on the chip so it doesn't steal picks from assets in front.
+   * Overlay host for selection frame, scale handle, and gradient wheel (always on top).
+   * Color stops keep pointer-events; the wheel box itself does not steal asset picks.
    */
   function ensureChrome(chip: DroppedChip): HTMLElement {
     if (chip.chrome?.isConnected) {
-      // Wheel stays on the chip; frame + handle live on the overlay.
-      for (const node of chip.chrome.querySelectorAll(":scope > .chip-grad-wheel")) {
-        chip.el.append(node);
-      }
       for (const node of chip.el.querySelectorAll(
-        ":scope > .chip-xform-frame, :scope > .chip-xform-handle",
+        ":scope > .chip-xform-frame, :scope > .chip-xform-handle, :scope > .chip-grad-wheel",
       )) {
         chip.chrome.append(node);
       }
@@ -2118,9 +2114,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const host = document.createElement("div");
     host.className = "chip-chrome";
     host.dataset.bodyId = String(chip.body.id);
-    // Migrate frame / handle left on the chip from earlier mounts / hot reload.
+    // Migrate chrome left on the chip from earlier mounts / hot reload.
     for (const node of chip.el.querySelectorAll(
-      ":scope > .chip-xform-frame, :scope > .chip-xform-handle",
+      ":scope > .chip-xform-frame, :scope > .chip-xform-handle, :scope > .chip-grad-wheel",
     )) {
       host.append(node);
     }
@@ -2129,7 +2125,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return host;
   }
 
-  /** Frame / scale-handle host (overlay when available, else the chip). */
+  /** Frame / scale-handle / gradient-wheel host (overlay when available, else the chip). */
   function xformChromeOf(chip: DroppedChip): HTMLElement {
     return chip.chrome?.isConnected ? chip.chrome : chip.el;
   }
@@ -2488,7 +2484,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         ? target.closest(".chip-grad-wheel__stop, .chip-grad-wheel__hit-ring")
         : null;
     if (overWheel instanceof Element) {
-      const host = overWheel.closest(".chip");
+      const host = overWheel.closest(".chip, .chip-chrome");
       const chip = chipFromEl(host);
       if (chip && isPickPainted(chip) && gradientOf?.(chip.slotId)) return chip.body.id;
     }
@@ -2507,7 +2503,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function syncGradWheelNear(chip: DroppedChip) {
-    const wheel = chip.el.querySelector(":scope > .chip-grad-wheel");
+    const wheel = xformChromeOf(chip).querySelector(":scope > .chip-grad-wheel");
     if (!(wheel instanceof HTMLElement)) return;
     const near =
       (gradAngleDrag != null && gradAngleDrag.chip.body.id === chip.body.id) ||
@@ -2587,7 +2583,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function syncGradWheel(chip: DroppedChip) {
     const info = gradientOf?.(chip.slotId) ?? null;
-    const host = chip.el;
+    const host = xformChromeOf(chip);
     let wheel = host.querySelector(":scope > .chip-grad-wheel");
     if (!info) {
       wheel?.remove();
@@ -2848,6 +2844,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (rotating) endScrub();
     for (const item of xformTargets(slotId)) {
       item.el.classList.remove("is-grad-angling");
+      item.chrome?.classList.remove("is-grad-angling");
       if (item.slotId !== editingId && item.body.isStatic) Body.setStatic(item.body, false);
       if (layoutMode) {
         Body.setVelocity(item.body, { x: 0, y: 0 });
@@ -2954,6 +2951,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         chip.chrome?.classList.add("is-scaling", "is-rotating");
       } else {
         chip.el.classList.add("is-grad-angling");
+        chip.chrome?.classList.add("is-grad-angling");
         // Color-stop / ring drag: full opacity on the whole gizmo immediately.
         applyGradWheelNear(chip.body.id);
       }
@@ -3229,7 +3227,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
     const gradStop = target?.closest?.(".chip-grad-wheel__stop");
     if (gradStop instanceof HTMLElement) {
-      const el = gradStop.closest(".chip");
+      const el = gradStop.closest(".chip, .chip-chrome");
       if (!(el instanceof HTMLElement) || el.closest(".bloom-layer")) return;
       const chip = chipFromEl(el);
       if (!chip || chip.slotId === editingId) return;

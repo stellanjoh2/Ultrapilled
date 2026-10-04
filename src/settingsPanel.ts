@@ -93,7 +93,6 @@ function shortcutsMarkup(): string {
       "45° steps while scale-dragging",
     ),
     shortcutRow("Add to selection", `${keycap("⇧")}${keycap("Click")}`),
-    shortcutRow("Dev mode", keycap("`"), "Physics outlines and chrome radii"),
   ].join("");
   return `
     <section class="section shortcuts-section${shortcutsOpen ? " is-open" : ""}" data-shortcuts-fold>

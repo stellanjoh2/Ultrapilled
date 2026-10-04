@@ -40,7 +40,7 @@ describe("settings panel close targets", () => {
     expect(isSettingsOpen()).toBe(false);
   });
 
-  it("lists Shift+D for duplicate and backtick for Dev mode", () => {
+  it("lists Shift+D for duplicate and hides Dev mode", () => {
     stubReducedMotion();
 
     openSettings({
@@ -55,7 +55,7 @@ describe("settings panel close targets", () => {
     expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toContain("⇧");
     expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toContain("D");
     expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toMatch(/⌘|Ctrl/);
-    expect(dev?.querySelector(".shortcut-list__keys")?.textContent).toContain("`");
+    expect(dev).toBeUndefined();
   });
 
   it("shows the report card at the bottom and opens the bug form", () => {
