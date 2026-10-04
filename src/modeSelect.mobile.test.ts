@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mountMobileAccessOverlay, stopModeSelectPreview } from "./modeSelect";
+import {
+  MODE_SELECT_MOBILE_ASSET_SCALE,
+  modeSelectAssetScale,
+  mountMobileAccessOverlay,
+  stopModeSelectPreview,
+} from "./modeSelect";
 import { mobileLandingPreviewState, modeSelectPreviewState } from "./modeSelectTheme";
 
 describe("mobile access overlay", () => {
@@ -82,5 +87,20 @@ describe("mobile landing preview", () => {
     expect(desktop.slots.some((slot) => slot.kind === "image" && slot.emoji)).toBe(false);
     expect(mobile.template).toBe("custom");
     expect(sad).toEqual(["😢", "☹️", "😞"]);
+  });
+});
+
+describe("mode select asset scale", () => {
+  it("matches 1440p at the authoring size and tracks 1080p / 4K", () => {
+    const master = modeSelectPreviewState().masterScale;
+    expect(modeSelectAssetScale(master, false, 2560, 1440)).toBeCloseTo(master, 10);
+    expect(modeSelectAssetScale(master, false, 1920, 1080)).toBeCloseTo(master * 0.75, 10);
+    expect(modeSelectAssetScale(master, false, 3840, 2160)).toBeCloseTo(master * 1.5, 10);
+  });
+
+  it("keeps the phone landing shrink instead of stacking viewport scale", () => {
+    const master = mobileLandingPreviewState().masterScale;
+    expect(modeSelectAssetScale(master, true, 390, 844)).toBeCloseTo(master * MODE_SELECT_MOBILE_ASSET_SCALE, 10);
+    expect(modeSelectAssetScale(master, true, 2560, 1440)).toBeCloseTo(master * MODE_SELECT_MOBILE_ASSET_SCALE, 10);
   });
 });

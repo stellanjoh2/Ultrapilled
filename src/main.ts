@@ -113,7 +113,7 @@ import { cancelSlotDrag } from "./slotDrag";
 import { bindUiClickSounds, bindUiTypeSounds, playButton, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
 import gsap from "gsap";
 import "./style.css";
-import { placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
+import { compositionScale, placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
 import { beginScrub, endScrub } from "./scrub";
 import {
   bindRangeValueEdit,
@@ -1828,8 +1828,8 @@ function importSlotSize(nativeW: number, nativeH: number, opts?: { minWidth?: nu
     const widthFrac = Math.max(nativeW, 1) / long;
     displayLong = Math.max(displayLong, opts.minWidth / widthFrac);
   }
-  // Read layout scale only — fitScale() also drives simulation and must not run mid-measure.
-  const scale = Math.max(0.001, state.masterScale * layoutScale(currentFrame()));
+  // Author in framed-canvas units; viewport scale is applied later via fitScale().
+  const scale = Math.max(0.001, state.masterScale * currentFrame().scale);
   return Math.max(8, displayLong / scale);
 }
 
@@ -4776,7 +4776,7 @@ function currentFrame() {
 }
 
 function layoutScale(frame: CanvasFrame): number {
-  return frame.scale;
+  return compositionScale(frame.scale);
 }
 
 function fitScale() {

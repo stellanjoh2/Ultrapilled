@@ -16,6 +16,7 @@ import { DEFAULT_THEME } from "./theme";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { playClick, playNotify } from "./uiSounds";
+import { compositionScale } from "./uiScale";
 import { createWorld } from "./world";
 import type { AppState } from "./types";
 
@@ -110,6 +111,13 @@ let previewRunning = false;
 
 /** Cap how long we wait for chips to fall off before forcing teardown. */
 const EXIT_DUMP_MAX_MS = 2800;
+/** Phone landing shrink; desktop uses compositionScale vs 2560×1440. */
+export const MODE_SELECT_MOBILE_ASSET_SCALE = 0.264;
+
+export function modeSelectAssetScale(masterScale: number, mobileGate: boolean, viewW?: number, viewH?: number): number {
+  const view = mobileGate ? MODE_SELECT_MOBILE_ASSET_SCALE : compositionScale(1, viewW, viewH);
+  return masterScale * view;
+}
 
 function ensureHost(): HTMLElement {
   if (hostEl) return hostEl;
@@ -174,16 +182,19 @@ export function warmModeSelectPreview() {
   previewPosePinned = false;
   previewRepeat = true;
 
+  const previewScale = () => {
+    const mobileGate = host.classList.contains("is-mobile-gate");
+    const view = mobileGate ? MODE_SELECT_MOBILE_ASSET_SCALE : compositionScale(1);
+    world.setSimulationScale(view);
+    return modeSelectAssetScale(state.masterScale, mobileGate);
+  };
+
   const session = createPlaySession({
     world,
     getState: () => state,
     stage,
     playfield,
-    fitScale: () => {
-      world.setSimulationScale(1);
-      const mobileGate = host.classList.contains("is-mobile-gate");
-      return state.masterScale * (mobileGate ? 0.264 : 1);
-    },
+    fitScale: previewScale,
     syncCanvas: () => {
       paintPreviewBackdrop(stage, playfield, state);
       return false;
@@ -228,11 +239,22 @@ export function warmModeSelectPreview() {
   }
 
   const onResize = () => {
-    if (!alive || world.chipCount() === 0) return;
+    if (!alive) return;
     const w = playfield.clientWidth;
     const h = playfield.clientHeight;
     if (w < 8 || h < 8) return;
     world.resize(w, h);
+    if (world.chipCount() === 0) return;
+    world.refresh(
+      state.slots,
+      state.physics,
+      previewScale(),
+      state.theme,
+      state.pillPad,
+      state.textTracking,
+      state.sizeRandom,
+      { quiet: true },
+    );
   };
   window.addEventListener("resize", onResize);
 
