@@ -5,7 +5,11 @@ import {
   mountMobileAccessOverlay,
   stopModeSelectPreview,
 } from "./modeSelect";
-import { mobileLandingPreviewState, modeSelectPreviewState } from "./modeSelectTheme";
+import {
+  MOBILE_LANDING_IMPACT_KEEP,
+  mobileLandingPreviewState,
+  modeSelectPreviewState,
+} from "./modeSelectTheme";
 
 describe("mobile access overlay", () => {
   afterEach(() => {
@@ -88,6 +92,17 @@ describe("mobile landing preview", () => {
     expect(desktop.slots.some((slot) => slot.kind === "image" && slot.emoji)).toBe(false);
     expect(mobile.template).toBe("custom");
     expect(sad).toEqual(["😢", "☹️", "😞"]);
+  });
+
+  it("keeps Mode Select bounce and damps mobile impact by 75%", () => {
+    const desktop = modeSelectPreviewState();
+    const mobile = mobileLandingPreviewState();
+
+    expect(desktop.physics.bounce).toBe(1.05);
+    expect(mobile.physics.bounce).toBeCloseTo(desktop.physics.bounce * MOBILE_LANDING_IMPACT_KEEP, 10);
+    expect(mobile.physics.friction).toBe(desktop.physics.friction);
+    expect(mobile.physics.grip).toBe(desktop.physics.grip);
+    expect(mobile.physics.spin).toBe(desktop.physics.spin);
   });
 });
 

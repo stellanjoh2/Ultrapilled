@@ -181,6 +181,8 @@ export function modeSelectPreviewState(): AppState {
 }
 
 export const MOBILE_LANDING_THEME_ID = "custom";
+/** Keep 25% of Mode Select impact bounce (75% less chip–chip / chip–shape jitter). */
+export const MOBILE_LANDING_IMPACT_KEEP = 0.25;
 
 /** Mobile gate backdrop — same pile as Mode Select, plus a few sad faces. */
 export function mobileLandingPreviewState(): AppState {
@@ -188,6 +190,10 @@ export function mobileLandingPreviewState(): AppState {
   return {
     ...state,
     template: MOBILE_LANDING_THEME_ID,
+    physics: {
+      ...state.physics,
+      bounce: state.physics.bounce * MOBILE_LANDING_IMPACT_KEEP,
+    },
     slots: [
       ...state.slots,
       defaultImageSlot({ src: "", name: "Crying Face", emoji: "😢", size: 56, amount: 1, colorIndex: 0, scale: 0.75 }),
