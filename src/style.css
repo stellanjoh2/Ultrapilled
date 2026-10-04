@@ -5799,6 +5799,10 @@ html[data-theme="day"] .settings-modal__body .keycap {
   line-height: 1.45;
 }
 
+.report-card__copy a {
+  color: inherit;
+}
+
 button.pill.report-card__open {
   width: 100%;
   min-height: calc(54px * var(--ui-scale));
@@ -6770,6 +6774,12 @@ html[data-theme="day"] .bug-report__message {
   letter-spacing: -0.01em;
   text-align: center;
   pointer-events: none;
+}
+
+.mode-select__foot a {
+  pointer-events: auto;
+  color: inherit;
+  font-weight: 700;
 }
 
 .mode-select__foot strong {

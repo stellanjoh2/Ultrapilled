@@ -2,6 +2,7 @@ import gsap from "gsap";
 import paperPlaneTiltIcon from "@phosphor-icons/core/assets/regular/paper-plane-tilt.svg?raw";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
+import { PRIVACY_HREF } from "./privacy";
 import { playNotify, playRemove, playTransition } from "./uiSounds";
 
 export const BUG_REPORT_APP = "ultrapilled";
@@ -72,6 +73,7 @@ export function reportCardHtml(): string {
       </h3>
       <p class="report-card__copy">
         Spotted something wrong? Use the quick form here. I can’t reply, but I read everything you send.
+        See also <a href="${PRIVACY_HREF}">Privacy</a>.
       </p>
       <button type="button" class="pill is-on report-card__open" data-open-bug-report>
         <span class="report-card__plane" aria-hidden="true">${paperPlaneTiltIcon}</span>

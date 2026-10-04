@@ -1,7 +1,7 @@
 {
   "name": "ultrapilled",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "license": "CC-BY-4.0",
   "type": "module",
   "scripts": {

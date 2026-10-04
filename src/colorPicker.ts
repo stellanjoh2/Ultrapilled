@@ -1,9 +1,9 @@
 import { playRemove } from "./uiSounds";
 import { beginScrub, endScrub } from "./scrub";
 import { uiScale } from "./uiScale";
+import { lsGet, lsSet } from "./legacyStorage";
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
-const RECENT_KEY = "falldown.recentColors";
 const MAX_RECENT = 14;
 
 type Hsv = { h: number; s: number; v: number };
@@ -429,7 +429,7 @@ function hslToHex(h: number, s: number, l: number): string {
 
 function readRecentColors(): string[] {
   try {
-    const raw = localStorage.getItem(RECENT_KEY);
+    const raw = lsGet("recentColors");
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -446,7 +446,7 @@ function pushRecentColor(hex: string) {
   const next = normalizeHex(hex);
   const list = [next, ...readRecentColors().filter((color) => color !== next)].slice(0, MAX_RECENT);
   try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+    lsSet("recentColors", JSON.stringify(list));
   } catch {
     /* ignore quota */
   }

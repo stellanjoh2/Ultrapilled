@@ -52,7 +52,7 @@ function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number): 
 }
 
 function frameName(index: number, ext: string): string {
-  return `falldown-frame${String(index).padStart(4, "0")}.${ext}`;
+  return `ultrapilled-frame${String(index).padStart(4, "0")}.${ext}`;
 }
 
 function sceneOf(
@@ -95,12 +95,12 @@ export async function exportStill(options: {
     sceneOf(options.state, options.stageWidth, options.stageHeight, width, height, options.transparent),
   );
   if (options.kind === "jpg") {
-    downloadBlob(await canvasBlob(canvas, "image/jpeg", 0.92), "falldown.jpg");
+    downloadBlob(await canvasBlob(canvas, "image/jpeg", 0.92), "ultrapilled.jpg");
     return;
   }
   downloadBlob(
     await canvasBlob(canvas, "image/png"),
-    options.transparent ? "falldown-transparent.png" : "falldown.png",
+    options.transparent ? "ultrapilled-transparent.png" : "ultrapilled.png",
   );
 }
 
@@ -145,7 +145,7 @@ export async function exportSequence(options: {
   await yieldToUi();
   const zipped = zipSync(files, { level: 0 });
   const copy = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength);
-  downloadBlob(new Blob([copy]), options.kind === "jpg" ? "falldown-jpg.zip" : "falldown-png.zip");
+    downloadBlob(new Blob([copy]), options.kind === "jpg" ? "ultrapilled-jpg.zip" : "ultrapilled-png.zip");
   return { ...result, truncated: false };
 }
 
@@ -305,7 +305,7 @@ async function encodeVideoFile(options: {
       }
     }
 
-    const filename = options.transparent ? "falldown-transparent.mov" : `falldown.${options.format}`;
+    const filename = options.transparent ? "ultrapilled-transparent.mov" : `ultrapilled.${options.format}`;
     const mime = options.format === "mp4" ? "video/mp4" : "video/quicktime";
     downloadBlob(new Blob([buffer], { type: mime }), filename);
     return { frames: result.frames, limited: result.limited, truncated: false };
@@ -400,6 +400,6 @@ export async function exportGif(options: {
   const bytes = await encodeGif(frames, width, height, options.fps);
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
-  downloadBlob(new Blob([copy], { type: "image/gif" }), "falldown.gif");
+  downloadBlob(new Blob([copy], { type: "image/gif" }), "ultrapilled.gif");
   return { frames: frames.length, limited: result.limited, truncated: false };
 }

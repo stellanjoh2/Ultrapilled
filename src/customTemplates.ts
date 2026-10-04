@@ -1,7 +1,6 @@
+import { lsGet, lsSet } from "./legacyStorage";
 import { parsePillProject, serializePillProject, type PillProject } from "./project/pillFormat";
 import { uid, type AppState } from "./types";
-
-const STORAGE_KEY = "falldown.customTemplates";
 
 export type CustomTemplate = {
   id: string;
@@ -11,7 +10,7 @@ export type CustomTemplate = {
 
 function readAll(): CustomTemplate[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = lsGet("customTemplates");
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -33,7 +32,11 @@ function readAll(): CustomTemplate[] {
 }
 
 function writeAll(items: CustomTemplate[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  try {
+    lsSet("customTemplates", JSON.stringify(items));
+  } catch {
+    throw new Error("Could not save templates");
+  }
 }
 
 export function listCustomTemplates(): CustomTemplate[] {

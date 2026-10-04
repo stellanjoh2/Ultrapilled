@@ -48,6 +48,7 @@ describe("mobile access overlay", () => {
     expect(github?.querySelector(".logotype__mark")?.getAttribute("viewBox")).toBe("0 0 98 96");
     const x = host?.querySelector<HTMLAnchorElement>(".mobile-overlay__x");
     expect(x?.getAttribute("href")).toBe("https://x.com/johstell");
+    expect(host?.querySelector(".mobile-overlay__privacy")?.getAttribute("href")).toBe("/privacy.html");
     expect(x?.querySelector(".logotype__mark")?.getAttribute("viewBox")).toBe("0 0 1200 1227");
     expect(document.querySelector(".panel")).toBeNull();
     expect(document.querySelector(".topbar")).toBeNull();

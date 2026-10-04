@@ -34,6 +34,15 @@ export type ChipPose = {
   angle: number;
 };
 
+/** YouTube and local video cannot be captured into GIF / video / stills. */
+export function slotSkipsRasterCapture(slot: Slot): boolean {
+  return slot.kind === "image" && Boolean(slot.youtube || slot.video);
+}
+
+export function sceneSkipsRasterCapture(slots: readonly Slot[]): boolean {
+  return slots.some(slotSkipsRasterCapture);
+}
+
 /** Built-in shapes are silhouettes. Uploaded SVGs keep their ink until tint is on. */
 export function isSvgSource(slot: ImageSlot): boolean {
   if (/\.svg$/i.test(slot.name)) return true;

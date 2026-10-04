@@ -103,7 +103,7 @@ export function youtubeEmbedSrc(clip: YouTubeClip, bust = 0): string {
     rel: "0",
   });
   if (bust > 0) params.set("_", String(bust));
-  return `https://www.youtube.com/embed/${clip.videoId}?${params.toString()}`;
+  return `https://www.youtube-nocookie.com/embed/${clip.videoId}?${params.toString()}`;
 }
 
 export function youtubeEmbedKey(clip: YouTubeClip): string {

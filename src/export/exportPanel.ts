@@ -1,4 +1,4 @@
-import type { ChipDraw } from "../chipKinds";
+import { sceneSkipsRasterCapture, type ChipDraw } from "../chipKinds";
 import type { AppState } from "../types";
 import { exportGif, exportMov, exportMp4, exportSequence, exportStill, type LoopResult } from "./exportMedia";
 import { ExportCancelled } from "./simulate";
@@ -15,6 +15,7 @@ import {
   type VideoSizePreset,
 } from "./size";
 import { defaultPillFileName, isPillFile } from "../project/pillFormat";
+import { askConfirm } from "../confirmDialog";
 import { playCaution, playCelebrate, playNotify, startProgress, stopProgress } from "../uiSounds";
 
 export type ExportController = {
@@ -262,6 +263,15 @@ export function mountExportPanel(panel: HTMLElement, controller: ExportControlle
 
 async function runExport(kind: ExportKind, controller: ExportController) {
   if (busy) return;
+  if (sceneSkipsRasterCapture(controller.state().slots)) {
+    const ok = await askConfirm({
+      title: "Video won’t export",
+      body: "YouTube clips and uploaded videos can’t be captured. They’ll show as a play button in this file.",
+      confirmLabel: "Export anyway",
+      cancelLabel: "Cancel",
+    });
+    if (!ok || busy) return;
+  }
   busy = true;
   cancelRequested = false;
   applyBusy();

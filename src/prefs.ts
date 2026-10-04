@@ -1,3 +1,5 @@
+import { lsGet, lsSet } from "./legacyStorage";
+
 export type ChromeTheme = "night" | "day";
 
 export type AppPrefs = {
@@ -12,8 +14,6 @@ export type AppPrefs = {
   performance: boolean;
   subtleSelect: boolean;
 };
-
-const STORAGE_KEY = "falldown.prefs";
 
 const DEFAULTS: AppPrefs = {
   soundOn: true,
@@ -34,7 +34,7 @@ function clampVolume(value: number): number {
 
 function read(): AppPrefs {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = lsGet("prefs");
     if (!raw) return { ...DEFAULTS };
     const parsed = JSON.parse(raw) as Partial<AppPrefs>;
     return {
@@ -59,7 +59,7 @@ const listeners = new Set<() => void>();
 
 function persist() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    lsSet("prefs", JSON.stringify(prefs));
   } catch {
     /* private mode / quota */
   }

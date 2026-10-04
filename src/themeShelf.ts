@@ -5,8 +5,8 @@ import {
   type PalettePreset,
 } from "./palettePresets";
 import { playRemove } from "./uiSounds";
+import { lsGet, lsRemove, lsSet } from "./legacyStorage";
 
-const TAB_KEY = "falldown.paletteTab";
 const TABS: PaletteCategory[] = ["common", "retro", "feral"];
 const TAB_LABEL: Record<PaletteCategory, string> = {
   common: "Common",
@@ -17,7 +17,7 @@ const SLIDE_MS = 450;
 
 function readTab(): PaletteCategory {
   try {
-    const stored = localStorage.getItem(TAB_KEY);
+    const stored = lsGet("paletteTab");
     if (stored === "retro" || stored === "feral") return stored;
   } catch {
     /* ignore */
@@ -27,8 +27,8 @@ function readTab(): PaletteCategory {
 
 function writeTab(tab: PaletteCategory): void {
   try {
-    if (tab === "common") localStorage.removeItem(TAB_KEY);
-    else localStorage.setItem(TAB_KEY, tab);
+    if (tab === "common") lsRemove("paletteTab");
+    else lsSet("paletteTab", tab);
   } catch {
     /* ignore */
   }

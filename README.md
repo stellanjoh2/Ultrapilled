@@ -1,6 +1,8 @@
 # Ultrapilled™
 
-A standalone physics playground for text chips and icons. Built on [Matter.js](https://brm.io/matter-js/).
+A desktop web physics playground for text, icons, images, and short video clips. Live at [ultrapilled.com](https://ultrapilled.com/). Built on [Matter.js](https://brm.io/matter-js/).
+
+**Desktop browsers only.** Phones and most tablets are gated at the door. Privacy: [ultrapilled.com/privacy.html](https://ultrapilled.com/privacy.html) (also in this repo as [`public/privacy.html`](public/privacy.html)).
 
 ## Run
 
@@ -9,12 +11,20 @@ npm install
 npm run dev
 ```
 
+Copy `.env.example` to `.env` if you want Unsplash search. The access key is public in the client bundle — restrict it to this origin in the Unsplash dashboard.
+
+```bash
+npm test
+```
+
 ## Use
 
-1. Add text slots (typeface, colors, pill / box / no holding shape, corner radius).
-2. Add icon slots from presets or upload SVG / PNG / JPG.
-3. Tune gravity, speed, and bounciness.
-4. Hit **Trigger Physics** — everything drops from above.
+1. Pick **Physics** (things fall) or **Layout** (place freely, like Figma).
+2. Add text, icons, uploads, Unsplash photos, or a YouTube / MP4 clip from Create.
+3. Tune gravity, speed, and bounciness (Physics), or arrange layers (Layout).
+4. Spacebar triggers a fall. Export GIF / MP4 / MOV / PNG, or save a `.pill` project.
+
+YouTube and uploaded video do not rasterize — export warns, then draws a play-button stand-in.
 
 ## Shapes
 
@@ -86,3 +96,5 @@ Original Ultrapilled code and original assets are under [CC BY 4.0](https://crea
   - [Le Murmure](https://velvetyne.fr/fonts/le-murmure/) (Ultrapilled logotype, SIL Open Font License 1.1)
   - Template photos (tables above / each folder’s `CREDITS.txt`)
   - Sounds (see [Sounds](#sounds))
+  - [Unsplash](https://unsplash.com/license) photos you search in-app
+  - YouTube embeds (YouTube’s terms)

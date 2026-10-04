@@ -14,6 +14,7 @@ import {
 } from "./logotypeReveal";
 import { DEFAULT_THEME } from "./theme";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
+import { PRIVACY_HREF } from "./privacy";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { playClick, playNotify } from "./uiSounds";
 import { compositionScale } from "./uiScale";
@@ -359,6 +360,7 @@ export function mountMobileAccessOverlay() {
     <div class="mobile-overlay__mark logotype" aria-hidden="true">${logotypeRevealMarkup()}</div>
     <p class="mobile-overlay__message" id="mobile-overlay-title"></p>
     <button type="button" class="mobile-overlay__ok">I understand</button>
+    <a class="mobile-overlay__privacy" href="${PRIVACY_HREF}">Privacy</a>
     <div class="mobile-overlay__social">
       <a class="mobile-overlay__x" href="https://x.com/johstell" target="_blank" rel="noopener noreferrer" aria-label="X">${xRevealMarkup()}</a>
       <a class="mobile-overlay__github" href="https://github.com/stellanjoh2/Ultrapilled" target="_blank" rel="noopener noreferrer" aria-label="GitHub">${githubRevealMarkup()}</a>
@@ -482,7 +484,9 @@ export function askModeSelect(): Promise<AppMode> {
         </p>
         <p class="mode-select__foot">
           Ultrapilled™ is a free physics playground for dropping text, icons, and images into motion.<br />
-          We don’t track you, and <strong>we don’t use anything you upload to train AI</strong> — your files stay on your device.
+          We don’t use your files to train AI. Most of the scene stays in this browser.
+          Fonts, photo search, YouTube, the microphone, and issue reports can leave the device —
+          <a href="${PRIVACY_HREF}">Privacy</a>.
         </p>
         <button type="button" class="mode-select__report" data-open-bug-report>
           <span class="mode-select__report-icon" aria-hidden="true">${warningCircleIcon}</span>

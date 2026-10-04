@@ -36,6 +36,7 @@ describe("youtubeEmbedSrc", () => {
   it("builds a muted embed that keeps start (no playlist loop)", () => {
     const src = youtubeEmbedSrc({ videoId: "dQw4w9WgXcQ", startSec: 10, loopSec: 5 });
     const url = new URL(src);
+    expect(url.hostname).toBe("www.youtube-nocookie.com");
     expect(url.pathname).toBe("/embed/dQw4w9WgXcQ");
     expect(url.searchParams.get("autoplay")).toBe("1");
     expect(url.searchParams.get("mute")).toBe("1");

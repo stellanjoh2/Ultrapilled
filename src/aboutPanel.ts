@@ -1,4 +1,5 @@
 import gsap from "gsap";
+import { PRIVACY_HREF } from "./privacy";
 import { playRemove, playTransition } from "./uiSounds";
 
 const ABOUT_TEXT =
@@ -12,6 +13,7 @@ const ABOUT_LINKS = [
   },
   { text: "X", href: "https://x.com/johstell" },
   { text: "Orby", href: "https://orby.studio/" },
+  { text: "Privacy", href: PRIVACY_HREF },
 ] as const;
 
 let modalRoot: HTMLElement | null = null;
@@ -23,10 +25,11 @@ function reducedMotion(): boolean {
 }
 
 function bodyHtml(): string {
-  const links = ABOUT_LINKS.map(
-    (link) =>
-      `<a href="${link.href}" target="_blank" rel="noopener noreferrer">${link.text}</a>`,
-  ).join(" · ");
+  const links = ABOUT_LINKS.map((link) => {
+    const external = link.href.startsWith("http");
+    const extra = external ? ` target="_blank" rel="noopener noreferrer"` : "";
+    return `<a href="${link.href}"${extra}>${link.text}</a>`;
+  }).join(" · ");
   return `
     <p class="about-modal__bio">${ABOUT_TEXT}</p>
     <p class="about-modal__links">${links}</p>

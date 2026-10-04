@@ -87,6 +87,7 @@ import {
   type YouTubeClip,
 } from "./youtube";
 import { checkInput } from "./checkBox";
+import { lsGet, lsSet } from "./legacyStorage";
 import { getPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
 import { askModeSelect, handoffModeSelectPreview, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
@@ -211,7 +212,7 @@ app.innerHTML = `
         <div class="post-grain" aria-hidden="true"></div>
         <div class="post-vignette" aria-hidden="true"></div>
         <canvas class="phys-debug" id="phys-debug" aria-hidden="true" hidden></canvas>
-        <p class="canvas-welcome" id="canvas-welcome" hidden>Press spacebar to trigger physics</p>
+        <p class="canvas-welcome" id="canvas-welcome" hidden></p>
         <div class="canvas-nudge" id="canvas-nudge" hidden aria-live="polite"></div>
       </div>
     </div>
@@ -292,15 +293,18 @@ let physDebugOn = false;
 let nudgeFadeTimer = 0;
 let shapeBlinkTimer = 0;
 
-const WELCOME_KEY = "falldown.welcomeDismissed";
+const WELCOME_KEY = "welcomeDismissed";
 let welcomeDismissed = false;
 try {
-  welcomeDismissed = localStorage.getItem(WELCOME_KEY) === "1";
+  welcomeDismissed = lsGet(WELCOME_KEY) === "1";
 } catch {
   /* private mode */
 }
 
 function paintWelcome() {
+  canvasWelcome.textContent = state.physics.layoutMode
+    ? "Add pieces from Create, then place them on the canvas"
+    : "Press spacebar to trigger physics";
   const show = !welcomeDismissed && !running && !posePinned && world.chipCount() === 0;
   gsap.killTweensOf(canvasWelcome);
   if (show) {
@@ -332,7 +336,7 @@ function dismissWelcome() {
   }
   welcomeDismissed = true;
   try {
-    localStorage.setItem(WELCOME_KEY, "1");
+    lsSet(WELCOME_KEY, "1");
   } catch {
     /* private mode */
   }
@@ -1276,15 +1280,23 @@ function scheduleDraft() {
   }, 800);
 }
 
+let draftSaveWarned = false;
+
 async function writeDraftNow() {
   if (!getPrefs().rememberLast) return;
   try {
     const json = serializePillProject(currentPillProject());
     if (json === lastDraftJson) return;
-    lastDraftJson = json;
     await writeDraftJson(json);
+    lastDraftJson = json;
+    draftSaveWarned = false;
   } catch {
-    /* quota / private mode */
+    if (draftSaveWarned) return;
+    draftSaveWarned = true;
+    void askNotice({
+      title: "Draft not saved",
+      body: "This browser wouldn’t keep the unsaved session. Download a .pill file if you want a copy.",
+    });
   }
 }
 
@@ -2281,7 +2293,7 @@ function swatchRow(
     .map((color, index) => {
       const selected = selectedIndex === index;
       const fill = selected && custom ? custom : color;
-      return `<button type="button" class="tint${selected ? " is-on" : ""}" data-${dataName}="${index}" style="background:${fill}" aria-pressed="${selected}" aria-label="${legend} ${index + 1}"></button>`;
+      return `<button type="button" class="tint${selected ? " is-on" : ""}" data-${dataName}="${index}" style="background:${fill}" aria-pressed="${selected}" aria-label="${legend} ${index + 1}" data-tip="Click the selected color again to pick any color"></button>`;
     })
     .join("")}</div>`;
 }
@@ -4931,7 +4943,7 @@ function showAddShapeNudge() {
 
   const hint = document.createElement("p");
   hint.className = "canvas-nudge__hint";
-  hint.textContent = "(Try right-clicking on the canvas)";
+  hint.textContent = "Use Create on the right, or right-click the canvas";
 
   canvasNudge.append(title, hint);
   canvasNudge.hidden = false;
@@ -5094,6 +5106,7 @@ async function setLayoutMode(next: boolean, opts?: { skipConfirm?: boolean }) {
     }
   }
   renderPanel();
+  paintWelcome();
   scheduleDraft();
 }
 
@@ -5345,7 +5358,15 @@ async function removeCustomTemplate(id: string) {
     cancelLabel: "No",
   });
   if (!ok) return;
-  deleteCustomTemplate(id);
+  try {
+    deleteCustomTemplate(id);
+  } catch {
+    await askNotice({
+      title: "Couldn’t delete",
+      body: "This browser wouldn’t update saved themes.",
+    });
+    return;
+  }
   if (state.template === id) {
     state.template = undefined;
     renderPanel();
@@ -5881,6 +5902,11 @@ void (async () => {
   } catch {
     draftReady = true;
     try {
+      await introAnimDone;
+      await askNotice({
+        title: "Couldn’t restore draft",
+        body: "The last session couldn’t be opened. Starting fresh.",
+      });
       await gateModeSelect();
     } catch {
       paintWelcome();

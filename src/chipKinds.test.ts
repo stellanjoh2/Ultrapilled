@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isColorMask, isSvgSource } from "./chipKinds";
+import { isColorMask, isSvgSource, sceneSkipsRasterCapture } from "./chipKinds";
 import { imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags, whiteBalanceGains } from "./chipLook";
 import { ICON_PRESETS } from "./icons";
 import {
@@ -12,6 +12,22 @@ import {
   imageTemperatureNormalized,
   imageTemperatureOf,
 } from "./types";
+
+describe("sceneSkipsRasterCapture", () => {
+  it("is true when a YouTube or local video chip is on the canvas", () => {
+    expect(sceneSkipsRasterCapture([defaultTextSlot(), defaultImageSlot()])).toBe(false);
+    expect(
+      sceneSkipsRasterCapture([
+        defaultImageSlot({ youtube: { videoId: "dQw4w9WgXcQ", startSec: 0, loopSec: 8 } }),
+      ]),
+    ).toBe(true);
+    expect(
+      sceneSkipsRasterCapture([
+        defaultImageSlot({ video: { src: "blob:video", ready: true } }),
+      ]),
+    ).toBe(true);
+  });
+});
 
 describe("isSvgSource", () => {
   it("detects svg by name and data url", () => {
