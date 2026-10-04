@@ -182,7 +182,7 @@ export function warmModeSelectPreview() {
     fitScale: () => {
       world.setSimulationScale(1);
       const mobileGate = host.classList.contains("is-mobile-gate");
-      return state.masterScale * (mobileGate ? 0.33 : 1);
+      return state.masterScale * (mobileGate ? 0.264 : 1);
     },
     syncCanvas: () => {
       paintPreviewBackdrop(stage, playfield, state);
