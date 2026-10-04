@@ -30,6 +30,10 @@ Shapes provided by [shapes.gallery](https://www.shapes.gallery/).
 npx shadcn add https://soundcn.xyz/r/<sound-name>.json
 ```
 
+## Fonts
+
+**Le Murmure** — used for the Ultrapilled logotype. [Le Murmure](https://velvetyne.fr/fonts/le-murmure/) by Jérémy Landes, published by [Velvetyne](https://velvetyne.fr/). SIL Open Font License 1.1.
+
 ## Template photo credits
 
 Bundled under `public/templates/<id>/`. Full per-file notes also live in each folder’s `CREDITS.txt`.
@@ -79,5 +83,6 @@ Original Ultrapilled code and original assets are under [CC BY 4.0](https://crea
   - [GSAP](https://gsap.com/standard-license/)
   - [Phosphor Icons](https://github.com/phosphor-icons/core)
   - Mattone (`public/fonts/Mattone-LICENSE.txt`, SIL Open Font License 1.1)
+  - [Le Murmure](https://velvetyne.fr/fonts/le-murmure/) (Ultrapilled logotype, SIL Open Font License 1.1)
   - Template photos (tables above / each folder’s `CREDITS.txt`)
   - Sounds (see [Sounds](#sounds))
