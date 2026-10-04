@@ -484,9 +484,7 @@ export function askModeSelect(): Promise<AppMode> {
         </p>
         <p class="mode-select__foot">
           Ultrapilled™ is a free physics playground for dropping text, icons, and images into motion.<br />
-          We don’t use your files to train AI. Most of the scene stays in this browser.
-          Fonts, photo search, YouTube, the microphone, and issue reports can leave the device —
-          <a href="${PRIVACY_HREF}">Privacy</a>.
+          We don’t use your files to train AI. <a href="${PRIVACY_HREF}">How we handle data</a>.
         </p>
         <button type="button" class="mode-select__report" data-open-bug-report>
           <span class="mode-select__report-icon" aria-hidden="true">${warningCircleIcon}</span>

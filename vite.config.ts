@@ -30,4 +30,12 @@ export default defineConfig({
     environment: "happy-dom",
     include: ["src/**/*.test.ts"],
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(root, "index.html"),
+        privacy: path.resolve(root, "privacy.html"),
+      },
+    },
+  },
 });

@@ -2,7 +2,7 @@
 
 A desktop web physics playground for text, icons, images, and short video clips. Live at [ultrapilled.com](https://ultrapilled.com/). Built on [Matter.js](https://brm.io/matter-js/).
 
-**Desktop browsers only.** Phones and most tablets are gated at the door. Privacy: [ultrapilled.com/privacy.html](https://ultrapilled.com/privacy.html) (also in this repo as [`public/privacy.html`](public/privacy.html)).
+**Desktop browsers only.** Phones and most tablets are gated at the door. Privacy: [ultrapilled.com/privacy.html](https://ultrapilled.com/privacy.html) (also in this repo as [`privacy.html`](privacy.html)).
 
 ## Run
 

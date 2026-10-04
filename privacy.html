@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy — Ultrapilled</title>
+    <meta
+      name="description"
+      content="How Ultrapilled handles your files, drafts, and third-party services."
+    />
+  </head>
+  <body>
+    <main>
+      <a class="back" href="/">Ultrapilled</a>
+      <h1>Privacy</h1>
+      <p class="lede">
+        Last updated 4 October 2026. A free desktop web app. We do not use your files to train AI.
+      </p>
+
+      <section>
+        <h2>What stays here</h2>
+        <p>
+          Scenes, uploads, custom themes, preferences, and the unsaved draft live in this browser
+          (localStorage and IndexedDB). Exports download to your computer. We do not run an account
+          system or store your projects on our servers.
+        </p>
+      </section>
+
+      <section>
+        <h2>What we contact</h2>
+        <ul>
+          <li><strong>Google Fonts</strong> — the editor loads typefaces from Google’s servers.</li>
+          <li><strong>Unsplash</strong> — photo search and chosen images go through Unsplash’s API and CDN. The public access key is restricted to this site when possible.</li>
+          <li><strong>YouTube</strong> — pasted clips load as privacy-enhanced YouTube embeds (<code>youtube-nocookie.com</code>). YouTube may still set cookies.</li>
+          <li><strong>Issue reports</strong> — the report form posts category, severity, and your message to a shared Orby inbox. No contact details are collected.</li>
+          <li><strong>Microphone</strong> — only if you turn on Audio react. Audio is processed in the browser and is not uploaded.</li>
+          <li><strong>Local fonts</strong> — listing fonts on your computer uses the browser’s font access prompt. Font files stay local.</li>
+        </ul>
+        <p>There is no advertising SDK and no analytics tracker in the app.</p>
+      </section>
+
+      <section>
+        <h2>Cookies</h2>
+        <p>
+          Ultrapilled does not set cookies. Drafts, preferences, and custom themes use required
+          browser storage (localStorage and IndexedDB) so the editor can reopen your last session.
+          If you paste a YouTube clip, YouTube may set its own cookies on that embed.
+        </p>
+      </section>
+
+      <section>
+        <h2>Terms in brief</h2>
+        <p>
+          The Ultrapilled app is licensed under CC BY 4.0. Files you export are yours. Third-party
+          fonts, photos, sounds, and video remain under their own licenses.
+        </p>
+        <p>Desktop browsers only. Phones and most tablets cannot open the editor.</p>
+      </section>
+    </main>
+    <script type="module" src="/src/privacyPage.ts"></script>
+  </body>
+</html>
