@@ -375,10 +375,10 @@ export function openSettings(controller: SettingsController): void {
     <div class="settings-modal__scrim" data-settings-close></div>
     <div class="settings-modal__sheet">
       <header class="settings-modal__head">
-        <h2 class="settings-modal__title" id="settings-modal-title">Settings</h2>
         <button type="button" class="settings-modal__back" data-settings-close aria-label="Back" data-tip="Close settings">
           <span class="settings-modal__back-icon" aria-hidden="true">${caretLeftIcon}</span>
         </button>
+        <h2 class="settings-modal__title" id="settings-modal-title">Settings</h2>
       </header>
       <div class="settings-modal__body" id="settings-modal-body"></div>
       <footer class="settings-modal__foot">
