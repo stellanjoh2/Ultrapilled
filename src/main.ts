@@ -264,7 +264,7 @@ app.innerHTML = `
           <button type="button" class="pill panel-util" id="loop" aria-pressed="false" data-tip="Keep the floor opening so the fall never ends">
             <span class="loop-chip__text">Loop</span>
           </button>
-          <button type="button" class="pill panel-util" id="reset-defaults" data-tip="Restore default sliders and options">Reset</button>
+          <button type="button" class="pill panel-util" id="reset-defaults" data-tip="Clear the canvas — can’t be undone">Reset</button>
           <button type="button" class="pill panel-util" id="open-settings" data-tip="Sound, theme, and preferences">Settings</button>
         </div>
         <button type="button" class="pill" id="copy-settings" hidden data-tip="Copy the current settings as text">Copy settings</button>
@@ -5331,19 +5331,44 @@ app.querySelector("#open-settings")?.addEventListener("click", () => {
 paintTransport();
 paintWelcome();
 app.querySelector("#reset-defaults")?.addEventListener("click", () => {
-  remember();
-  session.setRunning(false);
-  machineFont = "";
-  appliedFont = "";
-  pickedSlotId = null;
-  pickedSlotIds.clear();
-  world.setPicked(null);
-  adoptState(blankState());
-  for (const slot of state.slots) captureBaseline(slot);
-  applyBackground();
-  applyPost();
-  syncCanvas(false);
-  renderPanel();
+  void (async () => {
+    const ok = await askConfirm({
+      title: "Reset canvas?",
+      body: "This clears the scene and can’t be undone — physics piles aren’t something Undo can restore well.",
+      confirmLabel: "Reset",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
+
+    // Not undoable: live physics poses aren’t in the history stack.
+    endGesture();
+    past.length = 0;
+    future.length = 0;
+    session.setRunning(false);
+    running = false;
+    paused = false;
+    posePinned = false;
+    session.phase = "idle";
+    session.dropTicket++;
+    session.clearingDump = false;
+    machineFont = "";
+    appliedFont = "";
+    pickedSlotId = null;
+    pickedSlotIds.clear();
+    world.setPicked(null);
+    world.setFloorOpen(false);
+    world.discardAll();
+    openSlots.clear();
+    adoptState(blankState());
+    for (const slot of state.slots) captureBaseline(slot);
+    applyBackground();
+    applyPost();
+    syncCanvas(false);
+    renderPanel();
+    paintTransport();
+    paintWelcome();
+    scheduleDraft();
+  })();
 });
 
 function activeTemplateLabel(id: string | undefined): string | undefined {
