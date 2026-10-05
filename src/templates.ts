@@ -1,6 +1,6 @@
 import { putBackgroundImage, sanitizeSvgMarkup } from "./background";
 import { ICON_PRESETS } from "./icons";
-import { modeSelectPreviewState, MODE_SELECT_THEME_ID } from "./modeSelectTheme";
+import { modeSelectPreviewState, MODE_SELECT_THEME_ID, notFoundPreviewState, NOT_FOUND_THEME_ID } from "./modeSelectTheme";
 import { DEFAULT_THEME } from "./theme";
 import {
   DEFAULT_PHYSICS,
@@ -16,7 +16,14 @@ import {
 } from "./types";
 import ultrapilledLogoRaw from "./assets/ultrapilled-logo.svg?raw";
 
-export type TemplateId = "acid" | "new-york" | "miami" | "berlin" | "ultrapilled" | typeof MODE_SELECT_THEME_ID;
+export type TemplateId =
+  | "acid"
+  | "new-york"
+  | "miami"
+  | "berlin"
+  | "ultrapilled"
+  | typeof MODE_SELECT_THEME_ID
+  | typeof NOT_FOUND_THEME_ID;
 
 export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }[] = [
   { id: "acid", label: "London", build: acidState },
@@ -25,6 +32,7 @@ export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }
   { id: "berlin", label: "Berlin", build: berlinState },
   { id: "ultrapilled", label: "Ultrapilled", build: ultrapilledState },
   { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
+  { id: NOT_FOUND_THEME_ID, label: "404", build: notFoundPreviewState },
 ];
 
 export function templateLabel(id: string | undefined): string | undefined {

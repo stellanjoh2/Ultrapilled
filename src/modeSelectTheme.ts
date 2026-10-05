@@ -202,3 +202,12 @@ export function mobileLandingPreviewState(): AppState {
     ],
   };
 }
+
+/** Temporary 404 scene id — customize `notFoundPreviewState` when the real pile is ready. */
+export const NOT_FOUND_THEME_ID = "404";
+
+/** Standalone 404 backdrop — Mode Select pile for now; swap this builder when you ship the real scene. */
+export function notFoundPreviewState(): AppState {
+  const state = modeSelectPreviewState();
+  return { ...state, template: NOT_FOUND_THEME_ID };
+}

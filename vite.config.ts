@@ -35,6 +35,7 @@ export default defineConfig({
       input: {
         main: path.resolve(root, "index.html"),
         privacy: path.resolve(root, "privacy.html"),
+        notFound: path.resolve(root, "404.html"),
       },
     },
   },
