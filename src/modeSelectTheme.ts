@@ -203,11 +203,102 @@ export function mobileLandingPreviewState(): AppState {
   };
 }
 
-/** Temporary 404 scene id — customize `notFoundPreviewState` when the real pile is ready. */
+/** 404 page scene id — used by `404.html` and the CREATE template picker. */
 export const NOT_FOUND_THEME_ID = "404";
 
-/** Standalone 404 backdrop — Mode Select pile for now; swap this builder when you ship the real scene. */
+const NOT_FOUND_THEME = ["#050505", "#141414", "#282828", "#404040", "#FF1133"] as const;
+
+function emoji(char: string, name: string, scale: number, amount = 1): ImageSlot {
+  return defaultImageSlot({ src: "", name, emoji: char, size: 56, amount, colorIndex: 0, scale });
+}
+
+/** Standalone 404 backdrop — red stage, crying pile, “404 / OH NO / YOU MESSED UP”. */
 export function notFoundPreviewState(): AppState {
-  const state = modeSelectPreviewState();
-  return { ...state, template: NOT_FOUND_THEME_ID };
+  const heavy = { fontFamily: "Archivo Black", fontWeight: 400 as const };
+  const slots: Slot[] = [
+    icon("Spheres", 2, { scale: 0.25 })!,
+    icon("Clovers", 2, { scale: 0.25 })!,
+    icon("Stars", 4, { scale: 0.25 })!,
+    text({
+      ...heavy,
+      text: "404",
+      shape: "pill",
+      radius: 12,
+      scale: 1.8,
+      colorIndex: 0,
+      textAnim: true,
+    }),
+    icon("Spheres", 2, { scale: 0.7 })!,
+    text({
+      text: "YOU MESSED UP",
+      fontFamily: "Inter",
+      fontWeight: 700,
+      textHeight: 51,
+      shape: "pill",
+      radius: 12,
+      scale: 0.25,
+      colorIndex: 0,
+      tracking: 294,
+      pillPad: 60,
+    }),
+    icon("Blossoms", 4, { scale: 0.4 })!,
+    text({ ...heavy, text: "OH NO", shape: "box", radius: 6, scale: 0.55, colorIndex: 0 }),
+    text({ ...heavy, text: "OH NO", shape: "box", radius: 6, scale: 0.55, colorIndex: 0 }),
+    text({ ...heavy, text: "404", shape: "pill", radius: 12, scale: 0.6, colorIndex: 0 }),
+    text({ ...heavy, text: "404", shape: "pill", radius: 12, scale: 0.6, colorIndex: 0 }),
+    icon("Stars", 1, { scale: 0.3 })!,
+    emoji("😭", "Loudly Crying Face", 0.25, 16),
+    emoji("😭", "Loudly Crying Face", 0.2, 2),
+    emoji("😭", "Loudly Crying Face", 0.15, 1),
+    emoji("😥", "Sad But Relieved Face", 0.15, 1),
+    emoji("😥", "Sad But Relieved Face", 0.25, 5),
+  ].filter(Boolean) as Slot[];
+
+  return {
+    stageColor: "#ff1133",
+    background: normalizeBackground({
+      kind: "solid",
+      shape: "radial",
+      stops: [
+        { id: uid(), color: "#02006c", at: 0 },
+        { id: uid(), color: "#080808", at: 100 },
+      ],
+      imageId: "",
+      logoId: "",
+      logoScale: 1,
+      logoOriginal: "",
+      logoTint: null,
+      logoColor: "",
+      logoFront: false,
+      logoBlend: "normal",
+      grid: true,
+      gridDensity: "fine",
+      gridColor: "#ffffff",
+      gridOpacity: 10,
+    }),
+    canvas: "16:9",
+    masterScale: 8.3,
+    sizeRandom: 100,
+    pillPad: 30,
+    textTracking: 37,
+    shapeAmount: 31,
+    theme: [...NOT_FOUND_THEME],
+    post: { bloom: 0, bloomOpacity: 100, grain: 0, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
+    physics: {
+      ...DEFAULT_PHYSICS,
+      weight: 1,
+      gravity: 0.9,
+      speed: 1,
+      bounce: 1.05,
+      friction: 0.1,
+      grip: 0.5,
+      spin: 0.06,
+      hold: 0.8,
+      complexity: "normal",
+      layoutMode: false,
+    },
+    audioReact: { ...DEFAULT_AUDIO_REACT, enabled: false },
+    slots,
+    template: NOT_FOUND_THEME_ID,
+  };
 }

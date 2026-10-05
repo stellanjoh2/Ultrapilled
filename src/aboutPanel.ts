@@ -1,8 +1,13 @@
 import gsap from "gsap";
+import { DEFAULT_THEME } from "./theme";
 import { playRemove, playTransition } from "./uiSounds";
 
 const ABOUT_TEXT =
   "Hi, I'm Stellan Johansson, a creative director and brand designer with 20+ years across games, 3D, motion, UI and visual identity — shipping titles at studios, running agencies, and shaping platforms used by millions of creators. Ultrapilled™ is one of my sideprojects.";
+
+/** Orby Lime — same accent as Mode Select “Choose your vibe:”. */
+const NAME_ACCENT = DEFAULT_THEME[1];
+const ABOUT_NAME = "Stellan Johansson";
 
 const ABOUT_LINKS = [
   { text: "LinkedIn", href: "https://www.linkedin.com/in/stellanj/" },
@@ -11,7 +16,6 @@ const ABOUT_LINKS = [
     href: "https://www.mobygames.com/person/289121/stellan-johansson/credits/",
   },
   { text: "X", href: "https://x.com/johstell" },
-  { text: "Orby", href: "https://orby.studio/" },
 ] as const;
 
 /** Sideprojects + showreel — stills from Orby marketing / promo captures. */
@@ -106,16 +110,40 @@ function tweenAboutBlur(on: boolean, duration: number): void {
 
 function fillBio(el: HTMLElement): HTMLElement[] {
   el.replaceChildren();
-  const parts = ABOUT_TEXT.split(/\s+/);
   const words: HTMLElement[] = [];
-  parts.forEach((part, index) => {
-    const span = document.createElement("span");
-    span.className = "about-overlay__word";
-    span.textContent = part;
-    el.append(span);
-    words.push(span);
-    if (index < parts.length - 1) el.append(document.createTextNode(" "));
-  });
+  const parts = ABOUT_TEXT.split(/\s+/);
+  let index = 0;
+  while (index < parts.length) {
+    const part = parts[index]!;
+    const next = parts[index + 1];
+    if (part === "Stellan" && next?.startsWith("Johansson")) {
+      const name = document.createElement("span");
+      name.className = "about-overlay__word about-overlay__name";
+      name.textContent = ABOUT_NAME;
+      name.style.color = NAME_ACCENT;
+      el.append(name);
+      words.push(name);
+      const punct = next.slice("Johansson".length);
+      if (punct) el.append(document.createTextNode(punct));
+      index += 2;
+    } else if ((part === "a" || part === "an") && next) {
+      // Keep article + next word together so “a” doesn’t orphan at a line end.
+      const span = document.createElement("span");
+      span.className = "about-overlay__word";
+      span.textContent = `${part}\u00A0${next}`;
+      el.append(span);
+      words.push(span);
+      index += 2;
+    } else {
+      const span = document.createElement("span");
+      span.className = "about-overlay__word";
+      span.textContent = part;
+      el.append(span);
+      words.push(span);
+      index += 1;
+    }
+    if (index < parts.length) el.append(document.createTextNode(" "));
+  }
   return words;
 }
 

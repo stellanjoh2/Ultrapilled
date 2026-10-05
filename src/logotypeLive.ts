@@ -1,7 +1,7 @@
 import { fillLuminance, type ColorTheme } from "./theme";
 
 /** How many wordmark letterforms take a theme color at rest. */
-const LIT_COUNT = 5;
+const LIT_COUNT = 8;
 /** Hover reassigns theme colors across the letterforms three times a second. */
 const HOVER_MS = 333;
 /**
@@ -43,11 +43,6 @@ function mixHex(from: string, to: string, t: number): string {
   return `#${hexByte(ar + (br - ar) * k)}${hexByte(ag + (bg - ag) * k)}${hexByte(ab + (bb - ab) * k)}`;
 }
 
-function normHex(hex: string): string {
-  const [r, g, b] = parseHex(hex);
-  return `#${hexByte(r)}${hexByte(g)}${hexByte(b)}`;
-}
-
 function lumGap(hex: string, backdrop: string): number {
   return Math.abs(fillLuminance(hex) - fillLuminance(backdrop));
 }
@@ -78,36 +73,29 @@ function shiftUntil(hex: string, backdrop: string): string {
   return fillLuminance(backdrop) >= 0.5 ? "#111111" : "#ffffff";
 }
 
-/**
- * Keep a theme swatch when it clears the canvas. Otherwise another swatch that
- * does, or a luminance shift of the original. `used` avoids collapsing every
- * letter onto the same remaining swatch. Resting paint only — hover uses
- * `logotypeHoverFill`, which must not borrow a different swatch.
- */
-function resolveSwatch(
-  preferred: string,
-  theme: readonly string[],
-  backdrop: string,
-  used?: Set<string>,
-): string {
-  if (contrasts(preferred, backdrop)) {
-    used?.add(normHex(preferred));
-    return preferred;
-  }
-  const alt = theme.find((swatch) => contrasts(swatch, backdrop) && !used?.has(normHex(swatch)));
-  if (alt) {
-    used?.add(normHex(alt));
-    return alt;
-  }
-  const shifted = shiftUntil(preferred, backdrop);
-  used?.add(normHex(shifted));
-  return shifted;
-}
-
-function paletteFive(theme: readonly string[], backdrop: string): string[] {
+/** Shuffled theme accents for resting lit letters — keep each hue (shift if needed), never borrow. */
+function paletteLit(theme: readonly string[], backdrop: string): string[] {
   const src = theme.length ? theme : ["#ffffff"];
-  const used = new Set<string>();
-  return Array.from({ length: LIT_COUNT }, (_, i) => resolveSwatch(src[i % src.length]!, src, backdrop, used));
+  const ink = logotypeInk(backdrop);
+  // Drop ink-matching swatches (theme white on a dark stage) so they don't read as uncolored.
+  const accents = src.filter((swatch) => lumGap(swatch, ink) >= LOGOTYPE_MIN_LUM_GAP);
+  const pool = accents.length ? accents : src;
+
+  const out: string[] = [];
+  while (out.length < LIT_COUNT) {
+    const round = [...pool];
+    for (let i = round.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = round[i]!;
+      round[i] = round[j]!;
+      round[j] = tmp;
+    }
+    for (const swatch of round) {
+      if (out.length >= LIT_COUNT) break;
+      out.push(logotypeHoverFill(swatch, backdrop));
+    }
+  }
+  return out;
 }
 
 function sameSet(a: readonly number[], b: readonly number[]): boolean {
@@ -168,16 +156,16 @@ function tmPaths(root: HTMLElement): SVGPathElement[] {
 }
 
 /**
- * Header and Mode Select wordmarks. Five letterforms (Ultrapilled, including
+ * Header and Mode Select wordmarks. Most letterforms (Ultrapilled, including
  * the pill, excluding TM) take the active theme once on mount and again when
  * the color theme changes.
  * Every fill is checked against the canvas backdrop: a swatch within
- * LOGOTYPE_MIN_LUM_GAP is replaced by another theme color or luminance-shifted.
- * Hover reassigns a random theme color on every letterform every 333ms, then
- * the resting five return. A swatch that sits too close to the backdrop is
- * luminance-shifted in place so pinks and purples stay in the cycle instead of
- * being replaced by the first swatch that already contrasts. Reduced motion
- * does not run the hover cycle.
+ * LOGOTYPE_MIN_LUM_GAP is luminance-shifted in place so the hue stays.
+ * Resting accents shuffle the theme (skipping ink-matching white) and keep each
+ * hue via luminance shift — never borrow another swatch, or pink/purple collapse
+ * onto cyan. Hover reassigns a random theme color on every letterform every
+ * 333ms, then the resting set returns. Reduced motion does not run the hover
+ * cycle.
  */
 export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotypeSource): HeaderLogotype {
   const letters = letterPaths(root);
@@ -197,7 +185,7 @@ export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotyp
 
   const applyRest = () => {
     const { theme, backdrop } = read();
-    const colors = paletteFive(theme, backdrop);
+    const colors = paletteLit(theme, backdrop);
     const ink = logotypeInk(backdrop);
     letters.forEach((el, index) => {
       const slot = lit.indexOf(index);
