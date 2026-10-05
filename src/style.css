@@ -835,7 +835,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 .canvas-nudge__hint {
   margin: 0;
-  max-width: 34em;
+  max-width: 48em;
   color: rgb(255 255 255 / 0.72);
   font-family: var(--font-section);
   font-size: 42%;
@@ -5421,7 +5421,7 @@ html[data-theme="day"] .shape-swatch {
 .reconnect__card {
   position: relative;
   z-index: 1;
-  width: min(483px, 100%);
+  width: min(calc(483px * var(--ui-scale)), 100%);
   padding: calc(var(--space-3) * 1.15);
   border-radius: var(--radius-reconnect);
   background: var(--canvas);
@@ -5479,7 +5479,7 @@ html[data-theme="day"] .shape-swatch {
   margin: 0 0 var(--space-2);
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: clamp(32px, 4.6vw, 41px);
+  font-size: calc(41px * var(--ui-scale));
   font-weight: 400;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -6016,7 +6016,7 @@ button.pill.report-card__open {
 .bug-report__card {
   position: relative;
   z-index: 1;
-  width: min(483px, 100%);
+  width: min(calc(483px * var(--ui-scale)), 100%);
   max-height: calc(100% - (var(--space-2) * 2));
   overflow: auto;
   padding: var(--space-2);

@@ -4988,11 +4988,11 @@ function showAddShapeNudge() {
     nudgeAccent("Create"),
     " on the right, try ",
     nudgeAccent("Templates"),
-    " to quickly fill the canvas, or ",
-    nudgeAccent("right-click"),
-    " the",
+    " to quickly fill",
     document.createElement("br"),
-    "workspace.",
+    "the canvas, or ",
+    nudgeAccent("right-click"),
+    " the workspace.",
   );
 
   canvasNudge.append(title, hint);
