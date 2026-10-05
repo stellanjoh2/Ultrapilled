@@ -27,7 +27,13 @@ body,
 
 .not-found__preview {
   overflow: hidden;
-  pointer-events: none;
+  /* Chips are interactive — overlay stays pointer-events: none except the CTA. */
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.not-found__preview:active {
+  cursor: grabbing;
 }
 
 .not-found__overlay {
@@ -35,14 +41,15 @@ body,
   z-index: 2;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: min(100%, calc(1056px * var(--ui-scale, 1)));
+  width: min(100%, calc(1790px * var(--ui-scale, 1)));
   min-height: 100%;
   margin: 0 auto;
   padding: calc(64px * var(--ui-scale, 1)) calc(32px * var(--ui-scale, 1));
   pointer-events: none;
+  text-align: center;
 }
 
 .not-found__headline {
@@ -50,10 +57,11 @@ body,
   max-width: 18em;
   color: #ffffff;
   font-family: var(--font-section);
-  font-size: clamp(28px, 5.5vw, calc(56px * var(--ui-scale, 1)));
+  font-size: calc(64px * var(--ui-scale, 1));
   font-weight: 400;
   letter-spacing: -0.03em;
-  line-height: 1.15;
+  line-height: 1.2;
+  text-align: center;
   text-shadow: 0 2px 24px rgb(0 0 0 / 0.45);
 }
 

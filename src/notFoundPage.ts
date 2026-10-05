@@ -39,7 +39,6 @@ function warmNotFoundPreview(host: HTMLElement, state: ReturnType<typeof notFoun
 
   const wrap = document.createElement("div");
   wrap.className = "not-found__preview";
-  wrap.setAttribute("aria-hidden", "true");
   wrap.innerHTML = `
     <div class="stage not-found__stage">
       <div class="playfield not-found__playfield">
@@ -67,6 +66,8 @@ function warmNotFoundPreview(host: HTMLElement, state: ReturnType<typeof notFoun
 
   const world = createWorld();
   world.setImpactListener(() => {});
+  // Enable grab / toss — no panel chrome, just the physics.
+  world.attach(stage);
 
   let alive = true;
   let running = false;

@@ -208,50 +208,73 @@ export const NOT_FOUND_THEME_ID = "404";
 
 const NOT_FOUND_THEME = ["#050505", "#141414", "#282828", "#404040", "#FF1133"] as const;
 
-function emoji(char: string, name: string, scale: number, amount = 1): ImageSlot {
-  return defaultImageSlot({ src: "", name, emoji: char, size: 56, amount, colorIndex: 0, scale });
+function emoji(char: string, name: string, scale: number, amount = 1, colorIndex = 0): ImageSlot {
+  return defaultImageSlot({ src: "", name, emoji: char, size: 56, amount, colorIndex, scale });
 }
 
-/** Standalone 404 backdrop — red stage, crying pile, “404 / OH NO / YOU MESSED UP”. */
+/** Standalone 404 backdrop — red stage, ogres/fire pile, “404 / OH NO / YOU MESSED UP BAD”. */
 export function notFoundPreviewState(): AppState {
   const heavy = { fontFamily: "Archivo Black", fontWeight: 400 as const };
+  const redInk = { colorIndex: 0, textColorIndex: 4 } as const;
   const slots: Slot[] = [
     icon("Spheres", 2, { scale: 0.25 })!,
     icon("Clovers", 2, { scale: 0.25 })!,
     icon("Stars", 4, { scale: 0.25 })!,
     text({
       ...heavy,
+      ...redInk,
       text: "404",
       shape: "pill",
       radius: 12,
       scale: 1.8,
-      colorIndex: 0,
       textAnim: true,
     }),
     icon("Spheres", 2, { scale: 0.7 })!,
     text({
-      text: "YOU MESSED UP",
+      ...redInk,
+      text: "YOU MESSED UP BAD",
       fontFamily: "Inter",
       fontWeight: 700,
       textHeight: 51,
       shape: "pill",
       radius: 12,
       scale: 0.25,
-      colorIndex: 0,
       tracking: 294,
       pillPad: 60,
     }),
     icon("Blossoms", 4, { scale: 0.4 })!,
-    text({ ...heavy, text: "OH NO", shape: "box", radius: 6, scale: 0.55, colorIndex: 0 }),
-    text({ ...heavy, text: "OH NO", shape: "box", radius: 6, scale: 0.55, colorIndex: 0 }),
-    text({ ...heavy, text: "404", shape: "pill", radius: 12, scale: 0.6, colorIndex: 0 }),
-    text({ ...heavy, text: "404", shape: "pill", radius: 12, scale: 0.6, colorIndex: 0 }),
-    icon("Stars", 1, { scale: 0.3 })!,
-    emoji("😭", "Loudly Crying Face", 0.25, 16),
-    emoji("😭", "Loudly Crying Face", 0.2, 2),
-    emoji("😭", "Loudly Crying Face", 0.15, 1),
+    text({ ...heavy, ...redInk, text: "OH NO", shape: "box", radius: 6, scale: 0.55 }),
+    emoji("👹", "Ogre", 0.25, 8),
     emoji("😥", "Sad But Relieved Face", 0.15, 1),
+    emoji("😭", "Loudly Crying Face", 0.2, 2),
+    emoji("🔥", "Fire", 1, 1, 2),
+    emoji("🔥", "Fire", 1, 1, 2),
+    text({
+      ...redInk,
+      text: "WHAT NOW",
+      fontFamily: "Anton",
+      fontWeight: 400,
+      shape: "pill",
+      radius: 12,
+      scale: 0.6,
+    }),
+    text({ ...heavy, ...redInk, text: "404", shape: "pill", radius: 12, scale: 0.6 }),
+    text({
+      ...redInk,
+      text: "WELL SHIT",
+      fontFamily: "Libre Baskerville",
+      fontWeight: 400,
+      shape: "box",
+      radius: 6,
+      scale: 0.55,
+    }),
+    text({ ...heavy, ...redInk, text: "OH NO", shape: "box", radius: 6, scale: 0.55 }),
+    icon("Stars", 1, { scale: 0.3 })!,
+    emoji("🔥", "Fire", 1, 1, 2),
+    emoji("😭", "Loudly Crying Face", 0.15, 1),
     emoji("😥", "Sad But Relieved Face", 0.25, 5),
+    emoji("🔥", "Fire", 1, 1, 2),
+    emoji("🔥", "Fire", 1, 1, 2),
   ].filter(Boolean) as Slot[];
 
   return {
@@ -281,7 +304,7 @@ export function notFoundPreviewState(): AppState {
     sizeRandom: 100,
     pillPad: 30,
     textTracking: 37,
-    shapeAmount: 31,
+    shapeAmount: 28,
     theme: [...NOT_FOUND_THEME],
     post: { bloom: 0, bloomOpacity: 100, grain: 0, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
     physics: {
