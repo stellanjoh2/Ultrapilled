@@ -58,6 +58,7 @@ export function closeAbout(): void {
   if (!modalRoot || closing) return;
   closing = true;
   const root = modalRoot;
+  const scrim = root.querySelector<HTMLElement>(".about-overlay__scrim");
   const scroll = root.querySelector<HTMLElement>(".about-overlay__scroll");
   openTl?.kill();
   openTl = null;
@@ -71,14 +72,14 @@ export function closeAbout(): void {
     closing = false;
   };
 
-  if (reducedMotion() || !scroll) {
+  if (reducedMotion() || !scroll || !scrim) {
     done();
     return;
   }
 
   const tl = gsap.timeline({ onComplete: done });
   tl.to(scroll, { y: 12, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
-  tl.to(root, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
+  tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
 }
 
 export function openAbout(): void {
@@ -88,6 +89,7 @@ export function openAbout(): void {
   root.className = "about-overlay";
   root.setAttribute("role", "presentation");
   root.innerHTML = `
+    <div class="about-overlay__scrim" data-about-close></div>
     <div class="about-overlay__scroll" role="dialog" aria-modal="true" aria-label="About Stellan Johansson">
       <div class="about-overlay__content">
         ${bodyHtml()}
@@ -104,7 +106,7 @@ export function openAbout(): void {
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target === root || target.closest("[data-about-close]")) closeAbout();
+    if (target.closest("[data-about-close]")) closeAbout();
   });
 
   onKey = (event: KeyboardEvent) => {
@@ -120,10 +122,11 @@ export function openAbout(): void {
   playTransition(true);
   doneBtn.focus({ preventScroll: true });
 
-  gsap.set(root, { autoAlpha: 0 });
+  // Scrim stays at CSS opacity 1 so backdrop-filter can sample the page.
+  // Fading the old root with GSAP autoAlpha is what killed the blur in Chrome.
 
   if (reducedMotion()) {
-    gsap.set(root, { autoAlpha: 1 });
+    gsap.set([words, links, doneBtn], { clearProps: "all", autoAlpha: 1, y: 0 });
     return;
   }
 
@@ -133,7 +136,6 @@ export function openAbout(): void {
   gsap.set([links, doneBtn], { autoAlpha: 0, y: 22 });
 
   openTl = gsap.timeline({ defaults: { ease: "power3.out" } });
-  openTl.to(root, { autoAlpha: 1, duration: 0.32 }, 0);
   openTl.to(words, reveal, 0.08);
   openTl.to([links, doneBtn], reveal, ">");
 }

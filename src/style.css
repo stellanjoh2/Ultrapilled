@@ -5840,14 +5840,22 @@ html[data-theme="day"] .settings-modal__body .keycap {
   display: grid;
   place-items: center;
   padding: 0;
+  pointer-events: auto;
+}
+
+/* Blur lives on its own layer — opacity on the same node as backdrop-filter
+   (via GSAP autoAlpha on the root) prevents Chrome from sampling the page. */
+.about-overlay__scrim {
+  position: absolute;
+  inset: 0;
   background: rgb(0 0 0 / 0.48);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  pointer-events: auto;
 }
 
 .about-overlay__scroll {
   position: relative;
+  z-index: 1;
   isolation: isolate;
   width: min(100%, calc(1056px * var(--ui-scale)));
   max-height: 100%;
