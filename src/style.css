@@ -835,14 +835,18 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 .canvas-nudge__hint {
   margin: 0;
-  max-width: 22em;
+  max-width: 34em;
   color: rgb(255 255 255 / 0.72);
   font-family: var(--font-section);
-  font-size: 33.333%;
+  font-size: 42%;
   font-weight: 400;
   font-synthesis: none;
-  line-height: 1.35;
+  line-height: 1.3;
   letter-spacing: 0;
+}
+
+.canvas-nudge__accent {
+  color: var(--logotype-pill, var(--play-face));
 }
 
 .dev-panel {
@@ -1550,6 +1554,9 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   height: 1em;
   line-height: 1;
   overflow: hidden;
+  /* Keep the cycle row centered if the label stretches to the chip box. */
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .chip.chip-bare .text-anim-clip {

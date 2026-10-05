@@ -1539,12 +1539,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       airTilt: null,
     };
     mountMirrors(chip);
-    paint(chip, scaled, size, radius, theme, trackingEm(trackingOf(slot, tracking)), glyphShift(slot));
+    const trackEm = trackingEm(trackingOf(slot, tracking));
+    const shiftEm = glyphShift(slot);
+    paint(chip, scaled, size, radius, theme, trackEm, shiftEm);
     syncWallCollision(chip);
     for (const node of chipNodes(chip)) node.style.opacity = "0";
     seat(chip);
     layer!.append(el);
     bloomLayer!.append(glow);
+    // Letter-cycle clip width needs a mounted label (offsetWidth is 0 while detached).
+    // Reuse the timeline via matching sig; only refreshAnimClipWidth runs again.
+    if (scaled.kind === "text" && scaled.textAnim) {
+      paint(chip, scaled, size, radius, theme, trackEm, shiftEm);
+    }
     Composite.add(engine.world, body);
     chips.push(chip);
     animateChipPop(chip, 0, 1);

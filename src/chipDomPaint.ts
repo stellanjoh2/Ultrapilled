@@ -658,9 +658,14 @@ export function applyVisual(
         clearBareTextAnimSeat(label);
         label.textContent = "";
       } else if (
-        !applyTextAnim(label, slot, () => {
-          if (textGradient) paintGrad();
-        })
+        !applyTextAnim(
+          label,
+          slot,
+          () => {
+            if (textGradient) paintGrad();
+          },
+          tracking,
+        )
       ) {
         clearBareTextAnimSeat(label);
         label.style.lineHeight = "1";

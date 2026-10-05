@@ -23,10 +23,21 @@ export function setTextAnimsPaused(paused: boolean) {
 export type RollingTextOpts = {
   speed?: number;
   fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: number;
+  /** Letter-spacing in em (same units as chip style / measureTextInk). */
+  tracking?: number;
   /** Keep the full string as one cycle row (no word split). */
   asPhrase?: boolean;
   /** After split markup is mounted, before the timeline starts (e.g. gradient fill). */
   prepare?: (label: HTMLElement) => void;
+};
+
+type ClipMetrics = {
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: number;
+  tracking: number;
 };
 
 export function textAnimSpeedOf(speed: number | undefined): number {
@@ -396,6 +407,22 @@ export function stopBareCanvasTextAnimIn(root: ParentNode) {
   });
 }
 
+function clipMetricsFrom(label: HTMLElement, opts: RollingTextOpts = {}): ClipMetrics {
+  const cs = getComputedStyle(label);
+  const fontSize =
+    opts.fontSize ?? (Number.parseFloat(cs.fontSize) || 14);
+  const fontWeight =
+    opts.fontWeight ?? (Number.parseFloat(cs.fontWeight) || 700);
+  const fromStyle =
+    cs.fontFamily.split(",")[0]?.trim().replace(/^["']|["']$/g, "") || "";
+  const fontFamily = opts.fontFamily || fromStyle || "sans-serif";
+  const spacingPx = Number.parseFloat(cs.letterSpacing);
+  const tracking =
+    opts.tracking ??
+    (Number.isFinite(spacingPx) && fontSize > 0 ? spacingPx / fontSize : 0.02);
+  return { fontSize, fontFamily, fontWeight, tracking };
+}
+
 /**
  * Keep the letter-cycle clip as wide as the live word after tracking/scale remesh.
  * Must use layout px (offsetWidth + max-content), not getBoundingClientRect: the chip
@@ -403,24 +430,21 @@ export function stopBareCanvasTextAnimIn(root: ParentNode) {
  * is often still on the transform until the next seat(). Visual rects inflate the clip
  * so flex+overflow:hidden on the label crushes tracking; rotated chips do the same.
  *
+ * Chips are painted before they are appended (spawnChip), so offsetWidth / computed
+ * font styles are unreliable until mount — prefer explicit slot metrics and canvas ink
+ * whenever layout width is still 0.
+ *
  * The last .char has letter-spacing: 0 so offsetWidth includes its full advance
  * (negative tracking no longer shrinks the last box; positive tracking adds no tail).
  * Pad any remaining side-bearing so centered rows still clear overflow:hidden.
  * Also take the canvas ink width so we never undershoot painted bounds.
  */
-function refreshAnimClipWidth(label: HTMLElement) {
+function refreshAnimClipWidth(label: HTMLElement, opts: RollingTextOpts = {}) {
   const clip = label.querySelector(":scope > .text-anim-clip");
   if (!(clip instanceof HTMLElement)) return;
   const rows = [...clip.querySelectorAll<HTMLElement>(".text-anim-word")];
-  const cs = getComputedStyle(label);
-  // Prefer the serialized shorthand; fall back when the browser leaves font empty.
-  const font = cs.font?.trim() || `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  const fontSize = Number.parseFloat(cs.fontSize) || 14;
-  const spacingPx = Number.parseFloat(cs.letterSpacing);
-  const tracking = Number.isFinite(spacingPx) ? spacingPx / fontSize : 0;
-  const fontWeight = Number.parseFloat(cs.fontWeight) || 700;
-  const fontFamily =
-    cs.fontFamily.split(",")[0]?.trim().replace(/^["']|["']$/g, "") || "sans-serif";
+  const { fontSize, fontFamily, fontWeight, tracking } = clipMetricsFrom(label, opts);
+  const font = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
   let maxW = 0;
   for (const row of rows) {
     const prev = {
@@ -438,7 +462,8 @@ function refreshAnimClipWidth(label: HTMLElement) {
     row.style.right = "auto";
     row.style.width = "max-content";
     row.style.textAlign = "left";
-    const layoutW = row.offsetWidth;
+    // Disconnected chips (pre-append paint) report 0 — don't let that win over ink.
+    const layoutW = label.isConnected ? row.offsetWidth : 0;
     const chars = [...row.querySelectorAll(".char")];
     const first = chars[0]?.textContent ?? "";
     const last = chars.length > 1 ? (chars[chars.length - 1]?.textContent ?? first) : first;
@@ -450,7 +475,8 @@ function refreshAnimClipWidth(label: HTMLElement) {
       defaultTypeSlot({ text: word, fontFamily, fontWeight, fontSize }),
       tracking,
     );
-    maxW = Math.max(maxW, layoutW + side * 2 + TEXT_INK_PAD * 2, ink.width);
+    const layoutTerm = layoutW > 0 ? layoutW + side * 2 + TEXT_INK_PAD * 2 : 0;
+    maxW = Math.max(maxW, layoutTerm, ink.width);
     row.style.position = prev.position;
     row.style.inset = prev.inset;
     row.style.left = prev.left;
@@ -465,8 +491,8 @@ function refreshAnimClipWidth(label: HTMLElement) {
 /** Looping letter motion (same engine as pill text anim). */
 export function applyRollingText(label: HTMLElement, text: string, opts: RollingTextOpts = {}): boolean {
   const speed = textAnimSpeedOf(opts.speed);
-  const fontSize =
-    opts.fontSize ?? (Number.parseFloat(getComputedStyle(label).fontSize) || 14);
+  const metrics = clipMetricsFrom(label, opts);
+  const fontSize = metrics.fontSize;
   const travel = travelPx(label, fontSize);
   const asPhrase = Boolean(opts.asPhrase);
   // Rebuild when font size changes (scale remesh) so travel + glyph boxes match.
@@ -479,7 +505,7 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
     // Repaints must keep host/label markers even when the timeline is reused.
     label.classList.add("is-text-anim");
     host?.classList.add("is-text-anim-host");
-    refreshAnimClipWidth(label);
+    refreshAnimClipWidth(label, opts);
     return true;
   }
 
@@ -514,7 +540,7 @@ export function applyRollingText(label: HTMLElement, text: string, opts: Rolling
     clip.append(row);
   }
   label.replaceChildren(clip);
-  refreshAnimClipWidth(label);
+  refreshAnimClipWidth(label, opts);
 
   const rows = [...clip.querySelectorAll<HTMLElement>(".text-anim-word")];
 
@@ -579,6 +605,7 @@ export function applyTextAnim(
   label: HTMLElement,
   slot: TextSlot,
   prepare?: (label: HTMLElement) => void,
+  tracking = 0.02,
 ): boolean {
   if (!slot.textAnim) {
     stopTextAnim(label);
@@ -587,6 +614,9 @@ export function applyTextAnim(
   return applyRollingText(label, slot.text, {
     speed: slot.textAnimSpeed,
     fontSize: slot.fontSize,
+    fontFamily: slot.fontFamily,
+    fontWeight: slot.fontWeight,
+    tracking,
     asPhrase: true,
     prepare,
   });

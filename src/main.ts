@@ -302,10 +302,13 @@ try {
 }
 
 function paintWelcome() {
+  // First-shape nudge owns the empty canvas until Create / Templates adds something.
+  if (state.slots.length > 0 || world.chipCount() > 0) clearCanvasNudge();
   canvasWelcome.textContent = state.physics.layoutMode
     ? "Add pieces from Create, then place them on the canvas"
     : "Press spacebar to trigger physics";
-  const show = !welcomeDismissed && !running && !posePinned && world.chipCount() === 0;
+  const nudgeUp = !canvasNudge.hidden;
+  const show = !welcomeDismissed && !running && !posePinned && world.chipCount() === 0 && !nudgeUp;
   gsap.killTweensOf(canvasWelcome);
   if (show) {
     canvasWelcome.hidden = false;
@@ -330,6 +333,7 @@ function paintWelcome() {
 }
 
 function dismissWelcome() {
+  clearCanvasNudge();
   if (welcomeDismissed) {
     paintWelcome();
     return;
@@ -4956,13 +4960,20 @@ function clearCanvasNudge() {
   gsap.set(canvasNudge, { clearProps: "all" });
 }
 
+function nudgeAccent(label: string): HTMLElement {
+  const el = document.createElement("span");
+  el.className = "canvas-nudge__accent";
+  el.textContent = label;
+  return el;
+}
+
 function showAddShapeNudge() {
   clearCanvasNudge();
   canvasWelcome.hidden = true;
 
   const title = document.createElement("div");
   title.className = "canvas-nudge__title";
-  const words = "Please add your first shape!".split(/\s+/);
+  const words = "Please add your first asset!".split(/\s+/);
   for (const word of words) {
     const span = document.createElement("span");
     span.className = "canvas-nudge__word";
@@ -4972,7 +4983,17 @@ function showAddShapeNudge() {
 
   const hint = document.createElement("p");
   hint.className = "canvas-nudge__hint";
-  hint.textContent = "Use Create on the right, or right-click the canvas";
+  hint.append(
+    "Use ",
+    nudgeAccent("Create"),
+    " on the right, try ",
+    nudgeAccent("Templates"),
+    " to quickly fill the canvas, or ",
+    nudgeAccent("right-click"),
+    " the",
+    document.createElement("br"),
+    "workspace.",
+  );
 
   canvasNudge.append(title, hint);
   canvasNudge.hidden = false;
@@ -4992,23 +5013,6 @@ function showAddShapeNudge() {
       { y: 0, autoAlpha: 1, duration: 0.55, delay: 0.35, ease: "power2.out" },
     );
   }
-
-  nudgeFadeTimer = window.setTimeout(() => {
-    if (reducedMotion()) {
-      clearCanvasNudge();
-      paintWelcome();
-      return;
-    }
-    gsap.to(canvasNudge, {
-      autoAlpha: 0,
-      duration: 0.35,
-      ease: "power1.in",
-      onComplete: () => {
-        clearCanvasNudge();
-        paintWelcome();
-      },
-    });
-  }, 2800);
 }
 
 function blinkShapeCreate(section: HTMLElement) {
@@ -5403,6 +5407,7 @@ async function removeCustomTemplate(id: string) {
 }
 
 function loadTemplate(next: AppState) {
+  clearCanvasNudge();
   closeFontMenu();
   remember();
   session.setRunning(false);

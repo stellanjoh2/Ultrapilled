@@ -1,10 +1,50 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TEXT_ANIM_SPEED, textAnimCharPose, textAnimTravel } from "./textAnim";
+import { measureTextInk } from "./measure";
+import {
+  applyRollingText,
+  applyTextAnim,
+  DEFAULT_TEXT_ANIM_SPEED,
+  stopTextAnim,
+  textAnimCharPose,
+  textAnimTravel,
+} from "./textAnim";
+import { defaultTextSlot } from "./types";
 
 describe("textAnimTravel", () => {
   it("clears half the chip plus a font inset", () => {
     expect(textAnimTravel(100, 40)).toBe(Math.ceil(50 + 6));
     expect(textAnimTravel(0, 40)).toBe(Math.ceil(48));
+  });
+});
+
+describe("applyTextAnim clip width", () => {
+  it("sizes the cycle clip from slot metrics before the chip is mounted", () => {
+    // spawnChip paints while detached — offsetWidth/computed font are unusable.
+    const host = document.createElement("div");
+    const label = document.createElement("span");
+    host.append(label);
+    const slot = defaultTextSlot({
+      text: "rewind",
+      fontFamily: "Arial",
+      fontWeight: 400,
+      fontSize: 42,
+      shape: "box",
+      textAnim: true,
+    });
+    expect(label.isConnected).toBe(false);
+    applyTextAnim(label, slot, undefined, 0);
+    const clip = label.querySelector<HTMLElement>(":scope > .text-anim-clip");
+    expect(clip).toBeTruthy();
+    const clipW = Number.parseFloat(clip!.style.width);
+    const ink = measureTextInk(slot, 0);
+    expect(clipW).toBeGreaterThanOrEqual(ink.width);
+    // Must not fall back to the ~14px computed-style default used when detached.
+    applyRollingText(label, "rewind", { asPhrase: true, fontSize: 14, fontFamily: "Arial", fontWeight: 400, tracking: 0 });
+    const tiny = Number.parseFloat(
+      label.querySelector<HTMLElement>(":scope > .text-anim-clip")!.style.width,
+    );
+    stopTextAnim(label);
+    expect(clipW).toBeGreaterThan(tiny * 2);
   });
 });
 
