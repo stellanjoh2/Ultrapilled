@@ -787,6 +787,7 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       btn.className = "slot-menu__layer";
       btn.dataset.layer = item.where;
       btn.setAttribute("aria-label", item.label);
+      btn.setAttribute("data-tip", item.label);
       btn.innerHTML = `<span class="slot-menu__layer-icon" aria-hidden="true">${item.icon}</span>`;
       btn.disabled = !H.canMoveSlotLayer(id, item.where);
       btn.addEventListener("click", () => {
