@@ -44,6 +44,13 @@
   --field-hover: #333333;
   --shadow-1: rgba(0, 0, 0, 0.4) 0 1px 3px;
   --shadow-2: rgba(0, 0, 0, 0.55) 0 16px 40px;
+  /* Fun pills — Uiverse-style letter-space hover; lime instead of purple */
+  --pill-rest-bg: #ffffff;
+  --pill-rest-ink: #080808;
+  --pill-rest-shadow: rgb(0 0 0 / 0.08) 0 0 8px;
+  --pill-fun-face: #c4ff00;
+  --pill-fun-ink: #080808;
+  --pill-fun-glow: rgb(196 255 0 / 0.55);
   --panel-rule: rgba(255, 255, 255, 0.1);
   --space-0: calc(6px * var(--ui-scale));
   --space-1: calc(12px * var(--ui-scale));
@@ -101,6 +108,10 @@ html[data-theme="day"] {
   --shadow-1: rgba(0, 0, 0, 0.1) 0 1px 3px;
   --shadow-2: rgba(0, 0, 0, 0.16) 0 16px 40px;
   --panel-rule: rgba(0, 0, 0, 0.14);
+  /* Inverted rest — dark pill on light chrome; hover stays Orby lime */
+  --pill-rest-bg: #111111;
+  --pill-rest-ink: #ffffff;
+  --pill-rest-shadow: rgb(0 0 0 / 0.14) 0 0 8px;
 }
 
 /* Brief night↔day crossfade — only while .theme-animating is set from prefs. */
@@ -739,9 +750,10 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   inset: 0;
   z-index: 3;
   pointer-events: none;
-  /* Signed add on the composited plate — mix-blend overlay/soft-light screens highlights. */
-  backdrop-filter: url(#ultrapilled-grain);
+  /* Signed add on the composited plate — mix-blend overlay/soft-light screens highlights.
+     -webkit- first: LightningCSS drops the unprefixed property when it comes second. */
   -webkit-backdrop-filter: url(#ultrapilled-grain);
+  backdrop-filter: url(#ultrapilled-grain);
 }
 
 .playfield.has-grain > .post-grain {
@@ -1863,12 +1875,24 @@ button.pill.panel-util {
   text-transform: uppercase;
   box-shadow: none;
   isolation: isolate;
+  transition: all 0.25s ease;
 }
 
-button.pill.panel-util:hover {
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  color: var(--ink);
+button.pill.panel-util:hover:not(.is-on) {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  border-color: transparent;
+  box-shadow: var(--pill-fun-glow) 0 7px 29px 0;
   filter: none;
+}
+
+button.pill.panel-util:active:not(.is-on) {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  border-color: transparent;
+  box-shadow: var(--pill-fun-glow) 0 0 0 0;
+  transform: translateY(calc(4px * var(--ui-scale)));
+  transition: 100ms;
 }
 
 button.pill.panel-util.is-on,
@@ -1877,6 +1901,8 @@ button.pill.panel-util.is-on:active {
   border-color: transparent;
   background: var(--primary);
   color: var(--on-primary);
+  box-shadow: none;
+  transform: none;
 }
 
 button.pill.panel-util.is-on:hover {
@@ -2931,7 +2957,6 @@ html[data-theme="day"] input[type="number"],
 html[data-theme="day"] input[type="search"],
 html[data-theme="day"] input[type="url"],
 html[data-theme="day"] .font-pick-trigger,
-html[data-theme="day"] button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
 html[data-theme="day"] button.icon-btn,
 html[data-theme="day"] .icon-grid button,
 html[data-theme="day"] .emoji-grid button,
@@ -3507,6 +3532,67 @@ button.pill {
     transform 0.1s ease;
 }
 
+/* Fun pills — Orby lime glow on hover (Uiverse fuzzy-bullfrog, lime not purple).
+   Skips play/smash/slot-add/panel-util which have their own smash / dashed treatments.
+   :not(.is-on) so selected fills stay visible (rest ≈ primary on night otherwise). */
+button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
+a.pill.about-project__launch {
+  background: var(--pill-rest-bg);
+  color: var(--pill-rest-ink);
+  box-shadow: var(--pill-rest-shadow);
+  transition: all 0.25s ease;
+}
+
+button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):hover:not(:disabled):not(.is-on),
+a.pill.about-project__launch:hover {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  box-shadow: var(--pill-fun-glow) 0 7px 29px 0;
+}
+
+button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):active:not(:disabled):not(.is-on),
+a.pill.about-project__launch:active {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  box-shadow: var(--pill-fun-glow) 0 0 0 0;
+  transform: translateY(calc(8px * var(--ui-scale)));
+  transition: 100ms;
+}
+
+/* Stroked alt — choice groups (aspect, solid/gradient, on/off, export opts).
+   Idle = outline; .is-on = solid fill so the active option is obvious. */
+.segment button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
+.export-list button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on) {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  box-shadow: none;
+}
+
+.segment button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):hover:not(:disabled):not(.is-on),
+.export-list button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):hover:not(:disabled):not(.is-on) {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  border-color: transparent;
+  box-shadow: var(--pill-fun-glow) 0 7px 29px 0;
+}
+
+.segment button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):active:not(:disabled):not(.is-on),
+.export-list button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):active:not(:disabled):not(.is-on) {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  border-color: transparent;
+  box-shadow: var(--pill-fun-glow) 0 0 0 0;
+  transform: translateY(calc(6px * var(--ui-scale)));
+  transition: 100ms;
+}
+
+.segment button.pill.is-on,
+.export-list button.pill.is-on {
+  /* Keep 1px border so toggling on/off doesn’t nudge layout. */
+  border: 1px solid transparent;
+}
+
 button.pill:hover {
   background: var(--field-hover);
 }
@@ -3518,6 +3604,7 @@ button.pill:active {
 button.pill.is-on {
   background: var(--primary);
   color: var(--on-primary);
+  box-shadow: none;
 }
 
 button.pill.is-on:hover {
@@ -3526,6 +3613,8 @@ button.pill.is-on:hover {
 
 button.pill.is-on:active {
   background: var(--primary-press);
+  transform: translateY(calc(8px * var(--ui-scale)));
+  transition: 100ms;
 }
 
 button.pill.template-pick {
@@ -3544,6 +3633,8 @@ button.pill:disabled:hover,
 button.pill:disabled:active {
   opacity: 0.4;
   cursor: default;
+  transform: none;
+  box-shadow: var(--pill-rest-shadow);
 }
 
 button.ghost {
@@ -3590,9 +3681,24 @@ button:focus-visible,
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  button.pill:not(.play-btn):not(.smash-btn):active,
   button.icon-btn:active {
     transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
+  a.pill.about-project__launch {
+    transition:
+      background 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):active:not(:disabled),
+  a.pill.about-project__launch:active {
+    transform: none;
   }
 }
 
@@ -4972,8 +5078,8 @@ html[data-theme="day"] .shape-swatch {
   background: color-mix(in srgb, var(--canvas) 52%, transparent);
   color: color-mix(in srgb, var(--ink) 42%, transparent);
   box-shadow: var(--shadow-1);
-  backdrop-filter: blur(14px) saturate(1.15);
   -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
   cursor: default;
 }
 
@@ -5835,36 +5941,43 @@ html[data-theme="day"] .settings-modal__body .keycap {
   width: 100%;
 }
 
+/* Stage blur under About is GSAP-tweened in aboutPanel (avoids a hard pop-in). */
+
 .about-overlay {
   position: fixed;
   inset: 0;
   z-index: 120;
-  display: grid;
-  place-items: center;
+  display: block;
   padding: 0;
   pointer-events: auto;
+  /* About is always dark chrome — keep light resting pills even in day theme. */
+  --pill-rest-bg: #ffffff;
+  --pill-rest-ink: #080808;
+  --pill-rest-shadow: rgb(0 0 0 / 0.08) 0 0 8px;
 }
 
-/* Blur lives on its own layer — opacity on the same node as backdrop-filter
-   (via GSAP autoAlpha on the root) prevents Chrome from sampling the page. */
 .about-overlay__scrim {
   position: absolute;
   inset: 0;
   background: rgb(0 0 0 / 0.48);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .about-overlay__scroll {
   position: relative;
   z-index: 1;
   isolation: isolate;
-  width: min(100%, calc(1056px * var(--ui-scale)));
-  max-height: 100%;
-  margin: auto;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: calc(64px * var(--ui-scale)) calc(32px * var(--ui-scale));
   text-align: left;
+}
+
+.about-overlay__content {
+  width: min(100%, calc(1056px * var(--ui-scale)));
+  margin: 0 auto;
+  padding: calc(128px * var(--ui-scale)) calc(32px * var(--ui-scale));
 }
 
 .about-overlay__bio,
@@ -5916,28 +6029,133 @@ html[data-theme="day"] .settings-modal__body .keycap {
   text-underline-offset: 0.12em;
 }
 
-button.pill.about-overlay__ok {
+.about-overlay__projects {
+  margin-top: calc(128px * var(--ui-scale));
+}
+
+.about-overlay__projects-title {
+  margin: 0 0 calc(28px * var(--ui-scale));
+  color: #ffffff;
+  font-family: var(--font-section);
+  font-size: calc(24px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.about-overlay__projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(112px * var(--ui-scale));
+}
+
+.about-project {
+  display: block;
+  color: #ffffff;
+}
+
+.about-project__media {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0a0a0a;
+  transform: translateZ(0);
+}
+
+.about-project__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  pointer-events: none;
+  transform-origin: center center;
+  scale: 1;
+  transition: scale 0.35s ease;
+  transform: translateZ(0);
+}
+
+.about-project__media:hover .about-project__image,
+.about-project__media:focus-visible .about-project__image {
+  scale: 1.08;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-project__image {
+    transition: none;
+  }
+
+  .about-project__media:hover .about-project__image,
+  .about-project__media:focus-visible .about-project__image {
+    scale: 1;
+  }
+}
+
+.about-project__title {
+  margin: calc(36px * var(--ui-scale)) 0 calc(10px * var(--ui-scale));
+  color: inherit;
+  font-family: var(--font-section);
+  font-size: calc(28px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.about-project__lede {
+  margin: 0;
+  max-width: 42em;
+  color: rgb(255 255 255 / 0.78);
+  font-family: var(--font-section);
+  font-size: calc(18px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+a.pill.about-project__launch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: auto;
   min-width: 0;
   min-height: calc(54px * var(--ui-scale));
-  margin: 1.6em 0 0;
+  margin: calc(36px * var(--ui-scale)) 0 0;
   padding: var(--space-0) var(--space-2);
-  border: calc(2px * var(--ui-scale)) solid #ffffff;
-  background-color: rgb(255 255 255 / 0);
-  background-image: none;
-  color: #ffffff;
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
   font-size: calc(15px * var(--ui-scale));
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
+  font-weight: 500;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-feature-settings: "ss01";
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-button.pill.about-overlay__ok:hover,
-button.pill.about-overlay__ok:active {
-  background-color: #ffffff;
-  background-image: none;
-  border-color: #ffffff;
-  color: #111111;
+.about-overlay__ok {
+  display: inline;
+  width: auto;
+  margin: calc(112px * var(--ui-scale)) 0 calc(24px * var(--ui-scale));
+  padding: 0;
+  border: none;
+  background: none;
+  color: #ffffff;
+  font-family: var(--font-section);
+  font-size: calc(18px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.about-overlay__ok:hover,
+.about-overlay__ok:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
 }
 
 .report-card {
@@ -6263,8 +6481,8 @@ html[data-theme="day"] .bug-report__message {
 
 .bug-report.is-thanks .bug-report__scrim {
   background: color-mix(in srgb, #080808 55%, transparent);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   cursor: pointer;
 }
 

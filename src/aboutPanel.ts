@@ -14,13 +14,94 @@ const ABOUT_LINKS = [
   { text: "Orby", href: "https://orby.studio/" },
 ] as const;
 
+/** Sideprojects + showreel — stills from Orby marketing / promo captures. */
+const ABOUT_PROJECTS = [
+  {
+    id: "showreel",
+    name: "Showreel",
+    cta: "Watch showreel",
+    title: "Showreel 2020-2026",
+    lede: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus fermentum, nisl a tincidunt tincidunt, nisi nisl aliquam nisl, eget aliquam nisl nisl sit amet nisl.",
+    image: "/images/projects/showreel.jpg",
+    imageAlt: "Showreel 2020–2026 — Stellan Johansson",
+    href: "https://www.youtube.com/watch?v=SXf1NswrDpw",
+  },
+  {
+    id: "orby",
+    name: "Orby",
+    title: "Orby — Your virtual studio, in the browser",
+    lede: "Orby is more than a 3D viewer — set the stage on any model, in the browser. Go photoreal for portfolios and client decks, or push into expressive stylized territory for your designs and animations.",
+    image: "/images/projects/orby.jpg",
+    imageAlt: "Orby 3D studio — lighting and framing a model in the browser",
+    href: "https://orby.studio/",
+  },
+  {
+    id: "mozayk",
+    name: "Mozayk",
+    title: "Mozayk — Complex visuals, made easy",
+    lede: "Mozayk™ is a free mosaic generator for random abstract visuals — start on a blank canvas, generate a clean layout, or import a photo or video. Scramble, restyle, and export. Shape palettes, colour, overlays, and a timeline, then ship stills or a short animation.",
+    image: "/images/projects/mozayk.jpg",
+    imageAlt: "Mozayk mosaic generator — abstract grid mosaics",
+    href: "https://stellanjoh2.github.io/mozayk/",
+  },
+  {
+    id: "lx01",
+    name: "LX01",
+    title: "LX01 — Text in, cyborg out",
+    lede: "LX01™ is a free browser speech synthesizer for robotic voices — type a line, pick from four voice engines, or dial in a classic reciter preset. Vocode, crush, and reshape. Tune formants, EQ, and pronunciation, then ship synthetic speech or a fully vocoded take.",
+    image: "/images/projects/lx01.jpg",
+    imageAlt: "LX01 speech synthesizer — robotic voice vocoder",
+    href: "https://stellanjoh2.github.io/Cyborg/",
+  },
+] as const;
+
 let modalRoot: HTMLElement | null = null;
 let closing = false;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
 let openTl: gsap.core.Timeline | null = null;
+let blurTween: gsap.core.Tween | null = null;
+
+const ABOUT_BLUR_PX = 14;
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function appEl(): HTMLElement | null {
+  return document.querySelector<HTMLElement>("#app");
+}
+
+/** Soften the stage under About — tween blur so open/close isn’t a hard cut. */
+function tweenAboutBlur(on: boolean, duration: number): void {
+  const app = appEl();
+  if (!app) return;
+  blurTween?.kill();
+  blurTween = null;
+  if (reducedMotion()) {
+    if (on) app.style.filter = `blur(${ABOUT_BLUR_PX}px)`;
+    else {
+      app.style.removeProperty("filter");
+      gsap.set(app, { clearProps: "filter" });
+    }
+    return;
+  }
+  if (on) {
+    blurTween = gsap.fromTo(
+      app,
+      { filter: "blur(0px)" },
+      { filter: `blur(${ABOUT_BLUR_PX}px)`, duration, ease: "power2.out" },
+    );
+  } else {
+    blurTween = gsap.to(app, {
+      filter: "blur(0px)",
+      duration,
+      ease: "power1.in",
+      onComplete: () => {
+        gsap.set(app, { clearProps: "filter" });
+        blurTween = null;
+      },
+    });
+  }
 }
 
 function fillBio(el: HTMLElement): HTMLElement[] {
@@ -38,6 +119,30 @@ function fillBio(el: HTMLElement): HTMLElement[] {
   return words;
 }
 
+function projectsHtml(): string {
+  const cards = ABOUT_PROJECTS.map((project) => {
+    const external = project.href.startsWith("http");
+    const extra = external ? ` target="_blank" rel="noopener noreferrer"` : "";
+    const cta = "cta" in project ? project.cta : `Launch ${project.name}`;
+    return `
+      <article class="about-project">
+        <a class="about-project__media" href="${project.href}"${extra} aria-label="${cta}">
+          <img class="about-project__image" src="${project.image}" alt="${project.imageAlt}" width="1600" height="900" loading="lazy" decoding="async" />
+        </a>
+        <h3 class="about-project__title">${project.title}</h3>
+        <p class="about-project__lede">${project.lede}</p>
+        <a class="pill about-project__launch" href="${project.href}"${extra}>${cta}</a>
+      </article>
+    `;
+  }).join("");
+  return `
+    <section class="about-overlay__projects" aria-label="More from me">
+      <h2 class="about-overlay__projects-title">More from me</h2>
+      <div class="about-overlay__projects-list">${cards}</div>
+    </section>
+  `;
+}
+
 function bodyHtml(): string {
   const links = ABOUT_LINKS.map((link) => {
     const external = link.href.startsWith("http");
@@ -47,6 +152,7 @@ function bodyHtml(): string {
   return `
     <p class="about-overlay__bio"></p>
     <p class="about-overlay__links">${links}</p>
+    ${projectsHtml()}
   `;
 }
 
@@ -68,9 +174,12 @@ export function closeAbout(): void {
 
   const done = () => {
     root.remove();
+    document.body.classList.remove("is-about-open");
     modalRoot = null;
     closing = false;
   };
+
+  tweenAboutBlur(false, reducedMotion() ? 0 : 0.35);
 
   if (reducedMotion() || !scroll || !scrim) {
     done();
@@ -79,7 +188,7 @@ export function closeAbout(): void {
 
   const tl = gsap.timeline({ onComplete: done });
   tl.to(scroll, { y: 12, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
-  tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
+  tl.to(scrim, { autoAlpha: 0, duration: 0.35, ease: "power1.in" }, 0);
 }
 
 export function openAbout(): void {
@@ -93,7 +202,7 @@ export function openAbout(): void {
     <div class="about-overlay__scroll" role="dialog" aria-modal="true" aria-label="About Stellan Johansson">
       <div class="about-overlay__content">
         ${bodyHtml()}
-        <button type="button" class="pill about-overlay__ok" data-about-close>OK, TAKE ME BACK</button>
+        <button type="button" class="about-overlay__ok" data-about-close>OK, take me back</button>
       </div>
     </div>
   `;
@@ -101,12 +210,21 @@ export function openAbout(): void {
   const bio = root.querySelector<HTMLElement>(".about-overlay__bio")!;
   const words = fillBio(bio);
   const links = root.querySelector<HTMLElement>(".about-overlay__links")!;
+  const projectsTitle = root.querySelector<HTMLElement>(".about-overlay__projects-title")!;
+  const projectCards = [...root.querySelectorAll<HTMLElement>(".about-project")];
   const doneBtn = root.querySelector<HTMLButtonElement>(".about-overlay__ok")!;
+  const scroll = root.querySelector<HTMLElement>(".about-overlay__scroll")!;
+  const scrim = root.querySelector<HTMLElement>(".about-overlay__scrim")!;
 
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target.closest("[data-about-close]")) closeAbout();
+    if (target.closest("[data-about-close]")) {
+      closeAbout();
+      return;
+    }
+    // Full-bleed scroller sits above the scrim — gutter clicks land on `scroll`, not content.
+    if (target === scroll) closeAbout();
   });
 
   onKey = (event: KeyboardEvent) => {
@@ -119,23 +237,38 @@ export function openAbout(): void {
 
   document.body.append(root);
   modalRoot = root;
+  document.body.classList.add("is-about-open");
   playTransition(true);
   doneBtn.focus({ preventScroll: true });
 
-  // Scrim stays at CSS opacity 1 so backdrop-filter can sample the page.
-  // Fading the old root with GSAP autoAlpha is what killed the blur in Chrome.
+  const sequence = [links, projectsTitle, ...projectCards, doneBtn];
 
   if (reducedMotion()) {
-    gsap.set([words, links, doneBtn], { clearProps: "all", autoAlpha: 1, y: 0 });
+    tweenAboutBlur(true, 0);
+    gsap.set([words, ...sequence], { clearProps: "all", autoAlpha: 1, y: 0 });
     return;
   }
 
   const clearBlend = "opacity,visibility,transform";
-  const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend };
   gsap.set(words, { autoAlpha: 0, y: 22 });
-  gsap.set([links, doneBtn], { autoAlpha: 0, y: 22 });
+  gsap.set(sequence, { autoAlpha: 0, y: 28 });
+  gsap.set(scrim, { autoAlpha: 0 });
 
+  // Soften stage + dim together, then stagger copy.
+  tweenAboutBlur(true, 0.55);
   openTl = gsap.timeline({ defaults: { ease: "power3.out" } });
-  openTl.to(words, reveal, 0.08);
-  openTl.to([links, doneBtn], reveal, ">");
+  openTl.to(scrim, { autoAlpha: 1, duration: 0.55, ease: "power2.out" }, 0);
+  openTl.to(
+    words,
+    { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend },
+    0.12,
+  );
+  openTl.to(links, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, ">");
+  openTl.to(projectsTitle, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, ">");
+  openTl.to(
+    projectCards,
+    { autoAlpha: 1, y: 0, duration: 0.65, stagger: 0.18, clearProps: clearBlend },
+    ">",
+  );
+  openTl.to(doneBtn, { autoAlpha: 1, y: 0, duration: 0.5, clearProps: clearBlend }, ">");
 }
