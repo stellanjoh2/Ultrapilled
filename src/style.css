@@ -5155,7 +5155,7 @@ html[data-theme="day"] .shape-swatch {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 80;
+  z-index: 100;
   width: max-content;
   max-width: min(calc(240px * var(--ui-scale)), calc(100vw - 16px));
   margin: 0;
