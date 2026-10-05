@@ -1,7 +1,7 @@
 import gsap from "gsap";
 import atomIcon from "@phosphor-icons/core/assets/regular/atom.svg?raw";
 import boundingBoxIcon from "@phosphor-icons/core/assets/regular/bounding-box.svg?raw";
-import caretLeftIcon from "@phosphor-icons/core/assets/regular/caret-left.svg?raw";
+import arrowLeftIcon from "@phosphor-icons/core/assets/regular/arrow-left.svg?raw";
 import circleHalfIcon from "@phosphor-icons/core/assets/regular/circle-half.svg?raw";
 import clockCounterClockwiseIcon from "@phosphor-icons/core/assets/regular/clock-counter-clockwise.svg?raw";
 import gaugeIcon from "@phosphor-icons/core/assets/regular/gauge.svg?raw";
@@ -376,7 +376,7 @@ export function openSettings(controller: SettingsController): void {
     <div class="settings-modal__sheet">
       <header class="settings-modal__head">
         <button type="button" class="settings-modal__back" data-settings-close aria-label="Back" data-tip="Close settings">
-          <span class="settings-modal__back-icon" aria-hidden="true">${caretLeftIcon}</span>
+          <span class="settings-modal__back-icon" aria-hidden="true">${arrowLeftIcon}</span>
         </button>
         <h2 class="settings-modal__title" id="settings-modal-title">Settings</h2>
       </header>
