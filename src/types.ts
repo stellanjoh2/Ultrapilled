@@ -223,6 +223,7 @@ export type LocalVideo = {
 export type Slot = TextSlot | ImageSlot;
 
 export type PhysicsComplexity = "simple" | "normal" | "ultra";
+export type FallDirection = "down" | "left" | "right";
 
 export const DEFAULT_DROP_SHADOW_RADIUS = 16;
 export const DEFAULT_DROP_SHADOW_DISTANCE = 8;
@@ -316,6 +317,10 @@ export function physicsComplexity(value: string | undefined): PhysicsComplexity 
   return value === "simple" || value === "ultra" ? value : "normal";
 }
 
+export function fallDirection(value: string | undefined): FallDirection {
+  return value === "left" || value === "right" ? value : "down";
+}
+
 export type PhysicsSettings = {
   weight: number;
   gravity: number;
@@ -326,6 +331,8 @@ export type PhysicsSettings = {
   spin: number;
   hold: number;
   complexity: PhysicsComplexity;
+  /** Where pieces enter from — down drops above; left/right throw in from that side. */
+  fallDirection: FallDirection;
   /** Free placement — no gravity, no chip–chip collision (Figma-style). */
   layoutMode: boolean;
 };
@@ -344,6 +351,7 @@ export const DEFAULT_PHYSICS: PhysicsSettings = {
   spin: 0.06,
   hold: 0.8,
   complexity: "normal",
+  fallDirection: "down",
   layoutMode: false,
 };
 

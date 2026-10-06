@@ -10,6 +10,7 @@ import {
   blendMode,
   DEFAULT_AUDIO_REACT,
   DEFAULT_PHYSICS,
+  fallDirection,
   normalizeBackground,
   physicsComplexity,
   uid,
@@ -226,6 +227,9 @@ function parseState(value: unknown): AppState | null {
       ...physicsRaw,
       complexity: physicsComplexity(
         typeof physicsRaw.complexity === "string" ? physicsRaw.complexity : undefined,
+      ),
+      fallDirection: fallDirection(
+        typeof physicsRaw.fallDirection === "string" ? physicsRaw.fallDirection : undefined,
       ),
       layoutMode: Boolean(physicsRaw.layoutMode),
     },

@@ -23,6 +23,7 @@ describe("section reset dirty checks", () => {
         spin: 0.06,
         hold: 0.8,
         complexity: "normal" as const,
+        fallDirection: "down" as const,
         layoutMode: false,
       },
     };

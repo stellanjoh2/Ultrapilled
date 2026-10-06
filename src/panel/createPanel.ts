@@ -3,7 +3,6 @@ import bugIcon from "@phosphor-icons/core/assets/regular/bug.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
-import textT from "@phosphor-icons/core/assets/regular/text-t.svg?raw";
 import { isCanvasRatio } from "../canvas";
 import { openAbout } from "../aboutPanel";
 import { openBugReport } from "../bugReport";
@@ -16,6 +15,7 @@ import {
   DEFAULT_AUDIO_REACT,
   DEFAULT_PHYSICS,
   PHYSICS_COMPLEXITY,
+  fallDirection,
   physicsAtDefault,
   physicsComplexity,
   type AppState,
@@ -178,6 +178,11 @@ export function syncPhysicsControls(
   syncRange(panel, "hold", p.hold, paintRange, (v) => `${v.toFixed(2)}s`);
   const complexity = panel.querySelector<HTMLSelectElement>("#physics-complexity");
   if (complexity) complexity.value = p.complexity;
+  panel.querySelectorAll<HTMLButtonElement>("[data-fall-direction]").forEach((btn) => {
+    const on = fallDirection(btn.dataset.fallDirection) === p.fallDirection;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-pressed", String(on));
+  });
   paintSectionResets(panel, state);
 }
 
@@ -368,7 +373,7 @@ panel.innerHTML = `
         Add words
       </button>
       <button type="button" class="pill slot-add" id="add-text-field" data-tip="A wrapping box you can resize and paste into — sentences and paragraphs">
-        <span class="slot-add__icon" aria-hidden="true">${textT}</span>
+        <span class="slot-add__icon" aria-hidden="true">${plus}</span>
         Add longer text
       </button>
       <button type="button" class="pill slot-add" id="add-shape" data-tip="Add a built-in shape from the library">
@@ -400,6 +405,13 @@ panel.innerHTML = `
         ${PHYSICS_COMPLEXITY.map((tier) => `<option value="${tier.id}"${H.state.physics.complexity === tier.id ? " selected" : ""}>${tier.label}</option>`).join("")}
       </select>
     </label>
+    <div class="field" data-tip="Where pieces enter — floor pause still opens as usual">Fall direction
+      <div class="segment is-3" role="group" aria-label="Fall direction">
+        <button type="button" class="pill${H.state.physics.fallDirection === "left" ? " is-on" : ""}" data-fall-direction="left" aria-pressed="${H.state.physics.fallDirection === "left"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Throw pieces in from the left">Left</button>
+        <button type="button" class="pill${H.state.physics.fallDirection === "down" ? " is-on" : ""}" data-fall-direction="down" aria-pressed="${H.state.physics.fallDirection === "down"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Drop pieces in from above">Down</button>
+        <button type="button" class="pill${H.state.physics.fallDirection === "right" ? " is-on" : ""}" data-fall-direction="right" aria-pressed="${H.state.physics.fallDirection === "right"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Throw pieces in from the right">Right</button>
+      </div>
+    </div>
     <div class="row">
       <label class="field" data-tip="How hard pieces pull downward">${rangeCaptionHtml("gravity", "Gravity", H.state.physics.gravity.toFixed(2))}
         <input type="range" id="gravity" min="0" max="3" step="0.05" value="${H.state.physics.gravity}"${H.state.physics.layoutMode ? " disabled" : ""} />
@@ -703,6 +715,22 @@ panel.querySelector<HTMLSelectElement>("#physics-complexity")?.addEventListener(
     return;
   }
   H.live();
+});
+panel.querySelectorAll<HTMLButtonElement>("[data-fall-direction]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (H.state.physics.layoutMode) return;
+    const next = fallDirection(btn.dataset.fallDirection);
+    if (next === H.state.physics.fallDirection) return;
+    H.remember();
+    H.state.physics.fallDirection = next;
+    playClick();
+    panel.querySelectorAll<HTMLButtonElement>("[data-fall-direction]").forEach((other) => {
+      const on = fallDirection(other.dataset.fallDirection) === next;
+      other.classList.toggle("is-on", on);
+      other.setAttribute("aria-pressed", String(on));
+    });
+    paintSectionResets(panel, H.state);
+  });
 });
 panel.querySelector<HTMLButtonElement>("#audio-mic")?.addEventListener("click", () => {
   if (H.state.physics.layoutMode) return;

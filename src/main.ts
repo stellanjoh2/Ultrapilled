@@ -19,6 +19,7 @@ import {
   imageTemperatureLabel,
   imageTemperatureOf,
   physicsComplexity,
+  fallDirection,
   normalizeBackground,
   defaultImageSlot,
   defaultTextSlot,
@@ -5803,6 +5804,7 @@ function adoptState(next: typeof state) {
     ...DEFAULT_PHYSICS,
     ...next.physics,
     complexity: physicsComplexity(next.physics?.complexity),
+    fallDirection: fallDirection(next.physics?.fallDirection),
     layoutMode: Boolean(next.physics?.layoutMode),
   };
   state.audioReact = {

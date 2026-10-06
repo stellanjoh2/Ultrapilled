@@ -36,7 +36,7 @@ import {
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
 import { applyBareCanvasTextAnim, mirrorBareCanvas, setBareCanvasGradient, stopTextAnimIn, unmirrorBareCanvas } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
-import { blendMode, DEFAULT_PHYSICS, isTextField, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
+import { blendMode, DEFAULT_PHYSICS, fallDirection, isTextField, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
 import { playImpact } from "./uiSounds";
 import { beginScrub, endScrub } from "./scrub";
 import { hideTooltip, suggestTooltip } from "./tooltip";
@@ -524,6 +524,33 @@ function layerSpawnX(index: number, total: number, width: number, height: number
   return inset + ((index + 0.5) / total) * span;
 }
 
+/** Vertical spawn from layer index so side throws fan top→bottom every trigger. */
+function layerSpawnY(index: number, total: number, width: number, height: number, stageH: number): number {
+  const reach = Math.hypot(width, height) / 2;
+  const inset = Math.min(Math.max(reach + 12, 24), Math.max(24, stageH / 2 - 8));
+  // Keep the band in the upper field so throws still have air before they pile.
+  const top = inset;
+  const bottom = Math.min(stageH * 0.55, stageH - inset);
+  const span = Math.max(0, bottom - top);
+  if (span <= 0) return Math.max(reach + 16, stageH * 0.28);
+  if (total <= 1) return top + span / 2;
+  return top + ((index + 0.5) / total) * span;
+}
+
+/** Inward throw speed so every stacked chip clears the entry before gravity dumps it. */
+function sideThrowSpeed(
+  x: number,
+  halfW: number,
+  stageW: number,
+  dir: "left" | "right",
+): number {
+  // Trailing edge must clear the stage edge with a little margin.
+  const clearX = dir === "left" ? halfW + 40 : stageW - halfW - 40;
+  const travel = Math.max(0, dir === "left" ? clearX - x : x - clearX);
+  // Distance-scaled: rear of a deep stack needs a hard shove; clamp so Matter stays sane.
+  return Math.min(240, Math.max(60, travel * 0.14 + stageW * 0.12));
+}
+
 /** Vertical half-extent of a rotated rectangle. Upright height underestimates a tilt. */
 function tiltedHalfHeight(width: number, height: number, angle: number): number {
   return (width * Math.abs(Math.sin(angle)) + height * Math.abs(Math.cos(angle))) / 2;
@@ -588,6 +615,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let roof: Matter.Body | null = null;
   let floor: Matter.Body | null = null;
   let floorOpen = false;
+  /** Open side while pieces throw in from left/right; sealed once everyone is inside. */
+  let entryGap: "left" | "right" | null = null;
   let bounds = { width: 0, height: 0 };
   let maxSpan = 0;
   let chips: DroppedChip[] = [];
@@ -785,7 +814,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   /** Keep a chip fully between the hard side walls. */
   function pinInsideWalls(chip: DroppedChip) {
     // Layout mode turns walls off so large assets can cross the border freely.
-    if (layoutMode || bounds.width < 16) return;
+    // Entry gap leaves one side open so throw-ins aren't yanked mid-flight.
+    if (layoutMode || entryGap || bounds.width < 16) return;
     const mul = Math.max(chip.audioMul, 1) * scalePreviewFactor(chip);
     const reach = tiltedHalfWidth(chip.width, chip.height, chip.body.angle) * mul;
     const inset = EDGE + 1;
@@ -876,10 +906,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       Composite.remove(engine.world, roof);
       roof = null;
     }
-    sides = [
-      Bodies.rectangle(EDGE - t / 2, midY, t, tall, surfaceProps("wall")),
-      Bodies.rectangle(width - EDGE + t / 2, midY, t, tall, surfaceProps("wall")),
-    ];
+    sides = [];
+    if (entryGap !== "left") {
+      sides.push(Bodies.rectangle(EDGE - t / 2, midY, t, tall, surfaceProps("wall")));
+    }
+    if (entryGap !== "right") {
+      sides.push(Bodies.rectangle(width - EDGE + t / 2, midY, t, tall, surfaceProps("wall")));
+    }
     // Floor-style collision so wide chips (which skip side walls) still bounce off the ceiling.
     roof = Bodies.rectangle(
       width / 2,
@@ -888,8 +921,22 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       t,
       surfaceProps("floor"),
     );
-    Composite.add(engine.world, sides);
+    if (sides.length) Composite.add(engine.world, sides);
     Composite.add(engine.world, roof);
+  }
+
+  /** Close the throw-in gap once every chip is fully inside the stage. */
+  function maybeSealEntry() {
+    if (!entryGap || layoutMode || bounds.width < 8) return;
+    // Wait until the last trailing edge is clearly past the wall line.
+    const inset = EDGE + 12;
+    for (const chip of chips) {
+      const half = tiltedHalfWidth(chip.width, chip.height, chip.body.angle);
+      if (entryGap === "left" && chip.body.position.x - half < inset) return;
+      if (entryGap === "right" && chip.body.position.x + half > bounds.width - inset) return;
+    }
+    entryGap = null;
+    buildSides(bounds.width, bounds.height);
   }
 
   function setFloorOpen(open: boolean) {
@@ -1049,6 +1096,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     chips = [];
     fallStart = null;
+    entryGap = null;
     chromeLayer?.replaceChildren();
     bounceCount.clear();
     prevVel.clear();
@@ -1449,6 +1497,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   });
 
   Events.on(engine, "afterUpdate", () => {
+    maybeSealEntry();
     // Wide chips ignore side walls — keep them centered so they can't drift off-canvas.
     for (const chip of chips) {
       if (tooWideForWalls(chip)) pinInsideWalls(chip);
@@ -2201,23 +2250,42 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     maxSpan = 0;
     for (const { size } of layouts) noteSpan(size.width, size.height);
     floorOpen = false;
+    const dir = layoutMode ? "down" : fallDirection(physics.fallDirection);
+    entryGap = dir === "left" || dir === "right" ? dir : null;
     resize(stageW, stageH);
 
     let spawnY = layoutMode ? stageH * 0.28 : -160;
+    let spawnX = dir === "left" ? -160 : dir === "right" ? stageW + 160 : stageW / 2;
 
     falling.forEach((slot, index) => {
       const { size } = layouts[index];
       const angle = 0;
-      const x = layerSpawnX(index, total, size.width, size.height, stageW);
-      const half = tiltedHalfHeight(size.width, size.height, angle);
+      let x: number;
       let y: number;
-      if (layoutMode) {
-        y = Math.min(stageH * 0.72, Math.max(half + 16, spawnY));
-        spawnY = y + half + 18;
+      let sideHalf = 0;
+      if (dir === "left" || dir === "right") {
+        sideHalf = tiltedHalfWidth(size.width, size.height, angle);
+        if (dir === "left") {
+          spawnX -= sideHalf + 16;
+          x = spawnX;
+          spawnX -= sideHalf;
+        } else {
+          spawnX += sideHalf + 16;
+          x = spawnX;
+          spawnX += sideHalf;
+        }
+        y = layerSpawnY(index, total, size.width, size.height, stageH);
       } else {
-        spawnY -= half + 16;
-        y = spawnY;
-        spawnY -= half;
+        x = layerSpawnX(index, total, size.width, size.height, stageW);
+        const half = tiltedHalfHeight(size.width, size.height, angle);
+        if (layoutMode) {
+          y = Math.min(stageH * 0.72, Math.max(half + 16, spawnY));
+          spawnY = y + half + 18;
+        } else {
+          spawnY -= half + 16;
+          y = spawnY;
+          spawnY -= half;
+        }
       }
       spawnChip(
         slot,
@@ -2243,7 +2311,17 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         }
       } else {
         const chip = chips[chips.length - 1];
-        if (chip) armAirTilt(chip);
+        if (chip) {
+          if (dir === "left" || dir === "right") {
+            const inward = dir === "left" ? 1 : -1;
+            const speed = sideThrowSpeed(x, sideHalf, stageW, dir);
+            Body.setVelocity(chip.body, {
+              x: inward * speed,
+              y: (Math.random() - 0.35) * 2,
+            });
+          }
+          armAirTilt(chip);
+        }
       }
     });
     paintPicked();
@@ -3719,6 +3797,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     cancelPending();
     endXformDrag();
     endGradAngleDrag();
+    if (entryGap) {
+      entryGap = null;
+      if (bounds.width > 0) buildSides(bounds.width, bounds.height);
+    }
     for (const chip of chips) {
       Body.setVelocity(chip.body, { x: 0, y: 0 });
       Body.setAngularVelocity(chip.body, 0);
@@ -3739,7 +3821,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (!chips.length || bounds.width < 8) return;
 
     const stageW = bounds.width;
+    const stageH = bounds.height;
+    const dir = fallDirection(scenePhysics.fallDirection);
+    entryGap = dir === "left" || dir === "right" ? dir : null;
+    buildSides(stageW, stageH);
+
     let spawnY = -160;
+    let spawnX = dir === "left" ? -160 : dir === "right" ? stageW + 160 : stageW / 2;
 
     // Back → front (seqIndex), matching play()'s expandSlots order.
     const ordered = [...chips].sort(
@@ -3752,15 +3840,41 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (chip.slotId !== editingId && chip.body.isStatic) Body.setStatic(chip.body, false);
 
       const angle = 0;
-      const half = tiltedHalfHeight(chip.width, chip.height, angle);
-      spawnY -= half + 16;
-      const y = spawnY;
-      spawnY -= half;
-      const x = layerSpawnX(index, total, chip.width, chip.height, stageW);
+      let x: number;
+      let y: number;
+      let sideHalf = 0;
+      if (dir === "left" || dir === "right") {
+        sideHalf = tiltedHalfWidth(chip.width, chip.height, angle);
+        if (dir === "left") {
+          spawnX -= sideHalf + 16;
+          x = spawnX;
+          spawnX -= sideHalf;
+        } else {
+          spawnX += sideHalf + 16;
+          x = spawnX;
+          spawnX += sideHalf;
+        }
+        y = layerSpawnY(index, total, chip.width, chip.height, stageH);
+      } else {
+        const half = tiltedHalfHeight(chip.width, chip.height, angle);
+        spawnY -= half + 16;
+        y = spawnY;
+        spawnY -= half;
+        x = layerSpawnX(index, total, chip.width, chip.height, stageW);
+      }
 
       Body.setPosition(chip.body, { x, y });
       Body.setAngle(chip.body, angle);
-      Body.setVelocity(chip.body, { x: 0, y: 0 });
+      if (dir === "left" || dir === "right") {
+        const inward = dir === "left" ? 1 : -1;
+        const speed = sideThrowSpeed(x, sideHalf, stageW, dir);
+        Body.setVelocity(chip.body, {
+          x: inward * speed,
+          y: (Math.random() - 0.35) * 2,
+        });
+      } else {
+        Body.setVelocity(chip.body, { x: 0, y: 0 });
+      }
       Body.setAngularVelocity(chip.body, 0);
       Sleeping.set(chip.body, false);
       syncWallCollision(chip);
