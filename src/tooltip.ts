@@ -166,9 +166,9 @@ export function mountTooltips(root: ParentNode): void {
   });
 
   root.addEventListener("pointerdown", () => hide(true));
-  root.addEventListener("scroll", hide, true);
-  window.addEventListener("scroll", hide, true);
-  window.addEventListener("resize", hide);
+  root.addEventListener("scroll", () => hide(), true);
+  window.addEventListener("scroll", () => hide(), true);
+  window.addEventListener("resize", () => hide());
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") hide();
   });
