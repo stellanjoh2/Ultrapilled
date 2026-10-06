@@ -57,4 +57,19 @@ describe("section reset dirty checks", () => {
     expect(document.querySelector<HTMLButtonElement>("#reset-physics")?.hidden).toBe(true);
     expect(document.querySelector<HTMLButtonElement>("#reset-master")?.hidden).toBe(true);
   });
+
+  it("hides audio-react reset in layout mode even when settings are dirty", () => {
+    document.body.innerHTML = `
+      <button type="button" class="section-reset" id="reset-audio-react"></button>
+    `;
+    const scene = blankState();
+    scene.audioReact = { ...DEFAULT_AUDIO_REACT, enabled: true };
+    scene.physics.layoutMode = true;
+    paintSectionResets(document, scene);
+    expect(document.querySelector<HTMLButtonElement>("#reset-audio-react")?.hidden).toBe(true);
+
+    scene.physics.layoutMode = false;
+    paintSectionResets(document, scene);
+    expect(document.querySelector<HTMLButtonElement>("#reset-audio-react")?.hidden).toBe(false);
+  });
 });

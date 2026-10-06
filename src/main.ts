@@ -118,6 +118,13 @@ import { relinkProjectImages, relinkSlotImage } from "./remoteImage";
 import { ensureTrim, ensureTrims, peekTrim } from "./trim";
 import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
 import {
+  attractorReachOf,
+  attractorStrengthOf,
+  ATTRACTOR_UI,
+  DEFAULT_ATTRACTOR_REACH,
+  DEFAULT_ATTRACTOR_STRENGTH,
+} from "./attractors";
+import {
   clampScaleForFreeTransform,
   freeTransformScaleMax,
   slotScaleSliderMax as softSlotScaleSliderMax,
@@ -1824,6 +1831,7 @@ function slotMenuHost(): SlotMenuHost {
     renderPanel,
     liveChip,
     pickSlot,
+    openSlots,
     get gesture() {
       return gesture;
     },
@@ -1902,6 +1910,7 @@ function createPanelHost(): CreatePanelHost {
     gradientTintRow,
     blendField,
     dropShadowField,
+    attractorField,
     chosenWeight,
     mountFontPick,
     mountWeightPick,
@@ -3120,6 +3129,13 @@ function colorsDiffer(
 }
 
 function fieldDirty(slot: Slot, key: string): boolean {
+  if (key === "attractorStrength") {
+    return attractorStrengthOf(slot.attractorStrength) !== DEFAULT_ATTRACTOR_STRENGTH;
+  }
+  if (key === "attractorReach") {
+    return attractorReachOf(slot.attractorReach) !== DEFAULT_ATTRACTOR_REACH;
+  }
+  if (key === "attractorIdle") return Boolean(slot.attractorIdle);
   if (slot.kind === "text") {
     const base = textBaseline(slot);
     switch (key) {
@@ -3306,6 +3322,30 @@ function dropShadowField(slot: Slot): string {
   }`;
 }
 
+/** Strength / reach / idle pull — only after right-click Make Attractor. */
+function attractorField(slot: Slot): string {
+  if (!ATTRACTOR_UI || !slot.attractor) return "";
+  const strength = attractorStrengthOf(slot.attractorStrength);
+  const reach = attractorReachOf(slot.attractorReach);
+  const idle = Boolean(slot.attractorIdle);
+  return `<div class="slot-group" data-attractor-settings>
+    <p class="slot-label">Attractor Settings</p>
+    <label class="field" data-tip="How hard other assets chase this one">${settingLabel(slot, "Strength", "attractorStrength", String(strength))}
+      <input type="range" data-key="attractorStrength" min="1" max="100" step="1" value="${strength}" />
+    </label>
+    <label class="field" data-tip="How far the pull reaches. 100 covers the whole canvas">${settingLabel(slot, "Reach", "attractorReach", String(reach))}
+      <input type="range" data-key="attractorReach" min="1" max="100" step="1" value="${reach}" />
+    </label>
+    <div class="check-row" data-tip="Keep pulling even when this asset is sitting still">
+      <label class="check">
+        ${checkInput(`data-key="attractorIdle" ${idle ? "checked" : ""}`)}
+        Always pull
+      </label>
+      ${resetControl("Always pull", "attractorIdle", fieldDirty(slot, "attractorIdle"))}
+    </div>
+  </div>`;
+}
+
 function applyFieldReset(slot: Slot, key: string) {
   remember();
   if (slot.kind === "text") {
@@ -3393,6 +3433,9 @@ function applyFieldReset(slot: Slot, key: string) {
     else if (key === "dropShadowOpacity") slot.dropShadowOpacity = base.dropShadowOpacity;
     else if (key === "dropShadowColor") slot.dropShadowColor = base.dropShadowColor;
   }
+  if (key === "attractorStrength") slot.attractorStrength = undefined;
+  else if (key === "attractorReach") slot.attractorReach = undefined;
+  else if (key === "attractorIdle") slot.attractorIdle = undefined;
   if (slot.kind === "image" && key === "amount") live();
   else liveChip(slot.id);
   renderPanel();
@@ -3506,6 +3549,9 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       if (key === "dropShadowRadius") slot.dropShadowRadius = dropShadowRadiusOf(Number(value));
       if (key === "dropShadowDistance") slot.dropShadowDistance = dropShadowDistanceOf(Number(value));
       if (key === "dropShadowOpacity") slot.dropShadowOpacity = dropShadowOpacityOf(Number(value));
+      if (key === "attractorStrength") slot.attractorStrength = attractorStrengthOf(Number(value));
+      if (key === "attractorReach") slot.attractorReach = attractorReachOf(Number(value));
+      if (key === "attractorIdle") slot.attractorIdle = Boolean(value) || undefined;
       if (slot.kind === "image" && key === "exposure") slot.exposure = imageExposureOf(Number(value));
       if (slot.kind === "image" && key === "contrast") slot.contrast = imageContrastOf(Number(value));
       if (slot.kind === "image" && key === "saturation") slot.saturation = imageSaturationOf(Number(value));
@@ -3573,7 +3619,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) setRangeCaptionValue(caption, String(Math.round(Number(input.value))));
       }
-      if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius" || key === "dropShadowRadius" || key === "dropShadowDistance" || key === "dropShadowOpacity" || key === "exposure" || key === "contrast" || key === "saturation" || key === "hue" || key === "temperature") {
+      if (key === "textHeight" || key === "stroke" || key === "amount" || key === "pillPad" || key === "tracking" || key === "radius" || key === "dropShadowRadius" || key === "dropShadowDistance" || key === "dropShadowOpacity" || key === "exposure" || key === "contrast" || key === "saturation" || key === "hue" || key === "temperature" || key === "attractorStrength" || key === "attractorReach") {
         const caption = input.closest("label")?.querySelector("[data-range-label]");
         if (caption) {
           if (key === "temperature") {
@@ -4358,6 +4404,7 @@ function duplicateSlot(id: string) {
   remember();
   const copy = structuredClone(source);
   copy.id = uid();
+  copy.attractor = undefined;
   if (copy.kind === "text") sanitizeTextMotion(copy);
   copyBaseline(source, copy);
   state.slots.splice(index + 1, 0, copy);
@@ -4393,6 +4440,7 @@ function pasteClipboardSlots(): boolean {
   for (const source of slotClipboard) {
     const copy = structuredClone(source);
     copy.id = uid();
+    copy.attractor = undefined;
     if (copy.kind === "text") sanitizeTextMotion(copy);
     captureBaseline(copy);
     copies.push(copy);
@@ -4940,7 +4988,18 @@ function paintAudioScales(now: number) {
   }
 }
 
+function audioReactShouldListen(): boolean {
+  return state.audioReact.enabled && !state.physics.layoutMode;
+}
+
+function pauseAudioReactMic() {
+  setUiSoundsMuted(false);
+  stopMic();
+  clearAudioScale();
+}
+
 async function setAudioReactEnabled(on: boolean) {
+  if (on && state.physics.layoutMode) return;
   state.audioReact.enabled = on;
   setUiSoundsMuted(on);
   if (!on) {
@@ -4962,7 +5021,7 @@ async function setAudioReactEnabled(on: boolean) {
 }
 
 function tickAudioReact(now: number) {
-  if (!state.audioReact.enabled) {
+  if (!audioReactShouldListen()) {
     paintAudioScales(now);
     return;
   }
@@ -5599,6 +5658,13 @@ async function setLayoutMode(next: boolean, opts?: { skipConfirm?: boolean }) {
   remember();
   playClick();
   state.physics.layoutMode = next;
+  if (state.audioReact.enabled) {
+    if (next) pauseAudioReactMic();
+    else {
+      setUiSoundsMuted(true);
+      void startMic();
+    }
+  }
   if (next) {
     if (world.chipCount() > 0) {
       live();
@@ -5699,11 +5765,11 @@ function adoptState(next: typeof state) {
   };
   recountShapes();
   syncLogotypeAccent();
-  setUiSoundsMuted(state.audioReact.enabled);
-  if (state.audioReact.enabled) void startMic();
-  else {
-    stopMic();
-    clearAudioScale();
+  if (audioReactShouldListen()) {
+    setUiSoundsMuted(true);
+    void startMic();
+  } else {
+    pauseAudioReactMic();
   }
 }
 

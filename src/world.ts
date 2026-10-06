@@ -33,10 +33,11 @@ import {
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
 import { setBareCanvasGradient, stopTextAnimIn } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
-import { blendMode, isTextField, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
+import { blendMode, DEFAULT_PHYSICS, isTextField, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
 import { playImpact } from "./uiSounds";
 import { beginScrub, endScrub } from "./scrub";
 import { hideTooltip, suggestTooltip } from "./tooltip";
+import { applyAttractors, bodyAttractors, followAttractorFor, setBodyAttractors } from "./attractors";
 
 export type { ChipDraw, ChipPose } from "./chipKinds";
 
@@ -86,6 +87,14 @@ const FRAME_MS = 1000 / 60;
 const GRAVITY_SCALE = 0.001;
 const MATTER_DENSITY = 0.001;
 const AIR_FRICTION = 0.01;
+/** Honey air drag while a magnet is on — kills slingshot without freezing. */
+const ATTRACT_AIR_FRICTION = 0.2;
+const ATTRACT_BOUNCE = 0;
+const ATTRACT_FRICTION = 0.48;
+const ATTRACT_GRIP = 0.92;
+const ATTRACT_SPIN = 0.24;
+const ATTRACT_GRAVITY_MUL = 0.45;
+const ATTRACT_TIME_SCALE = 0.82;
 const GRAB_STIFFNESS = 0.2;
 /** Softens the grab spring so release doesn't sling chips into the pile. */
 const GRAB_DAMPING = 0.12;
@@ -539,6 +548,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let contactSteps = 1;
   let physicsKey = "";
   let layoutMode = false;
+  let scenePhysics: PhysicsSettings = { ...DEFAULT_PHYSICS };
+  let attractorSyrup = false;
   let quality = PHYSICS_QUALITY.normal;
   let simScale = 1;
   /** Corner free-transform hard max; main updates from masterScale. */
@@ -1017,21 +1028,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const layoutChanged = nextLayout !== layoutMode;
     physicsKey = key;
     layoutMode = nextLayout;
+    scenePhysics = { ...physics };
     quality = PHYSICS_QUALITY[complexity];
-    engine.gravity.y = layoutMode ? 0 : physics.gravity;
-    engine.gravity.scale = GRAVITY_SCALE;
-    engine.timing.timeScale = physics.speed;
-    spinDrag = physics.spin;
     setSimulationScale(simScale);
     for (const chip of chips) {
       if (changed) applyWeight(chip.body, weight);
-      chip.body.frictionAir = AIR_FRICTION;
-      for (const part of chip.body.parts) {
-        part.restitution = physics.bounce;
-        part.friction = physics.friction;
-        part.frictionStatic = physics.grip;
-        part.frictionAir = AIR_FRICTION;
-      }
       if (layoutChanged || changed) syncWallCollision(chip);
       if (layoutMode) {
         Body.setVelocity(chip.body, { x: 0, y: 0 });
@@ -1041,9 +1042,43 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         Sleeping.set(chip.body, false);
       }
     }
+    syncAttractorPhysics(true);
     // Leaving layout: walls are back — pull anything that drifted past the border in.
     if (layoutChanged && !layoutMode) {
       for (const chip of chips) pinInsideWalls(chip);
+    }
+  }
+
+  function attractorActive() {
+    if (layoutMode) return false;
+    return chips.some((chip) => bodyAttractors(chip.body).length > 0);
+  }
+
+  /** Temporary syrup contacts/gravity while any magnet is on. */
+  function syncAttractorPhysics(force = false) {
+    const on = attractorActive();
+    if (!force && on === attractorSyrup) return;
+    attractorSyrup = on;
+    engine.gravity.y = layoutMode ? 0 : scenePhysics.gravity * (on ? ATTRACT_GRAVITY_MUL : 1);
+    engine.gravity.scale = GRAVITY_SCALE;
+    engine.timing.timeScale = layoutMode
+      ? scenePhysics.speed
+      : on
+        ? Math.min(scenePhysics.speed, ATTRACT_TIME_SCALE)
+        : scenePhysics.speed;
+    spinDrag = on ? Math.max(ATTRACT_SPIN, scenePhysics.spin) : scenePhysics.spin;
+    const air = on ? ATTRACT_AIR_FRICTION : AIR_FRICTION;
+    const bounce = on ? ATTRACT_BOUNCE : scenePhysics.bounce;
+    const friction = on ? Math.max(ATTRACT_FRICTION, scenePhysics.friction) : scenePhysics.friction;
+    const grip = on ? Math.max(ATTRACT_GRIP, scenePhysics.grip) : scenePhysics.grip;
+    for (const chip of chips) {
+      chip.body.frictionAir = air;
+      for (const part of chip.body.parts) {
+        part.restitution = bounce;
+        part.friction = friction;
+        part.frictionStatic = grip;
+        part.frictionAir = air;
+      }
     }
   }
 
@@ -1250,6 +1285,34 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
   }
 
+  function attractorPulling() {
+    if (layoutMode) return false;
+    for (const chip of chips) {
+      if (!bodyAttractors(chip.body).length) continue;
+      if (chip.look?.slot.attractorIdle) return true;
+      if (isDraggedBody(chip.body)) return true;
+      if (!chip.body.isSleeping && chip.body.speed > 0.25) return true;
+    }
+    return false;
+  }
+
+  function driveAttractors() {
+    if (!attractorPulling()) return;
+    for (const chip of chips) {
+      if (chip.body.isStatic || bodyAttractors(chip.body).length) continue;
+      Sleeping.set(chip.body, false);
+    }
+    applyAttractors(engine);
+  }
+
+  function syncChipAttractor(chip: DroppedChip, slot: Slot) {
+    const on = Boolean(slot.attractor) && !layoutMode;
+    setBodyAttractors(chip.body, on ? [followAttractorFor(slot.attractorStrength, slot.attractorReach)] : []);
+    chip.el.classList.toggle("is-attractor", on);
+    syncAttractorPhysics();
+    if (on && slot.attractorIdle) setRunning(true);
+  }
+
   /** Bleed leftover motion once the pile is nearly still so sleep always arrives. */
   function dampTowardSleep() {
     if (drag || chips.length === 0) return;
@@ -1287,7 +1350,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     // Once the pile is nearly still, bleed residual slide/spin so Matter sleep
     // (and the floor/loop settle gate) always arrives — even on low friction.
-    dampTowardSleep();
+    if (!attractorSyrup) dampTowardSleep();
+    driveAttractors();
     driveAirTilts();
   });
 
@@ -1336,6 +1400,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     // While bass/sharp scale is live, keep hard-depenetrating so Matter soft contacts
     // can't leave the enlarged pile intersecting.
     if (chips.some((chip) => Math.abs(chip.audioMul - 1) > 0.002)) separateOverlaps(true);
+    else if (attractorSyrup) separateOverlaps("calm");
     else separateOverlaps();
   });
 
@@ -1481,6 +1546,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     buildSides(bounds.width, bounds.height);
     setFloorOpen(floorOpen);
     syncWallCollision(chip);
+    syncChipAttractor(chip, slot);
     seat(chip);
   }
 
@@ -3945,6 +4011,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           ? gradientEnd(theme, slot)
           : "";
     chip.look = { slot, radius, fill, ink, tracking, shiftEm };
+    syncChipAttractor(chip, slot);
     const editing = chip.slotId === editingId;
     applyVisual(chip.el, slot, size.width, size.height, radius, fill, ink, tracking, false, shiftEm, gradientTo, editing, lookPad);
     applyVisual(chip.glow, slot, size.width, size.height, radius, fill, ink, tracking, true, shiftEm, gradientTo, false, lookPad);

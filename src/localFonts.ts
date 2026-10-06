@@ -65,6 +65,17 @@ export function localWeights(family: string): number[] {
   return [...weights].sort((a, b) => a - b);
 }
 
+/** `undefined` when this family is not in the local catalog. */
+export function localHasItalic(family: string): boolean | undefined {
+  let found = false;
+  for (const font of catalog) {
+    if (font.family !== family) continue;
+    found = true;
+    if (/italic|oblique/i.test(font.style)) return true;
+  }
+  return found ? false : undefined;
+}
+
 export async function queryLocalCatalog(): Promise<string[]> {
   const query = queryLocalFontsFn();
   if (!query) throw new Error("unsupported");

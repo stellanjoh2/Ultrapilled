@@ -39,10 +39,12 @@ import {
   isTextField,
   TEXT_FIELD_WORD_MAX,
   TEXT_FIELD_STARTER,
+  bundledHasItalic,
   lineHeightSliderOf,
   textFieldLineHeight,
   textAlignOf,
 } from "../types";
+import { localHasItalic } from "../localFonts";
 import { clampTextFieldWords, textFieldWordCount } from "../textField";
 import { YOUTUBE_LOOP_MAX, YOUTUBE_LOOP_MIN } from "../youtube";
 import { setRangeCaptionValue } from "../rangeCaption";
@@ -117,6 +119,7 @@ export type SlotCardHost = {
   gradientTintRow(slot: Slot): string;
   blendField(slot: Slot): string;
   dropShadowField(slot: Slot): string;
+  attractorField(slot: Slot): string;
   chosenWeight(family: string, weight: number): number;
   mountFontPick(
     hostEl: HTMLElement,
@@ -391,6 +394,35 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
   return head;
 }
 
+function typefaceHasItalic(family: string): boolean {
+  const bundled = bundledHasItalic(family);
+  if (bundled !== undefined) return bundled;
+  return localHasItalic(family) !== false;
+}
+
+function formatBtn(opts: {
+  on: boolean;
+  tip: string;
+  attrs: string;
+  icon: string;
+  disabled?: boolean;
+}): string {
+  const tip = H.escapeAttr(opts.tip);
+  return `<button type="button" class="icon-btn icon-hover text-format__btn${opts.on ? " is-on" : ""}"${opts.disabled ? " disabled" : ""} ${opts.attrs} aria-label="${tip}" aria-pressed="${opts.on}" data-tip="${tip}"><span aria-hidden="true">${opts.icon}</span></button>`;
+}
+
+function paintItalicBtn(btn: HTMLButtonElement, slot: TextSlot) {
+  const ok = typefaceHasItalic(slot.fontFamily);
+  if (!ok) slot.italic = undefined;
+  const on = Boolean(slot.italic);
+  const tip = ok ? "Italic" : "Italic isn't available in this typeface";
+  btn.disabled = !ok;
+  btn.classList.toggle("is-on", on);
+  btn.setAttribute("aria-pressed", String(on));
+  btn.setAttribute("aria-label", tip);
+  btn.dataset.tip = tip;
+}
+
 function textFields(slot: TextSlot, open: boolean): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "slot-body";
@@ -401,19 +433,31 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
   const field = isTextField(slot);
   const align = textAlignOf(slot);
   const bold = slot.fontWeight >= 600;
+  const italicOk = typefaceHasItalic(slot.fontFamily);
   const words = textFieldWordCount(slot.text);
   const formatRow = field
-    ? `<textarea class="slot-live slot-live--field" data-text-field rows="5" aria-label="Text" placeholder="${H.escapeAttr(TEXT_FIELD_STARTER)}">${H.escapeAttr(slot.text)}</textarea>
-      <p class="text-field-count">${words} / ${TEXT_FIELD_WORD_MAX} words</p>
-      <div class="text-format" role="group" aria-label="Text formatting">
-        <button type="button" class="pill text-format__btn${bold ? " is-on" : ""}" data-text-bold aria-pressed="${bold}" data-tip="Bold">${textB}</button>
-        <button type="button" class="pill text-format__btn${slot.italic ? " is-on" : ""}" data-text-italic aria-pressed="${Boolean(slot.italic)}" data-tip="Italic">${textItalic}</button>
-        <span class="text-format__gap" aria-hidden="true"></span>
-        <button type="button" class="pill text-format__btn${align === "left" ? " is-on" : ""}" data-text-align="left" aria-pressed="${align === "left"}" data-tip="Align left">${textAlignLeft}</button>
-        <button type="button" class="pill text-format__btn${align === "center" ? " is-on" : ""}" data-text-align="center" aria-pressed="${align === "center"}" data-tip="Align center">${textAlignCenter}</button>
-        <button type="button" class="pill text-format__btn${align === "right" ? " is-on" : ""}" data-text-align="right" aria-pressed="${align === "right"}" data-tip="Align right">${textAlignRight}</button>
+    ? `<div class="text-compose">
+        <textarea class="slot-live slot-live--field" data-text-field rows="5" aria-label="Text" placeholder="${H.escapeAttr(TEXT_FIELD_STARTER)}">${H.escapeAttr(slot.text)}</textarea>
+        <p class="text-field-count">${words} / ${TEXT_FIELD_WORD_MAX} words</p>
+        <div class="text-format" role="group" aria-label="Text formatting">
+          ${formatBtn({ on: bold, tip: "Bold", attrs: "data-text-bold", icon: textB })}
+          ${formatBtn({
+            on: Boolean(slot.italic) && italicOk,
+            tip: italicOk ? "Italic" : "Italic isn't available in this typeface",
+            attrs: "data-text-italic",
+            icon: textItalic,
+            disabled: !italicOk,
+          })}
+          <span class="text-format__gap" aria-hidden="true"></span>
+          ${formatBtn({ on: align === "left", tip: "Align left", attrs: 'data-text-align="left"', icon: textAlignLeft })}
+          ${formatBtn({ on: align === "center", tip: "Align center", attrs: 'data-text-align="center"', icon: textAlignCenter })}
+          ${formatBtn({ on: align === "right", tip: "Align right", attrs: 'data-text-align="right"', icon: textAlignRight })}
+        </div>
       </div>`
     : "";
+  const textHeightField = `<label class="field" data-tip="${TIPS.textHeight}">${H.settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
+        <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
+      </label>`;
   editor.innerHTML = `
     <div class="slot-group">
       <p class="slot-label">Text</p>
@@ -429,9 +473,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       <label class="field" data-tip="${TIPS.textScale}">${H.settingLabel(slot, "Text scale", "scale", slot.scale.toFixed(2))}
         <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
       </label>
-      <label class="field" data-tip="${TIPS.textHeight}">${H.settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
-        <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
-      </label>
+      ${field ? "" : textHeightField}
       <label class="field" data-tip="${TIPS.tracking}">${H.settingLabel(slot, "Letter spacing", "tracking", String(trackingOf(slot, H.state.textTracking)))}
         <input type="range" data-key="tracking" min="-400" max="500" step="1" value="${trackingOf(slot, H.state.textTracking)}" />
       </label>
@@ -439,7 +481,8 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         field
           ? `<label class="field" data-tip="${TIPS.lineHeight}">${H.settingLabel(slot, "Line height", "lineHeight", textFieldLineHeight(slot).toFixed(2))}
         <input type="range" data-key="lineHeight" min="0" max="100" step="1" value="${lineHeightSliderOf(slot)}" />
-      </label>`
+      </label>
+      ${textHeightField}`
           : ""
       }
       ${
@@ -557,6 +600,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       }
     </div>`
     }
+    ${H.attractorField(slot)}
   `;
   placeFold(wrap, editor, open);
 
@@ -577,6 +621,8 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       H.remember();
       slot.fontFamily = family;
       if (weightPick) slot.fontWeight = weightPick.setFamily(family);
+      const italicBtn = editor.querySelector<HTMLButtonElement>("[data-text-italic]");
+      if (italicBtn) paintItalicBtn(italicBtn, slot);
       H.reflectGlobalWeight();
       H.paintFieldReset(editor, slot, "fontFamily");
       H.paintFieldReset(editor, slot, "fontWeight");
@@ -696,6 +742,7 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
     <label class="field" data-tip="${TIPS.amount}">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>
+    ${H.attractorField(slot)}
   `;
   placeFold(wrap, editor, open);
 
@@ -748,6 +795,7 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
     <label class="field" data-tip="${TIPS.amount}">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>
+    ${H.attractorField(slot)}
   `;
   placeFold(wrap, editor, open);
 
@@ -837,6 +885,7 @@ function youtubeFields(slot: ImageSlot, open: boolean): HTMLElement {
     <label class="field" data-tip="${TIPS.clipScale}">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
+    ${H.attractorField(slot)}
   `;
   placeFold(wrap, editor, open);
 
@@ -895,6 +944,7 @@ function videoFields(slot: ImageSlot, open: boolean): HTMLElement {
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     ${videoReplaceControl(slot)}
+    ${H.attractorField(slot)}
   `;
   placeFold(wrap, editor, open);
 
@@ -1041,6 +1091,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>`
     }
+    ${H.attractorField(slot)}
   `;
   placeFold(wrap, editor, open);
 

@@ -3,12 +3,59 @@ import {
   canQueryLocalFonts,
   listedFamilies,
   localCatalogLoaded,
+  localHasItalic,
   maybeQueryLocalCatalog,
   queryLocalCatalog,
   unbundledFontFamilies,
 } from "./localFonts";
 
 const bundled = new Set(["Inter", "Syne"]);
+
+describe("localHasItalic", () => {
+  afterEach(async () => {
+    Object.defineProperty(window, "queryLocalFonts", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue([]),
+    });
+    await queryLocalCatalog();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("is undefined when the family is not in the catalog", async () => {
+    Object.defineProperty(window, "queryLocalFonts", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue([]),
+    });
+    await queryLocalCatalog();
+    expect(localHasItalic("Didot")).toBeUndefined();
+  });
+
+  it("is true when a local face is italic", async () => {
+    Object.defineProperty(window, "queryLocalFonts", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue([
+        { family: "Didot", style: "Regular", blob: async () => new Blob() },
+        { family: "Didot", style: "Italic", blob: async () => new Blob() },
+      ]),
+    });
+    await queryLocalCatalog();
+    expect(localHasItalic("Didot")).toBe(true);
+  });
+
+  it("is false when local faces exist but none are italic", async () => {
+    Object.defineProperty(window, "queryLocalFonts", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue([{ family: "Impact", style: "Regular", blob: async () => new Blob() }]),
+    });
+    await queryLocalCatalog();
+    expect(localHasItalic("Impact")).toBe(false);
+  });
+});
 
 describe("unbundledFontFamilies", () => {
   it("keeps custom names and drops bundled and blanks", () => {

@@ -1078,6 +1078,10 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   cursor: grabbing;
 }
 
+.chip.is-attractor {
+  box-shadow: 0 0 0 2px var(--check-on);
+}
+
 .chip.is-picked,
 .chip.is-grad-angling,
 .chip-chrome.is-picked {
@@ -1812,37 +1816,69 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   white-space: pre-wrap;
 }
 
+.text-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+}
+
 .text-format {
   display: flex;
   align-items: center;
   gap: calc(6px * var(--ui-scale));
-  margin: 0 0 var(--space-1);
+  margin: 0;
 }
 
-.text-format__btn {
-  width: calc(36px * var(--ui-scale));
-  min-width: calc(36px * var(--ui-scale));
-  height: calc(36px * var(--ui-scale));
-  min-height: calc(36px * var(--ui-scale));
+button.icon-btn.text-format__btn {
+  width: calc(28px * var(--ui-scale));
+  min-width: calc(28px * var(--ui-scale));
+  height: calc(28px * var(--ui-scale));
+  min-height: calc(28px * var(--ui-scale));
   padding: 0;
+  border-radius: 9999px;
+  color: var(--ink-secondary);
+}
+
+button.icon-btn.text-format__btn.is-on {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+button.icon-btn.text-format__btn:disabled,
+button.icon-btn.text-format__btn:disabled:hover {
+  opacity: 0.35;
+  cursor: default;
+  color: var(--ink-mute);
+}
+
+.text-format__btn > span {
   display: grid;
   place-items: center;
+  line-height: 0;
 }
 
 .text-format__btn svg {
-  width: calc(16px * var(--ui-scale));
-  height: calc(16px * var(--ui-scale));
+  display: block;
+  width: calc(15px * var(--ui-scale));
+  height: calc(15px * var(--ui-scale));
+}
+
+/* Span already scales on hover; don't also scale the inner SVG. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  button.icon-btn.text-format__btn:hover:not(:disabled) svg {
+    transform: none;
+  }
 }
 
 .text-format__gap {
   width: 1px;
-  height: calc(20px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
   background: color-mix(in srgb, var(--ink) 16%, transparent);
   margin: 0 calc(2px * var(--ui-scale));
 }
 
 .text-field-count {
-  margin: 0 0 var(--space-1);
+  margin: 0;
   color: var(--ink-mute);
   font-size: calc(12px * var(--ui-scale));
 }
@@ -1851,7 +1887,7 @@ textarea.slot-live--field {
   display: block;
   width: 100%;
   min-height: calc(96px * var(--ui-scale));
-  margin: 0 0 var(--space-1);
+  margin: 0;
   padding: var(--space-0) var(--space-1);
   border: none;
   border-radius: calc(8px * var(--ui-scale));
@@ -2502,14 +2538,16 @@ button.pill.smash-btn.is-on::after {
   }
 }
 
-.physics-dynamics {
+.physics-dynamics,
+.audio-react-controls {
   display: flex;
   flex-direction: column;
   /* Pre-dense roomy rhythm — shared with .slot-editor / .slot-group. */
   gap: var(--space-2);
 }
 
-.physics-dynamics[inert] {
+.physics-dynamics[inert],
+.audio-react-controls[inert] {
   opacity: 0.45;
   pointer-events: none;
 }

@@ -59,6 +59,14 @@ export type TextSlot = {
   /** Shadow ink. Unset keeps black. */
   dropShadowColor?: string;
   scale: number;
+  /** Physics magnet: other chips pull toward this asset while it moves. */
+  attractor?: boolean;
+  /** 1–100. Pull strength. Unset keeps the default. */
+  attractorStrength?: number;
+  /** 1–100. Pull radius. 100 is the whole canvas. Unset keeps that. */
+  attractorReach?: number;
+  /** Keep pulling while this asset is sitting still. */
+  attractorIdle?: boolean;
   /** Wrapping paragraph box (no pill). Independent of single-word chips. */
   textField?: boolean;
   /** Unscaled box width. Used when `textField` is set. */
@@ -179,6 +187,14 @@ export type ImageSlot = {
   dropShadowOpacity?: number;
   /** Shadow ink. Unset keeps black. */
   dropShadowColor?: string;
+  /** Physics magnet: other chips pull toward this asset while it moves. */
+  attractor?: boolean;
+  /** 1–100. Pull strength. Unset keeps the default. */
+  attractorStrength?: number;
+  /** 1–100. Pull radius. 100 is the whole canvas. Unset keeps that. */
+  attractorReach?: number;
+  /** Keep pulling while this asset is sitting still. */
+  attractorIdle?: boolean;
   /** Muted autoplay YouTube iframe loop. When set, `src` / emoji are unused. */
   youtube?: YouTubeClip;
   /** Local muted autoplay video (mp4). When set, `src` / emoji / youtube are unused. */
@@ -532,24 +548,24 @@ export type AppState = {
 };
 
 export const FONTS = [
-  { id: "Inter", label: "Inter", weights: [300, 400, 600, 700] },
-  { id: "Space Grotesk", label: "Space Grotesk", weights: [600, 700] },
-  { id: "Space Mono", label: "Space Mono", weights: [400, 700] },
-  { id: "Syne", label: "Syne", weights: [400, 500, 600, 700, 800] },
-  { id: "Bricolage Grotesque", label: "Bricolage Grotesque", weights: [200, 300, 400, 500, 600, 700, 800] },
-  { id: "Outfit", label: "Outfit", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
-  { id: "Sora", label: "Sora", weights: [100, 200, 300, 400, 500, 600, 700, 800] },
-  { id: "Fraunces", label: "Fraunces", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
-  { id: "Archivo Black", label: "Archivo Black", weights: [400] },
-  { id: "Bebas Neue", label: "Bebas Neue", weights: [400] },
-  { id: "Anton", label: "Anton", weights: [400] },
-  { id: "Playfair Display", label: "Playfair Display", weights: [400, 500, 600, 700, 800, 900] },
-  { id: "DM Serif Display", label: "DM Serif Display", weights: [400] },
-  { id: "Libre Baskerville", label: "Libre Baskerville", weights: [400, 700] },
-  { id: "Libre Franklin", label: "Libre Franklin", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
-  { id: "Impact", label: "Impact", weights: [400] },
-  { id: "Georgia", label: "Georgia", weights: [400, 700] },
-  { id: "system-ui", label: "System UI", weights: [400, 500, 600, 700] },
+  { id: "Inter", label: "Inter", weights: [300, 400, 600, 700], italic: true },
+  { id: "Space Grotesk", label: "Space Grotesk", weights: [600, 700], italic: false },
+  { id: "Space Mono", label: "Space Mono", weights: [400, 700], italic: true },
+  { id: "Syne", label: "Syne", weights: [400, 500, 600, 700, 800], italic: false },
+  { id: "Bricolage Grotesque", label: "Bricolage Grotesque", weights: [200, 300, 400, 500, 600, 700, 800], italic: true },
+  { id: "Outfit", label: "Outfit", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900], italic: false },
+  { id: "Sora", label: "Sora", weights: [100, 200, 300, 400, 500, 600, 700, 800], italic: false },
+  { id: "Fraunces", label: "Fraunces", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900], italic: true },
+  { id: "Archivo Black", label: "Archivo Black", weights: [400], italic: false },
+  { id: "Bebas Neue", label: "Bebas Neue", weights: [400], italic: false },
+  { id: "Anton", label: "Anton", weights: [400], italic: false },
+  { id: "Playfair Display", label: "Playfair Display", weights: [400, 500, 600, 700, 800, 900], italic: true },
+  { id: "DM Serif Display", label: "DM Serif Display", weights: [400], italic: true },
+  { id: "Libre Baskerville", label: "Libre Baskerville", weights: [400, 700], italic: true },
+  { id: "Libre Franklin", label: "Libre Franklin", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900], italic: true },
+  { id: "Impact", label: "Impact", weights: [400], italic: false },
+  { id: "Georgia", label: "Georgia", weights: [400, 700], italic: true },
+  { id: "system-ui", label: "System UI", weights: [400, 500, 600, 700], italic: true },
 ] as const;
 
 export const FALLBACK_WEIGHTS = [400, 500, 600, 700, 800] as const;
@@ -572,6 +588,10 @@ export function weightName(weight: number): string {
 
 export function bundledWeights(family: string): readonly number[] | undefined {
   return FONTS.find((font) => font.id === family)?.weights;
+}
+
+export function bundledHasItalic(family: string): boolean | undefined {
+  return FONTS.find((font) => font.id === family)?.italic;
 }
 
 /** A holding shape paints a background behind the word. A stroke is an outline only. */

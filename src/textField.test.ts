@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { clampTextFieldWords, textFieldWordCount, wrapTextFieldLines } from "./textField";
-import { textFieldLineHeight } from "./types";
+import { bundledHasItalic, textFieldLineHeight } from "./types";
 
 describe("textFieldWordCount", () => {
   it("counts whitespace-separated words", () => {
@@ -29,6 +29,16 @@ describe("wrapTextFieldLines", () => {
 
   it("keeps explicit blank lines", () => {
     expect(wrapTextFieldLines("a\n\nb", 100, (value) => value.length)).toEqual(["a", "", "b"]);
+  });
+});
+
+describe("bundledHasItalic", () => {
+  it("is true only when the bundled face includes italic", () => {
+    expect(bundledHasItalic("Inter")).toBe(true);
+    expect(bundledHasItalic("Playfair Display")).toBe(true);
+    expect(bundledHasItalic("Bebas Neue")).toBe(false);
+    expect(bundledHasItalic("Outfit")).toBe(false);
+    expect(bundledHasItalic("Unknown Display")).toBeUndefined();
   });
 });
 

@@ -116,7 +116,7 @@ export function paintSectionResets(root: ParentNode, state: AppState) {
   const physics = root.querySelector<HTMLButtonElement>("#reset-physics");
   if (physics) physics.hidden = physicsAtDefault(state.physics);
   const audio = root.querySelector<HTMLButtonElement>("#reset-audio-react");
-  if (audio) audio.hidden = audioReactAtDefault(state.audioReact);
+  if (audio) audio.hidden = state.physics.layoutMode || audioReactAtDefault(state.audioReact);
   const composition = root.querySelector<HTMLButtonElement>("#reset-master");
   if (composition) composition.hidden = compositionAtDefault(state);
 }
@@ -394,7 +394,8 @@ panel.innerHTML = `
     "audio-react",
     "Audio react",
     "Bass hops everything and swells pills; sharp hits make icons hop",
-    `<button type="button" class="pill smash-btn${H.state.audioReact.enabled ? " is-on" : ""}" id="audio-mic" aria-pressed="${H.state.audioReact.enabled}" data-tip="Ask for mic access and drive scale from live audio">
+    `<div class="audio-react-controls"${H.state.physics.layoutMode ? " inert" : ""}>
+    <button type="button" class="pill smash-btn${H.state.audioReact.enabled ? " is-on" : ""}" id="audio-mic" aria-pressed="${H.state.audioReact.enabled}" ${H.state.physics.layoutMode ? "disabled " : ""}data-tip="${H.state.physics.layoutMode ? "Audio react is for Physics mode" : "Ask for mic access and drive scale from live audio"}">
       <span class="smash-btn__label">
         <svg class="smash-btn__icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3z"></path>
@@ -403,18 +404,19 @@ panel.innerHTML = `
       </span>
     </button>
     <label class="field" data-tip="How easily quiet sounds trigger a reaction">${rangeCaptionHtml("audioSensitivity", "Sensitivity", String(Math.round(H.state.audioReact.sensitivity)))}
-      <input type="range" id="audioSensitivity" min="0" max="100" step="1" value="${H.state.audioReact.sensitivity}" />
+      <input type="range" id="audioSensitivity" min="0" max="100" step="1" value="${H.state.audioReact.sensitivity}"${H.state.physics.layoutMode ? " disabled" : ""} />
     </label>
     <label class="field" data-tip="How hard pieces hop on a hit">${rangeCaptionHtml("audioBounce", "Bounce intensity", `${H.state.audioReact.bounce.toFixed(1)}×`)}
-      <input type="range" id="audioBounce" min="1" max="4" step="0.1" value="${H.state.audioReact.bounce}" />
+      <input type="range" id="audioBounce" min="1" max="4" step="0.1" value="${H.state.audioReact.bounce}"${H.state.physics.layoutMode ? " disabled" : ""} />
     </label>
     <label class="field" data-tip="How much text pills swell on bass hits">${rangeCaptionHtml("audioBassBoost", "Bass boost", `+${Math.round(H.state.audioReact.bassBoost)}%`)}
-      <input type="range" id="audioBassBoost" min="5" max="20" step="1" value="${H.state.audioReact.bassBoost}" />
+      <input type="range" id="audioBassBoost" min="5" max="20" step="1" value="${H.state.audioReact.bassBoost}"${H.state.physics.layoutMode ? " disabled" : ""} />
     </label>
     <label class="field" data-tip="Small color-wheel kick on sharp hits that snaps back">${rangeCaptionHtml("audioHueNudge", "Hue nudge", `${Math.round(H.state.audioReact.hueNudge)}°`)}
-      <input type="range" id="audioHueNudge" min="0" max="30" step="1" value="${H.state.audioReact.hueNudge}" />
-    </label>`,
-    { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react", dirty: !audioReactAtDefault(H.state.audioReact) },
+      <input type="range" id="audioHueNudge" min="0" max="30" step="1" value="${H.state.audioReact.hueNudge}"${H.state.physics.layoutMode ? " disabled" : ""} />
+    </label>
+    </div>`,
+    { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react", dirty: !H.state.physics.layoutMode && !audioReactAtDefault(H.state.audioReact) },
   )}
   <footer class="panel-credit">
     <span class="panel-credit__s" aria-hidden="true"></span>
@@ -623,6 +625,7 @@ panel.querySelector<HTMLSelectElement>("#physics-complexity")?.addEventListener(
   H.live();
 });
 panel.querySelector<HTMLButtonElement>("#audio-mic")?.addEventListener("click", () => {
+  if (H.state.physics.layoutMode) return;
   const on = !H.state.audioReact.enabled;
   H.remember();
   playSwitch(on);
@@ -643,6 +646,7 @@ H.bindRange("audioHueNudge", "Hue nudge", (v) => {
   H.state.audioReact.hueNudge = Math.round(v);
 }, (v) => `${Math.round(v)}°`);
 panel.querySelector("#reset-audio-react")?.addEventListener("click", () => {
+  if (H.state.physics.layoutMode) return;
   H.remember();
   void H.setAudioReactEnabled(false).then(() => {
     H.state.audioReact = { ...DEFAULT_AUDIO_REACT };

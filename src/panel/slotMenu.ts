@@ -11,6 +11,7 @@ import flipHorizontal from "@phosphor-icons/core/assets/regular/flip-horizontal.
 import flipVertical from "@phosphor-icons/core/assets/regular/flip-vertical.svg?raw";
 import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
 import linkSimple from "@phosphor-icons/core/assets/regular/link-simple.svg?raw";
+import magnet from "@phosphor-icons/core/assets/regular/magnet.svg?raw";
 import paintBrush from "@phosphor-icons/core/assets/regular/paint-brush.svg?raw";
 import paintBucket from "@phosphor-icons/core/assets/regular/paint-bucket.svg?raw";
 import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
@@ -28,6 +29,7 @@ import { placeZoomedFixed } from "../uiScale";
 import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
 import { isTextField, sanitizeTextMotion } from "../types";
 import { canRelinkSlot } from "../remoteImage";
+import { ATTRACTOR_UI } from "../attractors";
 
 export type LayerMove = "front" | "forward" | "backward" | "back";
 
@@ -50,6 +52,7 @@ export type SlotMenuHost = {
   endGesture(): void;
   renderPanel(): void;
   liveChip(id: string, opts?: { quiet?: boolean }): void;
+  openSlots: Set<string>;
   pickSlot(id: string, opts?: { force?: boolean; additive?: boolean }): void;
   get gesture(): string | null;
   get tintPicker(): { anchor: HTMLElement; close: () => void } | null;
@@ -664,6 +667,25 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     icon: copySimple,
     run: () => H.duplicateSlot(id),
   });
+  if (ATTRACTOR_UI && slot && !H.state.physics.layoutMode) {
+    const magnetOn = Boolean(slot.attractor);
+    actions.push({
+      id: magnetOn ? "remove-attractor" : "make-attractor",
+      label: magnetOn ? "Remove Attractor" : "Make Attractor",
+      icon: magnet,
+      run: () => {
+        H.remember();
+        for (const item of H.state.slots) {
+          if (item.id === id) item.attractor = magnetOn ? undefined : true;
+          else item.attractor = undefined;
+        }
+        playSwitch(!magnetOn);
+        if (!magnetOn) H.openSlots.add(id);
+        H.live();
+        H.renderPanel();
+      },
+    });
+  }
   if (slot) {
     actions.push({
       id: "copy-style",

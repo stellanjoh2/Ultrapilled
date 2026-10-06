@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ATTRACTOR_UI } from "../attractors";
 import { defaultImageSlot, demoState } from "../types";
 import { closeSlotMenu, openSlotMenu, type SlotMenuHost } from "./slotMenu";
 
@@ -39,6 +40,7 @@ describe("layout layer order controls", () => {
       renderPanel() {},
       liveChip() {},
       pickSlot() {},
+      openSlots: new Set<string>(),
       get gesture() {
         return null;
       },
@@ -139,5 +141,43 @@ describe("layout layer order controls", () => {
     host.state.slots = [slot];
     openSlotMenu(40, 40, slot.id, host);
     expect(document.querySelector("[data-action='relink-content']")).toBeNull();
+  });
+
+  it("offers Make Attractor outside Layout mode", () => {
+    stubReducedMotion();
+    const host = hostFor(false);
+    openSlotMenu(40, 40, host.state.slots[0].id, host);
+    const btn = document.querySelector("[data-action='make-attractor']");
+    if (ATTRACTOR_UI) expect(btn?.textContent).toContain("Make Attractor");
+    else expect(btn).toBeNull();
+  });
+
+  it("hides Make Attractor in Layout mode", () => {
+    stubReducedMotion();
+    const host = hostFor(true);
+    openSlotMenu(40, 40, host.state.slots[0].id, host);
+    expect(document.querySelector("[data-action='make-attractor']")).toBeNull();
+  });
+
+  it.skipIf(!ATTRACTOR_UI)("makes one attractor at a time and can remove it", () => {
+    stubReducedMotion();
+    const host = hostFor(false);
+    const [first, second] = host.state.slots;
+    expect(first && second).toBeTruthy();
+    host.live = vi.fn();
+    openSlotMenu(40, 40, first!.id, host);
+    document.querySelector<HTMLButtonElement>("[data-action='make-attractor']")?.click();
+    expect(first!.attractor).toBe(true);
+    expect(second!.attractor).toBeUndefined();
+    expect(host.openSlots.has(first!.id)).toBe(true);
+
+    openSlotMenu(40, 40, second!.id, host);
+    document.querySelector<HTMLButtonElement>("[data-action='make-attractor']")?.click();
+    expect(first!.attractor).toBeUndefined();
+    expect(second!.attractor).toBe(true);
+
+    openSlotMenu(40, 40, second!.id, host);
+    document.querySelector<HTMLButtonElement>("[data-action='remove-attractor']")?.click();
+    expect(second!.attractor).toBeUndefined();
   });
 });
