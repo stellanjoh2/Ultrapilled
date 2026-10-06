@@ -1,4 +1,4 @@
-import { backgroundImage, isSvgLogo, paintBackdrop, paintGrid, paintLogo } from "../background";
+import { backgroundImage, isSvgLogo, paintBackdrop, paintGrid, paintLogo, paintUnsplashCredit } from "../background";
 import { gradientEnd, gradientLine, gradientPhase, pillGradientStops, pillSweepStops, textGradientFill } from "../pillFill";
 import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
@@ -46,6 +46,7 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
       const img = new Image();
       img.onload = () => resolve(img);
       img.onerror = () => resolve(null);
+      if (/^https?:/i.test(src)) img.crossOrigin = "anonymous";
       img.src = src;
     });
     images.set(src, pending);
@@ -790,5 +791,9 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
     ctx.globalCompositeOperation = "copy";
     ctx.drawImage(bloomBuffer, 0, 0);
     ctx.restore();
+  }
+
+  if (!scene.transparent && scene.background.kind === "image") {
+    paintUnsplashCredit(ctx, scene.width, scene.height, scene.background.imageCredit);
   }
 }

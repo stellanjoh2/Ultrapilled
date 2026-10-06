@@ -1,8 +1,11 @@
 import { mountColorPicker } from "./colorPicker";
 import { backgroundImage, gridDivisions, isSvgLogo, logoFill, sampleStopColor, sanitizeSvgMarkup, stopBarGradient, storeBackgroundImage, svgOriginalColor, svgSize } from "./background";
+import type { CanvasRatio } from "./canvas";
 import type { AppState, GradientStop, GridDensity } from "./types";
 import { BLEND_MODES, blendMode, uid } from "./types";
 import { playCreate, playRemove } from "./uiSounds";
+import { openUnsplashImport } from "./unsplashPanel";
+import { unsplashHotlinkUrl, type UnsplashOrientation } from "./unsplashApi";
 
 const MAX_STOPS = 6;
 const MIN_STOPS = 2;
@@ -49,7 +52,7 @@ function openPicker(controller: BackgroundController, anchor: HTMLElement, value
   pickerClose = picker.close;
 }
 
-function readImageFile(file: File): Promise<{ src: string; name: string }> {
+function readImageFile(file: File): Promise<{ src: string; name: string; width: number; height: number }> {
   const name = file.name.toLowerCase();
   const png = file.type === "image/png" || name.endsWith(".png");
   const jpg = file.type === "image/jpeg" || name.endsWith(".jpg") || name.endsWith(".jpeg");
@@ -68,11 +71,23 @@ function readImageFile(file: File): Promise<{ src: string; name: string }> {
       ctx.drawImage(bitmap, 0, 0, width, height);
       const keepPng = png && opaque(ctx, width, height) === false;
       const src = keepPng ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", 0.86);
-      return { src, name: file.name || "image" };
+      return { src, name: file.name || "image", width, height };
     } finally {
       bitmap.close();
     }
   });
+}
+
+function coverOrientation(canvas: CanvasRatio): UnsplashOrientation {
+  if (canvas === "1:1") return "squarish";
+  if (canvas === "9:16" || canvas === "3:4") return "portrait";
+  return "landscape";
+}
+
+export function backgroundImageMeta(file: { name: string; width: number; height: number }): string {
+  const name = file.name.trim() || "image";
+  if (file.width >= 1 && file.height >= 1) return `${name} · ${file.width} × ${file.height}`;
+  return name;
 }
 
 function opaque(ctx: CanvasRenderingContext2D, width: number, height: number): boolean {
@@ -87,7 +102,7 @@ function opaque(ctx: CanvasRenderingContext2D, width: number, height: number): b
 }
 
 export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundController, scroll: number) {
-  const { background, canvas, stageColor } = controller.state();
+  const { background, stageColor } = controller.state();
   const file = backgroundImage(background.imageId);
   const stop = selectedStop(background.stops);
   if (stop) selectedStopId = stop.id;
@@ -127,25 +142,50 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
       }
       ${
         background.kind === "image"
-          ? `<button type="button" class="pill" id="bg-upload" data-tip="Use a JPG or PNG as the stage">${file ? "Replace image" : "Upload image"}</button>
-            <input class="bg-file" id="bg-file" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" />
+          ? `${
+              file
+                ? `<label class="field file-replace" data-tip="Use a JPG or PNG as the stage">
+                    <span class="field-label"><span>Replace image</span></span>
+                    <span class="file-replace__btn" id="bg-photo">
+                      <span class="file-replace__text">Browse</span>
+                    </span>
+                    <input type="file" class="file-replace__input" id="bg-file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" />
+                  </label>
+                  <p class="hint" id="bg-name"></p>
+                  <label class="field" data-tip="Fade the photo over black to darken the stage"><span id="bg-image-opacity-label">Opacity ${Math.round(background.imageOpacity ?? 100)}</span>
+                    <input type="range" id="bg-image-opacity" min="0" max="100" step="1" value="${background.imageOpacity ?? 100}" />
+                  </label>`
+                : `<button type="button" class="pill" id="bg-upload" data-tip="Use a JPG or PNG as the stage">Upload image</button>
+                  <input class="bg-file" id="bg-file" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" />`
+            }
+            <button type="button" class="pill" id="bg-unsplash" data-tip="Search photos from Unsplash">Fetch from Unsplash</button>
             ${
               file
-                ? `<div class="bg-photo" id="bg-photo"></div>
-                  <p class="hint" id="bg-name"></p>
-                  <button type="button" class="pill" id="bg-clear" data-tip="Remove the background image">Remove image</button>`
+                ? `<button type="button" class="pill" id="bg-clear" data-tip="Remove the background image">Remove image</button>`
                 : ""
             }
-            <p class="hint" id="bg-note">${canvas === "9:16" || canvas === "3:4" ? "On portrait canvases the image meets the top and bottom. Wider photos crop at the sides." : "JPG or PNG. The image covers the frame."}</p>`
+            <p class="hint" id="bg-note">JPG or PNG. The image covers the frame over black.</p>`
           : ""
       }
     </section>
   `;
 
   const name = panel.querySelector("#bg-name");
-  if (name && file) name.textContent = file.name;
+  if (name && file) name.textContent = backgroundImageMeta(file);
   const photo = panel.querySelector<HTMLElement>("#bg-photo");
-  if (photo && file) photo.style.backgroundImage = `url("${file.src}")`;
+  if (photo && file) photo.style.backgroundImage = `url("${file.src.replace(/["\\\n\r()]/g, "")}")`;
+
+  const imageOpacity = panel.querySelector<HTMLInputElement>("#bg-image-opacity");
+  const imageOpacityLabel = panel.querySelector("#bg-image-opacity-label");
+  if (imageOpacity) paintSlider(imageOpacity);
+  imageOpacity?.addEventListener("input", () => {
+    controller.remember("bg-image-opacity");
+    const value = Number(imageOpacity.value);
+    backgroundOf(controller).imageOpacity = value;
+    paintSlider(imageOpacity);
+    if (imageOpacityLabel) imageOpacityLabel.textContent = `Opacity ${Math.round(value)}`;
+    controller.apply();
+  });
 
   panel.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -196,18 +236,14 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
     }, `bg-stop:${current.id}`);
   });
 
-  const input = panel.querySelector<HTMLInputElement>("#bg-file");
-  panel.querySelector("#bg-upload")?.addEventListener("click", () => input?.click());
-  input?.addEventListener("change", () => {
-    const picked = input.files?.[0];
-    input.value = "";
-    if (!picked) return;
+  const applyImageFile = (picked: File) => {
     const note = panel.querySelector("#bg-note");
     void readImageFile(picked)
       .then((image) => {
         controller.remember();
         const next = backgroundOf(controller);
-        next.imageId = storeBackgroundImage(image.src, image.name);
+        next.imageId = storeBackgroundImage(image.src, image.name, image.width, image.height);
+        next.imageCredit = null;
         next.kind = "image";
         playCreate();
         controller.apply();
@@ -216,11 +252,44 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
       .catch(() => {
         if (note) note.textContent = "Use a JPG or PNG.";
       });
+  };
+
+  const input = panel.querySelector<HTMLInputElement>("#bg-file");
+  panel.querySelector("#bg-upload")?.addEventListener("click", () => input?.click());
+  input?.addEventListener("change", () => {
+    const picked = input.files?.[0];
+    input.value = "";
+    if (!picked) return;
+    applyImageFile(picked);
+  });
+  panel.querySelector("#bg-unsplash")?.addEventListener("click", () => {
+    openUnsplashImport({
+      orientation: coverOrientation(controller.state().canvas),
+      onHotlink(photo) {
+        controller.remember();
+        const next = backgroundOf(controller);
+        next.imageId = storeBackgroundImage(
+          unsplashHotlinkUrl(photo),
+          photo.photographer || photo.alt || "Unsplash",
+          photo.width,
+          photo.height,
+        );
+        next.imageCredit = {
+          photographer: photo.photographer || "Photographer",
+          profileUrl: photo.profileUrl,
+        };
+        next.kind = "image";
+        playCreate();
+        controller.apply();
+        if (controller.showing()) controller.refresh();
+      },
+    });
   });
   panel.querySelector("#bg-clear")?.addEventListener("click", () => {
     controller.remember();
     const next = backgroundOf(controller);
     next.imageId = "";
+    next.imageCredit = null;
     playRemove();
     controller.apply();
     controller.refresh();

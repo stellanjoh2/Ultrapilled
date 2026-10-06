@@ -63,6 +63,17 @@ function isDataUrl(value: unknown): value is string {
   return typeof value === "string" && value.startsWith("data:");
 }
 
+function isStoredImageSrc(value: unknown): value is string {
+  if (isDataUrl(value)) return true;
+  if (typeof value !== "string") return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === "https:" && /(^|\.)unsplash\.com$/i.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function cloneSlot(slot: Slot): Slot {
   return structuredClone(slot);
 }
@@ -273,7 +284,7 @@ export function parsePillProject(raw: string): PillProject | null {
       for (const item of record.images) {
         if (!item || typeof item !== "object") continue;
         const image = item as Record<string, unknown>;
-        if (typeof image.id !== "string" || !image.id || !isDataUrl(image.src)) continue;
+        if (typeof image.id !== "string" || !image.id || !isStoredImageSrc(image.src)) continue;
         images.push({
           id: image.id,
           src: image.src,

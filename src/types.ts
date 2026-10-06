@@ -488,7 +488,24 @@ export type BackgroundSettings = {
   gridColor: string;
   /** 0–100. */
   gridOpacity: number;
+  /** Attribution when the stage photo is an Unsplash hotlink. */
+  imageCredit: UnsplashImageCredit | null;
+  /** 0–100. Photo sits on black, so lower values darken the stage. */
+  imageOpacity: number;
 };
+
+export type UnsplashImageCredit = {
+  photographer: string;
+  profileUrl: string;
+};
+
+function unsplashImageCredit(raw: unknown): UnsplashImageCredit | null {
+  if (!raw || typeof raw !== "object") return null;
+  const photographer = "photographer" in raw && typeof raw.photographer === "string" ? raw.photographer.trim() : "";
+  const profileUrl = "profileUrl" in raw && typeof raw.profileUrl === "string" ? raw.profileUrl.trim() : "";
+  if (!photographer || !/^https:\/\//i.test(profileUrl)) return null;
+  return { photographer, profileUrl };
+}
 
 export function defaultBackground(): BackgroundSettings {
   return {
@@ -510,6 +527,8 @@ export function defaultBackground(): BackgroundSettings {
     gridDensity: "base",
     gridColor: "#ffffff",
     gridOpacity: 20,
+    imageCredit: null,
+    imageOpacity: 100,
   };
 }
 
@@ -526,6 +545,8 @@ export function normalizeBackground(raw: Partial<BackgroundSettings> | null | un
     gridDensity: raw.gridDensity === "finest" || raw.gridDensity === "fine" ? raw.gridDensity : "base",
     gridColor: typeof raw.gridColor === "string" && raw.gridColor ? raw.gridColor : base.gridColor,
     gridOpacity: typeof raw.gridOpacity === "number" ? Math.min(100, Math.max(0, raw.gridOpacity)) : base.gridOpacity,
+    imageCredit: unsplashImageCredit(raw.imageCredit),
+    imageOpacity: typeof raw.imageOpacity === "number" ? Math.min(100, Math.max(0, raw.imageOpacity)) : base.imageOpacity,
   };
 }
 

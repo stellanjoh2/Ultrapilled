@@ -127,7 +127,7 @@ function sectionMarkupImpl(
   title: string,
   tip: string,
   body: string,
-  options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string; dirty?: boolean },
+  options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string; dirty?: boolean; muted?: boolean },
 ): string {
   const open = openSections.has(id);
   const reset =
@@ -136,7 +136,7 @@ function sectionMarkupImpl(
       : "";
   const domId = options?.sectionId ? ` id="${options.sectionId}"` : "";
   return `
-    <section class="section${open ? " is-open" : ""}" data-section="${id}"${domId}>
+    <section class="section${open ? " is-open" : ""}${options?.muted ? " is-muted" : ""}" data-section="${id}"${domId}>
       <div class="section-head">
         <button type="button" class="section-toggle" aria-expanded="${open}">
           <span class="section-toggle__label" data-tip="${tip}">${title}</span>
@@ -196,7 +196,7 @@ export function mountCreatePanel(
     title: string,
     tip: string,
     bodyHtml: string,
-    options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string; dirty?: boolean },
+    options?: { resetId?: string; resetLabel?: string; resetTip?: string; sectionId?: string; dirty?: boolean; muted?: boolean },
   ) => sectionMarkupImpl(openSections, id, title, tip, bodyHtml, options);
   const revealSlotId = host.consumeRevealSlotId();
 const shapes = H.shapeAmountRange();
@@ -289,13 +289,13 @@ panel.innerHTML = `
         <span class="slot-add__icon" aria-hidden="true">${plus}</span>
         Add pill
       </button>
-      <button type="button" class="pill slot-add" id="add-type" data-tip="Add a short word without a pill shape">
+      <button type="button" class="pill slot-add" id="add-type" data-tip="One-line type sized to the letters — a few words, not a wrapping box">
         <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-        Add word
+        Add words
       </button>
-      <button type="button" class="pill slot-add" id="add-text-field" data-tip="Add a wrapping text box you can resize and paste into">
+      <button type="button" class="pill slot-add" id="add-text-field" data-tip="A wrapping box you can resize and paste into — sentences and paragraphs">
         <span class="slot-add__icon" aria-hidden="true">${textT}</span>
-        Add Text
+        Add longer text
       </button>
       <button type="button" class="pill slot-add" id="add-shape" data-tip="Add a built-in shape from the library">
         <span class="slot-add__icon" aria-hidden="true">${plus}</span>
@@ -416,7 +416,7 @@ panel.innerHTML = `
       <input type="range" id="audioHueNudge" min="0" max="30" step="1" value="${H.state.audioReact.hueNudge}"${H.state.physics.layoutMode ? " disabled" : ""} />
     </label>
     </div>`,
-    { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react", dirty: !H.state.physics.layoutMode && !audioReactAtDefault(H.state.audioReact) },
+    { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react", dirty: !H.state.physics.layoutMode && !audioReactAtDefault(H.state.audioReact), muted: H.state.physics.layoutMode },
   )}
   <footer class="panel-credit">
     <span class="panel-credit__s" aria-hidden="true"></span>

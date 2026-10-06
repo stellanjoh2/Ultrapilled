@@ -7,10 +7,13 @@ export type UnsplashPhoto = {
   alt: string;
   thumb: string;
   regular: string;
+  raw: string;
   downloadLocation: string;
   photographer: string;
   profileUrl: string;
   pageUrl: string;
+  width: number;
+  height: number;
 };
 
 export type UnsplashSearchPage = {
@@ -20,6 +23,8 @@ export type UnsplashSearchPage = {
   page: number;
 };
 
+export type UnsplashOrientation = "landscape" | "portrait" | "squarish";
+
 type SearchResponse = {
   total: number;
   total_pages: number;
@@ -27,9 +32,11 @@ type SearchResponse = {
     id: string;
     alt_description: string | null;
     description: string | null;
-    urls: { thumb: string; small: string; regular: string };
+    urls: { raw?: string; full?: string; thumb: string; small: string; regular: string };
     links: { download_location: string; html: string };
     user: { name: string; links: { html: string } };
+    width?: number;
+    height?: number;
   }>;
 };
 
@@ -72,10 +79,13 @@ function mapPhoto(photo: SearchResponse["results"][number]): UnsplashPhoto | nul
     alt: photo.alt_description || photo.description || photo.user.name,
     thumb: photo.urls.thumb || photo.urls.small,
     regular: photo.urls.regular,
+    raw: photo.urls.raw || photo.urls.full || photo.urls.regular,
     downloadLocation: photo.links.download_location,
     photographer: photo.user.name,
     profileUrl: withUnsplashUtm(photo.user.links.html),
     pageUrl: withUnsplashUtm(photo.links.html),
+    width: photo.width ?? 0,
+    height: photo.height ?? 0,
   };
 }
 
@@ -90,7 +100,11 @@ export async function getUnsplashPhoto(id: string): Promise<UnsplashPhoto> {
   return mapped;
 }
 
-export async function searchUnsplash(query: string, page = 1): Promise<UnsplashSearchPage> {
+export async function searchUnsplash(
+  query: string,
+  page = 1,
+  orientation?: UnsplashOrientation,
+): Promise<UnsplashSearchPage> {
   const q = query.trim();
   if (!q) return { photos: [], total: 0, totalPages: 0, page: 1 };
   const params = new URLSearchParams({
@@ -99,6 +113,7 @@ export async function searchUnsplash(query: string, page = 1): Promise<UnsplashS
     per_page: String(UNSPLASH_PER_PAGE),
     content_filter: "high",
   });
+  if (orientation) params.set("orientation", orientation);
   const res = await apiGet(`/search/photos?${params}`);
   const data = (await res.json()) as SearchResponse;
   return {
@@ -119,6 +134,26 @@ export async function trackUnsplashDownload(downloadLocation: string): Promise<v
   await fetch(url).catch(() => {
     /* tracking must not block import */
   });
+}
+
+/** Longest edge for hotlinked backgrounds — same cap as a local JPG upload. */
+export const UNSPLASH_BG_MAX = 3840;
+
+/** CDN URL at a useful stage size. `regular` is only ~1080px wide. */
+export function unsplashHotlinkUrl(photo: UnsplashPhoto, maxEdge = UNSPLASH_BG_MAX): string {
+  const src = photo.raw || photo.regular;
+  try {
+    const u = new URL(src);
+    const long = Math.max(photo.width || 0, photo.height || 0);
+    const edge = long > 0 ? Math.min(maxEdge, long) : maxEdge;
+    u.searchParams.set("w", String(edge));
+    u.searchParams.set("h", String(edge));
+    u.searchParams.set("fit", "max");
+    u.searchParams.set("q", u.searchParams.get("q") || "85");
+    return u.toString();
+  } catch {
+    return src;
+  }
 }
 
 export async function unsplashPhotoFile(photo: UnsplashPhoto, opts?: { track?: boolean }): Promise<File> {

@@ -137,7 +137,8 @@ export function pillGradientStops(from: string, to: string, scale?: number): { a
 function sampleLoop(from: string, to: string, scale: number | undefined, phase: number): { at: number; color: string }[] {
   const span = 2 * gradientScaleFactor(scale);
   const shift = loopUnit(phase);
-  const count = Math.min(64, Math.max(GRADIENT_STOPS, Math.ceil(GRADIENT_STOPS / gradientScaleFactor(scale))));
+  let count = Math.min(64, Math.max(GRADIENT_STOPS, Math.ceil(GRADIENT_STOPS / gradientScaleFactor(scale))));
+  if (count % 2 === 0) count = Math.min(64, count + 1);
   const stops: { at: number; color: string }[] = [];
   for (let i = 0; i < count; i++) {
     const at = i / (count - 1);
@@ -194,6 +195,11 @@ function stopList(stops: { at: number; color: string }[]): string {
   return stops.map((stop) => `${stop.color} ${(stop.at * 100).toFixed(2)}%`).join(", ");
 }
 
+/** One from→to→from period as mixHue samples. sRGB between samples has no hue-wrap seam. */
+function loopTileStops(from: string, to: string): { at: number; color: string }[] {
+  return sampleLoop(from, to, DEFAULT_GRADIENT_SCALE / 2, 0);
+}
+
 export function pillGradient(from: string, to: string, angle?: number, scale?: number): string {
   return `linear-gradient(${gradientAngleOf(angle)}deg ${HUE_SPACE}, ${stopList(loopAnchors(from, to, scale))})`;
 }
@@ -208,7 +214,9 @@ export function pillSweepStops(from: string, to: string, phase = 0, scale?: numb
  * gradient angle so repeat-x stays seamless at every angle.
  */
 export function pillSweepBand(from: string, to: string): string {
-  return `linear-gradient(90deg ${HUE_SPACE}, ${from} 0%, ${to} 50%, ${from} 100%)`;
+  // CSS `in hsl` on three stops treats white as hue 0, so the B→A half
+  // pops a hard stripe when the tile join crosses the fill.
+  return `linear-gradient(90deg, ${stopList(loopTileStops(from, to))})`;
 }
 
 /**
@@ -219,9 +227,10 @@ export function pillSweepBand(from: string, to: string): string {
  */
 export function textSweepImage(from: string, to: string, angle?: number, periodPx = 200): string {
   const period = Math.max(2, periodPx);
-  const mid = (period / 2).toFixed(2);
-  const end = period.toFixed(2);
-  return `repeating-linear-gradient(${gradientAngleOf(angle)}deg ${HUE_SPACE}, ${from} 0px, ${to} ${mid}px, ${from} ${end}px)`;
+  const list = loopTileStops(from, to)
+    .map((stop) => `${stop.color} ${(stop.at * period).toFixed(2)}px`)
+    .join(", ");
+  return `repeating-linear-gradient(${gradientAngleOf(angle)}deg, ${list})`;
 }
 
 /** Pixel shift for one seamless text-sweep period. CSS 0° is up, 90° is right. */
@@ -234,7 +243,7 @@ export function textSweepShift(angle: number | undefined, periodPx: number): { x
 /** Angled seamless fill for small UI previews (two periods for a 200% background shift). */
 export function pillSweepGradient(from: string, to: string, angle?: number, scale?: number): string {
   // Half scale packs two visible periods into 0–100% so a 100% shift loops without a B|A join.
-  return `linear-gradient(${gradientAngleOf(angle)}deg ${HUE_SPACE}, ${stopList(loopAnchors(from, to, gradientScaleOf(scale) / 2))})`;
+  return `linear-gradient(${gradientAngleOf(angle)}deg, ${stopList(sampleLoop(from, to, gradientScaleOf(scale) / 2, 0))})`;
 }
 
 /**

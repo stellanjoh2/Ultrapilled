@@ -90,4 +90,40 @@ describe("pillFormat round-trip", () => {
       remote: { kind: "giphy", id: "abc123" },
     });
   });
+
+  it("round-trips an Unsplash background hotlink and credit", () => {
+    const state = {
+      ...blankState(),
+      template: "blank",
+      background: {
+        ...blankState().background,
+        kind: "image" as const,
+        imageId: "bg-unsplash",
+        imageCredit: {
+          photographer: "Ada Lovelace",
+          profileUrl: "https://unsplash.com/@ada?utm_source=ultrapilled&utm_medium=referral",
+        },
+      },
+    };
+    const project: PillProject = {
+      state,
+      poses: [],
+      frame: { width: 1280, height: 720 },
+      images: [
+        {
+          id: "bg-unsplash",
+          src: "https://images.unsplash.com/photo-test?w=1080",
+          name: "Ada Lovelace",
+          width: 4032,
+          height: 3024,
+        },
+      ],
+      loop: false,
+      pages: [],
+      pageIndex: 0,
+    };
+    const parsed = parsePillProject(serializePillProject(project));
+    expect(parsed!.state.background.imageCredit).toEqual(state.background.imageCredit);
+    expect(parsed!.images).toEqual(project.images);
+  });
 });

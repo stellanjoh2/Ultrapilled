@@ -92,6 +92,7 @@ import { isAboutOpen } from "./aboutPanel";
 import { isBugReportOpen } from "./bugReport";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
 import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
+import { withUnsplashUtm } from "./unsplashApi";
 import { openGiphyImport, isGiphyOpen } from "./giphyPanel";
 import { openYouTubeImport, isYouTubeOpen } from "./youtubePanel";
 import {
@@ -250,6 +251,10 @@ app.innerHTML = `
         <canvas class="phys-debug" id="phys-debug" aria-hidden="true" hidden></canvas>
         <p class="canvas-welcome" id="canvas-welcome" hidden></p>
         <div class="canvas-nudge" id="canvas-nudge" hidden aria-live="polite"></div>
+        <p class="bg-credit" id="bg-credit" hidden>
+          Photo by <a data-credit-by target="_blank" rel="noopener noreferrer"></a>
+          on <a data-credit-home target="_blank" rel="noopener noreferrer">Unsplash</a>
+        </p>
       </div>
     </div>
     <nav class="page-strip" id="page-strip" hidden aria-label="Pages"></nav>
@@ -326,6 +331,9 @@ const stageVeil = app.querySelector<HTMLElement>("#stage-veil")!;
 const physDebugCanvas = app.querySelector<HTMLCanvasElement>("#phys-debug")!;
 const canvasWelcome = app.querySelector<HTMLElement>("#canvas-welcome")!;
 const canvasNudge = app.querySelector<HTMLElement>("#canvas-nudge")!;
+const bgCredit = playfield.querySelector<HTMLElement>("#bg-credit")!;
+bgCredit.addEventListener("pointerdown", (event) => event.stopPropagation());
+bgCredit.addEventListener("click", (event) => event.stopPropagation());
 let physDebugOn = false;
 let nudgeFadeTimer = 0;
 let shapeBlinkTimer = 0;
@@ -1020,7 +1028,31 @@ function applyBackground() {
   playfield.style.backgroundRepeat = paint.repeat;
   applyGrid();
   applyLogo();
+  applyUnsplashCredit();
   syncLogotypeAccent();
+}
+
+function applyUnsplashCredit() {
+  const by = bgCredit.querySelector<HTMLAnchorElement>("[data-credit-by]");
+  const home = bgCredit.querySelector<HTMLAnchorElement>("[data-credit-home]");
+  const credit = state.background.kind === "image" ? state.background.imageCredit : null;
+  if (!credit || !by || !home) {
+    bgCredit.hidden = true;
+    return;
+  }
+  try {
+    if (new URL(credit.profileUrl).protocol !== "https:") {
+      bgCredit.hidden = true;
+      return;
+    }
+  } catch {
+    bgCredit.hidden = true;
+    return;
+  }
+  by.textContent = credit.photographer;
+  by.href = credit.profileUrl;
+  home.href = withUnsplashUtm("https://unsplash.com");
+  bgCredit.hidden = false;
 }
 
 /** Hold grid invisible until Mode Select preview finishes dumping. */
@@ -2485,8 +2517,11 @@ function addTextFieldSlot(at?: PlaceAt) {
   playCreate();
   renderPanel();
   live();
-  showPick(slot.id);
-  editChipText(slot.id, "end");
+  // Edit pins the body as static. Keep that for layout; physics should fall.
+  if (state.physics.layoutMode) {
+    showPick(slot.id);
+    editChipText(slot.id, "end");
+  }
 }
 
 function addShapeSlot(at?: PlaceAt) {
@@ -3826,8 +3861,8 @@ function openCanvasMenu(x: number, y: number) {
   const uiHidden = shell.classList.contains("ui-hidden");
   const entries: { label: string; icon: string; run: () => void; clear?: boolean; tip: string }[] = [
     { label: "Pill", icon: pillIcon, tip: "Add a text label inside a rounded pill", run: () => addPillSlot(at) },
-    { label: "Word", icon: textAa, tip: "Add a short word without a pill shape", run: () => addTypeSlot(at) },
-    { label: "Text", icon: textT, tip: "Add a wrapping text box you can resize and paste into", run: () => addTextFieldSlot(at) },
+    { label: "Words", icon: textAa, tip: "One-line type sized to the letters — a few words, not a wrapping box", run: () => addTypeSlot(at) },
+    { label: "Longer text", icon: textT, tip: "A wrapping box you can resize and paste into — sentences and paragraphs", run: () => addTextFieldSlot(at) },
     { label: "Shape", icon: shapesIcon, tip: "Add a built-in shape from the library", run: () => addShapeSlot(at) },
     { label: "Emoji", icon: smileyIcon, tip: "Add an emoji", run: () => addEmojiSlot(at) },
     {

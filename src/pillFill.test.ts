@@ -9,12 +9,13 @@ function cssColors(image: string): string[] {
 describe("text gradient sweep", () => {
   it("repeats a from→to→from tile whose ends match", () => {
     const image = textSweepImage("#ff2d55", "#5ac8fa", 90, 160);
-    expect(image.startsWith("repeating-linear-gradient(90deg in hsl shorter hue, ")).toBe(true);
+    expect(image.startsWith("repeating-linear-gradient(90deg, ")).toBe(true);
+    expect(image).not.toContain("in hsl");
     const stops = cssColors(image);
     expect(stops[0]).toBe("#ff2d55");
-    expect(stops[1]).toBe("#5ac8fa");
     expect(stops[stops.length - 1]).toBe("#ff2d55");
-    expect(stops.length).toBe(3);
+    expect(stops.length).toBeGreaterThan(3);
+    expect(stops).toContain("#5ac8fa");
   });
 
   it("shifts one period along the gradient axis", () => {
@@ -40,8 +41,11 @@ describe("pill gradient seams", () => {
   });
 
   it("tiles a sweep band with matching ends", () => {
-    const colors = cssColors(pillSweepBand("#ff00c4", "#3b00ff"));
+    const css = pillSweepBand("#ff00c4", "#3b00ff");
+    expect(css).not.toContain("in hsl");
+    const colors = cssColors(css);
     expect(colors[0]).toBe(colors[colors.length - 1]);
+    expect(colors[0]).toBe("#ff00c4");
     expect(colors).toContain("#3b00ff");
   });
 
@@ -49,7 +53,6 @@ describe("pill gradient seams", () => {
     const colors = cssColors(pillSweepGradient("#ff00c4", "#3b00ff", 90, 50));
     expect(colors[0]).toBe("#ff00c4");
     expect(colors[colors.length - 1]).toBe("#ff00c4");
-    const mid = colors[Math.floor(colors.length / 2)];
-    expect(mid).toBe("#3b00ff");
+    expect(colors).toContain("#3b00ff");
   });
 });

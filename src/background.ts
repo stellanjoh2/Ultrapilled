@@ -222,20 +222,34 @@ function cssUrl(src: string): string {
   return `url("${src.replace(/["\\\n\r()]/g, "")}")`;
 }
 
-/** Portrait frames meet the top and bottom and crop the sides. Landscape and square cover the frame. */
-export function imageFrame(ratio: CanvasRatio): { size: string; position: string } {
-  if (ratio === "9:16" || ratio === "3:4") return { size: "auto 100%", position: "center center" };
+const IMAGE_UNDERLAY = "#000";
+
+function imageOpacityOf(background: BackgroundSettings): number {
+  const n = background.imageOpacity;
+  if (typeof n !== "number" || !Number.isFinite(n)) return 100;
+  return Math.min(100, Math.max(0, n));
+}
+
+function imageStack(src: string, opacity: number): string {
+  const url = cssUrl(src);
+  const veil = 1 - opacity / 100;
+  if (veil <= 0) return url;
+  return `linear-gradient(rgb(0 0 0 / ${veil}), rgb(0 0 0 / ${veil})), ${url}`;
+}
+
+/** Fill the frame. Extra photo is cropped on the long side so the stage never letterboxes. */
+export function imageFrame(): { size: string; position: string } {
   return { size: "cover", position: "center center" };
 }
 
-export function backgroundPaint(background: BackgroundSettings, ratio: CanvasRatio, solid: string): BackgroundPaint {
+export function backgroundPaint(background: BackgroundSettings, _ratio: CanvasRatio, solid: string): BackgroundPaint {
   if (background.kind === "image") {
     const file = backgroundImage(background.imageId);
     if (file) {
-      const frame = imageFrame(ratio);
+      const frame = imageFrame();
       return {
-        color: solid,
-        image: cssUrl(file.src),
+        color: IMAGE_UNDERLAY,
+        image: imageStack(file.src, imageOpacityOf(background)),
         size: frame.size,
         position: frame.position,
         repeat: "no-repeat",
@@ -287,10 +301,10 @@ export function paintBackdrop(
   height: number,
   solid: string,
   background: BackgroundSettings,
-  ratio: CanvasRatio,
+  _ratio: CanvasRatio,
   image: HTMLImageElement | null,
 ) {
-  ctx.fillStyle = solid;
+  ctx.fillStyle = background.kind === "image" ? IMAGE_UNDERLAY : solid;
   ctx.fillRect(0, 0, width, height);
   if (background.kind === "gradient" && background.stops.length >= 2) {
     const stops = sortedStops(background.stops);
@@ -303,13 +317,15 @@ export function paintBackdrop(
     return;
   }
   if (background.kind !== "image" || !image || image.width < 1 || image.height < 1) return;
-  const cover = ratio !== "9:16" && ratio !== "3:4";
-  const scale = cover
-    ? Math.max(width / image.width, height / image.height)
-    : height / image.height;
+  const opacity = imageOpacityOf(background) / 100;
+  if (opacity <= 0) return;
+  const scale = Math.max(width / image.width, height / image.height);
   const dw = image.width * scale;
   const dh = image.height * scale;
-  ctx.drawImage(image, (width - dw) / 2, cover ? (height - dh) / 2 : 0, dw, dh);
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.drawImage(image, (width - dw) / 2, (height - dh) / 2, dw, dh);
+  ctx.restore();
 }
 
 export function paintGrid(
@@ -339,5 +355,28 @@ export function paintGrid(
     ctx.lineTo(width, y);
   }
   ctx.stroke();
+  ctx.restore();
+}
+
+/** Bottom-right Unsplash attribution for exported frames. Live editor uses the HTML overlay. */
+export function paintUnsplashCredit(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  credit: BackgroundSettings["imageCredit"],
+) {
+  const name = credit?.photographer?.trim();
+  if (!name || width < 480 || height < 270) return;
+  const pad = Math.max(10, Math.round(width * 0.014));
+  const size = Math.max(11, Math.round(width * 0.011));
+  ctx.save();
+  ctx.font = `500 ${size}px "Mattone Regular", system-ui, sans-serif`;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "bottom";
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.shadowColor = "rgba(0,0,0,0.7)";
+  ctx.shadowBlur = Math.max(3, size * 0.35);
+  ctx.shadowOffsetY = 1;
+  ctx.fillText(`Photo by ${name} on Unsplash`, width - pad, height - pad);
   ctx.restore();
 }

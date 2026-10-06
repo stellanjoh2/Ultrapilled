@@ -2,9 +2,11 @@ import gsap from "gsap";
 import type { ImageRemote } from "./types";
 import {
   searchUnsplash,
+  trackUnsplashDownload,
   unsplashConfigured,
   unsplashPhotoFile,
   withUnsplashUtm,
+  type UnsplashOrientation,
   type UnsplashPhoto,
 } from "./unsplashApi";
 import { playRemove, playTransition } from "./uiSounds";
@@ -62,7 +64,11 @@ export function closeUnsplash(): void {
   tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
 }
 
-export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRemote) => void }): void {
+export function openUnsplashImport(opts: {
+  onPick?: (file: File, remote?: ImageRemote) => void;
+  onHotlink?: (photo: UnsplashPhoto) => void;
+  orientation?: UnsplashOrientation;
+}): void {
   if (modalRoot || closing) return;
 
   const root = document.createElement("div");
@@ -176,11 +182,17 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
   const pickPhoto = async (photo: UnsplashPhoto, btn: HTMLButtonElement) => {
     if (btn.classList.contains("is-busy")) return;
     btn.classList.add("is-busy");
-    setStatus("Importing…");
+    setStatus(opts.onHotlink ? "Applying…" : "Importing…");
     try {
+      if (opts.onHotlink) {
+        await trackUnsplashDownload(photo.downloadLocation);
+        closeUnsplash();
+        opts.onHotlink(photo);
+        return;
+      }
       const file = await unsplashPhotoFile(photo);
       closeUnsplash();
-      opts.onPick(file, { kind: "unsplash", id: photo.id });
+      opts.onPick?.(file, { kind: "unsplash", id: photo.id });
     } catch {
       btn.classList.remove("is-busy");
       setStatus("Couldn’t import that photo. Try another.");
@@ -227,7 +239,7 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
     loadingMore = false;
     setStatus("Searching…");
     updateMore();
-    void searchUnsplash(q, 1)
+    void searchUnsplash(q, 1, opts.orientation)
       .then((next) => {
         if (gen !== searchGen) return;
         if (!next.photos.length) {
@@ -248,7 +260,7 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
     const gen = searchGen;
     loadingMore = true;
     updateMore();
-    void searchUnsplash(activeQuery, page + 1)
+    void searchUnsplash(activeQuery, page + 1, opts.orientation)
       .then((next) => {
         if (gen !== searchGen) return;
         loadingMore = false;
