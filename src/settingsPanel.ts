@@ -1,6 +1,5 @@
 import gsap from "gsap";
 import atomIcon from "@phosphor-icons/core/assets/regular/atom.svg?raw";
-import boundingBoxIcon from "@phosphor-icons/core/assets/regular/bounding-box.svg?raw";
 import arrowLeftIcon from "@phosphor-icons/core/assets/regular/arrow-left.svg?raw";
 import circleHalfIcon from "@phosphor-icons/core/assets/regular/circle-half.svg?raw";
 import clockCounterClockwiseIcon from "@phosphor-icons/core/assets/regular/clock-counter-clockwise.svg?raw";
@@ -86,12 +85,13 @@ function shortcutsMarkup(): string {
     shortcutRow("Redo", `${keycap(mod)}${keycap("⇧")}${keycap("Z")}`, `Also ${mod}+Y`),
     shortcutRow("Deselect / exit edit", keycap("Esc")),
     shortcutRow("Edit selected text", keycap("Enter")),
-    shortcutRow("Scale only while transforming", keycap("⇧"), "Hold during scale drag"),
+    shortcutRow("Scale only from corner", keycap("⇧"), "Hold during transform drag"),
     shortcutRow(
-      "Scale only, snap angle",
+      "Scale only from center",
       `${keycap("⇧")}${keycap(altKeyLabel())}`,
-      "45° steps while scale-dragging",
+      "Hold during transform drag",
     ),
+    shortcutRow("Move in a straight line", keycap("⇧"), "Hold while dragging a piece"),
     shortcutRow("Add to selection", `${keycap("⇧")}${keycap("Click")}`),
   ].join("");
   return `
@@ -131,7 +131,7 @@ function paintVolume() {
 
 function paintToggles(controller?: SettingsController) {
   const prefs = getPrefs();
-  panelEl?.querySelectorAll<HTMLInputElement>("#settings-sound, #settings-bounce-sounds, #settings-ui-sounds, #settings-tips, #settings-tooltips, #settings-remember, #settings-performance, #settings-subtle-select").forEach((input) => {
+  panelEl?.querySelectorAll<HTMLInputElement>("#settings-sound, #settings-bounce-sounds, #settings-ui-sounds, #settings-tips, #settings-tooltips, #settings-remember, #settings-performance").forEach((input) => {
     if (input.id === "settings-sound") input.checked = prefs.soundOn;
     if (input.id === "settings-bounce-sounds") {
       input.checked = prefs.soundOn && prefs.bounceSounds;
@@ -145,7 +145,6 @@ function paintToggles(controller?: SettingsController) {
     if (input.id === "settings-tooltips") input.checked = prefs.tooltipsOn;
     if (input.id === "settings-remember") input.checked = prefs.rememberLast;
     if (input.id === "settings-performance") input.checked = prefs.performance;
-    if (input.id === "settings-subtle-select") input.checked = prefs.subtleSelect;
   });
   panelEl?.querySelectorAll<HTMLButtonElement>("[data-theme-chrome]").forEach((button) => {
     const on = button.dataset.themeChrome === prefs.theme;
@@ -223,15 +222,6 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
       </div>
     </section>
     <section class="section">
-      <h2 data-tip="How selected pieces are outlined on the stage">${sectionTitleIcon(boundingBoxIcon)}Selection</h2>
-      <div class="check-row">
-        <label class="check" data-tip="Solid accent outline instead of the animated multi-color stroke">
-          ${checkInput(`id="settings-subtle-select" ${prefs.subtleSelect ? "checked" : ""}`)}
-          Subtle Select
-        </label>
-      </div>
-    </section>
-    <section class="section">
       <h2 data-tip="Lighter live bloom so piles stay smoother; exports stay full quality">${sectionTitleIcon(gaugeIcon)}Performance</h2>
       <div class="check-row">
         <label class="check" data-tip="Softens live bloom for smoother playback; exports stay full quality">
@@ -299,7 +289,6 @@ function mountSettingsBody(panel: HTMLElement, controller: SettingsController) {
   bindCheck(panel, "settings-tooltips", "tooltipsOn", controller);
   bindCheck(panel, "settings-remember", "rememberLast", controller);
   bindCheck(panel, "settings-performance", "performance", controller);
-  bindCheck(panel, "settings-subtle-select", "subtleSelect", controller);
 
   const volumeInput = panel.querySelector<HTMLInputElement>("#settings-volume");
   const volumeCaption = panel.querySelector("[data-range-label='settings-volume']");

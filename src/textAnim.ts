@@ -200,6 +200,8 @@ type BareCanvasRun = {
   gradientTo: string;
   angle?: number;
   scale?: number;
+  /** Bloom glow canvases that copy this face each frame (one clock, no lag). */
+  mirrors: Set<HTMLCanvasElement>;
 };
 
 function bareCanvasSig(run: Pick<BareCanvasRun, "slot" | "width" | "height" | "tracking" | "shiftEm" | "color" | "gradientTo" | "angle" | "scale">): string {
@@ -210,6 +212,33 @@ function bareCanvasSig(run: Pick<BareCanvasRun, "slot" | "width" | "height" | "t
 
 const bareCanvasRuns = new WeakMap<HTMLCanvasElement, BareCanvasRun>();
 const bareCanvasTickers = new Set<() => void>();
+/** mirror canvas → face canvas (so detach can unlink). */
+const bareCanvasMirrorOf = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+
+function blitCanvasBitmap(src: HTMLCanvasElement, dst: HTMLCanvasElement) {
+  if (dst.width !== src.width) dst.width = src.width;
+  if (dst.height !== src.height) dst.height = src.height;
+  dst.style.width = src.style.width;
+  dst.style.height = src.style.height;
+  dst.style.display = "block";
+  dst.style.transform = "translateZ(0)";
+  const ctx = dst.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, dst.width, dst.height);
+  ctx.drawImage(src, 0, 0);
+}
+
+function paintBareCanvasMirrors(run: BareCanvasRun, canvas: HTMLCanvasElement) {
+  for (const mirror of [...run.mirrors]) {
+    if (!mirror.isConnected) {
+      run.mirrors.delete(mirror);
+      bareCanvasMirrorOf.delete(mirror);
+      continue;
+    }
+    blitCanvasBitmap(canvas, mirror);
+  }
+}
 
 function paintBareRollingFrame(
   canvas: HTMLCanvasElement,
@@ -234,6 +263,7 @@ function paintBareRollingFrame(
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.style.display = "block";
+  canvas.style.transform = "translateZ(0)";
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   // Identity CTM + device-pixel font: measure/paint share one space (no DPR transform
@@ -311,6 +341,7 @@ export function applyBareCanvasTextAnim(
     if (slot.textAnim) host.classList.add("is-text-anim-host");
     return;
   }
+  const mirrors = prev?.mirrors ?? new Set<HTMLCanvasElement>();
   stopBareCanvasTextAnim(canvas);
 
   if (slot.textAnim) host.classList.add("is-text-anim-host");
@@ -335,6 +366,7 @@ export function applyBareCanvasTextAnim(
       run.angle,
       run.scale,
     );
+    paintBareCanvasMirrors(run, canvas);
   };
 
   const tick = () => {
@@ -367,7 +399,7 @@ export function applyBareCanvasTextAnim(
   gsap.ticker.add(tick);
   bareCanvasTickers.add(tick);
 
-  bareCanvasRuns.set(canvas, {
+  const run: BareCanvasRun = {
     sig,
     slot,
     width,
@@ -378,19 +410,51 @@ export function applyBareCanvasTextAnim(
     gradientTo,
     angle,
     scale,
+    mirrors,
     repaint: paintNow,
     kill: () => {
       gsap.ticker.remove(tick);
       bareCanvasTickers.delete(tick);
       host.classList.remove("is-text-anim-host");
+      for (const mirror of mirrors) bareCanvasMirrorOf.delete(mirror);
+      mirrors.clear();
       bareCanvasRuns.delete(canvas);
     },
-  });
+  };
+  bareCanvasRuns.set(canvas, run);
+  paintBareCanvasMirrors(run, canvas);
 }
 
 export function stopBareCanvasTextAnim(canvas: HTMLCanvasElement) {
   const prev = bareCanvasRuns.get(canvas);
   if (prev) prev.kill();
+}
+
+/**
+ * Bloom glow follows the face letter-cycle / sweep — one clock, blit each frame.
+ * Returns false if `source` is not running a bare-canvas anim.
+ */
+export function mirrorBareCanvas(source: HTMLCanvasElement, mirror: HTMLCanvasElement): boolean {
+  const run = bareCanvasRuns.get(source);
+  if (!run) return false;
+  stopBareCanvasTextAnim(mirror);
+  const prevSource = bareCanvasMirrorOf.get(mirror);
+  if (prevSource && prevSource !== source) {
+    bareCanvasRuns.get(prevSource)?.mirrors.delete(mirror);
+  }
+  run.mirrors.add(mirror);
+  bareCanvasMirrorOf.set(mirror, source);
+  blitCanvasBitmap(source, mirror);
+  return true;
+}
+
+export function unmirrorBareCanvas(mirror: HTMLCanvasElement) {
+  const source = bareCanvasMirrorOf.get(mirror);
+  if (source) {
+    bareCanvasRuns.get(source)?.mirrors.delete(mirror);
+    bareCanvasMirrorOf.delete(mirror);
+  }
+  stopBareCanvasTextAnim(mirror);
 }
 
 /** Live gradient-wheel updates. The letter-cycle ticker owns the canvas; rewriting the bitmap from outside is overwritten next frame, and a missing label used to drop the angle entirely. */
@@ -408,7 +472,10 @@ export function setBareCanvasGradient(canvas: HTMLCanvasElement, angle: number, 
 
 export function stopBareCanvasTextAnimIn(root: ParentNode) {
   root.querySelectorAll("canvas").forEach((node) => {
-    if (node instanceof HTMLCanvasElement) stopBareCanvasTextAnim(node);
+    if (!(node instanceof HTMLCanvasElement)) return;
+    // Face kill clears mirrors; glow unlink drops the blit link.
+    if (bareCanvasRuns.has(node)) stopBareCanvasTextAnim(node);
+    else unmirrorBareCanvas(node);
   });
 }
 

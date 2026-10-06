@@ -1,8 +1,8 @@
 /**
- * Free-transform scale pivots.
+ * Free-transform scale pivots (Photoshop-style).
  *
- * Default: opposite corner stays fixed (Figma/Photoshop-style).
- * Shift: center-anchored uniform scale (legacy “straight” scale).
+ * Default / Shift: opposite corner stays fixed.
+ * Alt / Shift+Alt: center-anchored uniform scale.
  */
 
 export type XformCorner = "se" | "ne" | "nw" | "sw";

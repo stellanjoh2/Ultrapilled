@@ -5,12 +5,15 @@ import { imageColliderId } from "./icons";
 import { isColorMask, type ChipDraw, type ChipPose } from "./chipKinds";
 import {
   applyVisual,
+  blitBareTextCanvas,
+  isChipChrome,
   paintBareText,
   paintBareTextCss,
   paintDropShadow,
   paintFill,
   paintSweepBand,
 } from "./chipDomPaint";
+import { chipContributesBloom } from "./chipLook";
 import { createColliderBody, presetIdForSrc, simpleColliderKind } from "./iconMesh";
 import {
   cornerRadius,
@@ -31,7 +34,7 @@ import {
   type XformCorner,
 } from "./xformAnchor";
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
-import { applyBareCanvasTextAnim, setBareCanvasGradient, stopTextAnimIn } from "./textAnim";
+import { applyBareCanvasTextAnim, mirrorBareCanvas, setBareCanvasGradient, stopTextAnimIn, unmirrorBareCanvas } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
 import { blendMode, DEFAULT_PHYSICS, isTextField, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
 import { playImpact } from "./uiSounds";
@@ -130,33 +133,33 @@ type PhysicsQuality = {
 
 const PHYSICS_QUALITY: Record<PhysicsComplexity, PhysicsQuality> = {
   simple: {
-    separatePasses: 12,
+    separatePasses: 8,
     maxContactSteps: 2,
     positionSingle: 6,
-    positionMulti: 16,
+    positionMulti: 12,
     velocitySingle: 4,
-    velocityMulti: 6,
+    velocityMulti: 5,
     // Tiny slop only — larger allow left chips visually stacked after settle.
     overlapAllow: 0.12,
     maxPush: 5,
   },
   normal: {
-    separatePasses: 20,
-    maxContactSteps: 4,
+    separatePasses: 12,
+    maxContactSteps: 3,
     positionSingle: 6,
-    positionMulti: 32,
+    positionMulti: 18,
     velocitySingle: 4,
-    velocityMulti: 8,
+    velocityMulti: 6,
     overlapAllow: 0.12,
     maxPush: 7,
   },
   ultra: {
-    separatePasses: 32,
-    maxContactSteps: 4,
-    positionSingle: 12,
-    positionMulti: 40,
-    velocitySingle: 6,
-    velocityMulti: 12,
+    separatePasses: 16,
+    maxContactSteps: 3,
+    positionSingle: 8,
+    positionMulti: 24,
+    velocitySingle: 5,
+    velocityMulti: 8,
     overlapAllow: 0.08,
     maxPush: 10,
   },
@@ -212,6 +215,8 @@ type ChipLook = {
   ink: string;
   tracking: number;
   shiftEm: number;
+  /** Resolved gradient end used for bloom contribution + glow paint. */
+  gradientTo: string;
 };
 
 /** Bounce SFX event for offline export muxing. `timeMs` is sim clock since `play()`. */
@@ -267,6 +272,11 @@ export type WorldHandle = {
     onBoxSize?: (slotId: string, sx: number, sy: number, phase: "start" | "move" | "end") => void,
   ) => void;
   refreshFrost: () => void;
+  /**
+   * Live CSS bloom layer. When false, glow twins stay detached so seat/paint
+   * only touch the face layer (biggest win when bloom is off).
+   */
+  setBloomLive: (on: boolean) => void;
   setPicked: (slotId: string | null, opts?: { ids?: string[] }) => void;
   setEditing: (slotId: string | null) => void;
   editingId: () => string | null;
@@ -284,6 +294,11 @@ export type WorldHandle = {
     opts?: { quiet?: boolean },
   ) => void;
   setSimulationScale: (scale: number) => void;
+  /**
+   * Drop contact substeps when wall-clock frames run long (dt from rAF).
+   * Export/offline `step()` ignores this and keeps scale-based steps.
+   */
+  adaptFrameBudget: (dtMs: number) => void;
   /** Corner free-transform hard max (from composition masterScale). */
   setFreeScaleMax: (max: number) => void;
   /** Scale pulse per slot id (1 = normal). Grows dig out overlaps. */
@@ -308,6 +323,11 @@ export type WorldHandle = {
   poses: () => ChipPose[];
   /** Next refresh spawns these slots at a playfield point instead of above the pile. */
   armPlaceAt: (slotIds: Iterable<string>, x: number, y: number) => void;
+  /**
+   * Next refresh spawns `slotId` chips with these poses (scaleMul, angle, flips, sizeUnit),
+   * offset slightly from the source so duplicates don't stack on top.
+   */
+  armSpawnFrom: (slotId: string, poses: ChipPose[]) => void;
   /** Move chips for these slots to a playfield point and shove overlapping neighbors out. */
   placeSlotsAt: (slotIds: Iterable<string>, x: number, y: number) => void;
   /** True when any two chip colliders intersect (used before leaving layout mode). */
@@ -546,12 +566,21 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let running = false;
   let spinDrag = 0;
   let contactSteps = 1;
+  /** Live-frame cap on contactSteps (lowered when rAF dt is heavy). */
+  let frameBudgetSteps = 4;
+  let frameMsEma = FRAME_MS;
+  /** Coalesce intense audio digs — afterUpdate hard-digs while liveAudioScale. */
+  let lastAudioDigAt = 0;
   let physicsKey = "";
   let layoutMode = false;
   let scenePhysics: PhysicsSettings = { ...DEFAULT_PHYSICS };
   let attractorSyrup = false;
   let quality = PHYSICS_QUALITY.normal;
   let simScale = 1;
+  /** Soft afterUpdate separation runs once per this many engine updates (matches contactSteps). */
+  let softSeparateSkip = 0;
+  /** True while any chip is audio-scaled away from 1 — hard-dig every substep. */
+  let liveAudioScale = false;
   /** Corner free-transform hard max; main updates from masterScale. */
   let freeScaleMax = SCALE_FREE_BASE;
   let audioScaleBySlot = new Map<string, number>();
@@ -566,6 +595,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let fallStart: ChipPose[] | null = null;
   let layer: HTMLElement | null = null;
   let bloomLayer: HTMLElement | null = null;
+  /** When false, glow nodes stay detached — no seat/paint work for bloom twins. */
+  let bloomLive = false;
   let chromeLayer: HTMLElement | null = null;
   let stageEl: HTMLElement | null = null;
   let mirrorScenes: HTMLElement[] = [];
@@ -592,6 +623,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let editingId: string | null = null;
   /** Spawn these slot ids at a point on the next refresh (import / drop). */
   let pendingPlace: { ids: Set<string>; x: number; y: number } | null = null;
+  /** New slot id → source poses to inherit on the next refresh spawn. */
+  let pendingSpawnFrom: Map<string, ChipPose[]> | null = null;
+  /** Diagonal nudge so a duplicate isn't buried under its source. */
+  const SPAWN_FROM_OFFSET = 24;
   let clickChip: DroppedChip | null = null;
   let drag: {
     /** Chip under the pointer (click / release still key off this). */
@@ -599,6 +634,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     pointerId: number;
     x: number;
     y: number;
+    /** Stage pointer at grab start — Shift locks move to the dominant axis from here. */
+    startX: number;
+    startY: number;
     originX: number;
     originY: number;
     moved: boolean;
@@ -618,8 +656,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   } | null = null;
   /**
    * Combined scale+rotate: radial drag scales, angular drag rotates (like the gradient wheel).
-   * Default pivot = opposite corner (Figma-style). Shift = center-anchored scale only.
-   * Shift+Alt also snaps the locked angle to 45° steps.
+   * Default pivot = opposite corner. Alt = center-anchored. Shift = scale only (no rotate).
+   * Shift+Alt = scale only from center (Photoshop-style).
    */
   let xformDrag: {
     chip: DroppedChip;
@@ -630,7 +668,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     /** World-space opposite-corner anchor (default mode). */
     anchorX: number;
     anchorY: number;
-    /** True while Shift holds center-anchored uniform scale. */
+    /** True while Alt holds center-anchored uniform scale. */
     centerAnchored: boolean;
     startDist: number;
     startScale: number;
@@ -984,7 +1022,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       Sleeping.set(body, false);
       return { chip: item, pin, ox, oy };
     });
-    drag = { chip, pointerId, x, y, originX, originY, moved: false, pins };
+    drag = { chip, pointerId, x, y, startX: x, startY: y, originX, originY, moved: false, pins };
     if (!layoutMode) setRunning(true);
   }
 
@@ -1123,12 +1161,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (boundsMiss(a, b)) return false;
 
     let best: Matter.Collision | null = null;
-    const aParts = solidParts(a);
-    const bParts = solidParts(b);
-    for (let pa = 0; pa < aParts.length; pa++) {
-      const partA = aParts[pa];
-      for (let pb = 0; pb < bParts.length; pb++) {
-        const partB = bParts[pb];
+    const aParts = a.parts;
+    const bParts = b.parts;
+    const aStart = aParts.length > 1 ? 1 : 0;
+    const bStart = bParts.length > 1 ? 1 : 0;
+    for (let pa = aStart; pa < aParts.length; pa++) {
+      const partA = aParts[pa]!;
+      for (let pb = bStart; pb < bParts.length; pb++) {
+        const partB = bParts[pb]!;
         if (boundsMiss(partA, partB)) continue;
         const hit = Collision.collides(partA, partB);
         if (hit && (!best || hit.depth > best.depth)) best = hit;
@@ -1231,9 +1271,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     let passes = quality.separatePasses;
     if (intense) {
       // Audio growth can dig many bodies into each other at once — need room to Gauss-Seidel out.
-      passes = Math.max(passes, 48);
+      passes = Math.max(passes, 28);
     } else if (force) {
-      passes = Math.max(passes, 18);
+      passes = Math.max(passes, 14);
     } else if (!drag) {
       let peak = 0;
       let allSleeping = true;
@@ -1243,22 +1283,27 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       }
       // Calm piles still dig out residual overlaps (position only) — never leave
       // intersections frozen in a sleep island — but keep the pass budget small.
-      if (allSleeping || peak < QUIET_SEPARATE_SPEED) passes = Math.min(passes, 6);
-      else if (peak < 2) passes = Math.min(passes, 10);
+      if (allSleeping || peak < QUIET_SEPARATE_SPEED) passes = Math.min(passes, 4);
+      else if (peak < 2) passes = Math.min(passes, 8);
     }
+
+    // Reuse one grid/seen set across passes — clear between passes (no string keys).
+    const grid = new Map<number, number[]>();
+    const seen = new Set<number>();
+    const cellKey = (gx: number, gy: number) => ((gx + 512) << 12) | ((gy + 512) & 0xfff);
 
     for (let pass = 0; pass < passes; pass++) {
       let moved = false;
-      const grid = new Map<string, number[]>();
+      grid.clear();
       for (let i = 0; i < n; i++) {
-        const b = bodies[i];
+        const b = bodies[i]!;
         const x0 = Math.floor(b.bounds.min.x / cell);
         const y0 = Math.floor(b.bounds.min.y / cell);
         const x1 = Math.floor(b.bounds.max.x / cell);
         const y1 = Math.floor(b.bounds.max.y / cell);
         for (let gx = x0; gx <= x1; gx++) {
           for (let gy = y0; gy <= y1; gy++) {
-            const key = `${gx},${gy}`;
+            const key = cellKey(gx, gy);
             const bucket = grid.get(key);
             if (bucket) bucket.push(i);
             else grid.set(key, [i]);
@@ -1266,23 +1311,34 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         }
       }
 
-      const seen = new Set<number>();
+      seen.clear();
       for (const bucket of grid.values()) {
         for (let a = 0; a < bucket.length; a++) {
           for (let b = a + 1; b < bucket.length; b++) {
-            const i = bucket[a];
-            const j = bucket[b];
+            const i = bucket[a]!;
+            const j = bucket[b]!;
             const lo = i < j ? i : j;
             const hi = i < j ? j : i;
             const id = lo * n + hi;
             if (seen.has(id)) continue;
             seen.add(id);
-            if (resolveOverlap(bodies[i], bodies[j], force, calm)) moved = true;
+            if (resolveOverlap(bodies[i]!, bodies[j]!, force, calm)) moved = true;
           }
         }
       }
       if (!moved) break;
     }
+  }
+
+  /** Soft/calm afterUpdate dig: once per contactSteps engine ticks (~1×/frame), not every substep. */
+  function softSeparateThisUpdate() {
+    if (drag || xformDrag) return true;
+    if (softSeparateSkip > 0) {
+      softSeparateSkip--;
+      return false;
+    }
+    softSeparateSkip = Math.max(0, contactSteps - 1);
+    return true;
   }
 
   function attractorPulling() {
@@ -1399,8 +1455,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     // While bass/sharp scale is live, keep hard-depenetrating so Matter soft contacts
     // can't leave the enlarged pile intersecting.
-    if (chips.some((chip) => Math.abs(chip.audioMul - 1) > 0.002)) separateOverlaps(true);
-    else if (attractorSyrup) separateOverlaps("calm");
+    if (liveAudioScale) {
+      separateOverlaps(true);
+      return;
+    }
+    // Soft/calm: once per visual frame (contactSteps substeps), not every Engine.update.
+    if (!softSeparateThisUpdate()) return;
+    if (attractorSyrup) separateOverlaps("calm");
     else separateOverlaps();
   });
 
@@ -1414,7 +1475,159 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function chipNodes(chip: DroppedChip) {
-    return [chip.el, chip.glow, ...chip.mirrors.flatMap((mirror) => [mirror.face, mirror.glow])];
+    const nodes = [chip.el];
+    if (chip.glow.isConnected) nodes.push(chip.glow);
+    for (const mirror of chip.mirrors) {
+      nodes.push(mirror.face);
+      if (mirror.glow.isConnected) nodes.push(mirror.glow);
+    }
+    return nodes;
+  }
+
+  function slotGradientTo(slot: Slot, theme: ColorTheme): string {
+    if (slot.kind === "text" && slot.gradient && !slot.stroked) return gradientEnd(theme, slot);
+    if (slot.kind === "image" && slot.gradient && !slot.emoji && isColorMask(slot)) {
+      return gradientEnd(theme, slot);
+    }
+    return "";
+  }
+
+  function detachGlow(chip: DroppedChip) {
+    if (!chip.glow.isConnected) return;
+    const glowCanvas = chip.glow.querySelector(":scope > canvas");
+    if (glowCanvas instanceof HTMLCanvasElement) unmirrorBareCanvas(glowCanvas);
+    stopTextAnimIn(chip.glow);
+    chip.glow.remove();
+  }
+
+  function attachGlow(chip: DroppedChip) {
+    if (!bloomLayer || chip.glow.isConnected) return;
+    bloomLayer.append(chip.glow);
+  }
+
+  function styleBareGlowShell(
+    chip: DroppedChip,
+    size: { width: number; height: number },
+    radius: number,
+  ) {
+    chip.glow.style.width = `${size.width}px`;
+    chip.glow.style.height = `${size.height}px`;
+    chip.glow.style.borderRadius = `${radius}px`;
+    chip.glow.style.background = "transparent";
+    chip.glow.style.backgroundColor = "transparent";
+    chip.glow.classList.add("chip-bare");
+    chip.glow.classList.remove("is-editing", "is-text-anim-host");
+  }
+
+  /** Mount + paint glow only when live bloom is on and the chip contributes. */
+  function syncChipGlow(
+    chip: DroppedChip,
+    slot: Slot,
+    size: { width: number; height: number },
+    radius: number,
+    fill: string,
+    ink: string,
+    tracking: number,
+    shiftEm: number,
+    gradientTo: string,
+  ) {
+    if (!bloomLive || !chipContributesBloom(slot, fill, ink, gradientTo)) {
+      detachGlow(chip);
+      return;
+    }
+    attachGlow(chip);
+    // Bare ink: glow is a bitmap twin of the face — blit / mirror, never a second letter-cycle clock.
+    const bare = slot.kind === "text" && slot.shape === "none";
+    if (bare) {
+      const faceCanvas = chip.el.querySelector(":scope > canvas");
+      if (faceCanvas instanceof HTMLCanvasElement) {
+        let glowCanvas = chip.glow.querySelector(":scope > canvas");
+        if (!(glowCanvas instanceof HTMLCanvasElement)) {
+          paintBareText(
+            chip.glow,
+            slot,
+            size.width,
+            size.height,
+            tracking,
+            slot.gradient && gradientTo ? fill : ink,
+            shiftEm,
+            slot.gradient && gradientTo ? gradientTo : "",
+          );
+          glowCanvas = chip.glow.querySelector(":scope > canvas");
+        }
+        if (glowCanvas instanceof HTMLCanvasElement) {
+          styleBareGlowShell(chip, size, radius);
+          if (mirrorBareCanvas(faceCanvas, glowCanvas) || blitBareTextCanvas(chip.el, chip.glow)) {
+            const mix = layoutMode ? blendMode(slot.blend) : "normal";
+            if (mix === "normal") chip.glow.style.removeProperty("mix-blend-mode");
+            else chip.glow.style.mixBlendMode = mix;
+            paintDropShadow(chip.glow, slot, false);
+            return;
+          }
+        }
+      } else if (chip.slotId === editingId) {
+        // Contenteditable face has no canvas — a fresh ink paint seats glyphs differently
+        // and the bloom drifts until edit ends. Clone the live DOM so layouts match.
+        styleBareGlowShell(chip, size, radius);
+        stopTextAnimIn(chip.glow);
+        chip.glow.querySelector(":scope > canvas")?.remove();
+        chip.glow.style.cssText = chip.el.style.cssText;
+        styleBareGlowShell(chip, size, radius);
+        chip.glow.replaceChildren();
+        for (const child of chip.el.childNodes) {
+          if (child instanceof Element && isChipChrome(child)) continue;
+          chip.glow.append(child.cloneNode(true));
+        }
+        chip.glow.classList.remove("is-editing", "is-picked", "is-text-anim-host");
+        const glowEdit = chip.glow.querySelector<HTMLElement>(":scope > .chip-edit, :scope > .chip-label");
+        if (glowEdit) {
+          glowEdit.removeAttribute("contenteditable");
+          glowEdit.contentEditable = "inherit";
+          glowEdit.removeAttribute("role");
+          glowEdit.removeAttribute("aria-label");
+          glowEdit.removeAttribute("tabindex");
+          glowEdit.style.pointerEvents = "none";
+          glowEdit.style.caretColor = "transparent";
+        }
+        const mix = layoutMode ? blendMode(slot.blend) : "normal";
+        if (mix === "normal") chip.glow.style.removeProperty("mix-blend-mode");
+        else chip.glow.style.mixBlendMode = mix;
+        paintDropShadow(chip.glow, slot, false);
+        return;
+      }
+    }
+    applyVisual(chip.glow, slot, size.width, size.height, radius, fill, ink, tracking, true, shiftEm, gradientTo, false, lookPad);
+    const mix = layoutMode ? blendMode(slot.blend) : "normal";
+    if (mix === "normal") chip.glow.style.removeProperty("mix-blend-mode");
+    else chip.glow.style.mixBlendMode = mix;
+    paintDropShadow(chip.glow, slot, false);
+  }
+
+  function setBloomLive(on: boolean) {
+    const next = Boolean(on);
+    if (bloomLive === next) return;
+    bloomLive = next;
+    if (!bloomLive) {
+      for (const chip of chips) detachGlow(chip);
+      return;
+    }
+    for (const chip of chips) {
+      const look = chip.look;
+      if (!look) continue;
+      // Re-paint from last look so contribution / silhouette match the face.
+      syncChipGlow(
+        chip,
+        look.slot,
+        { width: chip.width, height: chip.height },
+        look.radius,
+        look.fill,
+        look.ink,
+        look.tracking,
+        look.shiftEm,
+        look.gradientTo,
+      );
+      if (chip.glow.isConnected) seat(chip);
+    }
   }
 
   /** Ease matching CSS `ease` closely enough for short discard pops. */
@@ -1625,7 +1838,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     for (const node of chipNodes(chip)) node.style.opacity = "0";
     seat(chip);
     layer!.append(el);
-    bloomLayer!.append(glow);
+    // Glow attaches inside paint() only when bloom is live and the chip contributes.
     // Letter-cycle clip width needs a mounted label (offsetWidth is 0 while detached).
     // Reuse the timeline via matching sig; only refreshAnimClipWidth runs again.
     if (scaled.kind === "text" && scaled.textAnim) {
@@ -1677,7 +1890,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         tracking,
         bounds.width,
       );
-      if (editingId === chip.slotId && scaled.kind === "text") {
+      if (editingId === chip.slotId && scaled.kind === "text" && scaled.shape !== "none") {
+        // Bare type keeps the ink box — remeshing wider around center jumps the glyphs.
+        // Contenteditable overflow is visible while editing.
         size = measureTextEditSize(
           scaled,
           pillPadOf(slot, pillPad) / 50,
@@ -1732,11 +1947,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const slot = byId.get(id);
       if (!slot) continue;
       let have = kept.get(id) ?? 0;
+      const inheritPoses = pendingSpawnFrom?.get(id);
       while (have < need) {
-        const sizeUnit = Math.random() * 2 - 1;
+        const pose = inheritPoses?.[have];
+        const sizeUnit = pose?.sizeUnit ?? Math.random() * 2 - 1;
+        const scaleMul = pose?.scaleMul ?? 1;
         const layout = contained(
           slot,
-          scale * sizeJitter(sizeUnit, sizeRandom),
+          scale * sizeJitter(sizeUnit, sizeRandom) * scaleMul,
           pillPad,
           tracking,
           bounds.width,
@@ -1746,13 +1964,26 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         const span = Math.max(0, bounds.width - inset * 2);
         const drop = pendingPlace && pendingPlace.ids.has(id) ? pendingPlace : null;
         const tight = layout.size.width > bounds.width * 0.65;
-        const angle = drop ? 0 : (Math.random() - 0.5) * (tight ? 0.12 : 0.8);
+        const angle = pose
+          ? pose.angle
+          : drop
+            ? 0
+            : (Math.random() - 0.5) * (tight ? 0.12 : 0.8);
         const half = tiltedHalfHeight(layout.size.width, layout.size.height, angle);
-        const x = drop
-          ? drop.x + (placeIndex % 3) * 14
-          : inset + Math.random() * span;
-        const y = drop ? drop.y + Math.floor(placeIndex / 3) * 14 : Math.max(half + 8, spawnY);
-        if (!drop) spawnY = y - half - 12;
+        let x: number;
+        let y: number;
+        if (pose) {
+          const at = clampPlacePoint(pose.x + SPAWN_FROM_OFFSET, pose.y + SPAWN_FROM_OFFSET);
+          x = at.x;
+          y = at.y;
+        } else if (drop) {
+          x = drop.x + (placeIndex % 3) * 14;
+          y = drop.y + Math.floor(placeIndex / 3) * 14;
+        } else {
+          x = inset + Math.random() * span;
+          y = Math.max(half + 8, spawnY);
+          spawnY = y - half - 12;
+        }
         const chip = spawnChip(
           slot,
           x,
@@ -1767,11 +1998,18 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           sizeRandom,
           chips.length,
           falling.length,
+          scaleMul,
         );
-        if (drop) {
+        if (pose) {
+          chip.flipX = Boolean(pose.flipX);
+          chip.flipY = Boolean(pose.flipY);
+          applyBodyFlip(chip);
+        }
+        if (pose || drop) {
           Body.setVelocity(chip.body, { x: 0, y: 0 });
+          Body.setAngularVelocity(chip.body, 0);
           placed.push(chip);
-          placeIndex += 1;
+          if (drop) placeIndex += 1;
         } else if (layoutMode) {
           Body.setVelocity(chip.body, { x: 0, y: 0 });
           Body.setAngularVelocity(chip.body, 0);
@@ -1786,9 +2024,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       }
     }
 
-    if (pendingPlace) {
+    if (pendingPlace || pendingSpawnFrom) {
       if (placed.length > 0) releaseGrowth(placed);
       pendingPlace = null;
+      pendingSpawnFrom = null;
     }
 
     const disturbed = added > 0 || removed > 0 || remeshed > 0;
@@ -1858,7 +2097,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         bounds.width,
       );
       // Contenteditable lays out by advance width; ink AABB is tighter and clips glyphs.
-      if (editingId === slotId && scaled.kind === "text") {
+      // Bare type keeps the ink box (overflow:visible) so remesh doesn't jump the glyphs.
+      if (editingId === slotId && scaled.kind === "text" && scaled.shape !== "none") {
         size = measureTextEditSize(
           scaled,
           pillPadOf(slot, pillPad) / 50,
@@ -2149,6 +2389,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     pendingPlace = { ids: new Set(slotIds), x: at.x, y: at.y };
   }
 
+  function armSpawnFrom(slotId: string, poses: ChipPose[]) {
+    if (!poses.length) return;
+    if (!pendingSpawnFrom) pendingSpawnFrom = new Map();
+    pendingSpawnFrom.set(slotId, poses);
+  }
+
   function restore(
     slots: Slot[],
     physics: PhysicsSettings,
@@ -2426,8 +2672,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return "se";
   }
 
-  const XFORM_TIP = "Drag to rotate and scale — Shift scales from center";
-  const XFORM_BOX_TIP = "Drag to resize the writing area";
+  const XFORM_TIP =
+    "Drag to rotate and scale — Shift scales from corner, Shift+Alt from center";
+  const XFORM_BOX_TIP = "Drag to resize the writing area — Alt from center";
   const GRAD_FROM_TIP = "Start color — drag to rotate and scale, click to pick";
   const GRAD_TO_TIP = "End color — drag to rotate and scale, click to pick";
 
@@ -2937,21 +3184,25 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         // Letter-cycle / gradient-sweep own the canvas. Updating a label that isn't
         // there dropped the angle.
         if ((slot.textAnim || slot.animatedGradient) && chip.slotId !== editingId) {
-          let painted = false;
-          for (const root of [chip.el, chip.glow]) {
-            let canvas = root.querySelector(":scope > canvas");
-            if (!(canvas instanceof HTMLCanvasElement)) {
-              paintBareText(root, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
-              canvas = root.querySelector(":scope > canvas");
+          // Face owns the letter-cycle clock; glow mirrors that bitmap (no second ticker).
+          let canvas = chip.el.querySelector(":scope > canvas");
+          if (!(canvas instanceof HTMLCanvasElement)) {
+            paintBareText(chip.el, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
+            canvas = chip.el.querySelector(":scope > canvas");
+          }
+          if (!(canvas instanceof HTMLCanvasElement)) {
+            /* fall through to CSS / static paths */
+          } else if (setBareCanvasGradient(canvas, angle, scale)) {
+            if (chip.glow.isConnected) {
+              const glowCanvas = chip.glow.querySelector(":scope > canvas");
+              if (glowCanvas instanceof HTMLCanvasElement) mirrorBareCanvas(canvas, glowCanvas);
+              else blitBareTextCanvas(chip.el, chip.glow);
             }
-            if (!(canvas instanceof HTMLCanvasElement)) continue;
-            if (setBareCanvasGradient(canvas, angle, scale)) {
-              painted = true;
-              continue;
-            }
+            return;
+          } else {
             applyBareCanvasTextAnim(
               canvas,
-              root,
+              chip.el,
               slot,
               chip.width,
               chip.height,
@@ -2962,13 +3213,21 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
               angle,
               scale,
             );
-            painted = true;
+            if (chip.glow.isConnected) {
+              let glowCanvas = chip.glow.querySelector(":scope > canvas");
+              if (!(glowCanvas instanceof HTMLCanvasElement)) {
+                paintBareText(chip.glow, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
+                glowCanvas = chip.glow.querySelector(":scope > canvas");
+              }
+              if (glowCanvas instanceof HTMLCanvasElement) mirrorBareCanvas(canvas, glowCanvas);
+            }
+            return;
           }
-          if (painted) return;
         }
         // Static text gradients can be background-clip labels.
         let paintedCss = false;
-        for (const root of [chip.el, chip.glow]) {
+        const labelRoots = chip.glow.isConnected ? [chip.el, chip.glow] : [chip.el];
+        for (const root of labelRoots) {
           const label = root.querySelector<HTMLElement>(":scope > .chip-label, :scope > .chip-edit");
           if (!label) continue;
           paintBareTextCss(label, from, to, angle, scale, false, slot.gradientSpeed, chip.width, chip.height);
@@ -2976,7 +3235,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         }
         if (!paintedCss) {
           paintBareText(chip.el, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
-          paintBareText(chip.glow, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
+          if (chip.glow.isConnected && !blitBareTextCanvas(chip.el, chip.glow)) {
+            paintBareText(chip.glow, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
+          }
         }
         return;
       }
@@ -2994,22 +3255,26 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         Boolean(slot.animatedGradient),
         slot.gradientSpeed,
       );
-      paintFill(
-        chip.glow,
-        active,
-        from,
-        to,
-        chip.width,
-        chip.height,
-        radius,
-        angle,
-        scale,
-        Boolean(slot.animatedGradient),
-        slot.gradientSpeed,
-      );
+      if (chip.glow.isConnected) {
+        paintFill(
+          chip.glow,
+          active,
+          from,
+          to,
+          chip.width,
+          chip.height,
+          radius,
+          angle,
+          scale,
+          Boolean(slot.animatedGradient),
+          slot.gradientSpeed,
+        );
+      }
       return;
     }
-    for (const face of [chip.el.querySelector(":scope > .chip-face"), chip.glow.querySelector(":scope > .chip-face")]) {
+    const faces = [chip.el.querySelector(":scope > .chip-face")];
+    if (chip.glow.isConnected) faces.push(chip.glow.querySelector(":scope > .chip-face"));
+    for (const face of faces) {
       if (!(face instanceof HTMLElement)) continue;
       if (slot.animatedGradient) {
         face.style.setProperty("--grad-angle", String(gradientAngleOf(angle)));
@@ -3256,8 +3521,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     hideTooltip({ fade: true });
     const point = stagePoint(event);
     const corner = readXformHandleCorner(handle);
-    // Shift at gesture start → legacy center-anchored scale; else opposite corner.
-    const centerAnchored = event.shiftKey;
+    // Alt at gesture start → center-anchored scale; else opposite corner (PS-style).
+    const centerAnchored = event.altKey;
     const anchor = xformCornerWorld(chip, oppositeXformCorner(corner), 1);
     const pivotX = centerAnchored ? chip.body.position.x : anchor.x;
     const pivotY = centerAnchored ? chip.body.position.y : anchor.y;
@@ -3639,8 +3904,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function onPointerMove(event: PointerEvent) {
     if (xformDrag && event.pointerId === xformDrag.pointerId) {
       const point = stagePoint(event);
-      const centerAnchored = event.shiftKey;
-      // Mid-gesture Shift toggles corner ↔ center pivot without a scale jump.
+      // Photoshop: Alt = from center; Shift = scale only (no rotate).
+      const centerAnchored = event.altKey;
+      const scaleOnly = event.shiftKey;
+      // Mid-gesture Alt toggles corner ↔ center pivot without a scale jump.
       if (centerAnchored !== xformDrag.centerAnchored) {
         if (centerAnchored) {
           const cdx = point.x - xformDrag.chip.body.position.x;
@@ -3651,6 +3918,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
             xformDrag.lastScale,
             cdist,
           );
+          xformDrag.startPointerAngle = Math.atan2(cdy, cdx);
+          xformDrag.startBodyAngle = xformDrag.lastAngle;
         } else {
           const anchor = xformCornerWorld(
             xformDrag.chip,
@@ -3686,13 +3955,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         scaleMaxFor(xformDrag.chip.look?.slot),
       );
       const pointerAngle = Math.atan2(dy, dx);
-      // Shift = center scale only. Shift+Alt also snaps to 45°. Re-anchor on release.
       let nextAngle: number;
-      if (centerAnchored) {
-        const step = Math.PI / 4;
-        nextAngle = event.altKey
-          ? Math.round(xformDrag.lastAngle / step) * step
-          : xformDrag.lastAngle;
+      if (scaleOnly) {
+        nextAngle = xformDrag.lastAngle;
         xformDrag.startPointerAngle = pointerAngle;
         xformDrag.startBodyAngle = nextAngle;
       } else {
@@ -3763,8 +4028,15 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     if (!drag || event.pointerId !== drag.pointerId) return;
     const point = stagePoint(event);
-    drag.x = point.x;
-    drag.y = point.y;
+    let x = point.x;
+    let y = point.y;
+    // Shift: lock to horizontal or vertical from grab start (dominant axis).
+    if (event.shiftKey) {
+      if (Math.abs(x - drag.startX) >= Math.abs(y - drag.startY)) y = drag.startY;
+      else x = drag.startX;
+    }
+    drag.x = x;
+    drag.y = y;
     if (!drag.moved) {
       const dx = event.clientX - drag.originX;
       const dy = event.clientY - drag.originY;
@@ -3990,11 +4262,15 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
 
     place(chip.el, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
-    place(chip.glow, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
+    if (chip.glow.isConnected) {
+      place(chip.glow, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
+    }
     syncChromeSeat(chip, x, y, angle, anchorX, anchorY, scaleX, scaleY);
     for (const mirror of chip.mirrors) {
       place(mirror.face, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
-      place(mirror.glow, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
+      if (mirror.glow.isConnected) {
+        place(mirror.glow, x, y, angle, chip.width, chip.height, anchorX, anchorY, scaleX, scaleY);
+      }
     }
     // Keep the gradient wheel glued to the live visual size (incl. scale-drag preview).
     if (isPickPainted(chip)) {
@@ -4014,32 +4290,24 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   ) {
     const fill = slotFill(theme, slot);
     const ink = slotInk(theme, slot);
-    const gradientTo =
-      slot.kind === "text" && slot.gradient && !slot.stroked
-        ? gradientEnd(theme, slot)
-        : slot.kind === "image" && slot.gradient && !slot.emoji && isColorMask(slot)
-          ? gradientEnd(theme, slot)
-          : "";
-    chip.look = { slot, radius, fill, ink, tracking, shiftEm };
+    const gradientTo = slotGradientTo(slot, theme);
+    chip.look = { slot, radius, fill, ink, tracking, shiftEm, gradientTo };
     syncChipAttractor(chip, slot);
     const editing = chip.slotId === editingId;
     applyVisual(chip.el, slot, size.width, size.height, radius, fill, ink, tracking, false, shiftEm, gradientTo, editing, lookPad);
-    applyVisual(chip.glow, slot, size.width, size.height, radius, fill, ink, tracking, true, shiftEm, gradientTo, false, lookPad);
+    syncChipGlow(chip, slot, size, radius, fill, ink, tracking, shiftEm, gradientTo);
     // Per-layer blend only matters when pieces can overlap (layout mode).
     const mix = layoutMode ? blendMode(slot.blend) : "normal";
     if (mix === "normal") {
       chip.el.style.removeProperty("mix-blend-mode");
-      chip.glow.style.removeProperty("mix-blend-mode");
     } else {
       chip.el.style.mixBlendMode = mix;
-      chip.glow.style.mixBlendMode = mix;
     }
     // Drop shadow is layout-only — physics keeps chips filter-free while tumbling.
     paintDropShadow(chip.el, slot, layoutMode);
-    paintDropShadow(chip.glow, slot, false);
     for (const mirror of chip.mirrors) {
       copyLook(chip.el, mirror.face);
-      copyLook(chip.glow, mirror.glow);
+      if (chip.glow.isConnected) copyLook(chip.glow, mirror.glow);
     }
     if (isPickPainted(chip)) {
       ensureXformFrame(ensureChrome(chip));
@@ -4083,7 +4351,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (sameOrder) return;
     for (const chip of chips) {
       layer.append(chip.el);
-      bloomLayer.append(chip.glow);
+      if (chip.glow.isConnected) bloomLayer.append(chip.glow);
     }
   }
 
@@ -4125,15 +4393,47 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return out;
   }
 
+  function applyContactSteps() {
+    // sqrt softens small-canvas escalation (0.5→1, 0.25→2) vs raw 1/scale.
+    const scaleSteps = Math.min(
+      quality.maxContactSteps,
+      Math.max(1, Math.round(1 / Math.sqrt(Math.max(simScale, 0.2)))),
+    );
+    const next = Math.min(scaleSteps, frameBudgetSteps);
+    contactSteps = next;
+    runner.delta = FRAME_MS / contactSteps;
+    if (contactSteps <= 1) {
+      engine.positionIterations = quality.positionSingle;
+      engine.velocityIterations = quality.velocitySingle;
+    } else {
+      // Blend toward multi — don't jump to full Ultra iterations at 2 steps.
+      const span = Math.max(1, quality.maxContactSteps - 1);
+      const t = Math.min(1, (contactSteps - 1) / span);
+      engine.positionIterations = Math.round(
+        quality.positionSingle + (quality.positionMulti - quality.positionSingle) * t,
+      );
+      engine.velocityIterations = Math.round(
+        quality.velocitySingle + (quality.velocityMulti - quality.velocitySingle) * t,
+      );
+    }
+    softSeparateSkip = 0;
+  }
+
   function setSimulationScale(scale: number) {
     const safe = Number.isFinite(scale) && scale > 0 ? Math.min(1, scale) : 1;
     simScale = safe;
-    // Same pixel speed on a smaller body tunnels and rests inside neighbors.
-    // Shorter steps keep the fall distance and let contacts resolve.
-    contactSteps = Math.min(quality.maxContactSteps, Math.max(1, Math.ceil(1 / safe)));
-    runner.delta = FRAME_MS / contactSteps;
-    engine.positionIterations = contactSteps > 1 ? quality.positionMulti : quality.positionSingle;
-    engine.velocityIterations = contactSteps > 1 ? quality.velocityMulti : quality.velocitySingle;
+    applyContactSteps();
+  }
+
+  function adaptFrameBudget(dtMs: number) {
+    if (!(dtMs > 0) || dtMs > 80) return;
+    frameMsEma = frameMsEma * 0.85 + dtMs * 0.15;
+    let cap = quality.maxContactSteps;
+    if (frameMsEma > 19) cap = Math.min(cap, 2);
+    if (frameMsEma > 24) cap = 1;
+    if (cap === frameBudgetSteps) return;
+    frameBudgetSteps = cap;
+    applyContactSteps();
   }
 
   function setFreeScaleMax(max: number) {
@@ -4146,6 +4446,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     let woke = false;
     let grew = false;
     let growDelta = 0;
+    liveAudioScale = false;
     for (const chip of chips) {
       const target = audioScaleBySlot.get(chip.slotId) ?? 1;
       const prev = chip.audioMul;
@@ -4160,6 +4461,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           growDelta = Math.max(growDelta, target - prev);
         }
       }
+      if (Math.abs(chip.audioMul - 1) > 0.002) liveAudioScale = true;
       seat(chip);
     }
     if (woke) {
@@ -4170,7 +4472,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     // resolving while anything stays enlarged so the pile can't rest intersecting.
     if (grew) {
       breatheAudioGrowth(growDelta);
-      separateOverlaps("audio");
+      // Intense dig at most ~20fps; afterUpdate hard-digs every substep while scaled.
+      const now = performance.now();
+      if (now - lastAudioDigAt >= 48) {
+        lastAudioDigAt = now;
+        separateOverlaps("audio");
+      }
       for (const chip of chips) seat(chip);
     } else if (woke) {
       for (const chip of chips) seat(chip);
@@ -4281,6 +4588,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     setRunning,
     attach,
     refreshFrost,
+    setBloomLive,
     setFloorOpen,
     freezePile,
     redeployFall,
@@ -4297,6 +4605,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     chipEl,
     refreshSlot,
     setSimulationScale,
+    adaptFrameBudget,
     setFreeScaleMax,
     setAudioScales,
     impulseAudioJump,
@@ -4304,6 +4613,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     draws,
     poses,
     armPlaceAt,
+    armSpawnFrom,
     placeSlotsAt,
     chipsOverlap,
     syncLayerOrder,

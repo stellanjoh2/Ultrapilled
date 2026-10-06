@@ -619,8 +619,25 @@ body:has(.app.is-presenting) .ui-tip {
   --post-hue: 0deg;
 }
 
-.stage.has-hue {
+/* Hue + grain run on .post-plate (one filtered group) — not stage-wide / backdrop-filter. */
+.post-plate {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.stage.has-hue .post-plate {
   filter: hue-rotate(var(--post-hue));
+}
+
+.playfield.has-grain .post-plate {
+  filter: url(#ultrapilled-grain);
+}
+
+.stage.has-hue .playfield.has-grain .post-plate {
+  /* Grain during plate paint, then hue — same as old backdrop-grain + stage hue. */
+  filter: url(#ultrapilled-grain) hue-rotate(var(--post-hue));
 }
 
 .playfield {
@@ -892,7 +909,11 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   box-shadow: none;
 }
 
-.stage.has-sat .chip-layer .chip {
+.stage.has-sat:not(.has-chip-blend) .chip-layer {
+  filter: saturate(var(--post-sat));
+}
+
+.stage.has-sat.has-chip-blend .chip-layer .chip {
   filter: saturate(var(--post-sat));
 }
 
@@ -917,22 +938,6 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   pointer-events: none;
   cursor: default;
   will-change: auto;
-}
-
-.post-grain {
-  display: none;
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  /* Signed add on the composited plate — mix-blend overlay/soft-light screens highlights.
-     -webkit- first: LightningCSS drops the unprefixed property when it comes second. */
-  -webkit-backdrop-filter: url(#ultrapilled-grain);
-  backdrop-filter: url(#ultrapilled-grain);
-}
-
-.playfield.has-grain > .post-grain {
-  display: block;
 }
 
 .post-grain-defs {
@@ -1202,16 +1207,6 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   .chip-chrome.is-picked > .chip-xform-frame {
     animation: smash-stroke-spin calc(8s / 3) linear infinite;
   }
-}
-
-/* Subtle Select — solid Orby accent ring, no spin (Settings → Subtle Select). */
-html[data-subtle-select="true"] .chip-xform-frame {
-  background: color-mix(in srgb, var(--loop-stroke-a) 80%, transparent);
-  animation: none;
-}
-
-html[data-subtle-select="true"] .chip-chrome.is-picked > .chip-xform-frame {
-  animation: none;
 }
 
 /* Transform grab: four corner handles stay hidden until proximity.
@@ -4249,11 +4244,6 @@ button.pill.slot-add:hover {
   }
 }
 
-html[data-subtle-select="true"] .slot-card.is-picked::before {
-  background: color-mix(in srgb, var(--loop-stroke-a) 80%, transparent);
-  animation: none;
-}
-
 .slot-card.is-new:not(.is-lifted) {
   position: relative;
 }
@@ -4859,12 +4849,6 @@ html[data-theme="day"] .color-pop-scale {
   .emoji-grid button.is-on::before {
     animation: smash-stroke-spin calc(16s / 3) linear infinite;
   }
-}
-
-html[data-subtle-select="true"] .icon-grid button.is-on::before,
-html[data-subtle-select="true"] .emoji-grid button.is-on::before {
-  background: color-mix(in srgb, var(--loop-stroke-a) 80%, transparent);
-  animation: none;
 }
 
 /* Day: soft tiles + glyph edge so white/pale masks don't vanish on --field. */

@@ -10,7 +10,7 @@ import textAlignCenter from "@phosphor-icons/core/assets/regular/text-align-cent
 import textAlignRight from "@phosphor-icons/core/assets/regular/text-align-right.svg?raw";
 import textT from "@phosphor-icons/core/assets/regular/text-t.svg?raw";
 import { checkInput } from "../checkBox";
-import { FEATURED_EMOJI, searchEmoji, type EmojiItem } from "../emojis";
+import { FEATURED_EMOJI, searchEmoji, warmEmojiCatalog, type EmojiItem } from "../emojis";
 import { ICON_PRESETS, IMAGE_COLLIDERS } from "../icons";
 import { isColorMask, isSvgSource } from "../chipKinds";
 import { pillPadOf, trackingOf } from "../measure";
@@ -96,6 +96,8 @@ export type SlotCardHost = {
   live(opts?: { quiet?: boolean }): void;
   endGesture(): void;
   renderPanel(): void;
+  /** Rebuild one slot card when its editor structure changes — avoids a full panel remount. */
+  refreshSlotCard(id: string): void;
   openSlotMenu(x: number, y: number, id: string): void;
   get focusSlotId(): string | null;
   get pointerHeld(): boolean;
@@ -159,6 +161,18 @@ let H: SlotCardHost;
 
 export function bindSlotCards(host: SlotCardHost) {
   H = host;
+}
+
+/** Replace one `.slot-card` in `#slots`. Returns false if the create panel isn't mounted. */
+export function replaceSlotCard(slotId: string, host?: SlotCardHost): boolean {
+  if (host) H = host;
+  const stack = H.panel.querySelector("#slots");
+  if (!stack) return false;
+  const slot = H.state.slots.find((item) => item.id === slotId);
+  const old = [...stack.querySelectorAll<HTMLElement>(".slot-card")].find((card) => card.dataset.id === slotId);
+  if (!slot || !old) return false;
+  old.replaceWith(renderSlotCard(slot));
+  return true;
 }
 
 export function renderSlotCard(slot: Slot, host?: SlotCardHost): HTMLElement {
@@ -657,14 +671,22 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
     H.remember();
     slot.fontWeight = slot.fontWeight >= 600 ? H.chosenWeight(slot.fontFamily, 400) : H.chosenWeight(slot.fontFamily, 700);
     H.reflectGlobalWeight();
-    H.renderPanel();
+    const boldBtn = editor.querySelector<HTMLButtonElement>("[data-text-bold]");
+    if (boldBtn) {
+      const on = slot.fontWeight >= 600;
+      boldBtn.classList.toggle("is-on", on);
+      boldBtn.setAttribute("aria-pressed", String(on));
+    }
+    const italicBtn = editor.querySelector<HTMLButtonElement>("[data-text-italic]");
+    if (italicBtn) paintItalicBtn(italicBtn, slot);
     void H.settleFont(slot.fontFamily, slot.fontWeight).then(() => H.liveChip(slot.id));
   });
   editor.querySelector("[data-text-italic]")?.addEventListener("click", () => {
     H.remember();
     slot.italic = !slot.italic || undefined;
     H.liveChip(slot.id);
-    H.renderPanel();
+    const italicBtn = editor.querySelector<HTMLButtonElement>("[data-text-italic]");
+    if (italicBtn) paintItalicBtn(italicBtn, slot);
   });
   editor.querySelectorAll<HTMLButtonElement>("[data-text-align]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -673,7 +695,11 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       H.remember();
       slot.align = next;
       H.liveChip(slot.id);
-      H.renderPanel();
+      editor.querySelectorAll<HTMLButtonElement>("[data-text-align]").forEach((other) => {
+        const on = other.dataset.textAlign === next;
+        other.classList.toggle("is-on", on);
+        other.setAttribute("aria-pressed", String(on));
+      });
     });
   });
   return wrap;
@@ -762,7 +788,7 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
       slot.emoji = undefined;
       slot.collider = undefined;
       slot.radius = 0;
-      H.renderPanel();
+      H.refreshSlotCard(slot.id);
       H.live();
     });
     grid.append(btn);
@@ -806,7 +832,7 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
     slot.src = "";
     slot.collider = undefined;
     slot.radius = 0;
-    H.renderPanel();
+    H.refreshSlotCard(slot.id);
     H.live();
   };
 
@@ -843,8 +869,13 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
     }
   };
 
-  wrap.querySelector<HTMLInputElement>("[data-emoji-search]")?.addEventListener("input", (e) => {
-    paintResults(searchEmoji((e.target as HTMLInputElement).value));
+  const search = wrap.querySelector<HTMLInputElement>("[data-emoji-search]");
+  search?.addEventListener("focus", () => {
+    void warmEmojiCatalog();
+  });
+  search?.addEventListener("input", (e) => {
+    const q = (e.target as HTMLInputElement).value;
+    void searchEmoji(q).then(paintResults);
   });
 
   H.bindSlotInputs(editor, slot);
@@ -961,7 +992,7 @@ function videoFields(slot: ImageSlot, open: boolean): HTMLElement {
     }
     const job = H.isVideoFile(file) ? H.assignVideoFile(slot, file) : H.assignImageFile(slot, file);
     void job.then(() => {
-      H.renderPanel();
+      H.refreshSlotCard(slot.id);
       H.live();
     });
   });
@@ -1103,7 +1134,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     playCreate();
     const job = H.isVideoFile(file) ? H.assignVideoFile(slot, file) : H.assignImageFile(slot, file);
     void job.then(() => {
-      H.renderPanel();
+      H.refreshSlotCard(slot.id);
       H.live();
     });
   });

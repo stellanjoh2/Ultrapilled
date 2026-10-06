@@ -24,7 +24,8 @@ import { blankState, TEMPLATES } from "../templates";
 import { listCustomTemplates } from "../customTemplates";
 import { playClick, playSwitch, playTransition } from "../uiSounds";
 import { bindSlotCards, renderSlotCard, type SlotCardHost } from "./slotCards";
-import { rangeCaptionHtml } from "../rangeCaption";
+import { rangeCaptionHtml, setRangeCaptionValue } from "../rangeCaption";
+import { preloadIconDecomp } from "../iconMesh";
 
 export const RESET_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 3v5h5"/></svg>';
@@ -119,6 +120,79 @@ export function paintSectionResets(root: ParentNode, state: AppState) {
   if (audio) audio.hidden = state.physics.layoutMode || audioReactAtDefault(state.audioReact);
   const composition = root.querySelector<HTMLButtonElement>("#reset-master");
   if (composition) composition.hidden = compositionAtDefault(state);
+}
+
+/** Update the mic smash button without remounting the create panel. */
+export function paintAudioMic(panel: HTMLElement, state: AppState) {
+  const btn = panel.querySelector<HTMLButtonElement>("#audio-mic");
+  if (!btn) return;
+  const on = state.audioReact.enabled;
+  btn.classList.toggle("is-on", on);
+  btn.setAttribute("aria-pressed", String(on));
+  const label = btn.querySelector(".smash-btn__text");
+  if (label) label.textContent = on ? "Listening" : "Microphone";
+  paintSectionResets(panel, state);
+}
+
+function syncRange(
+  panel: HTMLElement,
+  id: string,
+  value: number,
+  paintRange: (input: HTMLInputElement) => void,
+  format: (value: number) => string,
+) {
+  const input = panel.querySelector<HTMLInputElement>(`#${id}`);
+  if (!input) return;
+  input.value = String(value);
+  paintRange(input);
+  const caption = input.closest("label")?.querySelector("[data-range-label]");
+  if (caption) setRangeCaptionValue(caption, format(value));
+}
+
+/** Push composition slider values from state — avoids full remount after Reset. */
+export function syncCompositionControls(
+  panel: HTMLElement,
+  state: AppState,
+  paintRange: (input: HTMLInputElement) => void,
+) {
+  syncRange(panel, "masterScale", state.masterScale * 10, paintRange, (v) => `${v.toFixed(0)}`);
+  syncRange(panel, "sizeRandom", state.sizeRandom, paintRange, (v) => `${Math.round(v)}`);
+  syncRange(panel, "pillPad", state.pillPad, paintRange, (v) => `${Math.round(v)}`);
+  syncRange(panel, "shapeAmount", state.shapeAmount, paintRange, (v) => `${Math.round(v)}`);
+  paintSectionResets(panel, state);
+}
+
+/** Push physics slider / complexity values from state — avoids full remount after Reset. */
+export function syncPhysicsControls(
+  panel: HTMLElement,
+  state: AppState,
+  paintRange: (input: HTMLInputElement) => void,
+) {
+  const p = state.physics;
+  syncRange(panel, "gravity", p.gravity, paintRange, (v) => v.toFixed(2));
+  syncRange(panel, "speed", p.speed, paintRange, (v) => v.toFixed(2));
+  syncRange(panel, "bounce", p.bounce, paintRange, (v) => v.toFixed(2));
+  syncRange(panel, "friction", p.friction, paintRange, (v) => v.toFixed(2));
+  syncRange(panel, "grip", p.grip, paintRange, (v) => v.toFixed(2));
+  syncRange(panel, "spin", p.spin, paintRange, (v) => v.toFixed(2));
+  syncRange(panel, "hold", p.hold, paintRange, (v) => `${v.toFixed(2)}s`);
+  const complexity = panel.querySelector<HTMLSelectElement>("#physics-complexity");
+  if (complexity) complexity.value = p.complexity;
+  paintSectionResets(panel, state);
+}
+
+/** Push audio-react controls from state — avoids full remount after Reset. */
+export function syncAudioReactControls(
+  panel: HTMLElement,
+  state: AppState,
+  paintRange: (input: HTMLInputElement) => void,
+) {
+  const a = state.audioReact;
+  syncRange(panel, "audioSensitivity", a.sensitivity, paintRange, (v) => `${Math.round(v)}`);
+  syncRange(panel, "audioBounce", a.bounce, paintRange, (v) => `${(Math.round(v * 10) / 10).toFixed(1)}×`);
+  syncRange(panel, "audioBassBoost", a.bassBoost, paintRange, (v) => `+${Math.round(v)}%`);
+  syncRange(panel, "audioHueNudge", a.hueNudge, paintRange, (v) => `${Math.round(v)}°`);
+  paintAudioMic(panel, state);
 }
 
 function sectionMarkupImpl(
@@ -543,7 +617,9 @@ panel.querySelector("#reset-master")?.addEventListener("click", () => {
   H.state.textTracking = next.textTracking;
   H.scaleFallingAmounts(next.shapeAmount);
   H.live();
-  H.renderPanel();
+  syncCompositionControls(panel, H.state, (input) => H.paintRange(input));
+  H.paintPerfHints();
+  H.syncInheritedPillPads();
 });
 
 const globalFont = panel.querySelector<HTMLElement>("#global-font");
@@ -609,7 +685,7 @@ panel.querySelector("#reset-physics")?.addEventListener("click", () => {
   H.remember();
   H.state.physics = { ...DEFAULT_PHYSICS };
   H.live();
-  H.renderPanel();
+  syncPhysicsControls(panel, H.state, (input) => H.paintRange(input));
 });
 panel.querySelectorAll<HTMLButtonElement>("[data-layout-mode]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -622,6 +698,10 @@ panel.querySelector<HTMLSelectElement>("#physics-complexity")?.addEventListener(
   H.remember();
   H.state.physics.complexity = physicsComplexity((e.target as HTMLSelectElement).value);
   playClick();
+  if (H.state.physics.complexity === "ultra") {
+    void preloadIconDecomp().then(() => H.live());
+    return;
+  }
   H.live();
 });
 panel.querySelector<HTMLButtonElement>("#audio-mic")?.addEventListener("click", () => {
@@ -650,7 +730,7 @@ panel.querySelector("#reset-audio-react")?.addEventListener("click", () => {
   H.remember();
   void H.setAudioReactEnabled(false).then(() => {
     H.state.audioReact = { ...DEFAULT_AUDIO_REACT };
-    H.renderPanel();
+    syncAudioReactControls(panel, H.state, (input) => H.paintRange(input));
   });
 });
 H.bindRange("bloom", "Bloom", (v) => {

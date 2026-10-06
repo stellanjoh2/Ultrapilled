@@ -184,6 +184,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
   function frame(now: number) {
     const dt = prevFrame ? now - prevFrame : 0;
     prevFrame = now;
+    if (dt > 0) host.world.adaptFrameBudget(dt);
     host.tickAudioReact(now);
     if (host.getPaused()) {
       host.world.setRunning(false);

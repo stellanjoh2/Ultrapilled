@@ -1,4 +1,3 @@
-import decomp from "poly-decomp";
 import Matter from "matter-js";
 import { ICON_PRESETS } from "./icons";
 import { GALLERY_SHAPE_PATHS, GALLERY_SHAPE_VIEWBOX } from "./mosaikShapes";
@@ -6,6 +5,26 @@ import { GALLERY_SHAPE_PATHS, GALLERY_SHAPE_VIEWBOX } from "./mosaikShapes";
 const { Bodies, Body } = Matter;
 
 type Pt = { x: number; y: number };
+
+type DecompApi = {
+  makeCCW(vertices: [number, number][]): void;
+  removeDuplicatePoints(vertices: [number, number][], precision: number): void;
+  removeCollinearPoints(vertices: [number, number][], threshold: number): void;
+  quickDecomp(vertices: [number, number][]): [number, number][][];
+};
+
+/** poly-decomp is only needed for Ultra traced meshes — keep it out of the boot chunk. */
+let decomp: DecompApi | null = null;
+let decompWarm: Promise<DecompApi> | null = null;
+
+export function preloadIconDecomp(): Promise<void> {
+  if (decomp) return Promise.resolve();
+  decompWarm ??= import("poly-decomp").then((m) => {
+    decomp = m.default as DecompApi;
+    return decomp;
+  });
+  return decompWarm.then(() => undefined);
+}
 
 type RawPart =
   | { kind: "circle"; x: number; y: number; r: number }
@@ -227,6 +246,10 @@ export function createColliderBody(
   height: number,
   options: Matter.IBodyDefinition,
 ): { body: Matter.Body; anchor: { x: number; y: number } } | null {
+  if (!decomp) {
+    void preloadIconDecomp();
+    return null;
+  }
   if (!isPresetId(id) || width < 2 || height < 2) return null;
   const locals = localParts(id);
   if (!locals.length) return null;
@@ -709,6 +732,11 @@ function regionMismatch(outline: Pt[], parts: RawPart[]): number {
 }
 
 function decompPieces(points: Pt[]): RawPart[] {
+  if (!decomp) {
+    // Boot / pre-preload: single outline; createColliderBody callers can use Normal proxies.
+    void preloadIconDecomp();
+    return points.length >= 3 ? [{ kind: "poly", points: points.map((p) => ({ ...p })) }] : [];
+  }
   const scale = 1000;
   const concave = points.map((p) => [p.x * scale, p.y * scale] as [number, number]);
   decomp.makeCCW(concave);

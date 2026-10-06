@@ -170,7 +170,10 @@ export function paintBareText(
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.style.display = "block";
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  // Own compositor layer so one-shot redraws show under the chip's CSS transform
+  // (avoids a GPU getImageData flush on every paint).
+  canvas.style.transform = "translateZ(0)";
+  const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
@@ -196,16 +199,68 @@ export function paintBareText(
         )
       : color;
   paintTextInk(ctx, paintSlot, tracking, fill, shiftEm, ink);
-  // Read back one pixel so a transformed chip uploads the new bitmap. Without
-  // this, dragging the gradient angle redraws and the screen keeps the old frame.
-  ctx.getImageData(0, 0, 1, 1);
+}
+
+/** Copy face ink bitmap onto an existing glow canvas — skip a second measure/paint. */
+export function blitBareTextCanvas(fromEl: HTMLElement, toEl: HTMLElement): boolean {
+  const src = fromEl.querySelector(":scope > canvas");
+  if (!(src instanceof HTMLCanvasElement) || src.width < 1 || src.height < 1) return false;
+  const dst = toEl.querySelector(":scope > canvas");
+  if (!(dst instanceof HTMLCanvasElement)) return false;
+  if (dst.width !== src.width) dst.width = src.width;
+  if (dst.height !== src.height) dst.height = src.height;
+  dst.style.width = src.style.width;
+  dst.style.height = src.style.height;
+  dst.style.display = "block";
+  dst.style.transform = "translateZ(0)";
+  const ctx = dst.getContext("2d");
+  if (!ctx) return false;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, dst.width, dst.height);
+  ctx.drawImage(src, 0, 0);
+  return true;
 }
 
 
 function clearBareGradientSeat(label: HTMLElement) {
-  for (const prop of ["position", "left", "top", "width", "height", "overflow"] as const) {
+  for (const prop of ["position", "left", "top", "width", "height", "overflow", "padding", "box-sizing", "margin", "text-align"] as const) {
     label.style.removeProperty(prop);
   }
+}
+
+let sharedGlyphProbe: CanvasRenderingContext2D | null | undefined;
+
+function glyphProbeCtx(): CanvasRenderingContext2D | null {
+  if (sharedGlyphProbe !== undefined) return sharedGlyphProbe;
+  sharedGlyphProbe = document.createElement("canvas").getContext("2d");
+  return sharedGlyphProbe;
+}
+
+/**
+ * Seat contenteditable bare type on the same ink origins as paintTextInk.
+ * Flex-centering the caret box is what made glyphs jump when entering Edit.
+ */
+function seatBareEditLabel(
+  label: HTMLElement,
+  slot: TextSlot,
+  tracking: number,
+  width: number,
+  height: number,
+) {
+  const ink = measureTextInk(slot, tracking);
+  const top = ink.baseline - measureTextFontAscent(slot);
+  label.style.position = "absolute";
+  label.style.left = "0px";
+  label.style.top = "0px";
+  label.style.width = `${width}px`;
+  label.style.height = `${height}px`;
+  label.style.boxSizing = "border-box";
+  label.style.margin = "0";
+  label.style.padding = `${Math.max(0, top)}px 0 0 ${ink.originX}px`;
+  label.style.letterSpacing = `${tracking}em`;
+  label.style.lineHeight = "1";
+  label.style.overflow = "visible";
+  label.style.textAlign = "left";
 }
 
 /**
@@ -223,7 +278,7 @@ function seatBareGradientGlyphs(
   height: number,
 ) {
   const ink = measureTextInk(slot, tracking);
-  const probe = document.createElement("canvas").getContext("2d");
+  const probe = glyphProbeCtx();
   label.style.position = "absolute";
   label.style.left = "0px";
   label.style.top = "0px";
@@ -800,14 +855,18 @@ export function applyVisual(
       else paintBareTextCss(label, "", "");
       if (textGradient) el.style.color = "transparent";
     } else {
-      clearBareGradientSeat(label);
+      if (bare) {
+        seatBareEditLabel(label, slot, tracking, width, height);
+      } else {
+        clearBareGradientSeat(label);
+      }
       if (label.classList.contains("is-text-anim")) {
         stopTextAnim(label);
         clearBareTextAnimSeat(label);
       }
       // Caret wants one text node. Flatten the tracking split once; later paints
       // must not clobber what the user has typed.
-      label.style.removeProperty("letter-spacing");
+      if (!bare) label.style.removeProperty("letter-spacing");
       if (label.children.length > 0 && label.textContent === slot.text) {
         label.textContent = slot.text;
       }

@@ -1,7 +1,7 @@
 import { canvasFrame, keepSelectedCanvas, parseCanvasRatio, type CanvasFrame, type CanvasRatio } from "./canvas";
 import { FEATURED_EMOJI } from "./emojis";
 import { ICON_PRESETS, imageColliderId } from "./icons";
-import { matchCollider, presetIdForSrc, simpleColliderKind } from "./iconMesh";
+import { matchCollider, preloadIconDecomp, presetIdForSrc, simpleColliderKind } from "./iconMesh";
 import {
   bundledWeights,
   BLEND_MODES,
@@ -144,8 +144,8 @@ import {
   setRangeCaptionValue,
   wireRangeCaptions,
 } from "./rangeCaption";
-import { mountCreatePanel, paintSectionResets, RESET_ICON, setSectionOpen, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
-import { closeOtherSlots, setSlotOpen } from "./panel/slotCards";
+import { mountCreatePanel, paintAudioMic, paintSectionResets, RESET_ICON, setSectionOpen, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
+import { closeOtherSlots, replaceSlotCard, setSlotOpen } from "./panel/slotCards";
 import {
   assignCloseSlotMenu,
   closeSlotMenu,
@@ -221,6 +221,8 @@ app.innerHTML = `
         <div data-side="left"></div>
       </div>
         <div class="playfield" id="playfield">
+        <!-- Bg + pile share one filtered group (hue/grain). Vignette stays outside. -->
+        <div class="post-plate" id="post-plate">
         <div class="grid-layer" id="grid-layer" hidden aria-hidden="true"></div>
         <div class="logo-layer" id="logo-layer" hidden></div>
         <!-- Outside .pile so Create mix (e.g. Difference) can't invert the glow. -->
@@ -238,6 +240,7 @@ app.innerHTML = `
           </div>
           <div class="chip-chrome-layer" aria-hidden="true"></div>
         </div>
+        </div>
         <svg class="post-grain-defs" width="0" height="0" aria-hidden="true" focusable="false">
           <filter id="ultrapilled-grain" color-interpolation-filters="sRGB" x="0%" y="0%" width="100%" height="100%">
             <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" result="noise" />
@@ -245,8 +248,6 @@ app.innerHTML = `
             <feComposite id="ultrapilled-grain-composite" in="SourceGraphic" in2="mono" operator="arithmetic" k1="0" k2="1" k3="0" k4="0" />
           </filter>
         </svg>
-        <!-- Backdrop filter (not a playfield filter) so Difference still sees the grid. -->
-        <div class="post-grain" aria-hidden="true"></div>
         <div class="post-vignette" aria-hidden="true"></div>
         <canvas class="phys-debug" id="phys-debug" aria-hidden="true" hidden></canvas>
         <p class="canvas-welcome" id="canvas-welcome" hidden></p>
@@ -327,6 +328,7 @@ bindUiTypeSounds(app);
 
 const stage = app.querySelector<HTMLElement>("#stage")!;
 const playfield = app.querySelector<HTMLElement>("#playfield")!;
+const postPlate = app.querySelector<HTMLElement>("#post-plate")!;
 const stageVeil = app.querySelector<HTMLElement>("#stage-veil")!;
 const physDebugCanvas = app.querySelector<HTMLCanvasElement>("#phys-debug")!;
 const canvasWelcome = app.querySelector<HTMLElement>("#canvas-welcome")!;
@@ -1021,11 +1023,17 @@ function openChoiceMenu<T>(
 function applyBackground() {
   const paint = backgroundPaint(state.background, state.canvas, state.stageColor);
   stage.style.background = state.stageColor;
-  playfield.style.backgroundColor = paint.color;
-  playfield.style.backgroundImage = paint.image;
-  playfield.style.backgroundSize = paint.size;
-  playfield.style.backgroundPosition = paint.position;
-  playfield.style.backgroundRepeat = paint.repeat;
+  // Paint on .post-plate so hue/grain filters include the backdrop (old backdrop-filter grain did).
+  postPlate.style.backgroundColor = paint.color;
+  postPlate.style.backgroundImage = paint.image;
+  postPlate.style.backgroundSize = paint.size;
+  postPlate.style.backgroundPosition = paint.position;
+  postPlate.style.backgroundRepeat = paint.repeat;
+  playfield.style.backgroundColor = "";
+  playfield.style.backgroundImage = "";
+  playfield.style.backgroundSize = "";
+  playfield.style.backgroundPosition = "";
+  playfield.style.backgroundRepeat = "";
   applyGrid();
   applyLogo();
   applyUnsplashCredit();
@@ -1336,6 +1344,12 @@ function applyPost() {
   stage.classList.toggle("perf-bloom", perf);
   stage.classList.toggle("has-sat", state.post.saturate !== 100);
   stage.classList.toggle("has-hue", hueDeg % 360 !== 0);
+  // Per-chip saturate only when layout blend modes need filter-before-blend; else one layer filter.
+  const chipBlend =
+    Boolean(state.physics.layoutMode) &&
+    state.slots.some((slot) => blendMode(slot.blend) !== "normal");
+  stage.classList.toggle("has-chip-blend", chipBlend);
+  world.setBloomLive(state.post.bloom > 0 && state.post.bloomOpacity > 0);
 }
 
 const exportController = {
@@ -1914,6 +1928,7 @@ function createPanelHost(): CreatePanelHost {
     live,
     endGesture,
     renderPanel,
+    refreshSlotCard,
     openSlotMenu(x, y, id) {
       openSlotMenu(x, y, id, slotMenuHost());
     },
@@ -2074,6 +2089,15 @@ function renderPanel() {
   mountCreatePanel(panel, createPanelHost(), scroll, inserted);
 }
 
+/** Rebuild one slot editor when its fields change shape — keeps the rest of the panel alive. */
+function refreshSlotCard(id: string) {
+  if (replaceSlotCard(id, createPanelHost())) {
+    paintSectionResets(panel, state);
+    return;
+  }
+  renderPanel();
+}
+
 function syncInheritedPillPads() {
   panel.querySelectorAll<HTMLInputElement>('[data-key="pillPad"]').forEach((input) => {
     const id = input.closest<HTMLElement>("[data-id]")?.dataset.id;
@@ -2100,7 +2124,11 @@ function bindRange(
   format: (value: number) => string = (value) => value.toFixed(2),
 ) {
   const input = panel.querySelector<HTMLInputElement>(`#${id}`);
-  const caption = panel.querySelector(`[data-range-label="${id}"]`);
+  // Scope to this input's field — keys like "hue" also appear on slot cards.
+  const caption =
+    input?.closest("label, .field")?.querySelector(`[data-range-label="${id}"]`) ??
+    input?.closest("label, .field")?.querySelector("[data-range-label]") ??
+    null;
   if (input) paintRange(input);
   let scrubbing = false;
   const startScrub = () => {
@@ -3694,7 +3722,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         key === "textAnim" ||
         key === "dropShadow"
       ) {
-        renderPanel();
+        refreshSlotCard(slot.id);
       }
       if (key === "fontFamily") {
         void activateFamily(String(value)).then(() => liveChip(slot.id));
@@ -4441,6 +4469,8 @@ function duplicateSlot(id: string) {
   const next = panel.querySelector<HTMLElement>(`[data-id="${id}"]`)?.nextElementSibling;
   const anchor = next instanceof HTMLElement ? next : panel.querySelector<HTMLElement>(".slot-adds");
   const anchorId = anchor?.classList.contains("slot-card") ? anchor.dataset.id ?? null : null;
+  // Live free-transform (scaleMul / angle / flips) lives on chips, not the slot.
+  const sourcePoses = world.poses().filter((pose) => pose.slotId === id);
   remember();
   const copy = structuredClone(source);
   copy.id = uid();
@@ -4448,6 +4478,7 @@ function duplicateSlot(id: string) {
   if (copy.kind === "text") sanitizeTextMotion(copy);
   copyBaseline(source, copy);
   state.slots.splice(index + 1, 0, copy);
+  if (sourcePoses.length) world.armSpawnFrom(copy.id, sourcePoses);
   revealSlotId = copy.id;
   insertMotion = {
     id: copy.id,
@@ -5045,19 +5076,19 @@ async function setAudioReactEnabled(on: boolean) {
   if (!on) {
     stopMic();
     clearAudioScale();
-    renderPanel();
+    paintAudioMic(panel, state);
     return;
   }
-  renderPanel();
+  paintAudioMic(panel, state);
   const ok = await startMic();
   if (!ok) {
     state.audioReact.enabled = false;
     setUiSoundsMuted(false);
     window.alert("Microphone access was blocked or unavailable.");
-    renderPanel();
+    paintAudioMic(panel, state);
     return;
   }
-  renderPanel();
+  paintAudioMic(panel, state);
 }
 
 function tickAudioReact(now: number) {
@@ -5159,6 +5190,14 @@ function live(opts?: { quiet?: boolean; skipFit?: boolean }) {
   bump();
   void Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]).then(bump);
   if (state.physics.layoutMode) scheduleLiveThumb();
+}
+
+/** Ultra meshes need poly-decomp — fetch the chunk, then quiet-remesh when ready. */
+function warmUltraDecomp() {
+  if (physicsComplexity(state.physics.complexity) !== "ultra") return;
+  void preloadIconDecomp().then(() => {
+    if (physicsComplexity(state.physics.complexity) === "ultra") live({ quiet: true });
+  });
 }
 
 function escapeAttr(value: string): string {
@@ -5805,6 +5844,7 @@ function adoptState(next: typeof state) {
   };
   recountShapes();
   syncLogotypeAccent();
+  warmUltraDecomp();
   if (audioReactShouldListen()) {
     setUiSoundsMuted(true);
     void startMic();
@@ -6458,6 +6498,7 @@ resize();
 applyBackground();
 applyPost();
 renderPanel();
+warmUltraDecomp();
 {
   const pageStripEl = app.querySelector<HTMLElement>("#page-strip");
   if (pageStripEl) {
