@@ -31,7 +31,7 @@ import {
   type XformCorner,
 } from "./xformAnchor";
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
-import { setBareCanvasGradient, stopTextAnimIn } from "./textAnim";
+import { applyBareCanvasTextAnim, setBareCanvasGradient, stopTextAnimIn } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
 import { blendMode, DEFAULT_PHYSICS, isTextField, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
 import { playImpact } from "./uiSounds";
@@ -2934,34 +2934,44 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (slot.shape === "none" && slot.gradient) {
         const tracking = chip.look?.tracking ?? 0.02;
         const shiftEm = chip.look?.shiftEm ?? 0;
-        // Letter-cycle owns the canvas. Updating a label that isn't there dropped the angle.
-        if (slot.textAnim && chip.slotId !== editingId) {
+        // Letter-cycle / gradient-sweep own the canvas. Updating a label that isn't
+        // there dropped the angle.
+        if ((slot.textAnim || slot.animatedGradient) && chip.slotId !== editingId) {
           let painted = false;
           for (const root of [chip.el, chip.glow]) {
-            const canvas = root.querySelector(":scope > canvas");
-            if (canvas instanceof HTMLCanvasElement && setBareCanvasGradient(canvas, angle, scale)) {
-              painted = true;
+            let canvas = root.querySelector(":scope > canvas");
+            if (!(canvas instanceof HTMLCanvasElement)) {
+              paintBareText(root, slot, chip.width, chip.height, tracking, from, shiftEm, to, angle, scale);
+              canvas = root.querySelector(":scope > canvas");
             }
+            if (!(canvas instanceof HTMLCanvasElement)) continue;
+            if (setBareCanvasGradient(canvas, angle, scale)) {
+              painted = true;
+              continue;
+            }
+            applyBareCanvasTextAnim(
+              canvas,
+              root,
+              slot,
+              chip.width,
+              chip.height,
+              tracking,
+              from,
+              shiftEm,
+              to,
+              angle,
+              scale,
+            );
+            painted = true;
           }
           if (painted) return;
         }
-        // Static and animated text gradients are background-clip labels (same live
-        // angle path as shape fills). Fall back to the ink canvas if the label is gone.
+        // Static text gradients can be background-clip labels.
         let paintedCss = false;
         for (const root of [chip.el, chip.glow]) {
           const label = root.querySelector<HTMLElement>(":scope > .chip-label, :scope > .chip-edit");
           if (!label) continue;
-          paintBareTextCss(
-            label,
-            from,
-            to,
-            angle,
-            scale,
-            Boolean(slot.animatedGradient) && !slot.textAnim,
-            slot.gradientSpeed,
-            chip.width,
-            chip.height,
-          );
+          paintBareTextCss(label, from, to, angle, scale, false, slot.gradientSpeed, chip.width, chip.height);
           paintedCss = true;
         }
         if (!paintedCss) {

@@ -200,6 +200,18 @@ function loopTileStops(from: string, to: string): { at: number; color: string }[
   return sampleLoop(from, to, DEFAULT_GRADIENT_SCALE / 2, 0);
 }
 
+/**
+ * Pixel stops for one period, slid by `--sweep-t` (0–1). Animating that number
+ * keeps the gradient box covering the element — shifting background-position on
+ * a finite tile exposed a from|to edge.
+ */
+function sweepStopList(from: string, to: string, periodPx: number): string {
+  const period = Math.max(2, periodPx);
+  return loopTileStops(from, to)
+    .map((stop) => `${stop.color} calc(${(stop.at * period).toFixed(2)}px + (var(--sweep-t, 0) * ${period.toFixed(2)}px))`)
+    .join(", ");
+}
+
 export function pillGradient(from: string, to: string, angle?: number, scale?: number): string {
   return `linear-gradient(${gradientAngleOf(angle)}deg ${HUE_SPACE}, ${stopList(loopAnchors(from, to, scale))})`;
 }
@@ -210,40 +222,25 @@ export function pillSweepStops(from: string, to: string, phase = 0, scale?: numb
 }
 
 /**
- * Horizontal seamless tile for a rotated sweep band. The band is rotated to the
- * gradient angle so repeat-x stays seamless at every angle.
+ * Horizontal repeating tile for a rotated sweep band. `--sweep-t` slides the
+ * stops; the band stays fully covering so nothing from|to joins at a box edge.
  */
-export function pillSweepBand(from: string, to: string): string {
-  // CSS `in hsl` on three stops treats white as hue 0, so the B→A half
-  // pops a hard stripe when the tile join crosses the fill.
-  return `linear-gradient(90deg, ${stopList(loopTileStops(from, to))})`;
+export function pillSweepBand(from: string, to: string, periodPx = 200): string {
+  return `repeating-linear-gradient(90deg, ${sweepStopList(from, to, periodPx)})`;
 }
 
 /**
- * One from→to→from tile for clipped text. Repeating it and shifting background-position
- * by `textSweepShift` (one period along the gradient axis) loops with no seam.
- * Percent stops can't do this: a 200% background shift on a finite image runs off the
- * glyphs (hard cutoff) unless the tile itself repeats.
+ * One from→to→from period for clipped text. `--sweep-t` (0–1) offsets every stop
+ * by one period; the gradient box stays 100% so glyphs never see a tile edge.
  */
 export function textSweepImage(from: string, to: string, angle?: number, periodPx = 200): string {
-  const period = Math.max(2, periodPx);
-  const list = loopTileStops(from, to)
-    .map((stop) => `${stop.color} ${(stop.at * period).toFixed(2)}px`)
-    .join(", ");
-  return `repeating-linear-gradient(${gradientAngleOf(angle)}deg, ${list})`;
+  return `repeating-linear-gradient(${gradientAngleOf(angle)}deg, ${sweepStopList(from, to, periodPx)})`;
 }
 
-/** Pixel shift for one seamless text-sweep period. CSS 0° is up, 90° is right. */
-export function textSweepShift(angle: number | undefined, periodPx: number): { x: number; y: number } {
-  const period = Math.max(2, periodPx);
-  const rad = (gradientAngleOf(angle) * Math.PI) / 180;
-  return { x: Math.sin(rad) * period, y: -Math.cos(rad) * period };
-}
-
-/** Angled seamless fill for small UI previews (two periods for a 200% background shift). */
+/** Angled repeating fill for small UI previews (same `--sweep-t` as live chips). */
 export function pillSweepGradient(from: string, to: string, angle?: number, scale?: number): string {
-  // Half scale packs two visible periods into 0–100% so a 100% shift loops without a B|A join.
-  return `linear-gradient(${gradientAngleOf(angle)}deg, ${stopList(sampleLoop(from, to, gradientScaleOf(scale) / 2, 0))})`;
+  const period = Math.max(8, 48 * gradientScaleFactor(scale));
+  return `repeating-linear-gradient(${gradientAngleOf(angle)}deg, ${sweepStopList(from, to, period)})`;
 }
 
 /**

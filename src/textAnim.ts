@@ -205,7 +205,7 @@ type BareCanvasRun = {
 function bareCanvasSig(run: Pick<BareCanvasRun, "slot" | "width" | "height" | "tracking" | "shiftEm" | "color" | "gradientTo" | "angle" | "scale">): string {
   const speed = textAnimSpeedOf(run.slot.textAnimSpeed);
   const { slot } = run;
-  return `bare-canvas|${speed}|${slot.text}|${slot.fontFamily}|${slot.fontWeight}|${slot.fontSize}|${run.tracking}|${run.shiftEm}|${run.width}|${run.height}|${run.color}|${run.gradientTo}|${run.angle ?? ""}|${run.scale ?? ""}`;
+  return `bare-canvas|${speed}|${slot.text}|${slot.fontFamily}|${slot.fontWeight}|${slot.fontSize}|${run.tracking}|${run.shiftEm}|${run.width}|${run.height}|${run.color}|${run.gradientTo}|${run.angle ?? ""}|${run.scale ?? ""}|${slot.gradientSpeed ?? ""}|${slot.textAnim ? 1 : 0}|${slot.animatedGradient ? 1 : 0}`;
 }
 
 const bareCanvasRuns = new WeakMap<HTMLCanvasElement, BareCanvasRun>();
@@ -265,6 +265,11 @@ function paintBareRollingFrame(
         )
       : color;
 
+  if (!slot.textAnim) {
+    paintTextInk(ctx, paintSlot, tracking, fill, shiftEm, ink);
+    return;
+  }
+
   const fontSize = slot.fontSize;
   const travel = textAnimTravel(0, fontSize);
   const text = slot.text || "";
@@ -303,12 +308,12 @@ export function applyBareCanvasTextAnim(
   });
   const prev = bareCanvasRuns.get(canvas);
   if (prev?.sig === sig) {
-    host.classList.add("is-text-anim-host");
+    if (slot.textAnim) host.classList.add("is-text-anim-host");
     return;
   }
   stopBareCanvasTextAnim(canvas);
 
-  host.classList.add("is-text-anim-host");
+  if (slot.textAnim) host.classList.add("is-text-anim-host");
   let start = performance.now();
   let pausedAt: number | null = textAnimsPaused ? start : null;
 

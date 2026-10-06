@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { pillGradient, pillSweepBand, pillSweepGradient, textSweepImage, textSweepShift } from "./pillFill";
+import { pillGradient, pillSweepBand, pillSweepGradient, pillSweepStops, textSweepImage } from "./pillFill";
 
 function cssColors(image: string): string[] {
-  const body = image.slice(image.indexOf(",") + 1);
-  return body.split(",").map((part) => part.trim().split(" ")[0]);
+  return image.match(/#[0-9a-f]{6}/gi) ?? [];
 }
 
 describe("text gradient sweep", () => {
@@ -11,6 +10,7 @@ describe("text gradient sweep", () => {
     const image = textSweepImage("#ff2d55", "#5ac8fa", 90, 160);
     expect(image.startsWith("repeating-linear-gradient(90deg, ")).toBe(true);
     expect(image).not.toContain("in hsl");
+    expect(image).toContain("var(--sweep-t, 0)");
     const stops = cssColors(image);
     expect(stops[0]).toBe("#ff2d55");
     expect(stops[stops.length - 1]).toBe("#ff2d55");
@@ -18,11 +18,9 @@ describe("text gradient sweep", () => {
     expect(stops).toContain("#5ac8fa");
   });
 
-  it("shifts one period along the gradient axis", () => {
-    expect(textSweepShift(90, 200)).toEqual({ x: 200, y: expect.closeTo(0, 6) });
-    expect(textSweepShift(0, 200).x).toBeCloseTo(0, 6);
-    expect(textSweepShift(0, 200).y).toBeCloseTo(-200, 6);
-    expect(textSweepShift(180, 80).y).toBeCloseTo(80, 6);
+  it("offsets stops by one period at --sweep-t 1", () => {
+    const image = textSweepImage("#ff2d55", "#5ac8fa", 90, 160);
+    expect(image).toContain("* 160.00px)");
   });
 });
 
@@ -41,8 +39,10 @@ describe("pill gradient seams", () => {
   });
 
   it("tiles a sweep band with matching ends", () => {
-    const css = pillSweepBand("#ff00c4", "#3b00ff");
+    const css = pillSweepBand("#ff00c4", "#3b00ff", 120);
     expect(css).not.toContain("in hsl");
+    expect(css.startsWith("repeating-linear-gradient(90deg, ")).toBe(true);
+    expect(css).toContain("var(--sweep-t, 0)");
     const colors = cssColors(css);
     expect(colors[0]).toBe(colors[colors.length - 1]);
     expect(colors[0]).toBe("#ff00c4");
@@ -54,5 +54,13 @@ describe("pill gradient seams", () => {
     expect(colors[0]).toBe("#ff00c4");
     expect(colors[colors.length - 1]).toBe("#ff00c4");
     expect(colors).toContain("#3b00ff");
+  });
+
+  it("wraps canvas sweep phase so 0 and 1 match", () => {
+    const a = pillSweepStops("#ff00c4", "#3b00ff", 0, 50);
+    const b = pillSweepStops("#ff00c4", "#3b00ff", 1, 50);
+    expect(a.map((stop) => stop.color)).toEqual(b.map((stop) => stop.color));
+    const loop = pillSweepStops("#ff00c4", "#3b00ff", 0, 25);
+    expect(loop[0]?.color).toBe(loop[loop.length - 1]?.color);
   });
 });

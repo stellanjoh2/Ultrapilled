@@ -27,7 +27,7 @@ export type ExportController = {
   /** True when poses are the last fall’s start layout (replay instead of redeploy). */
   replayFall(): boolean;
   state(): AppState;
-  saveProject(): void;
+  saveProject(): void | Promise<void>;
   loadProject(file: File): Promise<void>;
 };
 
@@ -370,14 +370,16 @@ export function mountExportPanel(panel: HTMLElement, controller: ExportControlle
     "click",
     () => {
       if (busy) return;
-      try {
-        controller.saveProject();
-        setStatus(`Saved ${defaultPillFileName()}`);
-        playNotify();
-      } catch {
-        setStatus("Could not save the project.");
-        playCaution();
-      }
+      void (async () => {
+        try {
+          await controller.saveProject();
+          setStatus(`Saved ${defaultPillFileName()}`);
+          playNotify();
+        } catch {
+          setStatus("Could not save the project.");
+          playCaution();
+        }
+      })();
     },
     { signal },
   );

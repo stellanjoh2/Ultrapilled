@@ -2,7 +2,7 @@ import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { chipContributesBloom, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
 import { measureTextFontAscent, measureTextInk, paintTextInk, textFieldPad, textInkGlyphStarts } from "./measure";
-import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, sweepBandMetrics, textGradientFill, textSweepImage, textSweepShift } from "./pillFill";
+import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, sweepBandMetrics, textGradientFill, textSweepImage } from "./pillFill";
 import {
   applyBareCanvasTextAnim,
   applyTextAnim,
@@ -36,8 +36,8 @@ export function paintSweepBand(
   }
   band.style.width = `${coverPx}px`;
   band.style.height = `${coverPx}px`;
-  band.style.setProperty("--sweep-tile", `${tilePx}px`);
-  band.style.backgroundImage = pillSweepBand(from, to);
+  band.style.removeProperty("--sweep-tile");
+  band.style.backgroundImage = pillSweepBand(from, to, tilePx);
 }
 
 export function setSweepDuration(el: HTMLElement, speed?: number) {
@@ -271,6 +271,7 @@ export function clearBareTextCss(el: HTMLElement) {
   el.style.removeProperty("--grad-angle");
   el.style.removeProperty("--sweep-dx");
   el.style.removeProperty("--sweep-dy");
+  el.style.removeProperty("--sweep-t");
 }
 
 export function styleBareTextCss(
@@ -286,21 +287,18 @@ export function styleBareTextCss(
 ) {
   el.classList.add("is-text-gradient");
   if (animated) {
-    // Repeating from→to→from tile. background-size:200% + no-repeat slid a finite
-    // image off the glyphs (hard cutoff) and the duplicated from→to join was a seam.
     const boxW = width > 0 ? width : el.offsetWidth || 64;
     const boxH = height > 0 ? height : el.offsetHeight || 24;
     const { tilePx } = sweepBandMetrics(boxW, boxH, angle, scale);
-    const shift = textSweepShift(angle, tilePx);
     el.classList.add("is-gradient-animated");
     el.style.backgroundImage = textSweepImage(from, to, angle, tilePx);
-    el.style.backgroundRepeat = "repeat";
-    el.style.backgroundSize = "auto";
+    el.style.backgroundRepeat = "no-repeat";
+    el.style.backgroundSize = "100% 100%";
     el.style.backgroundPosition = "0px 0px";
     setSweepDuration(el, speed);
     el.style.setProperty("--grad-angle", String(gradientAngleOf(angle)));
-    el.style.setProperty("--sweep-dx", `${shift.x.toFixed(2)}px`);
-    el.style.setProperty("--sweep-dy", `${shift.y.toFixed(2)}px`);
+    el.style.removeProperty("--sweep-dx");
+    el.style.removeProperty("--sweep-dy");
   } else {
     el.classList.remove("is-gradient-animated");
     el.style.backgroundImage = pillGradient(from, to, angle, scale);
@@ -311,6 +309,7 @@ export function styleBareTextCss(
     el.style.removeProperty("--grad-angle");
     el.style.removeProperty("--sweep-dx");
     el.style.removeProperty("--sweep-dy");
+    el.style.removeProperty("--sweep-t");
   }
   el.style.backgroundColor = "transparent";
   el.style.webkitBackgroundClip = "text";
@@ -643,13 +642,12 @@ export function applyVisual(
     const textGradient = wantsTextGradient && Boolean(gradientTo);
     const hideText = bloom && !bare;
     const liveEdit = editing && !bloom;
-    // Pill letter-cycle needs a DOM label. Bare letter-cycle AND the resting
-    // gradient stay on the ink canvas — stopping animation must not swap to a
-    // CSS label (letter-spacing after the last glyph + flex center crops it).
+    // Pill letter-cycle needs a DOM label. Bare letter-cycle AND gradient
+    // sweeps stay on the ink canvas — CSS repeating-linear-gradient tiles the
+    // axis-aligned box, so diagonal sweeps showed a hard join on X and Y.
     const bareCss =
       (Boolean(slot.textAnim) && !bare) ||
-      (textGradient && liveEdit) ||
-      (textGradient && Boolean(slot.animatedGradient) && !slot.textAnim);
+      (textGradient && liveEdit);
     el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video", "chip-text-field");
     el.classList.toggle("chip-bare", bare || ring);
     el.classList.toggle("is-editing", liveEdit);
@@ -668,8 +666,8 @@ export function applyVisual(
     el.style.fontSize = `${slot.fontSize}px`;
     el.style.letterSpacing = `${tracking}em`;
 
-    // Bare Animate: canvas letter poses — never swap to DOM (that caused the jump).
-    if (bare && slot.textAnim && !liveEdit && !hideText) {
+    // Bare Animate / animated gradient: canvas — never swap to DOM (that caused the jump).
+    if (bare && (slot.textAnim || (textGradient && slot.animatedGradient)) && !liveEdit && !hideText) {
       stopTextAnimIn(el);
       el.querySelectorAll(":scope > .chip-label, :scope > .chip-edit").forEach((n) => n.remove());
       // Ensure the ink canvas exists without resetting a running cycle every tick.

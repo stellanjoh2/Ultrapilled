@@ -1350,8 +1350,8 @@ const exportController = {
   poses: () => world.fallStartPoses() ?? (world.chipCount() > 0 ? world.poses() : []),
   replayFall: () => world.fallStartPoses() != null,
   state: () => state,
-  saveProject() {
-    const json = serializePillProject(currentPillProject());
+  async saveProject() {
+    const json = serializePillProject(await embedSlotImages(currentPillProject()));
     downloadPillJson(json, defaultPillFileName());
     lastDraftJson = json;
     void clearDraft().catch(() => {});
@@ -1393,7 +1393,9 @@ let draftSaveWarned = false;
 async function writeDraftNow() {
   if (!getPrefs().rememberLast) return;
   try {
-    const json = serializePillProject(currentPillProject());
+    // Bake blob: uploads into data URLs — otherwise reconnect restores poses but
+    // photos are dead forever, and Trigger Physics looks like the stock template.
+    const json = serializePillProject(await embedSlotImages(currentPillProject()));
     if (json === lastDraftJson) return;
     await writeDraftJson(json);
     lastDraftJson = json;
@@ -1701,7 +1703,10 @@ async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolea
     session.setRunning(false);
   }
   renderPanel();
-  live();
+  // Quiet: a noisy live() remesh would unpin the restored pile and start a
+  // fall/hold/(dump) cycle — Trigger Physics then respawns from slots and the
+  // arranged scene is gone.
+  live(hasPoses ? { quiet: true } : undefined);
   paintPages();
   scheduleDraft();
 }
@@ -5858,11 +5863,9 @@ function restore(snap: Snapshot) {
   applyPost();
   syncCanvas(world.chipCount() > 0);
   const page = pages[pageIndex];
-  if (state.physics.layoutMode && page?.poses.length) {
-    pinRestoredPoses(page.poses, page.frame);
-  }
+  const pinned = Boolean(page?.poses.length) && pinRestoredPoses(page.poses, page.frame);
   renderPanel();
-  live();
+  live(pinned ? { quiet: true } : undefined);
   paintPages();
 }
 
