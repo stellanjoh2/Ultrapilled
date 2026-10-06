@@ -106,7 +106,7 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
       </div>
       ${
         background.kind === "solid"
-          ? `<button type="button" class="bg-swatch" id="bg-solid" style="background:${stageColor}" aria-label="Solid color"></button>`
+          ? `<button type="button" class="bg-swatch" id="bg-solid" style="background:${stageColor}" aria-label="Solid color" data-tip="Pick the stage color"></button>`
           : ""
       }
       ${
@@ -116,24 +116,24 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
               <button type="button" class="pill${linear ? " is-on" : ""}" data-shape="linear" aria-pressed="${linear}" data-tip="Blend from the top of the frame to the bottom">Linear</button>
             </div>
             <p class="hint">${shapeHint}</p>
-            <div class="grad" id="grad">
+            <div class="grad" id="grad" data-tip="Click the bar to add a color. Drag a stop to move it, or drag it away to remove it.">
               <div class="grad__bar" id="grad-bar"></div>
             </div>
             <p class="hint">Click the bar to add a color. Drag a color away to remove it.</p>
-            <div class="field">Color
-              <button type="button" class="bg-swatch" id="bg-stop" style="background:${stop?.color ?? "#000"}" aria-label="Gradient color"></button>
+            <div class="field" data-tip="Color of the selected gradient stop">Color
+              <button type="button" class="bg-swatch" id="bg-stop" style="background:${stop?.color ?? "#000"}" aria-label="Gradient color" data-tip="Color of the selected gradient stop"></button>
             </div>`
           : ""
       }
       ${
         background.kind === "image"
-          ? `<button type="button" class="pill" id="bg-upload">${file ? "Replace image" : "Upload image"}</button>
+          ? `<button type="button" class="pill" id="bg-upload" data-tip="Use a JPG or PNG as the stage">${file ? "Replace image" : "Upload image"}</button>
             <input class="bg-file" id="bg-file" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" />
             ${
               file
                 ? `<div class="bg-photo" id="bg-photo"></div>
                   <p class="hint" id="bg-name"></p>
-                  <button type="button" class="pill" id="bg-clear">Remove image</button>`
+                  <button type="button" class="pill" id="bg-clear" data-tip="Remove the background image">Remove image</button>`
                 : ""
             }
             <p class="hint" id="bg-note">${canvas === "9:16" || canvas === "3:4" ? "On portrait canvases the image meets the top and bottom. Wider photos crop at the sides." : "JPG or PNG. The image covers the frame."}</p>`
@@ -288,21 +288,21 @@ function mountGrid(panel: HTMLElement, controller: BackgroundController) {
   section.innerHTML = `
     <h2 data-tip="Optional guide overlay locked to the canvas ratio — shortcut G">Grid</h2>
     <div class="segment" role="group" aria-label="Grid">
-      <button type="button" class="pill${!on ? " is-on" : ""}" data-grid="off" aria-pressed="${!on}">Off</button>
-      <button type="button" class="pill${on ? " is-on" : ""}" data-grid="on" aria-pressed="${on}">On</button>
+      <button type="button" class="pill${!on ? " is-on" : ""}" data-grid="off" aria-pressed="${!on}" data-tip="Hide the guide overlay">Off</button>
+      <button type="button" class="pill${on ? " is-on" : ""}" data-grid="on" aria-pressed="${on}" data-tip="Show square guides locked to the canvas ratio — shortcut G">On</button>
     </div>
     ${
       on
         ? `<div class="segment is-3" role="group" aria-label="Grid density">
-            <button type="button" class="pill${density === "base" ? " is-on" : ""}" data-grid-density="base" aria-pressed="${density === "base"}">${base.cols}×${base.rows}</button>
-            <button type="button" class="pill${density === "fine" ? " is-on" : ""}" data-grid-density="fine" aria-pressed="${density === "fine"}">${fine.cols}×${fine.rows}</button>
-            <button type="button" class="pill${density === "finest" ? " is-on" : ""}" data-grid-density="finest" aria-pressed="${density === "finest"}">${finest.cols}×${finest.rows}</button>
+            <button type="button" class="pill${density === "base" ? " is-on" : ""}" data-grid-density="base" aria-pressed="${density === "base"}" data-tip="Coarser guides">${base.cols}×${base.rows}</button>
+            <button type="button" class="pill${density === "fine" ? " is-on" : ""}" data-grid-density="fine" aria-pressed="${density === "fine"}" data-tip="Finer guides">${fine.cols}×${fine.rows}</button>
+            <button type="button" class="pill${density === "finest" ? " is-on" : ""}" data-grid-density="finest" aria-pressed="${density === "finest"}" data-tip="Finest guides">${finest.cols}×${finest.rows}</button>
           </div>
-          <label class="field"><span id="grid-opacity-label">Opacity ${Math.round(opacity)}</span>
+          <label class="field" data-tip="How visible the grid is"><span id="grid-opacity-label">Opacity ${Math.round(opacity)}</span>
             <input type="range" id="grid-opacity" min="0" max="100" step="1" value="${opacity}" />
           </label>
-          <div class="field">Color
-            <button type="button" class="bg-swatch" id="grid-color" style="background:${color}" aria-label="Grid color"></button>
+          <div class="field" data-tip="Grid line color">Color
+            <button type="button" class="bg-swatch" id="grid-color" style="background:${color}" aria-label="Grid color" data-tip="Grid line color"></button>
           </div>`
         : `<p class="hint">Square cells that lock to the canvas ratio.</p>`
     }
@@ -385,7 +385,7 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
       file
         ? `<div class="logo-preview" id="logo-preview"></div>
           <p class="hint" id="logo-name"></p>
-          <label class="field"><span id="logo-scale-label">Scale ${scale.toFixed(2)}</span>
+          <label class="field" data-tip="Size of the centered mark"><span id="logo-scale-label">Scale ${scale.toFixed(2)}</span>
             <input type="range" id="logo-scale" min="0.25" max="4" step="0.05" value="${scale}" />
           </label>
           <div class="segment" role="group" aria-label="Logo layer">
@@ -399,22 +399,22 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
           </label>
           ${
             svg
-              ? `<div class="field">Color
-                  <button type="button" class="bg-swatch" id="logo-color" style="background:${current}" aria-label="Logo color"></button>
+              ? `<div class="field" data-tip="Recolor the SVG logo">Color
+                  <button type="button" class="bg-swatch" id="logo-color" style="background:${current}" aria-label="Logo color" data-tip="Recolor the SVG logo"></button>
                 </div>
                 <div class="tint-row" style="--theme-count:${theme.length + 1}">
-                  <button type="button" class="tint${originalOn ? " is-on" : ""}" id="logo-original" style="background:${original}" aria-pressed="${originalOn}" aria-label="Original color"></button>
+                  <button type="button" class="tint${originalOn ? " is-on" : ""}" id="logo-original" style="background:${original}" aria-pressed="${originalOn}" aria-label="Original color" data-tip="Restore the SVG file color"></button>
                   ${theme
                     .map((color, index) => {
                       const on = !background.logoColor && background.logoTint === index;
-                      return `<button type="button" class="tint${on ? " is-on" : ""}" data-logo-tint="${index}" style="background:${color}" aria-pressed="${on}" aria-label="Theme color ${index + 1}"></button>`;
+                      return `<button type="button" class="tint${on ? " is-on" : ""}" data-logo-tint="${index}" style="background:${color}" aria-pressed="${on}" aria-label="Theme color ${index + 1}" data-tip="Tint the logo with theme color ${index + 1}"></button>`;
                     })
                     .join("")}
                 </div>
                 <p class="hint">Pick a color or theme swatch to recolor the SVG. The first swatch restores the file's own color.</p>`
               : ""
           }
-          <button type="button" class="pill" id="logo-clear">Remove logo</button>`
+          <button type="button" class="pill" id="logo-clear" data-tip="Remove the logo">Remove logo</button>`
         : ""
     }
     <p class="hint" id="logo-note">SVG or PNG. Centered on the stage — choose whether it sits behind or in front of what falls.</p>
@@ -578,6 +578,7 @@ function mountStops(panel: HTMLElement, controller: BackgroundController) {
       knob.style.left = `${stop.at}%`;
       knob.style.background = stop.color;
       knob.setAttribute("aria-label", `Color at ${Math.round(stop.at)}%`);
+      knob.dataset.tip = "Drag to move, click to pick, drag away to remove";
       knob.addEventListener("pointerdown", (event) => onStopDown(event, knob, stop.id));
       bar.append(knob);
     }

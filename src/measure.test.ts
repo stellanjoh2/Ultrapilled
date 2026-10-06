@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TEXT_INK_PAD, measureTextInk, textFieldPad, textGlyphSideOverhangs, trackedRunWidth, trackingEm } from "./measure";
+import { TEXT_INK_PAD, fitTextFieldBox, measureTextInk, textFieldPad, textGlyphSideOverhangs, trackedRunWidth, trackingEm } from "./measure";
 import { defaultTextFieldSlot, defaultTypeSlot } from "./types";
 
 describe("measureTextInk", () => {
@@ -85,6 +85,51 @@ describe("textFieldPad", () => {
     const pad = textFieldPad(slot, 260, 140);
     expect(pad.x).toBe(Math.max(2, 18 * 0.12));
     expect(pad.y).toBe(pad.x);
+  });
+});
+
+describe("fitTextFieldBox", () => {
+  it("hugs starter copy instead of the default empty frame", () => {
+    const slot = defaultTextFieldSlot();
+    fitTextFieldBox(slot, 0);
+    expect(slot.boxH).toBeLessThan(80);
+    expect(slot.boxH).toBeGreaterThan(20);
+    slot.text = "Hi";
+    fitTextFieldBox(slot, 0);
+    expect(slot.boxW).toBeLessThan(120);
+  });
+
+  it("grows with a longer sentence and with a new line", () => {
+    const slot = defaultTextFieldSlot({ text: "Hi" });
+    fitTextFieldBox(slot, 0);
+    const short = { w: slot.boxW!, h: slot.boxH! };
+    slot.text = "Hi there, this is a longer sentence";
+    fitTextFieldBox(slot, 0);
+    expect(slot.boxW).toBeGreaterThan(short.w);
+    slot.text = "Hi there, this is a longer sentence\nand another line";
+    fitTextFieldBox(slot, 0);
+    expect(slot.boxH).toBeGreaterThan(short.h);
+  });
+
+  it("wraps a pasted paragraph instead of one long line", () => {
+    const slot = defaultTextFieldSlot({
+      text: "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty",
+    });
+    fitTextFieldBox(slot, 0);
+    expect(slot.boxW).toBeLessThanOrEqual(18 * 22 + 24);
+    expect(slot.boxH).toBeGreaterThan(40);
+  });
+
+  it("keeps a resized wrap width and only grows height", () => {
+    const slot = defaultTextFieldSlot({
+      text: "one two three four five six",
+      boxAuto: false,
+      boxW: 120,
+      boxH: 40,
+    });
+    fitTextFieldBox(slot, 0);
+    expect(slot.boxW).toBe(120);
+    expect(slot.boxH).toBeGreaterThan(40);
   });
 });
 

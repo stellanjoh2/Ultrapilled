@@ -74,7 +74,7 @@ export function reportCardHtml(): string {
         Spotted something wrong? Use the quick form here. I can’t reply, but I read everything you send.
         See also <a href="${PRIVACY_HREF}">Privacy</a>.
       </p>
-      <button type="button" class="report-card__open" data-open-bug-report>Tell us what happened</button>
+      <button type="button" class="report-card__open" data-open-bug-report data-tip="Open the issue form">Tell us what happened</button>
     </section>
   `;
 }
@@ -335,17 +335,17 @@ export function openBugReport(): void {
         I don’t collect contact details, so I can’t reply, but every submission is read.
       </p>
       <form class="bug-report__form" id="bug-report-form" novalidate>
-        <label class="bug-report__label" for="bug-report-category">Category</label>
+        <label class="bug-report__label" for="bug-report-category" data-tip="What kind of problem this is">Category</label>
         <select class="bug-report__select" id="bug-report-category" name="category">
           ${optionsHtml(CATEGORIES, "rendering")}
         </select>
-        <label class="bug-report__label" for="bug-report-severity">Severity</label>
+        <label class="bug-report__label" for="bug-report-severity" data-tip="How badly it gets in the way">Severity</label>
         <div class="bug-report__severity">
           <select class="bug-report__select" id="bug-report-severity" name="severity">
             ${optionsHtml(SEVERITIES, "moderate")}
           </select>
         </div>
-        <label class="bug-report__label" for="bug-report-message">Details</label>
+        <label class="bug-report__label" for="bug-report-message" data-tip="Steps, browser, and what you expected">Details</label>
         <textarea
           class="bug-report__message"
           id="bug-report-message"

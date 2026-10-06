@@ -91,14 +91,57 @@ export function fillSample(theme: ColorTheme, slot: GradientSlot): string {
   return mixHue(fill, gradientEnd(theme, slot), 0.5);
 }
 
-/** Even hue samples so the blend stays colorful and has no hard bands. */
-export function pillGradientStops(from: string, to: string, scale?: number): { at: number; color: string }[] {
+/** CSS hue interpolation — RGB-sampled hex stops used to facet and tile with a hard join. */
+const HUE_SPACE = "in hsl shorter hue";
+
+function loopUnit(t: number): number {
+  return ((t % 1) + 1) % 1;
+}
+
+/**
+ * Closed-loop blend: any start/end pair becomes from→to→from so a repeating
+ * sweep has no seam (phase 0 and phase 1 are identical).
+ */
+function loopBlend(from: string, to: string, t: number): string {
+  const u = loopUnit(t);
+  if (u < 1e-12 || 1 - u < 1e-12) return from;
+  if (Math.abs(u - 0.5) < 1e-12) return to;
+  const blend = u <= 0.5 ? u * 2 : 2 - u * 2;
+  return mixHue(from, to, blend);
+}
+
+/** Exact `from` / `to` at loop extrema, plus box ends — CSS `in hsl` fills the spans. */
+function loopAnchors(from: string, to: string, scale?: number, phase = 0): { at: number; color: string }[] {
   const span = 2 * gradientScaleFactor(scale);
+  const shift = loopUnit(phase);
+  const tAt = (at: number) => at / span + shift;
+  const stops: { at: number; color: string }[] = [{ at: 0, color: loopBlend(from, to, tAt(0)) }];
+  const maxT = tAt(1);
+  const n0 = Math.floor(tAt(0) * 2) + 1;
+  for (let n = n0; ; n++) {
+    const t = n / 2;
+    if (t >= maxT - 1e-12) break;
+    const at = span * (t - shift);
+    if (at <= 1e-12 || at >= 1 - 1e-12) continue;
+    stops.push({ at, color: n % 2 === 0 ? from : to });
+  }
+  stops.push({ at: 1, color: loopBlend(from, to, maxT) });
+  return stops;
+}
+
+/** Even hue samples so canvas RGB interpolation stays colorful and has no hard bands. */
+export function pillGradientStops(from: string, to: string, scale?: number): { at: number; color: string }[] {
+  return sampleLoop(from, to, scale, 0);
+}
+
+function sampleLoop(from: string, to: string, scale: number | undefined, phase: number): { at: number; color: string }[] {
+  const span = 2 * gradientScaleFactor(scale);
+  const shift = loopUnit(phase);
   const count = Math.min(64, Math.max(GRADIENT_STOPS, Math.ceil(GRADIENT_STOPS / gradientScaleFactor(scale))));
   const stops: { at: number; color: string }[] = [];
   for (let i = 0; i < count; i++) {
     const at = i / (count - 1);
-    stops.push({ at, color: loopBlend(from, to, at / span) });
+    stops.push({ at, color: loopBlend(from, to, at / span + shift) });
   }
   return stops;
 }
@@ -152,40 +195,12 @@ function stopList(stops: { at: number; color: string }[]): string {
 }
 
 export function pillGradient(from: string, to: string, angle?: number, scale?: number): string {
-  return `linear-gradient(${gradientAngleOf(angle)}deg, ${stopList(pillGradientStops(from, to, scale))})`;
-}
-
-/**
- * Closed-loop blend: any start/end pair becomes from→to→from so a repeating
- * sweep has no seam (phase 0 and phase 1 are identical).
- */
-function loopBlend(from: string, to: string, t: number): string {
-  const u = ((t % 1) + 1) % 1;
-  const blend = u <= 0.5 ? u * 2 : 2 - u * 2;
-  return mixHue(from, to, blend);
+  return `linear-gradient(${gradientAngleOf(angle)}deg ${HUE_SPACE}, ${stopList(loopAnchors(from, to, scale))})`;
 }
 
 /** Seamless from→to→from cycle for a looping sweep. phase shifts 0–1 along the axis. */
 export function pillSweepStops(from: string, to: string, phase = 0, scale?: number): { at: number; color: string }[] {
-  const span = 2 * gradientScaleFactor(scale);
-  const shift = ((phase % 1) + 1) % 1;
-  const count = Math.min(64, Math.max(GRADIENT_STOPS, Math.ceil(GRADIENT_STOPS / gradientScaleFactor(scale))));
-  const stops: { at: number; color: string }[] = [];
-  for (let i = 0; i < count; i++) {
-    const at = i / (count - 1);
-    stops.push({ at, color: loopBlend(from, to, at / span + shift) });
-  }
-  return stops;
-}
-
-/** One from→to→from period (endpoints match so tiling loops cleanly). */
-function seamlessLoopStops(from: string, to: string): { at: number; color: string }[] {
-  const stops: { at: number; color: string }[] = [];
-  for (let i = 0; i < GRADIENT_STOPS; i++) {
-    const at = i / (GRADIENT_STOPS - 1);
-    stops.push({ at, color: loopBlend(from, to, at) });
-  }
-  return stops;
+  return sampleLoop(from, to, scale, phase);
 }
 
 /**
@@ -193,7 +208,7 @@ function seamlessLoopStops(from: string, to: string): { at: number; color: strin
  * gradient angle so repeat-x stays seamless at every angle.
  */
 export function pillSweepBand(from: string, to: string): string {
-  return `linear-gradient(90deg, ${stopList(seamlessLoopStops(from, to))})`;
+  return `linear-gradient(90deg ${HUE_SPACE}, ${from} 0%, ${to} 50%, ${from} 100%)`;
 }
 
 /**
@@ -204,10 +219,9 @@ export function pillSweepBand(from: string, to: string): string {
  */
 export function textSweepImage(from: string, to: string, angle?: number, periodPx = 200): string {
   const period = Math.max(2, periodPx);
-  const stops = seamlessLoopStops(from, to)
-    .map((stop) => `${stop.color} ${(stop.at * period).toFixed(2)}px`)
-    .join(", ");
-  return `repeating-linear-gradient(${gradientAngleOf(angle)}deg, ${stops})`;
+  const mid = (period / 2).toFixed(2);
+  const end = period.toFixed(2);
+  return `repeating-linear-gradient(${gradientAngleOf(angle)}deg ${HUE_SPACE}, ${from} 0px, ${to} ${mid}px, ${from} ${end}px)`;
 }
 
 /** Pixel shift for one seamless text-sweep period. CSS 0° is up, 90° is right. */
@@ -219,13 +233,8 @@ export function textSweepShift(angle: number | undefined, periodPx: number): { x
 
 /** Angled seamless fill for small UI previews (two periods for a 200% background shift). */
 export function pillSweepGradient(from: string, to: string, angle?: number, scale?: number): string {
-  const one = pillSweepStops(from, to, 0, scale);
-  const stops: { at: number; color: string }[] = [];
-  for (const stop of one) stops.push({ at: stop.at * 0.5, color: stop.color });
-  for (let i = 1; i < one.length; i++) {
-    stops.push({ at: 0.5 + one[i].at * 0.5, color: one[i].color });
-  }
-  return `linear-gradient(${gradientAngleOf(angle)}deg, ${stopList(stops)})`;
+  // Half scale packs two visible periods into 0–100% so a 100% shift loops without a B|A join.
+  return `linear-gradient(${gradientAngleOf(angle)}deg ${HUE_SPACE}, ${stopList(loopAnchors(from, to, gradientScaleOf(scale) / 2))})`;
 }
 
 /**

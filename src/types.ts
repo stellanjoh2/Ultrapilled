@@ -65,6 +65,8 @@ export type TextSlot = {
   boxW?: number;
   /** Unscaled box height. Used when `textField` is set. */
   boxH?: number;
+  /** Hug the copy; cleared when the user resizes the field. */
+  boxAuto?: boolean;
   align?: TextAlign;
   italic?: boolean;
   /** 0–100. Line box for wrapping text fields. Unset keeps the default. */
@@ -76,7 +78,9 @@ export type TextAlign = "left" | "center" | "right";
 export const DEFAULT_TEXT_FIELD_W = 260;
 export const DEFAULT_TEXT_FIELD_H = 140;
 export const TEXT_FIELD_WORD_MAX = 250;
-export const TEXT_FIELD_BOX_MIN = 48;
+export const TEXT_FIELD_BOX_MIN = 24;
+/** Auto-wrap inner width in em so a paste stays a paragraph, not one long line. */
+export const TEXT_FIELD_AUTO_LINE_EM = 22;
 export const TEXT_FIELD_STARTER = "Paste or write your text...";
 export const TEXT_FIELD_LINE_HEIGHT_SLIDER = 50;
 
@@ -612,6 +616,7 @@ export function defaultTextFieldSlot(partial: Partial<TextSlot> = {}): TextSlot 
     fontWeight: 400,
     boxW: DEFAULT_TEXT_FIELD_W,
     boxH: DEFAULT_TEXT_FIELD_H,
+    boxAuto: true,
     align: "left",
     lineHeight: TEXT_FIELD_LINE_HEIGHT_SLIDER,
     ...partial,

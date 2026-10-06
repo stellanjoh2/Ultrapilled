@@ -103,6 +103,7 @@ describe("layout layer order controls", () => {
       ["backward", "Send backward"],
       ["back", "Send to back"],
     ]);
+    expect(document.querySelector(".slot-menu__check")?.getAttribute("data-tip")).toBeTruthy();
   });
 
   it("hides layer-order icons outside Layout mode", () => {

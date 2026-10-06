@@ -1,4 +1,5 @@
 const SHOW_MS = 380;
+const HIDE_MS = 180;
 const GAP = 8;
 const EDGE = 8;
 
@@ -6,8 +7,13 @@ let enabled = true;
 let tip: HTMLElement | null = null;
 let active: HTMLElement | null = null;
 let timer = 0;
+let fadeTimer = 0;
 let tipId = "";
 let rootEl: ParentNode | null = null;
+
+function reducedMotion(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 function tipTarget(node: EventTarget | null, root: ParentNode): HTMLElement | null {
   if (!(node instanceof Element)) return null;
@@ -17,17 +23,40 @@ function tipTarget(node: EventTarget | null, root: ParentNode): HTMLElement | nu
   return el;
 }
 
-function hide() {
+function finishHide() {
+  window.clearTimeout(fadeTimer);
+  fadeTimer = 0;
+  if (!tip) return;
+  tip.classList.remove("is-leaving");
+  tip.removeAttribute("id");
+  tip.hidden = true;
+  tip.textContent = "";
+}
+
+function hide(fade = false) {
   window.clearTimeout(timer);
   timer = 0;
   if (active && tipId) active.removeAttribute("aria-describedby");
   active = null;
   tipId = "";
-  if (tip) {
-    tip.removeAttribute("id");
-    tip.hidden = true;
-    tip.textContent = "";
+  if (!tip) return;
+  const visible = !tip.hidden;
+  if (fade && visible && !reducedMotion()) {
+    if (tip.classList.contains("is-leaving")) return;
+    const node = tip;
+    const done = (event?: TransitionEvent) => {
+      if (event && event.propertyName !== "opacity") return;
+      if (tip !== node) return;
+      node.removeEventListener("transitionend", onEnd);
+      finishHide();
+    };
+    const onEnd = (event: TransitionEvent) => done(event);
+    node.addEventListener("transitionend", onEnd);
+    node.classList.add("is-leaving");
+    fadeTimer = window.setTimeout(() => done(), HIDE_MS + 40);
+    return;
   }
+  finishHide();
 }
 
 function place(el: HTMLElement) {
@@ -54,6 +83,9 @@ function place(el: HTMLElement) {
 
 function show(el: HTMLElement) {
   if (!tip || !enabled) return;
+  window.clearTimeout(fadeTimer);
+  fadeTimer = 0;
+  tip.classList.remove("is-leaving");
   if (active && tipId) active.removeAttribute("aria-describedby");
   active = el;
   tipId = `ui-tip-${Math.random().toString(36).slice(2, 9)}`;
@@ -67,10 +99,15 @@ function entering(el: HTMLElement, related: EventTarget | null) {
   if (related instanceof Node && el.contains(related)) return;
   if (el === active) return;
   window.clearTimeout(timer);
+  window.clearTimeout(fadeTimer);
   timer = 0;
+  fadeTimer = 0;
   if (active && tipId) active.removeAttribute("aria-describedby");
   active = null;
-  if (tip) tip.hidden = true;
+  if (tip) {
+    tip.classList.remove("is-leaving");
+    tip.hidden = true;
+  }
   timer = window.setTimeout(() => show(el), SHOW_MS);
 }
 
@@ -84,6 +121,16 @@ function leaving(el: HTMLElement, related: EventTarget | null) {
 export function setTooltipsEnabled(on: boolean) {
   enabled = on;
   if (!on) hide();
+}
+
+/** Hide a lingering canvas-handle tip when the control goes away. */
+export function hideTooltip(opts?: { fade?: boolean }) {
+  hide(Boolean(opts?.fade));
+}
+
+/** Start the usual delay for an element that appeared under the pointer. */
+export function suggestTooltip(el: HTMLElement) {
+  entering(el, null);
 }
 
 export function mountTooltips(root: ParentNode): void {
@@ -118,7 +165,7 @@ export function mountTooltips(root: ParentNode): void {
     leaving(el, event instanceof FocusEvent ? event.relatedTarget : null);
   });
 
-  root.addEventListener("pointerdown", hide);
+  root.addEventListener("pointerdown", () => hide(true));
   root.addEventListener("scroll", hide, true);
   window.addEventListener("scroll", hide, true);
   window.addEventListener("resize", hide);

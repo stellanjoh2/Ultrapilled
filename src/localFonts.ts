@@ -6,11 +6,54 @@ type FontDataLike = {
   blob: () => Promise<Blob>;
 };
 
+type QueryLocalFonts = () => Promise<FontDataLike[]>;
+
 let catalog: FontDataLike[] = [];
 const loaded = new Set<string>();
 
+function queryLocalFontsFn(): QueryLocalFonts | undefined {
+  return (window as Window & { queryLocalFonts?: QueryLocalFonts }).queryLocalFonts;
+}
+
+export function canQueryLocalFonts(): boolean {
+  return typeof queryLocalFontsFn() === "function";
+}
+
+export function localCatalogLoaded(): boolean {
+  return catalog.length > 0;
+}
+
 export function listedFamilies(): string[] {
   return [...new Set(catalog.map((font) => font.family))].sort((a, b) => a.localeCompare(b));
+}
+
+/** Families that are not in the app’s bundled list. */
+export function unbundledFontFamilies(families: Iterable<string>, bundled: ReadonlySet<string>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of families) {
+    const family = raw.trim();
+    if (!family || bundled.has(family) || seen.has(family)) continue;
+    seen.add(family);
+    out.push(family);
+  }
+  return out;
+}
+
+/** Prompt once per session when a loaded scene needs installed fonts. */
+export async function maybeQueryLocalCatalog(opts: {
+  families: Iterable<string>;
+  bundled: ReadonlySet<string>;
+  askAllow: () => Promise<boolean>;
+}): Promise<void> {
+  if (!unbundledFontFamilies(opts.families, opts.bundled).length) return;
+  if (localCatalogLoaded() || !canQueryLocalFonts()) return;
+  if (!(await opts.askAllow())) return;
+  try {
+    await queryLocalCatalog();
+  } catch {
+    /* denied — activateFamily still tries local() */
+  }
 }
 
 export function localWeights(family: string): number[] {
@@ -23,7 +66,7 @@ export function localWeights(family: string): number[] {
 }
 
 export async function queryLocalCatalog(): Promise<string[]> {
-  const query = (window as Window & { queryLocalFonts?: () => Promise<FontDataLike[]> }).queryLocalFonts;
+  const query = queryLocalFontsFn();
   if (!query) throw new Error("unsupported");
   catalog = await query();
   return listedFamilies();

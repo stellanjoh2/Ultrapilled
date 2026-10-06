@@ -37,6 +37,7 @@ export function mountColorPicker(options: {
   closeBtn.type = "button";
   closeBtn.className = "color-pop-close icon-hover";
   closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.dataset.tip = "Close";
   closeBtn.innerHTML = `<span aria-hidden="true">✕</span>`;
   head.append(title, closeBtn);
 
@@ -58,6 +59,7 @@ export function mountColorPicker(options: {
   eye.type = "button";
   eye.className = "color-pop-eye";
   eye.setAttribute("aria-label", "Pick a color from the screen");
+  eye.dataset.tip = "Pick a color from the screen";
   eye.innerHTML =
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M16.2 3.3a2.4 2.4 0 0 1 3.4 3.4l-1.2 1.2-3.4-3.4 1.2-1.2zM14.6 6.3 17.7 9.4 8.4 18.7c-.3.3-.6.4-1 .5l-3.2.6.6-3.2c.1-.4.2-.7.5-1L14.6 6.3z"/></svg>';
   const fields = document.createElement("div");
@@ -65,6 +67,7 @@ export function mountColorPicker(options: {
   const scaleSelect = document.createElement("select");
   scaleSelect.className = "color-pop-scale";
   scaleSelect.setAttribute("aria-label", "Color values");
+  scaleSelect.dataset.tip = "Show hex, RGB, or HSL values";
   for (const option of ["hex", "rgb", "hsl"] as const) {
     const item = document.createElement("option");
     item.value = option;
@@ -88,6 +91,7 @@ export function mountColorPicker(options: {
       swatch.className = "color-pop-recent-swatch";
       swatch.style.background = color;
       swatch.setAttribute("aria-label", color);
+      swatch.dataset.tip = color;
       swatch.addEventListener("click", () => applyHex(color));
       recentRow.append(swatch);
     }

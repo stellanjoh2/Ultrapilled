@@ -36,6 +36,7 @@ import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
 import { blendMode, isTextField, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
 import { playImpact } from "./uiSounds";
 import { beginScrub, endScrub } from "./scrub";
+import { hideTooltip, suggestTooltip } from "./tooltip";
 
 export type { ChipDraw, ChipPose } from "./chipKinds";
 
@@ -2359,6 +2360,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return "se";
   }
 
+  const XFORM_TIP = "Drag to rotate and scale — Shift scales from center";
+  const XFORM_BOX_TIP = "Drag to resize the writing area";
+  const GRAD_FROM_TIP = "Start color — drag to rotate and scale, click to pick";
+  const GRAD_TO_TIP = "End color — drag to rotate and scale, click to pick";
+
   function ensureXformHandle(chip: DroppedChip) {
     const el = xformChromeOf(chip);
     for (const old of el.querySelectorAll(":scope > .chip-scale-handle, :scope > .chip-rotate-handle")) {
@@ -2389,6 +2395,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const box = field && (id === "ne" || id === "sw");
       const iconKey = box ? "bounding-box" : "hand-grabbing";
       const label = box ? "Resize writing area" : "Rotate and scale";
+      const tip = box ? XFORM_BOX_TIP : XFORM_TIP;
       const cornerClass = `${XFORM_CORNER_CLASS[id]}${box ? " chip-xform-handle--box" : ""}`;
       const icon = box ? boundingBoxIcon : handGrabbing;
       let handle = byCorner.get(id);
@@ -2398,12 +2405,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         btn.className = `chip-xform-handle ${cornerClass}`;
         btn.tabIndex = -1;
         btn.setAttribute("aria-label", label);
+        btn.dataset.tip = tip;
         btn.dataset.icon = iconKey;
         btn.innerHTML = icon;
         el.append(btn);
       } else {
         handle.className = `chip-xform-handle ${cornerClass}`;
         handle.setAttribute("aria-label", label);
+        handle.dataset.tip = tip;
         if (handle.dataset.icon !== iconKey) {
           handle.innerHTML = icon;
           handle.dataset.icon = iconKey;
@@ -2548,6 +2557,22 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     for (const chip of chips) {
       if (!isPickPainted(chip)) continue;
       syncXformHandleSide(chip);
+    }
+    if (!next) {
+      hideTooltip();
+      return;
+    }
+    const cornerChanged =
+      (next.bodyId ?? null) !== (prev?.bodyId ?? null) ||
+      (next.corner ?? null) !== (prev?.corner ?? null);
+    if (!cornerChanged) return;
+    const chip = chips.find((item) => item.body.id === next.bodyId);
+    if (!chip) return;
+    for (const node of xformChromeOf(chip).querySelectorAll(":scope > .chip-xform-handle")) {
+      if (!(node instanceof HTMLElement)) continue;
+      if (readXformHandleCorner(node) !== next.corner) continue;
+      suggestTooltip(node);
+      break;
     }
   }
 
@@ -2745,6 +2770,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       from.dataset.stop = "from";
       from.tabIndex = -1;
       from.setAttribute("aria-label", "Start color");
+      from.dataset.tip = GRAD_FROM_TIP;
       const fromDot = document.createElement("span");
       fromDot.className = "chip-grad-wheel__stop-dot";
       fromDot.setAttribute("aria-hidden", "true");
@@ -2755,6 +2781,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       to.dataset.stop = "to";
       to.tabIndex = -1;
       to.setAttribute("aria-label", "End color");
+      to.dataset.tip = GRAD_TO_TIP;
       const toDot = document.createElement("span");
       toDot.className = "chip-grad-wheel__stop-dot";
       toDot.setAttribute("aria-hidden", "true");
@@ -2801,11 +2828,13 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const fromStop = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__stop[data-stop='from']");
     const toStop = wheelEl.querySelector<HTMLElement>(".chip-grad-wheel__stop[data-stop='to']");
     if (fromStop) {
+      fromStop.dataset.tip = GRAD_FROM_TIP;
       const fromDot = fromStop.querySelector<HTMLElement>(":scope > .chip-grad-wheel__stop-dot");
       if (fromDot) fromDot.style.background = info.from;
       placeGradStop(fromStop, info.angle + 180, scaleR);
     }
     if (toStop) {
+      toStop.dataset.tip = GRAD_TO_TIP;
       const toDot = toStop.querySelector<HTMLElement>(":scope > .chip-grad-wheel__stop-dot");
       if (toDot) toDot.style.background = info.to;
       placeGradStop(toStop, info.angle, scaleR);
@@ -3148,6 +3177,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   function beginXformDrag(chip: DroppedChip, event: PointerEvent, handle: HTMLElement) {
     endXformDrag();
     endGradAngleDrag();
+    hideTooltip({ fade: true });
     const point = stagePoint(event);
     const corner = readXformHandleCorner(handle);
     // Shift at gesture start → legacy center-anchored scale; else opposite corner.
@@ -3433,6 +3463,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (!info) return;
       event.preventDefault();
       event.stopPropagation();
+      hideTooltip({ fade: true });
       blank = null;
       clickChip = null;
       cancelPending();

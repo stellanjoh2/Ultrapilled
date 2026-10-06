@@ -72,18 +72,20 @@ export function openGiphyImport(opts: { onPick: (file: File, remote?: ImageRemot
     <div class="unsplash-modal__card">
       <header class="unsplash-modal__head">
         <h2 class="unsplash-modal__title" id="giphy-modal-title">Add from Giphy</h2>
-        <button type="button" class="unsplash-modal__x icon-hover" data-giphy-close aria-label="Close">
+        <button type="button" class="unsplash-modal__x icon-hover" data-giphy-close aria-label="Close" data-tip="Close">
           <span aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.7 13 11l5.3 5.3-1.4 1.4L11.6 12.4 6.3 17.7 4.9 16.3 10.2 11 4.9 5.7 6.3 4.3l5.3 5.3 5.3-5.3z"/></svg></span>
         </button>
       </header>
       <div class="unsplash-modal__body">
-        <label class="field unsplash-modal__search">Search Giphy
+        <label class="field unsplash-modal__search" data-tip="Search GIFs on Giphy">Search Giphy
           <input type="search" data-giphy-query placeholder="cats, wow, dance…" autocomplete="off" />
         </label>
         <p class="unsplash-modal__status" data-giphy-status hidden></p>
-        <div class="unsplash-grid" data-giphy-grid></div>
+        <div class="unsplash-grid-scroll">
+          <div class="unsplash-grid" data-giphy-grid></div>
+        </div>
         <div class="unsplash-modal__more" data-giphy-more hidden>
-          <button type="button" class="pill pill--commit unsplash-modal__more-btn" data-giphy-load-more>
+          <button type="button" class="pill pill--commit unsplash-modal__more-btn" data-giphy-load-more data-tip="Load the next page of GIFs">
             Show more GIFs
           </button>
         </div>

@@ -420,7 +420,7 @@ panel.innerHTML = `
     <span class="panel-credit__s" aria-hidden="true"></span>
     <p>
       Ultrapilled™ is created by<br />
-      <button type="button" class="panel-credit__author" id="open-about">Stellan Johansson</button>
+      <button type="button" class="panel-credit__author" id="open-about" data-tip="About the creator">Stellan Johansson</button>
       <br />
     </p>
     <p class="panel-credit__social">

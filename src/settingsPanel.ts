@@ -97,7 +97,7 @@ function shortcutsMarkup(): string {
   return `
     <section class="section shortcuts-section${shortcutsOpen ? " is-open" : ""}" data-shortcuts-fold>
       <div class="section-head">
-        <button type="button" class="section-toggle" aria-expanded="${shortcutsOpen}">
+        <button type="button" class="section-toggle" aria-expanded="${shortcutsOpen}" data-tip="Show or hide keyboard shortcuts">
           <span class="shortcuts-title">
             ${sectionTitleIcon(keyboardIcon)}
             Keyboard Shortcuts

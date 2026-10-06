@@ -1,6 +1,17 @@
 import { measureEmojiBox } from "./emojis";
 import { peekTrim } from "./trim";
-import { isTextField, textFieldBoxH, textFieldBoxW, type ImageSlot, type Slot, type TextSlot } from "./types";
+import { wrapTextFieldLines } from "./textField";
+import {
+  isTextField,
+  TEXT_FIELD_AUTO_LINE_EM,
+  TEXT_FIELD_BOX_MIN,
+  textFieldBoxH,
+  textFieldBoxW,
+  textFieldLineHeight,
+  type ImageSlot,
+  type Slot,
+  type TextSlot,
+} from "./types";
 
 export type ChipSize = { width: number; height: number };
 
@@ -316,6 +327,58 @@ export function measureTrackedTextWidth(text: string, fontSize: number, tracking
 
 function measureLineWidth(text: string, fontSize: number, tracking: number): number {
   return measureTrackedTextWidth(text, fontSize, tracking);
+}
+
+function lineAdvance(value: string, fontSize: number, tracking: number, font?: string): number {
+  const measured = measureTrackedTextWidth(value, fontSize, tracking, font);
+  const chars = [...(value.length ? value : " ")].length;
+  if (measured >= fontSize * 0.12 * chars) return measured;
+  return Math.max(measured, fontSize * (0.5 + tracking) * chars);
+}
+
+function textFieldAutoWrapAt(slot: TextSlot): number {
+  return Math.max(TEXT_FIELD_BOX_MIN, slot.fontSize * TEXT_FIELD_AUTO_LINE_EM);
+}
+
+/** Ink + pad needed to show wrapped copy at `wrapAt` (box width). */
+export function measureTextFieldContent(slot: TextSlot, tracking: number, wrapAt: number): ChipSize {
+  const fontSize = slot.fontSize;
+  const probeW = Math.max(TEXT_FIELD_BOX_MIN, Number.isFinite(wrapAt) ? wrapAt : fontSize * 12);
+  const probeH = Math.max(TEXT_FIELD_BOX_MIN, slot.boxH ?? fontSize * 2);
+  const sizeFromPad = (padX: number, padY: number): ChipSize => {
+    const inner = Math.max(1, wrapAt - padX * 2);
+    const italic = slot.italic ? "italic " : "";
+    const font = `${italic}${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
+    const measure = (value: string) => lineAdvance(value, fontSize, tracking, font);
+    const lines = wrapTextFieldLines(slot.text || " ", inner, measure);
+    let maxLine = Math.max(4, Math.ceil(fontSize * 0.22));
+    for (const line of lines) maxLine = Math.max(maxLine, measure(line || " "));
+    if (slot.italic) maxLine += fontSize * 0.18;
+    const lineH = fontSize * textFieldLineHeight(slot);
+    return {
+      width: Math.max(TEXT_FIELD_BOX_MIN, Math.ceil(maxLine + padX * 2 + 4)),
+      height: Math.max(TEXT_FIELD_BOX_MIN, Math.ceil(lines.length * lineH + padY * 2 + 2)),
+    };
+  };
+  const first = textFieldPad(slot, probeW, probeH);
+  const sized = sizeFromPad(first.x, first.y);
+  const next = textFieldPad(slot, sized.width, sized.height);
+  if (next.x === first.x && next.y === first.y) return sized;
+  return sizeFromPad(next.x, next.y);
+}
+
+/** Hug new fields; after a manual resize, only grow height so copy isn't clipped. */
+export function fitTextFieldBox(slot: TextSlot, tracking: number) {
+  if (!isTextField(slot)) return;
+  const auto = slot.boxAuto === true;
+  const wrapAt = auto ? textFieldAutoWrapAt(slot) : textFieldBoxW(slot);
+  const size = measureTextFieldContent(slot, tracking, wrapAt);
+  if (auto) {
+    slot.boxW = size.width;
+    slot.boxH = size.height;
+    return;
+  }
+  slot.boxH = Math.max(textFieldBoxH(slot), size.height);
 }
 
 export function measureTextSlot(slot: TextSlot, pad = 1, tracking = 0.02): ChipSize {

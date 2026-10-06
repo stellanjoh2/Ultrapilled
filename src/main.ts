@@ -46,7 +46,7 @@ import {
 } from "./types";
 import { clampTextFieldWords } from "./textField";
 import { isMicActive, sampleOnset, startMic, stopMic } from "./audioReact";
-import { activateFamily, localWeights, queryLocalCatalog } from "./localFonts";
+import { activateFamily, listedFamilies, localWeights, maybeQueryLocalCatalog, queryLocalCatalog } from "./localFonts";
 import { closeBackgroundUi, mountBackgroundPanel } from "./backgroundPanel";
 import { backgroundImage, backgroundPaint, gridDivisions, logoBackdropColor, logoFill, logoSize, isSvgLogo } from "./background";
 import { mountColorPicker } from "./colorPicker";
@@ -62,7 +62,7 @@ import {
   settleLogotypeReveal,
 } from "./logotypeReveal";
 import { logotypeInk, mountHeaderLogotype } from "./logotypeLive";
-import { mountProTip, releaseProTips, setProTipsEnabled } from "./proTip";
+import { hintMediaExportOnce, mountProTip, releaseProTips, setProTipsEnabled } from "./proTip";
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
 import { blankPrefabText, blankState, preloadUltrapilledLogo, ultrapilledLogoAsset, templateLabel } from "./templates";
@@ -102,7 +102,7 @@ import { checkInput } from "./checkBox";
 import { lsGet, lsSet } from "./legacyStorage";
 import { getPrefs, setPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
-import { askModeSelect, handoffModeSelectPreview, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
+import { askModeSelect, handoffModeSelectPreview, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode, type ModeSelectChoice } from "./modeSelect";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
 import { clearDraft, readDraftJson, writeDraftJson } from "./project/draftStore";
 import {
@@ -122,6 +122,7 @@ import {
   freeTransformScaleMax,
   slotScaleSliderMax as softSlotScaleSliderMax,
 } from "./slotScale";
+import { fitTextFieldBox, trackingEm, trackingOf } from "./measure";
 import { createWorld } from "./world";
 import { cancelSlotDrag } from "./slotDrag";
 import { bindUiClickSounds, bindUiTypeSounds, playButton, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
@@ -572,6 +573,7 @@ function openFontMenu(
   closeBtn.type = "button";
   closeBtn.className = "font-menu-close icon-hover";
   closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.dataset.tip = "Close";
   closeBtn.innerHTML = `<span aria-hidden="true">✕</span>`;
   head.append(title, closeBtn);
   const search = document.createElement("input");
@@ -905,6 +907,7 @@ function openChoiceMenu<T>(
       remove.className = "font-menu-item__remove";
       remove.setAttribute("role", "button");
       remove.setAttribute("aria-label", `Delete ${choice.label}`);
+      remove.dataset.tip = `Delete ${choice.label}`;
       remove.textContent = "×";
       remove.addEventListener("click", (event) => {
         event.preventDefault();
@@ -1607,8 +1610,36 @@ const pageStripHost = {
   loadThumb: loadPageThumb,
 };
 
+function projectFontFamilies(project: PillProject): string[] {
+  const names: string[] = [];
+  const take = (slots: Slot[]) => {
+    for (const slot of slots) {
+      if (slot.kind === "text") names.push(slot.fontFamily);
+    }
+  };
+  take(project.state.slots);
+  for (const page of project.pages) take(page.slots);
+  return names;
+}
+
+async function offerLocalFontsForProject(project: PillProject) {
+  await maybeQueryLocalCatalog({
+    families: projectFontFamilies(project),
+    bundled: bundledFamilies,
+    askAllow: () =>
+      askConfirm({
+        title: "Allow local fonts",
+        body: "This project uses fonts installed on this computer. Allow access so they match the original file.",
+        confirmLabel: "Allow",
+        cancelLabel: "Not now",
+      }),
+  });
+  localFamilies = listedFamilies();
+}
+
 async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolean }) {
   setPresenting(false);
+  await offerLocalFontsForProject(project);
   await relinkProjectImages(project);
   hydratePillImages(project.images);
   adoptState(project.state);
@@ -1621,7 +1652,8 @@ async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolea
   applyBackground();
   applyPost();
   syncCanvas(false);
-  await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
+  const fontSlots = [...state.slots, ...pages.flatMap((page) => page.slots)];
+  await Promise.all([ensureTrims(state.slots), ensureTextFonts(fontSlots)]);
 
   const hasPoses = Boolean(opts?.pinPoses !== false && project.poses.length);
   if (hasPoses) pinRestoredPoses(project.poses, project.frame);
@@ -2075,6 +2107,11 @@ function isSvgFile(file: File): boolean {
   return /\.svg$/i.test(file.name);
 }
 
+function isGifFile(file: File): boolean {
+  if (/^image\/gif$/i.test(file.type)) return true;
+  return /\.gif$/i.test(file.name);
+}
+
 function isRasterFile(file: File): boolean {
   if (/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) return true;
   return /\.(png|jpe?g|webp|gif)$/i.test(file.name);
@@ -2160,6 +2197,7 @@ function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Pro
     slot.radius = 0;
     slot.stroked = undefined;
   }
+  if (isGifFile(file)) hintMediaExportOnce();
   return ensureTrim(url, file.name)
     .then((trim) => {
       if (slot.src !== url) return null;
@@ -2505,6 +2543,7 @@ function addYouTubeSlot(clip: YouTubeClip, at?: PlaceAt) {
   playCreate();
   renderPanel();
   live();
+  hintMediaExportOnce();
 }
 
 function slotColor(slot: Slot): string {
@@ -3209,7 +3248,7 @@ function paintFieldReset(root: ParentNode, slot: Slot, key: string) {
 }
 
 function resetControl(name: string, key: string, dirty: boolean): string {
-  return `<button type="button" class="field-reset icon-hover" data-reset="${key}" aria-label="Reset ${escapeAttr(name.toLowerCase())}"${dirty ? "" : " hidden"}>${RESET_ICON}</button>`;
+  return `<button type="button" class="field-reset icon-hover" data-reset="${key}" aria-label="Reset ${escapeAttr(name.toLowerCase())}" data-tip="Reset this setting to the default"${dirty ? "" : " hidden"}>${RESET_ICON}</button>`;
 }
 
 function settingLabel(slot: Slot, name: string, key: string, value?: string): string {
@@ -3248,19 +3287,19 @@ function dropShadowField(slot: Slot): string {
   </div>
   ${
     on
-      ? `<label class="field">${settingLabel(slot, "Shadow distance", "dropShadowDistance", String(distance))}
+      ? `<label class="field" data-tip="How far the shadow sits from the piece">${settingLabel(slot, "Shadow distance", "dropShadowDistance", String(distance))}
     <input type="range" data-key="dropShadowDistance" min="0" max="64" step="1" value="${distance}" />
   </label>
-  <label class="field">${settingLabel(slot, "Shadow radius", "dropShadowRadius", String(radius))}
+  <label class="field" data-tip="How soft the shadow edge is">${settingLabel(slot, "Shadow radius", "dropShadowRadius", String(radius))}
     <input type="range" data-key="dropShadowRadius" min="0" max="64" step="1" value="${radius}" />
   </label>
-  <label class="field">${settingLabel(slot, "Shadow opacity", "dropShadowOpacity", String(opacity))}
+  <label class="field" data-tip="How strong the shadow is">${settingLabel(slot, "Shadow opacity", "dropShadowOpacity", String(opacity))}
     <input type="range" data-key="dropShadowOpacity" min="0" max="100" step="1" value="${opacity}" />
   </label>
-  <div class="field"><span class="field-label"><span>Shadow color</span>
+  <div class="field" data-tip="Color of the drop shadow"><span class="field-label"><span>Shadow color</span>
     <span class="field-label-end">
       ${resetControl("Shadow color", "dropShadowColor", fieldDirty(slot, "dropShadowColor"))}
-      <button type="button" class="shadow-swatch" data-shadow-color style="background:${color}" aria-label="Shadow color"></button>
+      <button type="button" class="shadow-swatch" data-shadow-color style="background:${color}" aria-label="Shadow color" data-tip="Color of the drop shadow"></button>
     </span>
   </span></div>`
       : ""
@@ -3739,15 +3778,16 @@ function openCanvasMenu(x: number, y: number) {
 
   const at: PlaceAt = { clientX: x, clientY: y };
   const uiHidden = shell.classList.contains("ui-hidden");
-  const entries: { label: string; icon: string; run: () => void; clear?: boolean }[] = [
-    { label: "Pill", icon: pillIcon, run: () => addPillSlot(at) },
-    { label: "Word", icon: textAa, run: () => addTypeSlot(at) },
-    { label: "Text", icon: textT, run: () => addTextFieldSlot(at) },
-    { label: "Shape", icon: shapesIcon, run: () => addShapeSlot(at) },
-    { label: "Emoji", icon: smileyIcon, run: () => addEmojiSlot(at) },
+  const entries: { label: string; icon: string; run: () => void; clear?: boolean; tip: string }[] = [
+    { label: "Pill", icon: pillIcon, tip: "Add a text label inside a rounded pill", run: () => addPillSlot(at) },
+    { label: "Word", icon: textAa, tip: "Add a short word without a pill shape", run: () => addTypeSlot(at) },
+    { label: "Text", icon: textT, tip: "Add a wrapping text box you can resize and paste into", run: () => addTextFieldSlot(at) },
+    { label: "Shape", icon: shapesIcon, tip: "Add a built-in shape from the library", run: () => addShapeSlot(at) },
+    { label: "Emoji", icon: smileyIcon, tip: "Add an emoji", run: () => addEmojiSlot(at) },
     {
       label: "Image",
       icon: uploadSimple,
+      tip: "Add an SVG, PNG, JPG, GIF, or MP4",
       run: () => {
         void pickImageFiles(true).then((files) => {
           if (!files.length) return;
@@ -3758,6 +3798,7 @@ function openCanvasMenu(x: number, y: number) {
     {
       label: "Unsplash",
       icon: imagesIcon,
+      tip: "Search photos from Unsplash",
       run: () => {
         openUnsplashImport({
           onPick: (file, remote) => addImagesFromFiles([file], at, remote),
@@ -3767,6 +3808,7 @@ function openCanvasMenu(x: number, y: number) {
     {
       label: "Giphy",
       icon: gifIcon,
+      tip: "Search GIFs from Giphy",
       run: () => {
         openGiphyImport({
           onPick: (file, remote) => addImagesFromFiles([file], at, remote),
@@ -3776,6 +3818,7 @@ function openCanvasMenu(x: number, y: number) {
     {
       label: "YouTube",
       icon: youtubeLogo,
+      tip: "Embed a muted looping YouTube clip",
       run: () => {
         openYouTubeImport({
           onPick: (clip) => addYouTubeSlot(clip, at),
@@ -3785,6 +3828,7 @@ function openCanvasMenu(x: number, y: number) {
     {
       label: uiHidden ? "Show UI" : "Hide UI",
       icon: uiHidden ? eyeIcon : eyeSlash,
+      tip: uiHidden ? "Show the editor chrome — shortcut H" : "Hide the editor chrome — shortcut H",
       run: () => {
         const hidden = shell.classList.toggle("ui-hidden");
         playTransition(!hidden);
@@ -3792,7 +3836,7 @@ function openCanvasMenu(x: number, y: number) {
         resize();
       },
     },
-    { label: "Clear canvas", icon: trashSimple, clear: true, run: () => clearCanvas() },
+    { label: "Clear canvas", icon: trashSimple, clear: true, tip: "Remove every piece from the stage", run: () => clearCanvas() },
   ];
 
   const buttons: HTMLButtonElement[] = [];
@@ -3801,6 +3845,7 @@ function openCanvasMenu(x: number, y: number) {
     btn.type = "button";
     btn.className = entry.clear ? "pill slot-add is-clear" : "pill slot-add";
     btn.setAttribute("role", "menuitem");
+    btn.dataset.tip = entry.tip;
     btn.innerHTML = `<span class="slot-add__icon" aria-hidden="true">${entry.icon}</span>${entry.label}`;
     btn.addEventListener("click", () => {
       closeSlotMenu();
@@ -3858,7 +3903,14 @@ function writeChipEditText(edit: HTMLElement, text: string) {
   edit.textContent = text || EDIT_ZWSP;
 }
 
-function liveChip(id: string, opts?: { quiet?: boolean }) {
+function syncTextFieldBox(slot: Slot) {
+  if (!isTextField(slot)) return;
+  fitTextFieldBox(slot, trackingEm(trackingOf(slot, state.textTracking)));
+}
+
+function liveChip(id: string, opts?: { quiet?: boolean; skipFit?: boolean }) {
+  const slot = state.slots.find((item) => item.id === id);
+  if (slot && !opts?.skipFit) syncTextFieldBox(slot);
   world.refreshSlot(
     id,
     state.slots,
@@ -3960,9 +4012,10 @@ function resizeTextFieldBox(id: string, sx: number, sy: number, phase: "start" |
     return;
   }
   const start = textFieldBoxStart.get(id) ?? { w: textFieldBoxW(slot), h: textFieldBoxH(slot) };
+  slot.boxAuto = false;
   slot.boxW = Math.max(TEXT_FIELD_BOX_MIN, start.w * sx);
   slot.boxH = Math.max(TEXT_FIELD_BOX_MIN, start.h * sy);
-  liveChip(id, { quiet: true });
+  liveChip(id, { quiet: true, skipFit: true });
   if (phase === "end") {
     textFieldBoxStart.delete(id);
     endGesture();
@@ -4426,6 +4479,7 @@ function copySlotStyle(slot: Slot) {
         textField: slot.textField,
         boxW: slot.boxW,
         boxH: slot.boxH,
+        boxAuto: slot.boxAuto,
         align: slot.align,
         italic: slot.italic,
       },
@@ -4517,10 +4571,12 @@ function pasteSlotStyle(id: string) {
       slot.lineHeight = style.lineHeight;
       if (style.boxW != null) slot.boxW = style.boxW;
       if (style.boxH != null) slot.boxH = style.boxH;
+      slot.boxAuto = style.boxAuto;
     } else {
       slot.textField = undefined;
       slot.boxW = undefined;
       slot.boxH = undefined;
+      slot.boxAuto = undefined;
       slot.lineHeight = undefined;
     }
     playClick();
@@ -4967,10 +5023,11 @@ function refreshUploadPreviews() {
   }
 }
 
-function live(opts?: { quiet?: boolean }) {
+function live(opts?: { quiet?: boolean; skipFit?: boolean }) {
   for (const slot of state.slots) {
     const next = clampSlotScale(slot, slot.scale);
     if (next !== slot.scale) slot.scale = next;
+    if (!opts?.skipFit) syncTextFieldBox(slot);
   }
   const bump = () => {
     refreshUploadPreviews();
@@ -6326,6 +6383,22 @@ async function applyStartupMode(mode: AppMode) {
   paintPages();
 }
 
+async function applyModeSelectChoice(choice: ModeSelectChoice) {
+  if (choice.kind === "project") {
+    try {
+      await exportController.loadProject(choice.file);
+    } catch (error) {
+      await askNotice({
+        title: "Couldn’t load project",
+        body: error instanceof Error ? error.message : "Could not load this .pill file.",
+      });
+      await applyStartupMode("physics");
+    }
+    return;
+  }
+  await applyStartupMode(choice.mode);
+}
+
 /** Clear the canvas and return to Mode Select (logotype click). */
 async function resetToModeSelect() {
   const ok = await askConfirm({
@@ -6373,8 +6446,8 @@ async function resetToModeSelect() {
   warmModeSelectPreview();
   modeSelectContinuity = true;
   gridHoldForHandoff = true;
-  const mode = await askModeSelect();
-  await applyStartupMode(mode);
+  const choice = await askModeSelect();
+  await applyModeSelectChoice(choice);
   handoffModeSelectPreview(() => bootRevealGrid());
   releaseProTips();
   syncLogotypeAccent();
@@ -6402,9 +6475,9 @@ async function gateModeSelect() {
   const intro = app.querySelector<HTMLElement>("#app-intro");
   intro?.querySelector(".app-intro__gif")?.remove();
   intro?.querySelector(".app-intro__logo")?.remove();
-  const mode = await askModeSelect();
+  const choice = await askModeSelect();
   modeSelectContinuity = true;
-  await applyStartupMode(mode);
+  await applyModeSelectChoice(choice);
 }
 
 void (async () => {
@@ -6434,8 +6507,8 @@ void (async () => {
     if (!ok) {
       lastDraftJson = serializePillProject(currentPillProject());
       await clearDraft().catch(() => {});
-      const mode = await askModeSelect();
-      await applyStartupMode(mode);
+      const choice = await askModeSelect();
+      await applyModeSelectChoice(choice);
       return;
     }
     await applyPillProject(project);

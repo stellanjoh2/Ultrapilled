@@ -49,6 +49,42 @@ import { setRangeCaptionValue } from "../rangeCaption";
 
 const DUPLICATE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="4" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="4" y="9" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>`;
 
+const TIPS = {
+  typeface: "Font family for this piece",
+  weight: "How heavy the letters are",
+  textScale: "Size of this text piece",
+  textHeight: "How tall the letters sit in the holding shape",
+  tracking: "Space between letters",
+  lineHeight: "Space between lines in this text box",
+  textColor: "Color of the letters",
+  pillPad: "Space inside the holding shape",
+  shape: "None = bare type, Pill = rounded, Box = rectangle",
+  radius: "How round the corners are",
+  stroked: "Draw an outline instead of a filled shape",
+  stroke: "Thickness of the outline",
+  strokeColor: "Color of the outline",
+  gradient: "Blend two colors across the piece",
+  color: "Fill color — click the selected swatch again to pick any color",
+  endColor: "Second color of the gradient",
+  gradAngle: "Direction of the color blend",
+  gradScale: "How tightly the two colors blend",
+  textAnim: "Cycle letters through theme colors",
+  textAnimOff: "Turn off Animated Gradient to use Text animation",
+  textAnimSpeed: "How fast the color cycle runs",
+  gradAnim: "Sweep the gradient so it looks like it is moving",
+  gradAnimOff: "Turn off Text animation to use Animated Gradient",
+  gradSpeed: "How fast the gradient sweeps",
+  shapeScale: "Size of this piece",
+  amount: "How many copies drop into the frame",
+  clipScale: "How much of the clip is cropped in the frame",
+  loopSec: "How many seconds of the clip to loop",
+  collider: "Physics hit shape — box or circle",
+  recolor: "Tint this SVG with theme colors",
+  emojiSearch: "Filter emoji by name",
+  replaceImage: "Swap this file without losing other settings",
+  replaceVideo: "Swap this video without losing other settings",
+};
+
 export type SlotCardHost = {
   state: AppState;
   panel: HTMLElement;
@@ -383,32 +419,32 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       <p class="slot-label">Text</p>
       ${formatRow}
       <div class="row">
-        <div class="field">${H.settingLabel(slot, "Typeface", "fontFamily")}
+        <div class="field" data-tip="${TIPS.typeface}">${H.settingLabel(slot, "Typeface", "fontFamily")}
           <div class="font-pick" data-font-pick></div>
         </div>
-        <div class="field">${H.settingLabel(slot, "Weight", "fontWeight")}
+        <div class="field" data-tip="${TIPS.weight}">${H.settingLabel(slot, "Weight", "fontWeight")}
           <div class="font-pick" data-weight-pick></div>
         </div>
       </div>
-      <label class="field">${H.settingLabel(slot, "Text scale", "scale", slot.scale.toFixed(2))}
+      <label class="field" data-tip="${TIPS.textScale}">${H.settingLabel(slot, "Text scale", "scale", slot.scale.toFixed(2))}
         <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
       </label>
-      <label class="field">${H.settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
+      <label class="field" data-tip="${TIPS.textHeight}">${H.settingLabel(slot, "Text height", "textHeight", String(slot.textHeight))}
         <input type="range" data-key="textHeight" min="0" max="100" step="1" value="${slot.textHeight}" />
       </label>
-      <label class="field">${H.settingLabel(slot, "Letter spacing", "tracking", String(trackingOf(slot, H.state.textTracking)))}
+      <label class="field" data-tip="${TIPS.tracking}">${H.settingLabel(slot, "Letter spacing", "tracking", String(trackingOf(slot, H.state.textTracking)))}
         <input type="range" data-key="tracking" min="-400" max="500" step="1" value="${trackingOf(slot, H.state.textTracking)}" />
       </label>
       ${
         field
-          ? `<label class="field">${H.settingLabel(slot, "Line height", "lineHeight", textFieldLineHeight(slot).toFixed(2))}
+          ? `<label class="field" data-tip="${TIPS.lineHeight}">${H.settingLabel(slot, "Line height", "lineHeight", textFieldLineHeight(slot).toFixed(2))}
         <input type="range" data-key="lineHeight" min="0" max="100" step="1" value="${lineHeightSliderOf(slot)}" />
       </label>`
           : ""
       }
       ${
         slot.shape !== "none"
-          ? `<div class="field">${H.settingLabel(slot, "Text color", "textColor")}
+          ? `<div class="field" data-tip="${TIPS.textColor}">${H.settingLabel(slot, "Text color", "textColor")}
         ${H.textTintRow(slot)}
       </div>`
           : ""
@@ -418,56 +454,56 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       <p class="slot-label">Shape</p>
       ${
         slot.shape !== "none"
-          ? `<label class="field">${H.settingLabel(slot, "Shape padding", "pillPad", String(pillPadOf(slot, H.state.pillPad)))}
+          ? `<label class="field" data-tip="${TIPS.pillPad}">${H.settingLabel(slot, "Shape padding", "pillPad", String(pillPadOf(slot, H.state.pillPad)))}
         <input type="range" data-key="pillPad" min="0" max="100" step="1" value="${pillPadOf(slot, H.state.pillPad)}" />
       </label>`
           : ""
       }
       <div class="row">
-        <label class="field">${H.settingLabel(slot, "Holding shape", "shape")}
+        <label class="field" data-tip="${TIPS.shape}">${H.settingLabel(slot, "Holding shape", "shape")}
           <select data-key="shape">
             <option value="none" ${slot.shape === "none" ? "selected" : ""}>None</option>
             <option value="pill" ${slot.shape === "pill" ? "selected" : ""}${field ? " disabled" : ""}>Pill</option>
             <option value="box" ${slot.shape === "box" ? "selected" : ""}>Box</option>
           </select>
         </label>
-        <label class="field${slot.shape !== "box" ? " is-muted" : ""}">${H.settingLabel(slot, "Corner radius", "radius")}
+        <label class="field${slot.shape !== "box" ? " is-muted" : ""}" data-tip="${TIPS.radius}">${H.settingLabel(slot, "Corner radius", "radius")}
           <input type="range" data-key="radius" min="0" max="40" value="${slot.radius}" ${slot.shape !== "box" ? "disabled" : ""} />
         </label>
       </div>
       ${
         slot.shape !== "none"
-          ? `<div class="check-row">
+          ? `<div class="check-row" data-tip="${TIPS.stroked}">
         <label class="check">
           ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
           Stroked
         </label>
         ${H.resetControl("Stroked", "stroked", H.fieldDirty(slot, "stroked"))}
       </div>
-      ${slot.stroked ? `<label class="field">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke))}
+      ${slot.stroked ? `<label class="field" data-tip="${TIPS.stroke}">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke))}
         <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke}" />
       </label>` : ""}`
           : ""
       }
-      <div class="check-row">
+      <div class="check-row" data-tip="${TIPS.gradient}">
         <label class="check">
           ${checkInput(`data-key="gradient" ${slot.gradient ? "checked" : ""}`)}
           Gradient
         </label>
         ${H.resetControl("Gradient", "gradient", H.fieldDirty(slot, "gradient"))}
       </div>
-      <div class="field">${H.settingLabel(slot, slot.gradient ? "Start color" : slot.shape === "none" ? "Color" : "Shape color", "color")}
+      <div class="field" data-tip="${TIPS.color}">${H.settingLabel(slot, slot.gradient ? "Start color" : slot.shape === "none" ? "Color" : "Shape color", "color")}
         ${H.tintRow(slot, slot.shape === "none" ? "Color" : "Shape color")}
       </div>
       ${
         slot.gradient
-          ? `<div class="field">${H.settingLabel(slot, "End color", "gradientColor")}
+          ? `<div class="field" data-tip="${TIPS.endColor}">${H.settingLabel(slot, "End color", "gradientColor")}
         ${H.gradientTintRow(slot)}
       </div>
-      <label class="field">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
+      <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
         <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
       </label>
-      <label class="field">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
+      <label class="field" data-tip="${TIPS.gradScale}">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
         <input type="range" data-key="gradientScale" min="1" max="100" step="1" value="${gradientScaleOf(slot.gradientScale)}" />
       </label>`
           : ""
@@ -487,7 +523,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         field
           ? ""
           : `<div class="check-row">
-        <label class="check"${slot.animatedGradient ? ' data-tip="Turn off Animated Gradient to use Text animation"' : ""}>
+        <label class="check" data-tip="${slot.animatedGradient ? TIPS.textAnimOff : TIPS.textAnim}">
           ${checkInput(`data-key="textAnim" ${slot.textAnim ? "checked" : ""} ${slot.animatedGradient ? "disabled" : ""}`)}
           Text animation
         </label>
@@ -495,7 +531,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       </div>
       ${
         slot.textAnim
-          ? `<label class="field">${H.settingLabel(slot, "Text anim speed", "textAnimSpeed", String(textAnimSpeedOf(slot.textAnimSpeed)))}
+          ? `<label class="field" data-tip="${TIPS.textAnimSpeed}">${H.settingLabel(slot, "Text anim speed", "textAnimSpeed", String(textAnimSpeedOf(slot.textAnimSpeed)))}
         <input type="range" data-key="textAnimSpeed" min="1" max="100" step="1" value="${textAnimSpeedOf(slot.textAnimSpeed)}" />
       </label>`
           : ""
@@ -504,7 +540,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       ${
         slot.gradient
           ? `<div class="check-row">
-        <label class="check"${!field && slot.textAnim ? ' data-tip="Turn off Text animation to use Animated Gradient"' : ""}>
+        <label class="check" data-tip="${!field && slot.textAnim ? TIPS.gradAnimOff : TIPS.gradAnim}">
           ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""} ${!field && slot.textAnim ? "disabled" : ""}`)}
           Animated Gradient
         </label>
@@ -512,7 +548,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       </div>
       ${
         slot.animatedGradient
-          ? `<label class="field">${H.settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
+          ? `<label class="field" data-tip="${TIPS.gradSpeed}">${H.settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
         <input type="range" data-key="gradientSpeed" min="1" max="100" step="1" value="${gradientSpeedOf(slot.gradientSpeed)}" />
       </label>`
           : ""
@@ -611,12 +647,12 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
     <div class="pick-now">${pickPreview(slot)}${H.resetControl("Shape", "icon", H.fieldDirty(slot, "icon"))}</div>
     <p class="slot-label">Shapes</p>
     <div class="icon-grid" data-presets></div>
-    <div class="field">${H.settingLabel(slot, slot.gradient && H.iconCanGradient(slot) ? "Start color" : "Color", "color")}
+    <div class="field" data-tip="${TIPS.color}">${H.settingLabel(slot, slot.gradient && H.iconCanGradient(slot) ? "Start color" : "Color", "color")}
       ${H.tintRow(slot)}
     </div>
     ${
       H.iconCanGradient(slot)
-        ? `<div class="check-row">
+        ? `<div class="check-row" data-tip="${TIPS.gradient}">
       <label class="check">
         ${checkInput(`data-key="gradient" ${slot.gradient ? "checked" : ""}`)}
         Gradient
@@ -625,16 +661,16 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
     </div>
     ${
       slot.gradient
-        ? `<div class="field">${H.settingLabel(slot, "End color", "gradientColor")}
+        ? `<div class="field" data-tip="${TIPS.endColor}">${H.settingLabel(slot, "End color", "gradientColor")}
       ${H.gradientTintRow(slot)}
     </div>
-    <label class="field">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
+    <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
       <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
+    <label class="field" data-tip="${TIPS.gradScale}">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
       <input type="range" data-key="gradientScale" min="1" max="100" step="1" value="${gradientScaleOf(slot.gradientScale)}" />
     </label>
-    <div class="check-row">
+    <div class="check-row" data-tip="${TIPS.gradAnim}">
       <label class="check">
         ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""}`)}
         Animated Gradient
@@ -643,7 +679,7 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
     </div>
     ${
       slot.animatedGradient
-        ? `<label class="field">${H.settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
+        ? `<label class="field" data-tip="${TIPS.gradSpeed}">${H.settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
       <input type="range" data-key="gradientSpeed" min="1" max="100" step="1" value="${gradientSpeedOf(slot.gradientSpeed)}" />
     </label>`
         : ""
@@ -654,10 +690,10 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
     }
     ${H.blendField(slot)}
     ${H.dropShadowField(slot)}
-    <label class="field">${H.settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
+    <label class="field" data-tip="${TIPS.shapeScale}">${H.settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
+    <label class="field" data-tip="${TIPS.amount}">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>
   `;
@@ -668,7 +704,7 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
   for (const icon of ICON_PRESETS) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.title = icon.label;
+    btn.dataset.tip = icon.label;
     btn.className = slot.src === icon.src ? "is-on" : "";
     btn.setAttribute("aria-pressed", String(slot.src === icon.src));
     btn.append(H.shapeSwatch(icon.src, swatchColor));
@@ -700,16 +736,16 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
     <div class="pick-now">${pickPreview(slot)}${H.resetControl("Emoji", "icon", H.fieldDirty(slot, "icon"))}</div>
     <p class="slot-label">Emoji</p>
     <div class="emoji-grid" data-emoji-featured></div>
-    <label class="field">Search emoji
+    <label class="field" data-tip="${TIPS.emojiSearch}">Search emoji
       <input type="search" data-emoji-search placeholder="heart, fire, cat…" />
     </label>
     <div class="emoji-grid" data-emoji-results></div>
     ${H.blendField(slot)}
     ${H.dropShadowField(slot)}
-    <label class="field">${H.settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
+    <label class="field" data-tip="${TIPS.shapeScale}">${H.settingLabel(slot, "Shape scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
+    <label class="field" data-tip="${TIPS.amount}">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>
   `;
@@ -730,7 +766,7 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
   for (const item of FEATURED_EMOJI) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.title = item.name;
+    btn.dataset.tip = item.name;
     btn.className = slot.emoji === item.char ? "is-on" : "";
     btn.setAttribute("aria-pressed", String(slot.emoji === item.char));
     const glyph = document.createElement("span");
@@ -747,7 +783,7 @@ function emojiFields(slot: ImageSlot, open: boolean): HTMLElement {
     for (const item of items) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.title = item.name;
+      btn.dataset.tip = item.name;
       btn.className = slot.emoji === item.char ? "is-on" : "";
       btn.setAttribute("aria-pressed", String(slot.emoji === item.char));
       const glyph = document.createElement("span");
@@ -775,10 +811,10 @@ function youtubeFields(slot: ImageSlot, open: boolean): HTMLElement {
   editor.className = "slot-editor";
   const loopSec = slot.youtube?.loopSec ?? 10;
   editor.innerHTML = `
-    <label class="field">${H.settingLabel(slot, "Loop length", "loopSec", `${loopSec}s`)}
+    <label class="field" data-tip="${TIPS.loopSec}">${H.settingLabel(slot, "Loop length", "loopSec", `${loopSec}s`)}
       <input type="range" data-youtube-loop min="${YOUTUBE_LOOP_MIN}" max="${YOUTUBE_LOOP_MAX}" step="1" value="${loopSec}" />
     </label>
-    <div class="check-row">
+    <div class="check-row" data-tip="${TIPS.stroked}">
       <label class="check">
         ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
         Stroked
@@ -787,18 +823,18 @@ function youtubeFields(slot: ImageSlot, open: boolean): HTMLElement {
     </div>
     ${
       slot.stroked
-        ? `<label class="field">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
+        ? `<label class="field" data-tip="${TIPS.stroke}">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
       <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke ?? 4}" />
     </label>
-    <div class="field">${H.settingLabel(slot, "Stroke color", "color")}
+    <div class="field" data-tip="${TIPS.strokeColor}">${H.settingLabel(slot, "Stroke color", "color")}
       ${H.tintRow(slot, "Stroke color")}
     </div>`
         : ""
     }
-    <label class="field">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
+    <label class="field" data-tip="${TIPS.radius}">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
+    <label class="field" data-tip="${TIPS.clipScale}">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
   `;
@@ -835,7 +871,7 @@ function videoFields(slot: ImageSlot, open: boolean): HTMLElement {
   const editor = document.createElement("div");
   editor.className = "slot-editor";
   editor.innerHTML = `
-    <div class="check-row">
+    <div class="check-row" data-tip="${TIPS.stroked}">
       <label class="check">
         ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
         Stroked
@@ -844,18 +880,18 @@ function videoFields(slot: ImageSlot, open: boolean): HTMLElement {
     </div>
     ${
       slot.stroked
-        ? `<label class="field">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
+        ? `<label class="field" data-tip="${TIPS.stroke}">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
       <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke ?? 4}" />
     </label>
-    <div class="field">${H.settingLabel(slot, "Stroke color", "color")}
+    <div class="field" data-tip="${TIPS.strokeColor}">${H.settingLabel(slot, "Stroke color", "color")}
       ${H.tintRow(slot, "Stroke color")}
     </div>`
         : ""
     }
-    <label class="field">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
+    <label class="field" data-tip="${TIPS.radius}">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
+    <label class="field" data-tip="${TIPS.clipScale}">${H.settingLabel(slot, "Clip scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
     ${videoReplaceControl(slot)}
@@ -894,7 +930,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
   editor.innerHTML = `
     ${
       svgUpload
-        ? `<div class="check-row">
+        ? `<div class="check-row" data-tip="${TIPS.recolor}">
       <label class="check">
         ${checkInput(`data-key="tint" ${slot.tint ? "checked" : ""}`)}
         Recolor
@@ -905,10 +941,10 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     }
     ${
       canTint
-        ? `<div class="field">${H.settingLabel(slot, slot.gradient ? "Start color" : "Color", "color")}
+        ? `<div class="field" data-tip="${TIPS.color}">${H.settingLabel(slot, slot.gradient ? "Start color" : "Color", "color")}
       ${H.tintRow(slot)}
     </div>
-    <div class="check-row">
+    <div class="check-row" data-tip="${TIPS.gradient}">
       <label class="check">
         ${checkInput(`data-key="gradient" ${slot.gradient ? "checked" : ""}`)}
         Gradient
@@ -917,16 +953,16 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     </div>
     ${
       slot.gradient
-        ? `<div class="field">${H.settingLabel(slot, "End color", "gradientColor")}
+        ? `<div class="field" data-tip="${TIPS.endColor}">${H.settingLabel(slot, "End color", "gradientColor")}
       ${H.gradientTintRow(slot)}
     </div>
-    <label class="field">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
+    <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
       <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
+    <label class="field" data-tip="${TIPS.gradScale}">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
       <input type="range" data-key="gradientScale" min="1" max="100" step="1" value="${gradientScaleOf(slot.gradientScale)}" />
     </label>
-    <div class="check-row">
+    <div class="check-row" data-tip="${TIPS.gradAnim}">
       <label class="check">
         ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""}`)}
         Animated Gradient
@@ -935,7 +971,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     </div>
     ${
       slot.animatedGradient
-        ? `<label class="field">${H.settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
+        ? `<label class="field" data-tip="${TIPS.gradSpeed}">${H.settingLabel(slot, "Animation speed", "gradientSpeed", String(gradientSpeedOf(slot.gradientSpeed)))}
       <input type="range" data-key="gradientSpeed" min="1" max="100" step="1" value="${gradientSpeedOf(slot.gradientSpeed)}" />
     </label>`
         : ""
@@ -946,14 +982,14 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     }
     ${H.blendField(slot)}
     ${photoReplaceControl(slot)}
-    <label class="field">${H.settingLabel(slot, "Collision", "collider")}
+    <label class="field" data-tip="${TIPS.collider}">${H.settingLabel(slot, "Collision", "collider")}
       <select data-key="collider">
         ${IMAGE_COLLIDERS.map((icon) => `<option value="${icon.id}"${H.colliderOf(slot) === icon.id ? " selected" : ""}>${icon.label}</option>`).join("")}
       </select>
     </label>
     ${
       H.isRasterUpload(slot)
-        ? `<div class="check-row">
+        ? `<div class="check-row" data-tip="${TIPS.stroked}">
       <label class="check">
         ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
         Stroked
@@ -962,22 +998,22 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     </div>
     ${
       slot.stroked
-        ? `<label class="field">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
+        ? `<label class="field" data-tip="${TIPS.stroke}">${H.settingLabel(slot, "Stroke", "stroke", String(slot.stroke ?? 4))}
       <input type="range" data-key="stroke" min="1" max="16" step="1" value="${slot.stroke ?? 4}" />
     </label>
-    <div class="field">${H.settingLabel(slot, "Stroke color", "color")}
+    <div class="field" data-tip="${TIPS.strokeColor}">${H.settingLabel(slot, "Stroke color", "color")}
       ${H.tintRow(slot, "Stroke color")}
     </div>`
         : ""
     }
     ${H.dropShadowField(slot)}
-    <label class="field">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
+    <label class="field" data-tip="${TIPS.radius}">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
+    <label class="field" data-tip="${TIPS.shapeScale}">${H.settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
+    <label class="field" data-tip="${TIPS.amount}">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>
     <div class="slot-group slot-group--ruled">
@@ -998,10 +1034,10 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
       </label>
     </div>`
         : `${H.dropShadowField(slot)}
-    <label class="field">${H.settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
+    <label class="field" data-tip="${TIPS.shapeScale}">${H.settingLabel(slot, "Image scale", "scale", slot.scale.toFixed(2))}
       <input type="range" data-key="scale" min="0.1" max="${H.slotScaleSliderMax(slot)}" step="0.05" value="${slot.scale}" />
     </label>
-    <label class="field">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
+    <label class="field" data-tip="${TIPS.amount}">${H.settingLabel(slot, "Amount", "amount", String(slot.amount))}
       <input type="range" data-key="amount" min="1" max="${H.AMOUNT_SOFT_CAP}" value="${slot.amount}" />
     </label>`
     }
@@ -1057,7 +1093,7 @@ function pickPreview(slot: ImageSlot): string {
 
 function photoReplaceControl(slot: ImageSlot): string {
   const src = H.iconSrc(slot);
-  return `<label class="field file-replace">
+  return `<label class="field file-replace" data-tip="${TIPS.replaceImage}">
     <span class="field-label"><span>Replace image</span>${H.resetControl("Image", "icon", H.fieldDirty(slot, "icon"))}</span>
     <span class="file-replace__btn" style="background-image:url(&quot;${H.escapeAttr(src)}&quot;)" data-tip="${H.escapeAttr(slot.name)}">
       <span class="file-replace__text">Browse</span>
@@ -1071,7 +1107,7 @@ function videoReplaceControl(slot: ImageSlot): string {
   const thumb = poster
     ? ` style="background-image:url(&quot;${H.escapeAttr(poster)}&quot;)"`
     : "";
-  return `<label class="field file-replace">
+  return `<label class="field file-replace" data-tip="${TIPS.replaceVideo}">
     <span class="field-label"><span>Replace video</span></span>
     <span class="file-replace__btn${poster ? "" : " file-replace__btn--video"}"${thumb} data-tip="${H.escapeAttr(slot.name)}">
       <span class="file-replace__text">Browse</span>

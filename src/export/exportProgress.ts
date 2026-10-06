@@ -55,7 +55,7 @@ export function openExportProgress(cancel: () => void, opts?: { toFolder?: boole
       <div class="export-progress__card">
         <h2 class="export-progress__title" id="export-progress-title">Rendering frame:</h2>
         <p class="export-progress__n" aria-live="polite">0</p>
-        <button type="button" class="pill export-progress__cancel">Cancel Export</button>
+        <button type="button" class="pill export-progress__cancel" data-tip="Stop rendering and keep the scene">Cancel Export</button>
       </div>
       ${noteHtml(Boolean(opts?.toFolder))}
     </div>

@@ -1,4 +1,5 @@
 import exclamationMark from "@phosphor-icons/core/assets/regular/exclamation-mark.svg?raw";
+import { lsGet, lsSet } from "./legacyStorage";
 import { setPrefs } from "./prefs";
 
 const AFTER_READY_MS = 2000;
@@ -7,6 +8,7 @@ const GAP_MS = 5000;
 const ANIM_MS = 1000;
 /** Slide + mark + copy stagger (see .pro-tip CSS). */
 const REVEAL_MS = 1500;
+const MEDIA_EXPORT_HINT_KEY = "hintMediaExport";
 
 type Hint = {
   text: string;
@@ -59,6 +61,7 @@ let enterTimer = 0;
 let removeTimer = 0;
 let gapTimer = 0;
 let showTimer = 0;
+let afterHint: (() => void) | null = null;
 
 function animMs(): number {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ANIM_MS;
@@ -83,6 +86,7 @@ function dismiss() {
   if (!tip) return;
   clearTimers();
   const node = tip;
+  const oneOff = node.dataset.oneOff === "1";
   const index = Number(node.dataset.index);
   node.classList.add("is-leaving");
   node.classList.remove("is-in");
@@ -91,6 +95,12 @@ function dismiss() {
     if (done || tip !== node) return;
     done = true;
     remove();
+    if (oneOff) {
+      const next = afterHint;
+      afterHint = null;
+      if (next && enabled) gapTimer = window.setTimeout(next, GAP_MS);
+      return;
+    }
     if (!enabled || index + 1 >= queue().length) return;
     gapTimer = window.setTimeout(() => show(index + 1), GAP_MS);
   };
@@ -112,14 +122,14 @@ function onKey(event: KeyboardEvent) {
   if (event.key === "Escape" || event.key === "h" || event.key === "H") dismiss();
 }
 
-function show(index: number) {
-  if (!enabled || !hostEl) return;
-  const hint = queue()[index];
-  if (!hint) return;
+function paintCard(opts: { title: string; hint: Hint; index?: number; oneOff?: boolean; stop?: boolean }) {
+  if (!hostEl) return;
+  const hint = opts.hint;
 
   const node = document.createElement("div");
   node.className = "pro-tip";
-  node.dataset.index = String(index);
+  if (opts.index != null) node.dataset.index = String(opts.index);
+  if (opts.oneOff) node.dataset.oneOff = "1";
   node.setAttribute("role", "status");
 
   const mark = document.createElement("span");
@@ -132,7 +142,7 @@ function show(index: number) {
 
   const title = document.createElement("p");
   title.className = "pro-tip__title";
-  title.textContent = "Pro Tip";
+  title.textContent = opts.title;
 
   head.append(mark, title);
 
@@ -148,16 +158,18 @@ function show(index: number) {
   if (hint.after) body.append(` ${hint.after}`);
   body.append(".");
 
-  const stop = document.createElement("button");
-  stop.type = "button";
-  stop.className = "pro-tip__stop";
-  stop.textContent = "Stop showing me these";
-  stop.addEventListener("click", () => {
-    setPrefs({ tipsOn: false });
-    setProTipsEnabled(false);
-  });
-
-  node.append(head, body, stop);
+  node.append(head, body);
+  if (opts.stop) {
+    const stop = document.createElement("button");
+    stop.type = "button";
+    stop.className = "pro-tip__stop";
+    stop.textContent = "Stop showing me these";
+    stop.addEventListener("click", () => {
+      setPrefs({ tipsOn: false });
+      setProTipsEnabled(false);
+    });
+    node.append(stop);
+  }
   hostEl.append(node);
   tip = node;
   document.addEventListener("keydown", onKey);
@@ -182,9 +194,34 @@ function show(index: number) {
   });
 }
 
+function show(index: number) {
+  if (!enabled || !hostEl) return;
+  const hint = queue()[index];
+  if (!hint) return;
+  paintCard({ title: "Pro Tip", hint, index, stop: true });
+}
+
+/** One-time canvas notice: GIFs / YouTube are live-only and skip video export. */
+export function hintMediaExportOnce() {
+  if (lsGet(MEDIA_EXPORT_HINT_KEY) === "1" || !hostEl) return;
+  lsSet(MEDIA_EXPORT_HINT_KEY, "1");
+  const cycling = Boolean(showTimer || gapTimer || (tip && tip.dataset.oneOff !== "1"));
+  const index = tip?.dataset.index != null ? Number(tip.dataset.index) : 0;
+  if (cycling && enabled) afterHint = () => show(index);
+  clearTimers();
+  remove();
+  paintCard({
+    title: "Hint",
+    hint: { text: "GIFs and YouTube clips won’t export in videos" },
+    oneOff: true,
+  });
+}
+
 export function setProTipsEnabled(on: boolean) {
   enabled = on;
   if (on) return;
+  afterHint = null;
+  if (tip?.dataset.oneOff === "1") return;
   clearTimers();
   remove();
 }
@@ -195,6 +232,12 @@ export function setProTipsEnabled(on: boolean) {
  */
 export function releaseProTips(delayMs = AFTER_READY_MS) {
   if (!hostEl) return;
+  if (tip?.dataset.oneOff === "1") {
+    afterHint = () => {
+      showTimer = window.setTimeout(() => show(0), delayMs);
+    };
+    return;
+  }
   clearTimers();
   remove();
   if (!enabled) return;

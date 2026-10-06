@@ -93,6 +93,7 @@ export function createThemeShelf(options: {
     item.setAttribute("role", "listitem");
     item.setAttribute("aria-pressed", String(active));
     item.setAttribute("aria-label", `Apply ${preset.label} palette`);
+    item.dataset.tip = `Apply the ${preset.label} palette`;
 
     const swatch = document.createElement("span");
     swatch.className = "theme-gallery__swatch";
@@ -213,6 +214,7 @@ export function createThemeShelf(options: {
     dismiss.type = "button";
     dismiss.className = "theme-shelf__x icon-hover";
     dismiss.setAttribute("aria-label", "Close");
+    dismiss.dataset.tip = "Close theme picker";
     dismiss.innerHTML =
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6V4z"/></svg>';
     dismiss.addEventListener("click", close);
@@ -229,6 +231,7 @@ export function createThemeShelf(options: {
       button.dataset.tab = name;
       button.setAttribute("role", "tab");
       button.textContent = TAB_LABEL[name];
+      button.dataset.tip = `Browse ${TAB_LABEL[name].toLowerCase()} palettes`;
       button.addEventListener("click", () => selectTab(name));
       tabs.append(button);
     }
@@ -251,6 +254,7 @@ export function createThemeShelf(options: {
     done.type = "button";
     done.className = "pill pill--commit theme-shelf__done";
     done.textContent = "Close";
+    done.dataset.tip = "Close theme picker";
     done.addEventListener("click", close);
     foot.append(done);
 

@@ -168,6 +168,7 @@ function menuColorRow(
     const selected = selectedIndex === index;
     btn.style.background = selected && custom ? custom : color;
     btn.setAttribute("aria-label", `${label} ${index + 1}`);
+    btn.dataset.tip = "Click the selected color again to pick any color";
     btn.setAttribute("aria-pressed", String(selected));
     if (selected) {
       btn.classList.add("is-on");
@@ -202,9 +203,17 @@ function menuColorRow(
   return row;
 }
 
-function menuCheckRow(label: string, checked: boolean, onToggle: (next: boolean) => void): HTMLElement {
+function menuCheckRow(label: string, checked: boolean, onToggle: (next: boolean) => void, tip?: string): HTMLElement {
   const row = document.createElement("label");
   row.className = "slot-menu__check";
+  const hint =
+    tip ??
+    (label === "Stroked"
+      ? "Draw an outline instead of a filled shape"
+      : label === "Gradient"
+        ? "Blend two colors across the piece"
+        : "");
+  if (hint) row.dataset.tip = hint;
   const input = document.createElement("input");
   input.type = "checkbox";
   input.checked = checked;
