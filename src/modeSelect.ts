@@ -13,8 +13,8 @@ import {
   xRevealMarkup,
 } from "./logotypeReveal";
 import { DEFAULT_STAGE, DEFAULT_THEME } from "./theme";
+import bugIcon from "@phosphor-icons/core/assets/regular/bug.svg?raw";
 import folderOpenIcon from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
-import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import { PRIVACY_HREF } from "./privacy";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { mountHeaderLogotype } from "./logotypeLive";
@@ -459,8 +459,8 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
           Load Project
         </button>
         <button type="button" class="pill mode-select__action" data-open-bug-report data-tip="Send a bug report">
-          <span class="mode-select__action-icon" aria-hidden="true">${warningCircleIcon}</span>
-          Report an issue
+          <span class="mode-select__action-icon" aria-hidden="true">${bugIcon}</span>
+          Report issue
         </button>
       </div>
       <input type="file" class="mode-select__file" accept=".pill,application/x-ultrapilled-project" hidden tabindex="-1" aria-hidden="true" />

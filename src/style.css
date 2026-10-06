@@ -42,9 +42,7 @@
   --field-hover: #333333;
   --shadow-1: rgba(0, 0, 0, 0.4) 0 1px 3px;
   --shadow-2: rgba(0, 0, 0, 0.55) 0 16px 40px;
-  /* Fun pills — Uiverse-style letter-space hover; lime instead of purple */
-  --pill-rest-bg: #ffffff;
-  --pill-rest-ink: #080808;
+  /* Fun pills — lime hover smash; rest is outline (solid fill = selected/commit) */
   --pill-fun-face: #c4ff00;
   --pill-fun-ink: #080808;
   --panel-rule: rgba(255, 255, 255, 0.1);
@@ -103,9 +101,6 @@ html[data-theme="day"] {
   --shadow-1: rgba(0, 0, 0, 0.1) 0 1px 3px;
   --shadow-2: rgba(0, 0, 0, 0.16) 0 16px 40px;
   --panel-rule: rgba(0, 0, 0, 0.14);
-  /* Inverted rest — dark pill on light chrome; hover stays Orby lime */
-  --pill-rest-bg: #111111;
-  --pill-rest-ink: #ffffff;
 }
 
 /* Brief night↔day crossfade — only while .theme-animating is set from prefs. */
@@ -3828,12 +3823,13 @@ button {
     transform 0.1s ease;
 }
 
-/* Fun pills — lime fill on hover, no halo.
-   Opt out: play/smash/slot-add/panel-util, selected .is-on, dialog .pill--commit. */
+/* Idle pills = outline; solid fill is reserved for .is-on / .pill--commit.
+   Opt out: play/smash/slot-add/panel-util. Hover = Orby lime smash. */
 button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit, .is-on)),
 a.pill:not(.pill--commit) {
-  background: var(--pill-rest-bg);
-  color: var(--pill-rest-ink);
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
   box-shadow: none;
   transition: all 0.25s ease;
 }
@@ -3842,6 +3838,7 @@ button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit
 a.pill:not(.pill--commit):hover {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
+  border-color: transparent;
   box-shadow: none;
 }
 
@@ -3849,43 +3846,10 @@ button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit
 a.pill:not(.pill--commit):active {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
+  border-color: transparent;
   box-shadow: none;
   transform: translateY(calc(8px * var(--ui-scale)));
   transition: 100ms;
-}
-
-/* Stroked alt — choice groups (aspect, solid/gradient, on/off, export opts).
-   Idle = outline; .is-on = solid fill so the active option is obvious. */
-.segment button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit, .is-on)),
-.export-list button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit, .is-on)) {
-  background: transparent;
-  color: var(--ink);
-  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
-  box-shadow: none;
-}
-
-.segment button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):hover:not(:disabled):not(.is-on),
-.export-list button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):hover:not(:disabled):not(.is-on) {
-  background: var(--pill-fun-face);
-  color: var(--pill-fun-ink);
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.segment button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):active:not(:disabled):not(.is-on),
-.export-list button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):active:not(:disabled):not(.is-on) {
-  background: var(--pill-fun-face);
-  color: var(--pill-fun-ink);
-  border-color: transparent;
-  box-shadow: none;
-  transform: translateY(calc(6px * var(--ui-scale)));
-  transition: 100ms;
-}
-
-.segment button.pill.is-on,
-.export-list button.pill.is-on {
-  /* Keep 1px border so toggling on/off doesn’t nudge layout. */
-  border: 1px solid transparent;
 }
 
 button.pill:hover {
@@ -3899,6 +3863,8 @@ button.pill:active {
 button.pill.is-on {
   background: var(--primary);
   color: var(--on-primary);
+  /* Keep 1px border so toggling on/off doesn’t nudge layout. */
+  border: 1px solid transparent;
   box-shadow: none;
 }
 
@@ -3915,6 +3881,7 @@ button.pill.is-on:active {
 button.pill.pill--commit {
   background: var(--primary);
   color: var(--on-primary);
+  border: 1px solid transparent;
   box-shadow: none;
 }
 
@@ -6287,9 +6254,6 @@ html[data-theme="day"] .settings-modal__body .keycap {
   display: block;
   padding: 0;
   pointer-events: auto;
-  /* About is always dark chrome — keep light resting pills even in day theme. */
-  --pill-rest-bg: #ffffff;
-  --pill-rest-ink: #080808;
 }
 
 .about-overlay__scrim {
@@ -7371,8 +7335,6 @@ html[data-theme="day"] .bug-report__message {
   --ink-mute: #8f8f8f;
   --canvas: #121212;
   --shadow-1: rgba(0, 0, 0, 0.4) 0 1px 3px;
-  --pill-rest-bg: #ffffff;
-  --pill-rest-ink: #080808;
   pointer-events: auto;
 }
 
@@ -7397,8 +7359,7 @@ html[data-theme="day"] .bug-report__message {
   position: absolute;
   top: var(--panel-inset);
   right: var(--panel-inset);
-  display: inline-grid;
-  grid-template-columns: 1fr 1fr;
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   margin: 0;
@@ -7553,7 +7514,7 @@ input[type="file"].mode-select__file {
   font-weight: 700;
 }
 
-.mode-select__action {
+button.pill.mode-select__action:not(.pill--commit):not(.is-on) {
   appearance: none;
   pointer-events: auto;
   box-sizing: border-box;
@@ -7561,11 +7522,28 @@ input[type="file"].mode-select__file {
   align-items: center;
   justify-content: center;
   gap: calc(10px * var(--ui-scale));
-  width: 100%;
-  min-height: calc(48px * var(--ui-scale));
+  width: auto;
+  min-width: calc(220px * var(--ui-scale));
+  min-height: calc(52px * var(--ui-scale));
   margin: 0;
-  padding: calc(10px * var(--ui-scale)) calc(28px * var(--ui-scale));
-  font-size: calc(16px * var(--ui-scale));
+  padding: calc(12px * var(--ui-scale)) calc(36px * var(--ui-scale));
+  font-size: calc(14px * var(--ui-scale));
+  /* Keep stage art readable — rest + hover stay see-through over the preview. */
+  background: rgb(0 0 0 / 0.28);
+  color: #f5f5f5;
+  border: 1px solid color-mix(in srgb, #f5f5f5 40%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+button.pill.mode-select__action:not(.pill--commit):hover:not(:disabled):not(.is-on),
+button.pill.mode-select__action:not(.pill--commit):active:not(:disabled):not(.is-on) {
+  background: color-mix(in srgb, var(--pill-fun-face) 42%, transparent);
+  color: #f5f5f5;
+  border-color: color-mix(in srgb, var(--pill-fun-face) 70%, transparent);
+  box-shadow: none;
+  transform: none;
 }
 
 .mode-select__action-icon {
@@ -7574,6 +7552,7 @@ input[type="file"].mode-select__file {
   width: calc(18px * var(--ui-scale));
   height: calc(18px * var(--ui-scale));
   color: inherit;
+  flex-shrink: 0;
 }
 
 .mode-select__action-icon svg {

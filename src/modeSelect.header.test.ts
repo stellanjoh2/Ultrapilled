@@ -22,7 +22,7 @@ describe("mode select header actions", () => {
     );
   }
 
-  it("puts Load Project and Report an issue in the header, opposite the logo", async () => {
+  it("puts Load Project and Report issue in the header, opposite the logo", async () => {
     stubReducedMotion();
     const pending = askModeSelect();
     const root = document.querySelector(".mode-select")!;
@@ -33,7 +33,7 @@ describe("mode select header actions", () => {
     expect(root.querySelector(".mode-select__mark")).toBeTruthy();
     expect(actions).toBeTruthy();
     expect(load?.textContent).toContain("Load Project");
-    expect(report?.textContent).toContain("Report an issue");
+    expect(report?.textContent).toContain("Report issue");
     expect(root.querySelector(".mode-select__lower [data-open-bug-report]")).toBeNull();
     expect(root.querySelector(".mode-select__file")?.getAttribute("hidden")).toBe("");
     expect(load?.classList.contains("mode-select__action")).toBe(true);
