@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Copy `.env.example` to `.env` if you want Unsplash search. The access key is public in the client bundle — restrict it to this origin in the Unsplash dashboard.
+Copy `.env.example` to `.env` if you want Unsplash or Giphy search. Those keys are public in the client bundle — restrict them to this origin in each dashboard.
 
 ```bash
 npm test
@@ -20,7 +20,7 @@ npm test
 ## Use
 
 1. Pick **Physics** (things fall) or **Layout** (place freely, like Figma).
-2. Add text, icons, uploads, Unsplash photos, or a YouTube / MP4 clip from Create.
+2. Add text, icons, uploads, Unsplash photos, Giphy GIFs, or a YouTube / MP4 clip from Create.
 3. Tune gravity, speed, and bounciness (Physics), or arrange layers (Layout).
 4. Spacebar triggers a fall. Export GIF / MP4 / MOV / PNG, or save a `.pill` project.
 
@@ -97,4 +97,5 @@ Original Ultrapilled code and original assets are under [CC BY 4.0](https://crea
   - Template photos (tables above / each folder’s `CREDITS.txt`)
   - Sounds (see [Sounds](#sounds))
   - [Unsplash](https://unsplash.com/license) photos you search in-app
+  - [Giphy](https://support.giphy.com/hc/en-us/articles/360032872931-GIPHY-User-Terms-of-Service) GIFs you search in-app
   - YouTube embeds (YouTube’s terms)

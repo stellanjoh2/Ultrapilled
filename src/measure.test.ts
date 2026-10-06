@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TEXT_INK_PAD, measureTextInk, textGlyphSideOverhangs, trackedRunWidth, trackingEm } from "./measure";
-import { defaultTypeSlot } from "./types";
+import { TEXT_INK_PAD, measureTextInk, textFieldPad, textGlyphSideOverhangs, trackedRunWidth, trackingEm } from "./measure";
+import { defaultTextFieldSlot, defaultTypeSlot } from "./types";
 
 describe("measureTextInk", () => {
   it("keeps a bleed pad so AA glyph edges aren't clipped", () => {
@@ -69,3 +69,22 @@ describe("trackedRunWidth", () => {
     expect(width).toBeGreaterThanOrEqual(x + last.inkRight);
   });
 });
+
+describe("textFieldPad", () => {
+  it("insets wrapping copy inside a holding shape without growing the box", () => {
+    const slot = defaultTextFieldSlot({ shape: "box", fontSize: 20, pillPad: 50 });
+    const pad = textFieldPad(slot, 260, 140, 14);
+    expect(pad.x).toBeGreaterThan(2);
+    expect(pad.y).toBeGreaterThan(2);
+    expect(pad.x * 2).toBeLessThan(260);
+    expect(pad.y * 2).toBeLessThan(140);
+  });
+
+  it("uses a small inset when there is no holding shape", () => {
+    const slot = defaultTextFieldSlot({ shape: "none", fontSize: 18 });
+    const pad = textFieldPad(slot, 260, 140);
+    expect(pad.x).toBe(Math.max(2, 18 * 0.12));
+    expect(pad.y).toBe(pad.x);
+  });
+});
+

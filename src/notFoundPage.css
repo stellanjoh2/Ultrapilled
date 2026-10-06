@@ -75,45 +75,41 @@ a.pill.not-found__home {
   min-height: calc(54px * var(--ui-scale, 1));
   margin-top: calc(36px * var(--ui-scale, 1));
   padding: var(--space-0, 6px) var(--space-2, 24px);
-  border: none;
-  border-radius: calc(9999px * var(--ui-scale, 1));
-  background: var(--pill-rest-bg, #ffffff);
-  color: var(--pill-rest-ink, #080808);
-  box-shadow: var(--pill-rest-shadow, rgb(0 0 0 / 0.08) 0 0 8px);
   font-size: calc(15px * var(--ui-scale, 1));
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  line-height: 1;
   text-decoration: none;
-  text-transform: uppercase;
-  font-feature-settings: "ss01";
-  white-space: nowrap;
-  transition: all 0.25s ease;
 }
 
-a.pill.not-found__home:hover {
-  background: var(--pill-fun-face, #c4ff00);
-  color: var(--pill-fun-ink, #080808);
-  box-shadow: var(--pill-fun-glow, rgb(196 255 0 / 0.55)) 0 7px 29px 0;
+/* Same overlay type/layout as the mobile access gate (`src/mobile-gate.css`). */
+.not-found-host.is-mobile .not-found__overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-height: 0;
+  justify-content: center;
+  gap: 28px;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
 }
 
-a.pill.not-found__home:active {
-  background: var(--pill-fun-face, #c4ff00);
-  color: var(--pill-fun-ink, #080808);
-  box-shadow: var(--pill-fun-glow, rgb(196 255 0 / 0.55)) 0 0 0 0;
-  transform: translateY(calc(8px * var(--ui-scale, 1)));
-  transition: 100ms;
+.not-found-host.is-mobile .not-found__headline {
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(32px, 10vw, 64px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  a.pill.not-found__home {
-    transition:
-      background 0.15s ease,
-      color 0.15s ease,
-      box-shadow 0.15s ease;
-  }
+.not-found-host.is-mobile .not-found__headline .mode-select__word {
+  display: inline-block;
+}
 
-  a.pill.not-found__home:active {
-    transform: none;
-  }
+.not-found-host.is-mobile .not-found__headline .mode-select__word:not(:last-child) {
+  margin-right: 0.22em;
+}
+
+.not-found-host.is-mobile a.pill.not-found__home {
+  min-height: 44px;
+  margin-top: 0;
+  padding: 14px 28px;
+  font-size: 16px;
 }

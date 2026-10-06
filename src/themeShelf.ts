@@ -211,7 +211,7 @@ export function createThemeShelf(options: {
     title.textContent = "Pick a Theme";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.className = "theme-shelf__x";
+    dismiss.className = "theme-shelf__x icon-hover";
     dismiss.setAttribute("aria-label", "Close");
     dismiss.innerHTML =
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6V4z"/></svg>';
@@ -249,7 +249,7 @@ export function createThemeShelf(options: {
     foot.className = "theme-shelf__foot";
     const done = document.createElement("button");
     done.type = "button";
-    done.className = "theme-shelf__done";
+    done.className = "pill pill--commit theme-shelf__done";
     done.textContent = "Close";
     done.addEventListener("click", close);
     foot.append(done);

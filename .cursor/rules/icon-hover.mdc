@@ -1,0 +1,21 @@
+---
+description: Always add the canonical circular-icon hover and centering when introducing icon buttons
+globs: src/**/*.{ts,css}
+alwaysApply: true
+---
+
+# Icon buttons
+
+Every new icon-only control gets the shared hover. Do not ship a new icon without it.
+
+- Add class `icon-hover` on the button (or use `button.icon-btn`, which already includes hover).
+- Hit target is a circle/pill: `border-radius: 9999px`.
+- Center the glyph for real: `display: grid; place-items: center; line-height: 0` on the button, and `display: block` on the SVG (inline SVG baseline will otherwise sit low).
+- Hover is a glyph scale + color, not a circular wash and not the lime smash used on text pills. Gate with `@media (hover: hover)` and `:not(:disabled)`.
+- Selected (`.is-on`) keeps its rest fill; hover still scales the glyph.
+
+```html
+<button type="button" class="icon-hover" aria-label="…">
+  <span aria-hidden="true">${someIcon}</span>
+</button>
+```

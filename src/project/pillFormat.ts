@@ -1,11 +1,18 @@
 import { backgroundImage, putBackgroundImage } from "../background";
 import { parseCanvasRatio } from "../canvas";
 import {
+  clampPageIndex,
+  copyPage,
+  pageFromLive,
+  type LayoutPage,
+} from "../layoutPages";
+import {
   blendMode,
   DEFAULT_AUDIO_REACT,
   DEFAULT_PHYSICS,
   normalizeBackground,
   physicsComplexity,
+  uid,
   type AppState,
   type Slot,
 } from "../types";
@@ -28,6 +35,8 @@ export type PillProject = {
   frame: { width: number; height: number };
   images: PillEmbeddedImage[];
   loop: boolean;
+  pages: LayoutPage[];
+  pageIndex: number;
 };
 
 type PillPayload = {
@@ -38,6 +47,8 @@ type PillPayload = {
   frame?: { width: number; height: number };
   images?: PillEmbeddedImage[];
   loop?: boolean;
+  pages?: LayoutPage[];
+  pageIndex?: number;
 };
 
 export function isPillFile(file: File): boolean {
@@ -56,7 +67,7 @@ function cloneSlot(slot: Slot): Slot {
   return structuredClone(slot);
 }
 
-function collectImages(state: AppState): PillEmbeddedImage[] {
+function collectImages(state: AppState, pages: LayoutPage[]): PillEmbeddedImage[] {
   const out: PillEmbeddedImage[] = [];
   const seen = new Set<string>();
   const add = (id: string) => {
@@ -74,6 +85,10 @@ function collectImages(state: AppState): PillEmbeddedImage[] {
   };
   add(state.background.imageId);
   add(state.background.logoId);
+  for (const page of pages) {
+    add(page.background.imageId);
+    add(page.background.logoId);
+  }
   return out;
 }
 
@@ -87,8 +102,14 @@ export function serializePillProject(project: PillProject): string {
     },
     poses: project.poses.map((pose) => ({ ...pose })),
     frame: { ...project.frame },
-    images: project.images.length ? project.images : collectImages(project.state),
+    images: project.images.length ? project.images : collectImages(project.state, project.pages),
     loop: project.loop,
+    ...(project.pages.length > 1
+      ? {
+          pages: project.pages.map(copyPage),
+          pageIndex: clampPageIndex(project.pageIndex, project.pages.length),
+        }
+      : {}),
   };
   return JSON.stringify(payload);
 }
@@ -114,6 +135,50 @@ function parsePose(value: unknown): ChipPose | null {
     y,
     angle,
   };
+}
+
+function parsePages(
+  value: unknown,
+  state: AppState,
+  poses: ChipPose[],
+  frame: { width: number; height: number },
+): LayoutPage[] {
+  if (Array.isArray(value)) {
+    const pages: LayoutPage[] = [];
+    for (const item of value) {
+      if (!item || typeof item !== "object") continue;
+      const record = item as Record<string, unknown>;
+      const slots = parseSlots(record.slots);
+      if (!slots) continue;
+      const pagePoses: ChipPose[] = [];
+      if (Array.isArray(record.poses)) {
+        for (const entry of record.poses) {
+          const pose = parsePose(entry);
+          if (pose) pagePoses.push(pose);
+        }
+      }
+      const frameRaw = (record.frame ?? {}) as Record<string, unknown>;
+      pages.push({
+        id: typeof record.id === "string" && record.id ? record.id : uid(),
+        slots,
+        poses: pagePoses,
+        background: normalizeBackground(record.background as AppState["background"]),
+        frame: {
+          width: Math.max(1, Number(frameRaw.width) || frame.width),
+          height: Math.max(1, Number(frameRaw.height) || frame.height),
+        },
+      });
+    }
+    if (pages.length) return pages;
+  }
+  return [
+    pageFromLive({
+      slots: state.slots,
+      poses,
+      background: state.background,
+      frame,
+    }),
+  ];
 }
 
 function parseSlots(value: unknown): Slot[] | null {
@@ -219,12 +284,20 @@ export function parsePillProject(raw: string): PillProject | null {
       }
     }
 
+    const pages = parsePages(record.pages, state, poses, frame);
+    const pageIndex = clampPageIndex(Number(record.pageIndex), pages.length);
+    const current = pages[pageIndex]!;
+    state.slots = current.slots;
+    state.background = current.background;
+
     return {
       state,
-      poses,
+      poses: current.poses,
       frame,
       images,
       loop: Boolean(record.loop),
+      pages,
+      pageIndex,
     };
   } catch {
     return null;

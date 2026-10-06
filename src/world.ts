@@ -1,5 +1,6 @@
 import Matter from "matter-js";
 import handGrabbing from "@phosphor-icons/core/assets/regular/hand-grabbing.svg?raw";
+import boundingBoxIcon from "@phosphor-icons/core/assets/regular/bounding-box.svg?raw";
 import { imageColliderId } from "./icons";
 import { isColorMask, type ChipDraw, type ChipPose } from "./chipKinds";
 import {
@@ -32,7 +33,7 @@ import {
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
 import { setBareCanvasGradient, stopTextAnimIn } from "./textAnim";
 import { pickTheme, resolveTextColor, type ColorTheme } from "./theme";
-import { blendMode, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
+import { blendMode, isTextField, physicsComplexity, shapeHasFill, type PhysicsComplexity, type PhysicsSettings, type Slot } from "./types";
 import { playImpact } from "./uiSounds";
 import { beginScrub, endScrub } from "./scrub";
 
@@ -242,7 +243,7 @@ export type WorldHandle = {
     stage: HTMLElement,
     onPick?: (slotId: string | null, opts?: { force?: boolean; additive?: boolean }) => void,
     onMenu?: (slotId: string | null, x: number, y: number) => void,
-    onEdit?: (slotId: string) => void,
+    onEdit?: (slotId: string, at?: { x: number; y: number }) => void,
     scaleOf?: (slotId: string) => number,
     onScale?: (slotId: string, scale: number, phase: "start" | "move" | "end") => void,
     onRotate?: (slotId: string, angle: number, phase: "start" | "move" | "end") => void,
@@ -253,6 +254,7 @@ export type WorldHandle = {
       phase: "start" | "move" | "end",
     ) => void,
     onGradientStop?: (slotId: string, stop: "from" | "to", anchor: HTMLElement) => void,
+    onBoxSize?: (slotId: string, sx: number, sy: number, phase: "start" | "move" | "end") => void,
   ) => void;
   refreshFrost: () => void;
   setPicked: (slotId: string | null, opts?: { ids?: string[] }) => void;
@@ -557,7 +559,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let mirrorScenes: HTMLElement[] = [];
   let onPick: ((slotId: string | null, opts?: { force?: boolean; additive?: boolean }) => void) | null = null;
   let onMenu: ((slotId: string | null, x: number, y: number) => void) | null = null;
-  let onEdit: ((slotId: string) => void) | null = null;
+  let onEdit: ((slotId: string, at?: { x: number; y: number }) => void) | null = null;
   let scaleOf: ((slotId: string) => number) | null = null;
   let onScale: ((slotId: string, scale: number, phase: "start" | "move" | "end") => void) | null = null;
   let onRotate: ((slotId: string, angle: number, phase: "start" | "move" | "end") => void) | null = null;
@@ -567,6 +569,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     | ((slotId: string, value: { angle: number; scale: number }, phase: "start" | "move" | "end") => void)
     | null = null;
   let onGradientStop: ((slotId: string, stop: "from" | "to", anchor: HTMLElement) => void) | null = null;
+  let onBoxSize: ((slotId: string, sx: number, sy: number, phase: "start" | "move" | "end") => void) | null =
+    null;
+  let lookPad = 14;
   let pickedId: string | null = null;
   /** All selected slot ids (includes `pickedId`). Shift-click grows this set. */
   const pickedIds = new Set<string>();
@@ -625,6 +630,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     startPointerAngle: number;
     startBodyAngle: number;
     lastAngle: number;
+    /** Text-field corner drag: reflow the box instead of uniform scale. */
+    boxResize: boolean;
+    startW: number;
+    startH: number;
+    lastSx: number;
+    lastSy: number;
   } | null = null;
   let gradAngleDrag: {
     chip: DroppedChip;
@@ -1488,6 +1499,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     seqTotal: number,
     scaleMul = 1,
   ) {
+    lookPad = pillPad;
     const { scaled, size, radius, chamfer } = contained(
       slot,
       scale * sizeJitter(sizeUnit, sizeRandom) * scaleMul,
@@ -1569,6 +1581,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     opts?: { quiet?: boolean },
   ): boolean {
     applyPhysics(physics);
+    lookPad = pillPad;
     const byId = new Map(slots.map((slot) => [slot.id, slot]));
     const falling = expandSlots(slots);
     const want = new Map<string, number>();
@@ -1763,6 +1776,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const slot = slots.find((item) => item.id === slotId);
     if (!slot) return;
     applyPhysics(physics);
+    lookPad = pillPad;
     const grown: DroppedChip[] = [];
     let remeshed = 0;
     for (const chip of chips) {
@@ -1788,7 +1802,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       }
       paint(chip, scaled, size, radius, theme, trackingEm(trackingOf(slot, tracking)), glyphShift(slot));
       if (chip.meshKey !== meshKey(slot, size.width, size.height, chamfer, physicsComplexity(physics.complexity))) {
+        const drag = xformDrag;
+        const keepCorner =
+          Boolean(drag?.boxResize && !drag.centerAnchored && drag.chip.body.id === chip.body.id);
+        const opp = drag && keepCorner ? oppositeXformCorner(drag.corner) : null;
+        const before = opp ? xformCornerWorld(chip, opp, 1, 0) : null;
         replaceBody(chip, slot, size, chamfer, physics);
+        if (before && opp) {
+          const after = xformCornerWorld(chip, opp, 1, 0);
+          Body.setPosition(chip.body, {
+            x: chip.body.position.x + (before.x - after.x),
+            y: chip.body.position.y + (before.y - after.y),
+          });
+        }
         remeshed += 1;
         if (size.width > prevW + 1 || size.height > prevH + 1) grown.push(chip);
       }
@@ -1854,6 +1880,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
     clear();
     applyPhysics(physics);
+    lookPad = pillPad;
 
     const falling = expandSlots(slots);
     const box = playfieldBox(stage, layer);
@@ -2073,6 +2100,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
     clear();
     applyPhysics(physics);
+    lookPad = pillPad;
 
     const box = playfieldBox(stage, layer);
     const stageW = box.width;
@@ -2129,7 +2157,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         const needHandles = frameHost.querySelectorAll(":scope > .chip-xform-handle").length !== 4;
         const hadWheel = Boolean(frameHost.querySelector(":scope > .chip-grad-wheel"));
         ensureXformFrame(frameHost);
-        ensureXformHandle(frameHost);
+        ensureXformHandle(chip);
         syncGradWheel(chip);
         const createdWheel =
           !hadWheel && Boolean(frameHost.querySelector(":scope > .chip-grad-wheel"));
@@ -2331,7 +2359,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return "se";
   }
 
-  function ensureXformHandle(el: HTMLElement) {
+  function ensureXformHandle(chip: DroppedChip) {
+    const el = xformChromeOf(chip);
     for (const old of el.querySelectorAll(":scope > .chip-scale-handle, :scope > .chip-rotate-handle")) {
       old.remove();
     }
@@ -2355,23 +2384,29 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       byCorner.clear();
     }
 
+    const field = isTextField(chip.look?.slot);
     for (const { id } of XFORM_CORNERS) {
+      const box = field && (id === "ne" || id === "sw");
+      const iconKey = box ? "bounding-box" : "hand-grabbing";
+      const label = box ? "Resize writing area" : "Rotate and scale";
+      const cornerClass = `${XFORM_CORNER_CLASS[id]}${box ? " chip-xform-handle--box" : ""}`;
+      const icon = box ? boundingBoxIcon : handGrabbing;
       let handle = byCorner.get(id);
       if (!handle) {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = `chip-xform-handle ${XFORM_CORNER_CLASS[id]}`;
+        btn.className = `chip-xform-handle ${cornerClass}`;
         btn.tabIndex = -1;
-        btn.setAttribute("aria-label", "Rotate and scale");
-        btn.dataset.icon = "hand-grabbing";
-        btn.innerHTML = handGrabbing;
+        btn.setAttribute("aria-label", label);
+        btn.dataset.icon = iconKey;
+        btn.innerHTML = icon;
         el.append(btn);
       } else {
-        handle.className = `chip-xform-handle ${XFORM_CORNER_CLASS[id]}`;
-        if (handle.dataset.icon !== "hand-grabbing") {
-          handle.innerHTML = handGrabbing;
-          handle.dataset.icon = "hand-grabbing";
-          handle.setAttribute("aria-label", "Rotate and scale");
+        handle.className = `chip-xform-handle ${cornerClass}`;
+        handle.setAttribute("aria-label", label);
+        if (handle.dataset.icon !== iconKey) {
+          handle.innerHTML = icon;
+          handle.dataset.icon = iconKey;
         }
       }
     }
@@ -2939,10 +2974,22 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function endXformDrag(event?: PointerEvent) {
     if (!xformDrag) return;
-    const { lastScale, startScale, startScales, lastAngle, slotId, chip, bodyFactor, corner } =
-      xformDrag;
+    const {
+      lastScale,
+      startScale,
+      startScales,
+      lastAngle,
+      slotId,
+      chip,
+      bodyFactor,
+      corner,
+      boxResize,
+      lastSx,
+      lastSy,
+    } = xformDrag;
     const solo = soloBodyId != null && soloBodyId === chip.body.id;
     const factor = lastScale / startScale;
+    if (boxResize) onBoxSize?.(slotId, lastSx, lastSy, "end");
     // Settle BEFORE clearing is-scaling: shrink size ok, but never stay hot / inverted.
     // Release always snaps to soft (neutral dark) if still in soft range, else hidden.
     xformDrag = null;
@@ -2989,17 +3036,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       // Re-sync after class clear so soft/neutral wins over leftover drag chrome.
       if (isPickPainted(item)) syncXformHandleSide(item);
     }
-    if (solo) {
-      // Keep slot.scale shared; bake the gesture into this chip only, then remesh.
-      chip.scaleMul = Math.min(freeScaleMax, Math.max(SCALE_MIN, chip.scaleMul * factor));
-      onScale?.(slotId, scaleOf?.(slotId) ?? startScale, "end");
-    } else if (startScales.size > 0) {
-      for (const [id, base] of startScales) {
-        const max = scaleMaxFor(chips.find((c) => c.slotId === id)?.look?.slot);
-        onScale?.(id, clampScale(base * factor, max), "end");
+    if (!boxResize) {
+      if (solo) {
+        // Keep slot.scale shared; bake the gesture into this chip only, then remesh.
+        chip.scaleMul = Math.min(freeScaleMax, Math.max(SCALE_MIN, chip.scaleMul * factor));
+        onScale?.(slotId, scaleOf?.(slotId) ?? startScale, "end");
+      } else if (startScales.size > 0) {
+        for (const [id, base] of startScales) {
+          const max = scaleMaxFor(chips.find((c) => c.slotId === id)?.look?.slot);
+          onScale?.(id, clampScale(base * factor, max), "end");
+        }
+      } else {
+        onScale?.(slotId, lastScale, "end");
       }
-    } else {
-      onScale?.(slotId, lastScale, "end");
     }
     onRotate?.(slotId, lastAngle, "end");
   }
@@ -3029,6 +3078,30 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (soloBodyId != null && chip.body.id !== soloBodyId) return 1;
     if (!xformDrag.startScales.has(chip.slotId) && xformDrag.slotId !== chip.slotId) return 1;
     return xformDrag.bodyFactor;
+  }
+
+  function boxSizeFromPointer(point: { x: number; y: number }): { sx: number; sy: number } | null {
+    if (!xformDrag?.boxResize) return null;
+    const { chip, corner, centerAnchored, startW, startH } = xformDrag;
+    const angle = chip.body.angle;
+    const cos = Math.cos(-angle);
+    const sin = Math.sin(-angle);
+    const pivot = centerAnchored
+      ? { x: chip.body.position.x, y: chip.body.position.y }
+      : xformCornerWorld(chip, oppositeXformCorner(corner), 1, 0);
+    const dx = point.x - pivot.x;
+    const dy = point.y - pivot.y;
+    const lx = dx * cos - dy * sin;
+    const ly = dx * sin + dy * cos;
+    const entry = XFORM_CORNERS.find((item) => item.id === corner)!;
+    const nextW = centerAnchored ? Math.abs(lx) * 2 : lx * entry.sx;
+    const nextH = centerAnchored ? Math.abs(ly) * 2 : ly * entry.sy;
+    const minW = 48;
+    const minH = 32;
+    return {
+      sx: Math.max(minW, nextW) / Math.max(1, startW),
+      sy: Math.max(minH, nextH) / Math.max(1, startH),
+    };
   }
 
   /** Grow/shrink + rotate from one polar gesture (radial = scale, angular = rotate). */
@@ -3102,6 +3175,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const startScale = startScales.get(chip.slotId) ?? 1;
     const startPointerAngle = Math.atan2(dy, dx);
     const startBodyAngle = chip.body.angle;
+    const boxResize =
+      isTextField(chip.look?.slot) &&
+      (corner === "ne" || corner === "sw") &&
+      (pickedIds.size <= 1 || (pickedIds.size === 1 && pickedIds.has(chip.slotId)));
     xformHover = { bodyId: chip.body.id, corner, phase: "hot" };
     xformDrag = {
       chip,
@@ -3119,13 +3196,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       startPointerAngle,
       startBodyAngle,
       lastAngle: startBodyAngle,
+      boxResize,
+      startW: chip.width,
+      startH: chip.height,
+      lastSx: 1,
+      lastSy: 1,
     };
     lockHandle(chip.slotId, "xforming");
     syncXformHandleSide(chip);
     handle.setPointerCapture(event.pointerId);
     // One undo snapshot for the combined gesture (scale key covers rotate too).
     beginScrub();
-    onScale?.(chip.slotId, startScale, "start");
+    if (boxResize) onBoxSize?.(chip.slotId, 1, 1, "start");
+    else onScale?.(chip.slotId, startScale, "start");
   }
 
   function setPicked(slotId: string | null, opts?: { ids?: string[] }) {
@@ -3508,6 +3591,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       } else {
         nextAngle = xformDrag.startBodyAngle + (pointerAngle - xformDrag.startPointerAngle);
       }
+      if (xformDrag.boxResize) {
+        const size = boxSizeFromPointer(point);
+        if (size) {
+          const sizeChanged =
+            Math.abs(size.sx - xformDrag.lastSx) >= 0.001 || Math.abs(size.sy - xformDrag.lastSy) >= 0.001;
+          if (sizeChanged) {
+            xformDrag.lastSx = size.sx;
+            xformDrag.lastSy = size.sy;
+            onBoxSize?.(xformDrag.slotId, size.sx, size.sy, "move");
+          }
+        }
+        return;
+      }
       const scaleChanged = Math.abs(nextScale - xformDrag.lastScale) >= 0.0005;
       const angleChanged = Math.abs(nextAngle - xformDrag.lastAngle) >= 0.0005;
       if (!scaleChanged && !angleChanged) return;
@@ -3603,7 +3699,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const slot = chip.look?.slot;
       if (slot?.kind === "text") {
         soloBodyId = chip.body.id;
-        onEdit?.(chip.slotId);
+        onEdit?.(chip.slotId, { x: event.clientX, y: event.clientY });
         return;
       }
       // Non-text: force-pick this Amount instance (poses stay per-body).
@@ -3650,7 +3746,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     stage: HTMLElement,
     pick?: (slotId: string | null, opts?: { force?: boolean; additive?: boolean }) => void,
     menu?: (slotId: string | null, x: number, y: number) => void,
-    edit?: (slotId: string) => void,
+    edit?: (slotId: string, at?: { x: number; y: number }) => void,
     readScale?: (slotId: string) => number,
     scale?: (slotId: string, value: number, phase: "start" | "move" | "end") => void,
     rotate?: (slotId: string, angle: number, phase: "start" | "move" | "end") => void,
@@ -3661,6 +3757,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       phase: "start" | "move" | "end",
     ) => void,
     gradientStop?: (slotId: string, stop: "from" | "to", anchor: HTMLElement) => void,
+    boxSize?: (slotId: string, sx: number, sy: number, phase: "start" | "move" | "end") => void,
   ) {
     onPick = pick ?? null;
     onMenu = menu ?? null;
@@ -3671,6 +3768,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     gradientOf = readGradient ?? null;
     onGradientWheel = gradientWheel ?? null;
     onGradientStop = gradientStop ?? null;
+    onBoxSize = boxSize ?? null;
     bindStageLayers(stage);
     stage.addEventListener("pointerdown", onPointerDown);
     stage.addEventListener("click", onClick);
@@ -3817,8 +3915,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
           : "";
     chip.look = { slot, radius, fill, ink, tracking, shiftEm };
     const editing = chip.slotId === editingId;
-    applyVisual(chip.el, slot, size.width, size.height, radius, fill, ink, tracking, false, shiftEm, gradientTo, editing);
-    applyVisual(chip.glow, slot, size.width, size.height, radius, fill, ink, tracking, true, shiftEm, gradientTo, false);
+    applyVisual(chip.el, slot, size.width, size.height, radius, fill, ink, tracking, false, shiftEm, gradientTo, editing, lookPad);
+    applyVisual(chip.glow, slot, size.width, size.height, radius, fill, ink, tracking, true, shiftEm, gradientTo, false, lookPad);
     // Per-layer blend only matters when pieces can overlap (layout mode).
     const mix = layoutMode ? blendMode(slot.blend) : "normal";
     if (mix === "normal") {
@@ -3837,7 +3935,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
     if (isPickPainted(chip)) {
       ensureXformFrame(ensureChrome(chip));
-      ensureXformHandle(xformChromeOf(chip));
+      ensureXformHandle(chip);
       syncXformHandleSide(chip, chipCssMul(chip));
       syncGradWheel(chip);
       syncChromeSeat(chip);

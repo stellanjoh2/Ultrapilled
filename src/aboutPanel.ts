@@ -119,12 +119,11 @@ function fillBio(el: HTMLElement): HTMLElement[] {
     if (part === "Stellan" && next?.startsWith("Johansson")) {
       const name = document.createElement("span");
       name.className = "about-overlay__word about-overlay__name";
-      name.textContent = ABOUT_NAME;
+      const punct = next.slice("Johansson".length);
+      name.textContent = ABOUT_NAME + punct;
       name.style.color = NAME_ACCENT;
       el.append(name);
       words.push(name);
-      const punct = next.slice("Johansson".length);
-      if (punct) el.append(document.createTextNode(punct));
       index += 2;
     } else if ((part === "a" || part === "an") && next) {
       // Keep article + next word together so “a” doesn’t orphan at a line end.

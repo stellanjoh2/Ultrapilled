@@ -59,8 +59,8 @@ export function openYouTubeImport(opts: { onPick: (clip: YouTubeClip) => void })
     <div class="unsplash-modal__card">
       <header class="unsplash-modal__head">
         <h2 class="unsplash-modal__title" id="youtube-modal-title">Add from YouTube</h2>
-        <button type="button" class="unsplash-modal__x" data-youtube-close aria-label="Close">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.3 5.7 13 11l5.3 5.3-1.4 1.4L11.6 12.4 6.3 17.7 4.9 16.3 10.2 11 4.9 5.7 6.3 4.3l5.3 5.3 5.3-5.3z"/></svg>
+        <button type="button" class="unsplash-modal__x icon-hover" data-youtube-close aria-label="Close">
+          <span aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.7 13 11l5.3 5.3-1.4 1.4L11.6 12.4 6.3 17.7 4.9 16.3 10.2 11 4.9 5.7 6.3 4.3l5.3 5.3 5.3-5.3z"/></svg></span>
         </button>
       </header>
       <div class="unsplash-modal__body">
@@ -74,7 +74,7 @@ export function openYouTubeImport(opts: { onPick: (clip: YouTubeClip) => void })
         </div>
         <p class="unsplash-modal__status" data-youtube-status>Paste a link. The clip autoplays muted and loops.</p>
         <div class="youtube-modal__actions">
-          <button type="button" class="pill is-on youtube-modal__add" data-youtube-add>Add clip</button>
+          <button type="button" class="pill pill--commit youtube-modal__add" data-youtube-add>Add clip</button>
         </div>
       </div>
       <footer class="unsplash-modal__foot">

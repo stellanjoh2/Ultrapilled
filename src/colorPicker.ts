@@ -35,9 +35,9 @@ export function mountColorPicker(options: {
   title.textContent = "Select color";
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
-  closeBtn.className = "color-pop-close";
+  closeBtn.className = "color-pop-close icon-hover";
   closeBtn.setAttribute("aria-label", "Close");
-  closeBtn.textContent = "✕";
+  closeBtn.innerHTML = `<span aria-hidden="true">✕</span>`;
   head.append(title, closeBtn);
 
   const sv = document.createElement("div");

@@ -30,12 +30,10 @@
   --play-face: #c4ff00;
   --play-edge: #8fb800;
   --play-ink: #080808;
-  --play-glow: rgb(196 255 0 / 0.55);
   /* Loop — same smash, muted face; on = Orby magic stroke */
   --loop-face: #2a2a2a;
   --loop-edge: #1a1a1a;
   --loop-ink: #f5f5f5;
-  --loop-glow: rgb(0 0 0 / 0.45);
   --loop-stroke-a: #c4ff00;
   --loop-stroke-b: #9d80ff;
   --canvas: #121212;
@@ -47,10 +45,8 @@
   /* Fun pills — Uiverse-style letter-space hover; lime instead of purple */
   --pill-rest-bg: #ffffff;
   --pill-rest-ink: #080808;
-  --pill-rest-shadow: rgb(0 0 0 / 0.08) 0 0 8px;
   --pill-fun-face: #c4ff00;
   --pill-fun-ink: #080808;
-  --pill-fun-glow: rgb(196 255 0 / 0.55);
   --panel-rule: rgba(255, 255, 255, 0.1);
   --space-0: calc(6px * var(--ui-scale));
   --space-1: calc(12px * var(--ui-scale));
@@ -99,7 +95,6 @@ html[data-theme="day"] {
   --loop-face: #ffffff;
   --loop-edge: #c8c8c8;
   --loop-ink: #111111;
-  --loop-glow: rgb(0 0 0 / 0.14);
   /* Soft chrome so solid-white fields / icon tiles read clearly */
   --canvas: #f0f0f0;
   --canvas-soft: #e2e2e2;
@@ -111,7 +106,6 @@ html[data-theme="day"] {
   /* Inverted rest — dark pill on light chrome; hover stays Orby lime */
   --pill-rest-bg: #111111;
   --pill-rest-ink: #ffffff;
-  --pill-rest-shadow: rgb(0 0 0 / 0.14) 0 0 8px;
 }
 
 /* Brief night↔day crossfade — only while .theme-animating is set from prefs. */
@@ -273,6 +267,35 @@ body:has(.app.ui-hidden) .ui-tip {
   visibility: hidden;
 }
 
+.app.ui-hidden .page-strip {
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.app.is-presenting .topbar {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.97);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.app.is-presenting .pro-tip,
+body:has(.app.is-presenting) .ui-tip {
+  display: none;
+}
+
+.app.is-presenting .panel,
+.app.is-presenting .theme-shelf,
+.app.is-presenting .theme-shelf.is-open,
+.app.is-presenting .dev-panel {
+  opacity: 0;
+  transform: translateX(calc(100vw + var(--panel-inset)));
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .app.ui-hidden .panel,
 .app.ui-hidden .theme-shelf,
 .app.ui-hidden .theme-shelf.is-open,
@@ -284,7 +307,9 @@ body:has(.app.ui-hidden) .ui-tip {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .app.ui-hidden .topbar {
+  .app.ui-hidden .topbar,
+  .app.ui-hidden .page-strip,
+  .app.is-presenting .topbar {
     transition:
       opacity 0.14s ease,
       transform 0.14s ease,
@@ -294,7 +319,11 @@ body:has(.app.ui-hidden) .ui-tip {
   .app.ui-hidden .panel,
   .app.ui-hidden .theme-shelf,
   .app.ui-hidden .theme-shelf.is-open,
-  .app.ui-hidden .dev-panel {
+  .app.ui-hidden .dev-panel,
+  .app.is-presenting .panel,
+  .app.is-presenting .theme-shelf,
+  .app.is-presenting .theme-shelf.is-open,
+  .app.is-presenting .dev-panel {
     transition:
       opacity 0.5s cubic-bezier(0.83, 0, 0.17, 1),
       transform 0.5s cubic-bezier(0.83, 0, 0.17, 1),
@@ -329,8 +358,147 @@ body:has(.app.ui-hidden) .ui-tip {
   transform-origin: top left;
 }
 
+.page-strip {
+  position: absolute;
+  left: var(--panel-inset);
+  bottom: var(--panel-inset);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--ui-scale));
+  height: calc(54px * var(--ui-scale));
+  max-width: min(52vw, calc(720px * var(--ui-scale)));
+  padding: calc(6px * var(--ui-scale));
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: calc(9999px * var(--ui-scale));
+  background: color-mix(in srgb, var(--canvas) 88%, transparent);
+  box-shadow: var(--shadow-1);
+  transform-origin: bottom left;
+  pointer-events: auto;
+}
+
+.page-strip__tools {
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--ui-scale));
+  flex: 0 0 auto;
+}
+
+.page-strip[hidden] {
+  display: none;
+}
+
+.page-strip__frames {
+  display: flex;
+  align-items: center;
+  gap: calc(4px * var(--ui-scale));
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.page-strip__frames::-webkit-scrollbar {
+  display: none;
+}
+
+.page-strip__frame,
+.page-strip__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: calc(40px * var(--ui-scale));
+  height: calc(40px * var(--ui-scale));
+  margin: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: calc(9999px * var(--ui-scale));
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+  line-height: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.page-strip__frame {
+  font-size: calc(14px * var(--ui-scale));
+  font-weight: 600;
+  line-height: 1;
+}
+
+.page-strip__icon {
+  color: var(--ink-mute);
+}
+
+.page-strip__icon > span {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
+.page-strip__icon svg {
+  display: block;
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
+}
+
+.page-strip__frame.is-on {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.page-strip__icon.is-on {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.page-strip__icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.page-strip__preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 55;
+  padding: calc(4px * var(--ui-scale));
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: calc(14px * var(--ui-scale));
+  background: color-mix(in srgb, var(--canvas) 94%, transparent);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+  transform: translate(-9999px, -9999px);
+}
+
+.page-strip__preview[hidden] {
+  display: none;
+}
+
+.page-strip__preview img {
+  display: block;
+  width: calc(180px * var(--ui-scale));
+  height: auto;
+  border-radius: calc(10px * var(--ui-scale));
+}
+
+.app.is-presenting .page-strip {
+  opacity: 0.55;
+}
+
+.app.is-presenting .page-strip:hover,
+.app.is-presenting .page-strip:focus-within {
+  opacity: 1;
+}
+
+.app.is-presenting .stage {
+  cursor: default;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .topbar {
+  .topbar,
+  .page-strip {
     transition:
       opacity 0.14s ease,
       transform 0.14s ease,
@@ -1623,6 +1791,86 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   -webkit-user-modify: read-write-plaintext-only;
 }
 
+.chip.chip-text-field {
+  overflow: hidden;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.chip.chip-text-field > .chip-label,
+.chip.chip-text-field > .chip-edit {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.chip.chip-text-field.is-editing > .chip-edit {
+  pointer-events: auto;
+  white-space: pre-wrap;
+}
+
+.text-format {
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--ui-scale));
+  margin: 0 0 var(--space-1);
+}
+
+.text-format__btn {
+  width: calc(36px * var(--ui-scale));
+  min-width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
+  min-height: calc(36px * var(--ui-scale));
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.text-format__btn svg {
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
+}
+
+.text-format__gap {
+  width: 1px;
+  height: calc(20px * var(--ui-scale));
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
+  margin: 0 calc(2px * var(--ui-scale));
+}
+
+.text-field-count {
+  margin: 0 0 var(--space-1);
+  color: var(--ink-mute);
+  font-size: calc(12px * var(--ui-scale));
+}
+
+textarea.slot-live--field {
+  display: block;
+  width: 100%;
+  min-height: calc(96px * var(--ui-scale));
+  margin: 0 0 var(--space-1);
+  padding: var(--space-0) var(--space-1);
+  border: none;
+  border-radius: calc(8px * var(--ui-scale));
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: 0;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+textarea.slot-live--field:focus {
+  outline: none;
+  background: var(--field-hover);
+}
+
 .chip-edit:focus {
   outline: none;
 }
@@ -1634,6 +1882,11 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   animation: none !important;
   /* Ink-tight physics boxes are narrower than contenteditable layout — don't clip glyphs. */
   overflow: visible;
+}
+
+.chip.chip-text-field,
+.chip.chip-text-field.is-editing {
+  overflow: hidden;
 }
 
 .chip-fill,
@@ -1882,7 +2135,7 @@ button.pill.panel-util:hover:not(.is-on) {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
   border-color: transparent;
-  box-shadow: var(--pill-fun-glow) 0 7px 29px 0;
+  box-shadow: none;
   filter: none;
 }
 
@@ -1890,7 +2143,7 @@ button.pill.panel-util:active:not(.is-on) {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
   border-color: transparent;
-  box-shadow: var(--pill-fun-glow) 0 0 0 0;
+  box-shadow: none;
   transform: translateY(calc(4px * var(--ui-scale)));
   transition: 100ms;
 }
@@ -1933,9 +2186,7 @@ button.pill.play-btn {
   line-height: 1.1;
   text-transform: uppercase;
   /* Bevel via shadow so press doesn't change layout height */
-  box-shadow:
-    0 calc(8px * var(--ui-scale)) 0 var(--play-edge),
-    0 calc(12px * var(--ui-scale)) calc(18px * var(--ui-scale)) calc(-10px * var(--ui-scale)) var(--play-glow);
+  box-shadow: 0 calc(8px * var(--ui-scale)) 0 var(--play-edge);
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease,
@@ -1952,9 +2203,7 @@ button.pill.play-btn:active {
   background: var(--play-face);
   color: var(--play-ink);
   transform: translateY(calc(8px * var(--ui-scale)));
-  box-shadow:
-    0 0 0 var(--play-edge),
-    0 calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale)) calc(-8px * var(--ui-scale)) var(--play-glow);
+  box-shadow: 0 0 0 var(--play-edge);
   filter: none;
 }
 
@@ -1998,9 +2247,7 @@ button.pill.smash-btn {
   line-height: 1.1;
   text-transform: uppercase;
   isolation: isolate;
-  box-shadow:
-    0 calc(8px * var(--ui-scale)) 0 var(--loop-edge),
-    0 calc(12px * var(--ui-scale)) calc(18px * var(--ui-scale)) calc(-10px * var(--ui-scale)) var(--loop-glow);
+  box-shadow: 0 calc(8px * var(--ui-scale)) 0 var(--loop-edge);
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease,
@@ -2018,9 +2265,7 @@ button.pill.smash-btn:active {
   background: var(--loop-face);
   color: var(--loop-ink);
   transform: translateY(calc(8px * var(--ui-scale)));
-  box-shadow:
-    0 0 0 var(--loop-edge),
-    0 calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale)) calc(-8px * var(--ui-scale)) var(--loop-glow);
+  box-shadow: 0 0 0 var(--loop-edge);
   filter: none;
 }
 
@@ -2127,11 +2372,11 @@ button.pill.smash-btn.is-on::after {
   }
 
   button.pill.play-btn {
-    box-shadow: 0 12px 18px -10px var(--play-glow);
+    box-shadow: 0 8px 0 var(--play-edge);
   }
 
   button.pill.smash-btn {
-    box-shadow: 0 12px 18px -10px var(--loop-glow);
+    box-shadow: 0 8px 0 var(--loop-edge);
   }
 
   button.pill.play-btn:active,
@@ -2609,16 +2854,16 @@ button.pill.smash-btn.is-on::after {
   background: transparent;
   color: var(--ink-mute);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .section-reset svg {
   width: calc(14px * var(--ui-scale));
   height: calc(14px * var(--ui-scale));
+  transition: transform 0.15s ease;
 }
 
 .section-reset:hover {
-  background: var(--field);
   color: var(--ink);
 }
 
@@ -2737,16 +2982,16 @@ html[data-theme="day"] input[type="text"].field-caption-input:focus {
   border-radius: calc(9999px * var(--ui-scale));
   background: transparent;
   color: var(--ink-mute);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .field-reset svg {
   width: calc(14px * var(--ui-scale));
   height: calc(14px * var(--ui-scale));
+  transition: transform 0.15s ease;
 }
 
 .field-reset:hover {
-  background: var(--field);
   color: var(--ink);
 }
 
@@ -2956,6 +3201,7 @@ html[data-theme="day"] input[type="text"],
 html[data-theme="day"] input[type="number"],
 html[data-theme="day"] input[type="search"],
 html[data-theme="day"] input[type="url"],
+html[data-theme="day"] textarea.slot-live--field,
 html[data-theme="day"] .font-pick-trigger,
 html[data-theme="day"] button.icon-btn,
 html[data-theme="day"] .icon-grid button,
@@ -2969,6 +3215,7 @@ html[data-theme="day"] input[type="text"]:focus,
 html[data-theme="day"] input[type="number"]:focus,
 html[data-theme="day"] input[type="search"]:focus,
 html[data-theme="day"] input[type="url"]:focus,
+html[data-theme="day"] textarea.slot-live--field:focus,
 html[data-theme="day"] .font-pick-trigger:focus-visible {
   background-color: var(--field-hover);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
@@ -3004,6 +3251,10 @@ html[data-theme="day"] select:focus {
 option {
   background: var(--canvas);
   color: var(--ink);
+}
+
+option:disabled {
+  color: var(--ink-mute);
 }
 
 input[type="number"] {
@@ -3166,11 +3417,10 @@ select:focus {
   font-size: calc(14px * var(--ui-scale));
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .font-menu-item__remove:hover {
-  background: var(--field);
   color: var(--ink);
 }
 
@@ -3232,11 +3482,10 @@ select:focus {
   color: var(--ink-mute);
   font-size: calc(14px * var(--ui-scale));
   line-height: 1;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .font-menu-close:hover {
-  background: var(--field);
   color: var(--ink);
 }
 
@@ -3512,7 +3761,7 @@ button {
   cursor: pointer;
 }
 
-button.pill {
+:is(button, a).pill {
   min-height: calc(40px * var(--ui-scale));
   padding: var(--space-0) var(--space-1);
   border: none;
@@ -3526,63 +3775,64 @@ button.pill {
   text-transform: uppercase;
   font-feature-settings: "ss01";
   white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
   transition:
     background 0.15s ease,
     color 0.15s ease,
     transform 0.1s ease;
 }
 
-/* Fun pills — Orby lime glow on hover (Uiverse fuzzy-bullfrog, lime not purple).
-   Skips play/smash/slot-add/panel-util which have their own smash / dashed treatments.
-   :not(.is-on) so selected fills stay visible (rest ≈ primary on night otherwise). */
-button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
-a.pill.about-project__launch {
+/* Fun pills — lime fill on hover, no halo.
+   Opt out: play/smash/slot-add/panel-util, selected .is-on, dialog .pill--commit. */
+button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit, .is-on)),
+a.pill:not(.pill--commit) {
   background: var(--pill-rest-bg);
   color: var(--pill-rest-ink);
-  box-shadow: var(--pill-rest-shadow);
+  box-shadow: none;
   transition: all 0.25s ease;
 }
 
-button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):hover:not(:disabled):not(.is-on),
-a.pill.about-project__launch:hover {
+button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):hover:not(:disabled):not(.is-on),
+a.pill:not(.pill--commit):hover {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
-  box-shadow: var(--pill-fun-glow) 0 7px 29px 0;
+  box-shadow: none;
 }
 
-button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):active:not(:disabled):not(.is-on),
-a.pill.about-project__launch:active {
+button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):active:not(:disabled):not(.is-on),
+a.pill:not(.pill--commit):active {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
-  box-shadow: var(--pill-fun-glow) 0 0 0 0;
+  box-shadow: none;
   transform: translateY(calc(8px * var(--ui-scale)));
   transition: 100ms;
 }
 
 /* Stroked alt — choice groups (aspect, solid/gradient, on/off, export opts).
    Idle = outline; .is-on = solid fill so the active option is obvious. */
-.segment button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
-.export-list button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on) {
+.segment button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit, .is-on)),
+.export-list button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit, .is-on)) {
   background: transparent;
   color: var(--ink);
   border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
   box-shadow: none;
 }
 
-.segment button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):hover:not(:disabled):not(.is-on),
-.export-list button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):hover:not(:disabled):not(.is-on) {
+.segment button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):hover:not(:disabled):not(.is-on),
+.export-list button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):hover:not(:disabled):not(.is-on) {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
   border-color: transparent;
-  box-shadow: var(--pill-fun-glow) 0 7px 29px 0;
+  box-shadow: none;
 }
 
-.segment button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):active:not(:disabled):not(.is-on),
-.export-list button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):active:not(:disabled):not(.is-on) {
+.segment button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):active:not(:disabled):not(.is-on),
+.export-list button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):active:not(:disabled):not(.is-on) {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
   border-color: transparent;
-  box-shadow: var(--pill-fun-glow) 0 0 0 0;
+  box-shadow: none;
   transform: translateY(calc(6px * var(--ui-scale)));
   transition: 100ms;
 }
@@ -3617,6 +3867,24 @@ button.pill.is-on:active {
   transition: 100ms;
 }
 
+button.pill.pill--commit {
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: none;
+}
+
+button.pill.pill--commit:hover:not(:disabled) {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+}
+
+button.pill.pill--commit:active:not(:disabled) {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  transform: translateY(calc(8px * var(--ui-scale)));
+  transition: 100ms;
+}
+
 button.pill.template-pick {
   display: flex;
   align-items: center;
@@ -3634,13 +3902,33 @@ button.pill:disabled:active {
   opacity: 0.4;
   cursor: default;
   transform: none;
-  box-shadow: var(--pill-rest-shadow);
+  box-shadow: none;
 }
 
 button.ghost {
   border-color: transparent;
   background: transparent;
   color: var(--ink-secondary);
+}
+
+/* Canonical circular-icon hover. New icon-only controls must include .icon-hover
+   (button.icon-btn already does). See .cursor/rules/icon-hover.mdc. */
+.icon-hover {
+  display: grid;
+  place-items: center;
+  border-radius: calc(9999px * var(--ui-scale));
+  transition: color 0.15s ease;
+}
+
+.icon-hover > span {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+  transition: transform 0.15s ease;
+}
+
+.icon-hover svg {
+  display: block;
 }
 
 button.icon-btn {
@@ -3655,14 +3943,37 @@ button.icon-btn {
   color: var(--ink);
   font-size: calc(14px * var(--ui-scale));
   font-weight: 400;
-  line-height: 1;
+  line-height: 0;
   transition:
-    background 0.15s ease,
+    color 0.15s ease,
     transform 0.1s ease;
 }
 
-button.icon-btn:hover {
-  background: var(--field-hover);
+button.icon-btn svg {
+  display: block;
+  transition: transform 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .icon-hover:hover:not(:disabled) {
+    color: var(--ink);
+  }
+
+  .icon-hover.is-on:hover:not(:disabled) {
+    color: var(--on-primary);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .icon-hover:hover:not(:disabled) > :is(span, svg),
+  button.icon-btn:hover:not(:disabled) svg,
+  .font-menu-item__remove:hover {
+    transform: scale(1.12);
+  }
+
+  .theme-shelf__x.icon-hover:hover:not(:disabled) svg {
+    transform: rotate(45deg) scale(1.12);
+  }
 }
 
 .slot-head > .icon-btn {
@@ -3687,8 +3998,8 @@ button:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):not(.is-on),
-  a.pill.about-project__launch {
+  button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .is-on)),
+  a.pill {
     transition:
       background 0.15s ease,
       color 0.15s ease,
@@ -3696,8 +4007,9 @@ button:focus-visible,
       box-shadow 0.15s ease;
   }
 
-  button.pill:not(.play-btn):not(.smash-btn):not(.slot-add):not(.panel-util):active:not(:disabled),
-  a.pill.about-project__launch:active {
+  button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util)):active:not(:disabled),
+  button.pill.pill--commit:active:not(:disabled),
+  a.pill:active {
     transform: none;
   }
 }
@@ -4249,11 +4561,10 @@ input.slot-live:focus {
   color: var(--ink-mute);
   font-size: calc(14px * var(--ui-scale));
   line-height: 1;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .color-pop-close:hover {
-  background: var(--field);
   color: var(--ink);
 }
 
@@ -4601,10 +4912,6 @@ html[data-theme="day"] .shape-swatch {
   margin-left: auto;
 }
 
-.pick-now .field-reset:hover {
-  background: var(--field-hover);
-}
-
 .pick-glyph {
   flex: none;
   width: calc(22px * var(--ui-scale));
@@ -4834,6 +5141,7 @@ html[data-theme="day"] .shape-swatch {
   width: calc(14px * var(--ui-scale));
   height: calc(14px * var(--ui-scale));
   transform: rotate(45deg);
+  transition: transform 0.15s ease;
 }
 
 .theme-shelf__tabs {
@@ -4892,17 +5200,6 @@ html[data-theme="day"] .shape-swatch {
 
 .theme-shelf__done {
   width: 100%;
-  min-height: calc(40px * var(--ui-scale));
-  padding: var(--space-0) var(--space-1);
-  border: none;
-  border-radius: calc(9999px * var(--ui-scale));
-  background: var(--field);
-  color: var(--ink);
-  font: inherit;
-  font-size: calc(16px * var(--ui-scale));
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: 0;
 }
 
 .theme-gallery {
@@ -4975,16 +5272,7 @@ html[data-theme="day"] .shape-swatch {
   }
 
   .theme-shelf__x:hover {
-    background: var(--field);
     color: var(--ink);
-  }
-
-  .theme-shelf__done:hover {
-    background: var(--field-hover);
-  }
-
-  .theme-shelf__done:active {
-    background: var(--primary-soft);
   }
 }
 
@@ -5788,6 +6076,7 @@ body.is-exporting .app {
   border-radius: calc(9999px * var(--ui-scale));
   background: transparent;
   color: var(--ink-mute);
+  transition: color 0.15s ease;
 }
 
 .settings-modal__back-icon {
@@ -5795,6 +6084,7 @@ body.is-exporting .app {
   place-items: center;
   width: calc(22.5px * var(--ui-scale));
   height: calc(22.5px * var(--ui-scale));
+  transition: transform 0.15s ease;
 }
 
 .settings-modal__back-icon svg {
@@ -5805,7 +6095,6 @@ body.is-exporting .app {
 
 @media (hover: hover) and (pointer: fine) {
   .settings-modal__back:hover {
-    background: var(--field);
     color: var(--ink);
   }
 }
@@ -5953,7 +6242,6 @@ html[data-theme="day"] .settings-modal__body .keycap {
   /* About is always dark chrome — keep light resting pills even in day theme. */
   --pill-rest-bg: #ffffff;
   --pill-rest-ink: #080808;
-  --pill-rest-shadow: rgb(0 0 0 / 0.08) 0 0 8px;
 }
 
 .about-overlay__scrim {
@@ -6123,15 +6411,7 @@ a.pill.about-project__launch {
   min-height: calc(54px * var(--ui-scale));
   margin: calc(36px * var(--ui-scale)) 0 0;
   padding: var(--space-0) var(--space-2);
-  border: none;
-  border-radius: calc(9999px * var(--ui-scale));
   font-size: calc(15px * var(--ui-scale));
-  font-weight: 500;
-  text-decoration: none;
-  text-transform: uppercase;
-  font-feature-settings: "ss01";
-  white-space: nowrap;
-  cursor: pointer;
 }
 
 .about-overlay__ok {
@@ -6193,7 +6473,7 @@ a.pill.about-project__launch {
 }
 
 .report-card__copy {
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-1);
   color: var(--ink-mute);
   font-size: calc(16px * var(--ui-scale));
   line-height: 1.45;
@@ -6203,26 +6483,27 @@ a.pill.about-project__launch {
   color: inherit;
 }
 
-button.pill.report-card__open {
-  width: 100%;
-  min-height: calc(54px * var(--ui-scale));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(8px * var(--ui-scale));
+.report-card__open {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: calc(16px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.45;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.report-card__plane {
-  display: grid;
-  place-items: center;
-  width: calc(16px * var(--ui-scale));
-  height: calc(16px * var(--ui-scale));
-}
-
-.report-card__plane svg {
-  width: 100%;
-  height: 100%;
-  display: block;
+.report-card__open:hover,
+.report-card__open:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
 }
 
 .bug-report {
@@ -6293,7 +6574,7 @@ button.pill.report-card__open {
 
 @media (hover: hover) and (pointer: fine) {
   .bug-report__x:hover {
-    background: var(--field-hover);
+    color: var(--ink);
   }
 }
 

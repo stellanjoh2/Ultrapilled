@@ -2,12 +2,13 @@ import { backgroundImage, isSvgLogo, paintBackdrop, paintGrid, paintLogo } from 
 import { gradientEnd, gradientLine, gradientPhase, pillGradientStops, pillSweepStops, textGradientFill } from "../pillFill";
 import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
-import { measureTextInk, measureTrackedTextWidth, paintTextInk, textInkGlyphStarts } from "../measure";
+import { measureTextInk, measureTrackedTextWidth, paintTextInk, textFieldPad, textInkGlyphStarts } from "../measure";
 import { peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
 import { chipContributesBloom, applyWhiteBalance, imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags, whiteBalanceGains } from "../chipLook";
 import { textAnimCharPose, textAnimTravel } from "../textAnim";
-import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, grainArithmeticAmount, sanitizeTextMotion, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
+import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, grainArithmeticAmount, isTextField, sanitizeTextMotion, textAlignOf, textFieldLineHeight, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
+import { wrapTextFieldLines } from "../textField";
 
 /** Grayscale stitched fractal — same generator as the live SVG grain filter. */
 const GRAIN_URL =
@@ -34,6 +35,7 @@ export type PaintScene = {
   transparent: boolean;
   /** Soft per-layer shadows only when layout mode is on. */
   layoutMode: boolean;
+  pillPad?: number;
 };
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
@@ -245,6 +247,95 @@ function paintRollingText(
   }
 }
 
+function drawTextField(
+  ctx: CanvasRenderingContext2D,
+  chip: ChipDraw,
+  slot: TextSlot,
+  width: number,
+  height: number,
+  scale: number,
+  bloom: boolean,
+  theme: string[],
+  timeMs = 0,
+  globalPad = 14,
+) {
+  const { ring, bare, shapeGradient, textGradient } = textLookFlags(slot);
+  const radius = chip.radius * scale;
+  if (shapeGradient) {
+    const phase = slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined;
+    drawGradient(
+      ctx,
+      width,
+      height,
+      radius,
+      chip.fill,
+      gradientEnd(theme, slot),
+      slot.gradientAngle,
+      phase,
+      slot.gradientScale,
+    );
+  } else if (!bare && !ring) {
+    round(ctx, width, height, radius);
+    ctx.fillStyle = chip.fill;
+    ctx.fill();
+  }
+  if (ring) {
+    ctx.save();
+    round(ctx, width, height, radius);
+    ctx.clip();
+    round(ctx, width, height, radius);
+    ctx.lineWidth = Math.max(1, slot.stroke) * scale * 2;
+    ctx.strokeStyle = chip.fill;
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (bloom && !bare) return;
+
+  const fontSize = slot.fontSize * scale;
+  const italic = slot.italic ? "italic " : "";
+  const font = `${italic}${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
+  ctx.font = font;
+  ctx.letterSpacing = "0px";
+  ctx.textBaseline = "alphabetic";
+  const pad = textFieldPad(
+    { ...slot, fontSize },
+    width,
+    height,
+    globalPad,
+  );
+  const inner = Math.max(1, width - pad.x * 2);
+  const lineHeight = fontSize * textFieldLineHeight(slot);
+  const align = textAlignOf(slot);
+  ctx.textAlign = align;
+  const x = align === "left" ? pad.x : align === "right" ? width - pad.x : width / 2;
+  const fill = textGradient
+    ? textGradientFill(
+        ctx,
+        width,
+        height,
+        chip.fill,
+        gradientEnd(theme, slot),
+        slot.gradientAngle,
+        slot.gradientScale,
+      )
+    : chip.ink;
+  ctx.fillStyle = fill;
+  const lines = wrapTextFieldLines(slot.text || "", inner, (value) =>
+    measureTrackedTextWidth(value, fontSize, chip.tracking, font),
+  );
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  ctx.clip();
+  let y = pad.y + fontSize * 0.92 + chip.shiftEm * fontSize;
+  for (const line of lines) {
+    if (line) ctx.fillText(line, x, y);
+    y += lineHeight;
+    if (y > height + fontSize) break;
+  }
+  ctx.restore();
+}
+
 function drawText(
   ctx: CanvasRenderingContext2D,
   chip: ChipDraw,
@@ -255,8 +346,13 @@ function drawText(
   bloom: boolean,
   theme: string[],
   timeMs = 0,
+  globalPad = 14,
 ) {
   sanitizeTextMotion(slot);
+  if (isTextField(slot)) {
+    drawTextField(ctx, chip, slot, width, height, scale, bloom, theme, timeMs, globalPad);
+    return;
+  }
   const radius = chip.radius * scale;
   const { ring, bare, shapeGradient: gradient } = textLookFlags(slot);
   if (gradient) {
@@ -379,6 +475,7 @@ function drawChip(
   theme: string[],
   timeMs = 0,
   layoutMode = false,
+  pillPad = 14,
 ) {
   const width = chip.width * scale;
   const height = chip.height * scale;
@@ -397,7 +494,7 @@ function drawChip(
     withDropShadow(ctx, chip, scale, layoutMode, bloom, () => {
       const slot = chip.slot;
       if (slot.kind === "text") {
-        drawText(ctx, chip, slot, width, height, scale, bloom, theme, timeMs);
+        drawText(ctx, chip, slot, width, height, scale, bloom, theme, timeMs, pillPad);
         return;
       }
       if (slot.youtube || slot.video) {
@@ -623,7 +720,7 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
       ctx.save();
       // Bloom is a silhouette pass — keep source-over so blur stays clean.
       if (!bloomPass) ctx.globalCompositeOperation = canvasBlend(blendMode(chip.slot.blend));
-      drawChip(ctx, chip, scale, bloomPass, ready, scene.theme, timeMs, scene.layoutMode);
+      drawChip(ctx, chip, scale, bloomPass, ready, scene.theme, timeMs, scene.layoutMode, scene.pillPad ?? 14);
       ctx.restore();
     }
   };

@@ -76,25 +76,42 @@ export function deleteCustomTemplate(id: string): boolean {
 /** Turn blob: slot images into data URLs so the template survives reload. */
 export async function embedSlotImages(project: PillProject): Promise<PillProject> {
   const state = structuredClone(project.state);
-  await Promise.all(
-    state.slots.map(async (slot) => {
-      if (slot.kind !== "image" || !slot.src?.startsWith("blob:")) return;
-      try {
-        const response = await fetch(slot.src);
-        const blob = await response.blob();
-        slot.src = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (typeof reader.result === "string") resolve(reader.result);
-            else reject(new Error("Could not read image"));
-          };
-          reader.onerror = () => reject(reader.error ?? new Error("Could not read image"));
-          reader.readAsDataURL(blob);
-        });
-      } catch {
-        /* keep blob url — may not restore later */
-      }
-    }),
-  );
-  return { ...project, state };
+  const pages = project.pages.map((page) => structuredClone(page));
+  const cached = new Map<string, string>();
+
+  const embedSrc = async (src: string): Promise<string> => {
+    if (!src.startsWith("blob:")) return src;
+    const hit = cached.get(src);
+    if (hit) return hit;
+    try {
+      const response = await fetch(src);
+      const blob = await response.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") resolve(reader.result);
+          else reject(new Error("Could not read image"));
+        };
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read image"));
+        reader.readAsDataURL(blob);
+      });
+      cached.set(src, dataUrl);
+      return dataUrl;
+    } catch {
+      return src;
+    }
+  };
+
+  const walk = async (slots: AppState["slots"]) => {
+    await Promise.all(
+      slots.map(async (slot) => {
+        if (slot.kind !== "image" || !slot.src) return;
+        slot.src = await embedSrc(slot.src);
+      }),
+    );
+  };
+
+  await walk(state.slots);
+  for (const page of pages) await walk(page.slots);
+  return { ...project, state, pages };
 }

@@ -18,6 +18,7 @@ import { PRIVACY_HREF } from "./privacy";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { mountHeaderLogotype } from "./logotypeLive";
 import { playClick, playNotify } from "./uiSounds";
+import { MODE_SELECT_MOBILE_ASSET_SCALE, modeSelectAssetScale } from "./mobileGate";
 import { compositionScale } from "./uiScale";
 import { createWorld } from "./world";
 import type { AppState } from "./types";
@@ -113,13 +114,7 @@ let previewRunning = false;
 
 /** Cap how long we wait for chips to fall off before forcing teardown. */
 const EXIT_DUMP_MAX_MS = 2800;
-/** Phone landing shrink; desktop uses compositionScale vs 2560×1440. */
-export const MODE_SELECT_MOBILE_ASSET_SCALE = 0.264;
-
-export function modeSelectAssetScale(masterScale: number, mobileGate: boolean, viewW?: number, viewH?: number): number {
-  const view = mobileGate ? MODE_SELECT_MOBILE_ASSET_SCALE : compositionScale(1, viewW, viewH);
-  return masterScale * view;
-}
+export { MODE_SELECT_MOBILE_ASSET_SCALE, modeSelectAssetScale };
 
 function ensureHost(): HTMLElement {
   if (hostEl) return hostEl;

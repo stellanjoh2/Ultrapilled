@@ -79,6 +79,7 @@ function sceneOf(
     post: state.post,
     transparent,
     layoutMode: Boolean(state.physics.layoutMode),
+    pillPad: state.pillPad,
   };
 }
 

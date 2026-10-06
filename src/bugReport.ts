@@ -1,5 +1,4 @@
 import gsap from "gsap";
-import paperPlaneTiltIcon from "@phosphor-icons/core/assets/regular/paper-plane-tilt.svg?raw";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import { PRIVACY_HREF } from "./privacy";
@@ -75,10 +74,7 @@ export function reportCardHtml(): string {
         Spotted something wrong? Use the quick form here. I can’t reply, but I read everything you send.
         See also <a href="${PRIVACY_HREF}">Privacy</a>.
       </p>
-      <button type="button" class="pill is-on report-card__open" data-open-bug-report>
-        <span class="report-card__plane" aria-hidden="true">${paperPlaneTiltIcon}</span>
-        Tell us what happened
-      </button>
+      <button type="button" class="report-card__open" data-open-bug-report>Tell us what happened</button>
     </section>
   `;
 }
@@ -133,7 +129,7 @@ function revealThankYou() {
         <p class="bug-report-thanks__message" id="bug-report-thanks-message">
           ${THANK_YOU_PREFIX}<span class="bug-report-thanks__accent">${THANK_YOU_ACCENT}</span>
         </p>
-        <button type="button" class="pill play-btn bug-report-thanks__ok" data-bug-thanks-dismiss>
+        <button type="button" class="pill pill--commit bug-report-thanks__ok" data-bug-thanks-dismiss>
           ${THANK_YOU_OK}
         </button>
       </div>
@@ -330,8 +326,8 @@ export function openBugReport(): void {
     <div class="bug-report__card">
       <header class="bug-report__head">
         <h2 class="bug-report__title" id="bug-report-title">Report an issue</h2>
-        <button type="button" class="bug-report__x" data-bug-close aria-label="Close" data-tip="Close">
-          ${xIcon}
+        <button type="button" class="bug-report__x icon-hover" data-bug-close aria-label="Close" data-tip="Close">
+          <span aria-hidden="true">${xIcon}</span>
         </button>
       </header>
       <p class="bug-report__lede">
@@ -374,7 +370,7 @@ export function openBugReport(): void {
         <div class="bug-report__actions">
           <button type="button" class="pill" data-bug-close>Cancel</button>
           <span class="bug-report__send-wrap" data-bug-send-wrap>
-            <button type="submit" class="pill is-on" data-bug-send disabled>Send</button>
+            <button type="submit" class="pill pill--commit" data-bug-send disabled>Send</button>
           </span>
         </div>
       </form>

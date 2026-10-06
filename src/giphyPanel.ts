@@ -1,12 +1,13 @@
 import gsap from "gsap";
-import type { ImageRemote } from "./types";
 import {
-  searchUnsplash,
-  unsplashConfigured,
-  unsplashPhotoFile,
-  withUnsplashUtm,
-  type UnsplashPhoto,
-} from "./unsplashApi";
+  GIPHY_HOME,
+  giphyConfigured,
+  giphyGifFile,
+  searchGiphy,
+  trendingGiphy,
+  type GiphyGif,
+} from "./giphyApi";
+import type { ImageRemote } from "./types";
 import { playRemove, playTransition } from "./uiSounds";
 
 let modalRoot: HTMLElement | null = null;
@@ -27,15 +28,11 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
-function formatCount(n: number): string {
-  return n.toLocaleString("en-US");
-}
-
-export function isUnsplashOpen(): boolean {
+export function isGiphyOpen(): boolean {
   return Boolean(modalRoot);
 }
 
-export function closeUnsplash(): void {
+export function closeGiphy(): void {
   if (!modalRoot || closing) return;
   closing = true;
   const root = modalRoot;
@@ -62,39 +59,39 @@ export function closeUnsplash(): void {
   tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
 }
 
-export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRemote) => void }): void {
+export function openGiphyImport(opts: { onPick: (file: File, remote?: ImageRemote) => void }): void {
   if (modalRoot || closing) return;
 
   const root = document.createElement("div");
   root.className = "unsplash-modal";
   root.setAttribute("role", "dialog");
   root.setAttribute("aria-modal", "true");
-  root.setAttribute("aria-labelledby", "unsplash-modal-title");
+  root.setAttribute("aria-labelledby", "giphy-modal-title");
   root.innerHTML = `
-    <div class="unsplash-modal__scrim" data-unsplash-close></div>
+    <div class="unsplash-modal__scrim" data-giphy-close></div>
     <div class="unsplash-modal__card">
       <header class="unsplash-modal__head">
-        <h2 class="unsplash-modal__title" id="unsplash-modal-title">Import from Unsplash</h2>
-        <button type="button" class="unsplash-modal__x icon-hover" data-unsplash-close aria-label="Close">
+        <h2 class="unsplash-modal__title" id="giphy-modal-title">Add from Giphy</h2>
+        <button type="button" class="unsplash-modal__x icon-hover" data-giphy-close aria-label="Close">
           <span aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.7 13 11l5.3 5.3-1.4 1.4L11.6 12.4 6.3 17.7 4.9 16.3 10.2 11 4.9 5.7 6.3 4.3l5.3 5.3 5.3-5.3z"/></svg></span>
         </button>
       </header>
       <div class="unsplash-modal__body">
-        <label class="field unsplash-modal__search">Search Unsplash
-          <input type="search" data-unsplash-query placeholder="mountains, neon, portrait…" autocomplete="off" />
+        <label class="field unsplash-modal__search">Search Giphy
+          <input type="search" data-giphy-query placeholder="cats, wow, dance…" autocomplete="off" />
         </label>
-        <p class="unsplash-modal__status" data-unsplash-status hidden></p>
-        <div class="unsplash-grid" data-unsplash-grid></div>
-        <div class="unsplash-modal__more" data-unsplash-more hidden>
-          <button type="button" class="pill pill--commit unsplash-modal__more-btn" data-unsplash-load-more>
-            Show more photos
+        <p class="unsplash-modal__status" data-giphy-status hidden></p>
+        <div class="unsplash-grid" data-giphy-grid></div>
+        <div class="unsplash-modal__more" data-giphy-more hidden>
+          <button type="button" class="pill pill--commit unsplash-modal__more-btn" data-giphy-load-more>
+            Show more GIFs
           </button>
         </div>
       </div>
       <footer class="unsplash-modal__foot">
         <p class="unsplash-modal__credit">
-          Photos from
-          <a href="${withUnsplashUtm("https://unsplash.com")}" target="_blank" rel="noopener noreferrer">Unsplash</a>
+          Powered by
+          <a href="${GIPHY_HOME}" target="_blank" rel="noopener noreferrer">GIPHY</a>
         </p>
       </footer>
     </div>
@@ -102,11 +99,11 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
 
   const scrim = root.querySelector<HTMLElement>(".unsplash-modal__scrim")!;
   const card = root.querySelector<HTMLElement>(".unsplash-modal__card")!;
-  const input = root.querySelector<HTMLInputElement>("[data-unsplash-query]")!;
-  const status = root.querySelector<HTMLElement>("[data-unsplash-status]")!;
-  const grid = root.querySelector<HTMLElement>("[data-unsplash-grid]")!;
-  const moreWrap = root.querySelector<HTMLElement>("[data-unsplash-more]")!;
-  const moreBtn = root.querySelector<HTMLButtonElement>("[data-unsplash-load-more]")!;
+  const input = root.querySelector<HTMLInputElement>("[data-giphy-query]")!;
+  const status = root.querySelector<HTMLElement>("[data-giphy-status]")!;
+  const grid = root.querySelector<HTMLElement>("[data-giphy-grid]")!;
+  const moreWrap = root.querySelector<HTMLElement>("[data-giphy-more]")!;
+  const moreBtn = root.querySelector<HTMLButtonElement>("[data-giphy-load-more]")!;
 
   let activeQuery = "";
   let page = 0;
@@ -125,34 +122,35 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
     const hasMore = page > 0 && page < totalPages;
     moreWrap.hidden = !hasMore;
     moreBtn.disabled = loadingMore;
-    moreBtn.textContent = loadingMore ? "Loading…" : "Show more photos";
+    moreBtn.textContent = loadingMore ? "Loading…" : "Show more GIFs";
   };
 
   const resultStatus = () => {
-    if (!loaded) return "No photos found.";
+    if (!loaded) return "No GIFs found.";
+    const kind = activeQuery ? "GIFs" : "trending GIFs";
     if (total > loaded) {
-      return `Showing ${formatCount(loaded)} of ${formatCount(total)} photos`;
+      return `Showing ${loaded.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} ${kind}`;
     }
-    return `${formatCount(loaded)} photos`;
+    return `${loaded.toLocaleString("en-US")} ${kind}`;
   };
 
-  const appendPhotos = (photos: UnsplashPhoto[]) => {
-    for (const photo of photos) {
-      if (seen.has(photo.id)) continue;
-      seen.add(photo.id);
+  const appendGifs = (gifs: GiphyGif[]) => {
+    for (const gif of gifs) {
+      if (seen.has(gif.id)) continue;
+      seen.add(gif.id);
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "unsplash-grid__item";
-      btn.title = `${photo.alt} — ${photo.photographer}`;
+      btn.title = `${gif.alt} — ${gif.username}`;
       btn.innerHTML = `
-        <img src="${photo.thumb}" alt="" loading="lazy" draggable="false" />
+        <img src="${gif.thumb}" alt="" loading="lazy" draggable="false" />
         <span class="unsplash-grid__by">
-          <a href="${photo.profileUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(photo.photographer)}</a>
+          <a href="${gif.profileUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(gif.username)}</a>
         </span>
       `;
       btn.querySelector("a")?.addEventListener("click", (event) => event.stopPropagation());
       btn.addEventListener("click", () => {
-        void pickPhoto(photo, btn);
+        void pickGif(gif, btn);
       });
       grid.append(btn);
     }
@@ -171,22 +169,22 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
     updateMore();
   };
 
-  const pickPhoto = async (photo: UnsplashPhoto, btn: HTMLButtonElement) => {
+  const pickGif = async (gif: GiphyGif, btn: HTMLButtonElement) => {
     if (btn.classList.contains("is-busy")) return;
     btn.classList.add("is-busy");
     setStatus("Importing…");
     try {
-      const file = await unsplashPhotoFile(photo);
-      closeUnsplash();
-      opts.onPick(file, { kind: "unsplash", id: photo.id });
+      const file = await giphyGifFile(gif);
+      closeGiphy();
+      opts.onPick(file, { kind: "giphy", id: gif.id });
     } catch {
       btn.classList.remove("is-busy");
-      setStatus("Couldn’t import that photo. Try another.");
+      setStatus("Couldn’t import that GIF. Try another.");
       updateMore();
     }
   };
 
-  const applyPage = (next: Awaited<ReturnType<typeof searchUnsplash>>, replace: boolean) => {
+  const applyPage = (next: Awaited<ReturnType<typeof searchGiphy>>, replace: boolean) => {
     if (replace) {
       grid.replaceChildren();
       seen.clear();
@@ -194,7 +192,7 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
     page = next.page;
     total = next.total;
     totalPages = next.totalPages;
-    appendPhotos(next.photos);
+    appendGifs(next.gifs);
     if (loaded) card.classList.add("has-results");
     else card.classList.remove("has-results");
     setStatus(resultStatus());
@@ -204,33 +202,31 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
   const failSearch = (err: unknown) => {
     resetResults();
     const msg = err instanceof Error ? err.message : "";
-    if (/401|invalid|Unauthorized/i.test(msg)) {
-      setStatus("Invalid Access Key — re-paste it in .env and restart.");
-    } else if (/403|rate/i.test(msg)) {
+    if (/401|403|invalid|Unauthorized/i.test(msg)) {
+      setStatus("Invalid API key — re-paste it in .env and restart.");
+    } else if (/429|rate/i.test(msg)) {
       setStatus("Rate limit hit — try again in a bit.");
     } else {
-      setStatus("Search failed. Check your Access Key / rate limit.");
+      setStatus("Search failed. Check your API key / rate limit.");
     }
   };
+
+  const fetchPage = (query: string, nextPage: number) =>
+    query ? searchGiphy(query, nextPage) : trendingGiphy(nextPage);
 
   const runSearch = (query: string) => {
     const q = query.trim();
     const gen = ++searchGen;
     activeQuery = q;
-    if (!q) {
-      resetResults();
-      setStatus("");
-      return;
-    }
     loadingMore = false;
-    setStatus("Searching…");
+    setStatus(q ? "Searching…" : "Loading trending…");
     updateMore();
-    void searchUnsplash(q, 1)
+    void fetchPage(q, 1)
       .then((next) => {
         if (gen !== searchGen) return;
-        if (!next.photos.length) {
+        if (!next.gifs.length) {
           resetResults();
-          setStatus("No photos found.");
+          setStatus("No GIFs found.");
           return;
         }
         applyPage(next, true);
@@ -242,11 +238,11 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
   };
 
   const loadMore = () => {
-    if (!activeQuery || loadingMore || page >= totalPages) return;
+    if (loadingMore || page >= totalPages) return;
     const gen = searchGen;
     loadingMore = true;
     updateMore();
-    void searchUnsplash(activeQuery, page + 1)
+    void fetchPage(activeQuery, page + 1)
       .then((next) => {
         if (gen !== searchGen) return;
         loadingMore = false;
@@ -258,22 +254,22 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
         loadingMore = false;
         updateMore();
         const msg = err instanceof Error ? err.message : "";
-        if (/403|rate/i.test(msg)) setStatus("Rate limit hit — try again in a bit.");
-        else setStatus("Couldn’t load more photos.");
+        if (/429|rate/i.test(msg)) setStatus("Rate limit hit — try again in a bit.");
+        else setStatus("Couldn’t load more GIFs.");
       });
   };
 
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    if (target.closest("[data-unsplash-close]")) closeUnsplash();
-    if (target.closest("[data-unsplash-load-more]")) loadMore();
+    if (target.closest("[data-giphy-close]")) closeGiphy();
+    if (target.closest("[data-giphy-load-more]")) loadMore();
   });
 
   onKey = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      closeUnsplash();
+      closeGiphy();
     }
   };
   window.addEventListener("keydown", onKey);
@@ -287,18 +283,17 @@ export function openUnsplashImport(opts: { onPick: (file: File, remote?: ImageRe
   modalRoot = root;
   playTransition(true);
 
-  if (!unsplashConfigured()) {
+  if (!giphyConfigured()) {
     input.disabled = true;
     setStatus(
       import.meta.env.DEV
-        ? "Add VITE_UNSPLASH_ACCESS_KEY to .env and restart the dev server."
-        : "Unsplash search isn’t configured for this build.",
+        ? "Add VITE_GIPHY_API_KEY to .env and restart the dev server."
+        : "Giphy search isn’t configured for this build.",
     );
   } else {
-    setStatus("");
+    runSearch("");
   }
 
-  // Focus after the card is visible — gsap autoAlpha:0 would otherwise drop focus.
   const focusSearch = () => {
     if (!modalRoot || input.disabled) return;
     input.focus({ preventScroll: true });

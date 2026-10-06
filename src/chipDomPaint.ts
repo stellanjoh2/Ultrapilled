@@ -1,7 +1,7 @@
 import { EMOJI_FONT } from "./emojis";
 import { isColorMask } from "./chipKinds";
 import { chipContributesBloom, imageRasterFilter, rasterRing, textLookFlags } from "./chipLook";
-import { measureTextFontAscent, measureTextInk, paintTextInk, textInkGlyphStarts } from "./measure";
+import { measureTextFontAscent, measureTextInk, paintTextInk, textFieldPad, textInkGlyphStarts } from "./measure";
 import { gradientAngleOf, gradientPeriodMs, pillGradient, pillSweepBand, sweepBandMetrics, textGradientFill, textSweepImage, textSweepShift } from "./pillFill";
 import {
   applyBareCanvasTextAnim,
@@ -13,7 +13,7 @@ import {
 } from "./textAnim";
 import { inkOn } from "./theme";
 import { peekTrim } from "./trim";
-import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, sanitizeTextMotion, type Slot, type TextSlot } from "./types";
+import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, isTextField, sanitizeTextMotion, textAlignOf, textFieldLineHeight, type Slot, type TextSlot } from "./types";
 import { armYouTubeLoop, clearYouTubeLoop, youtubeEmbedKey, youtubeEmbedSrc } from "./youtube";
 
 export function paintSweepBand(
@@ -440,6 +440,118 @@ export function textLabel(el: HTMLElement, editing: boolean): HTMLElement {
   return label;
 }
 
+function paintTextField(
+  el: HTMLElement,
+  slot: TextSlot,
+  width: number,
+  height: number,
+  radius: number,
+  fill: string,
+  ink: string,
+  tracking: number,
+  bloom: boolean,
+  shiftEm: number,
+  gradientTo: string,
+  editing: boolean,
+  globalPad: number,
+) {
+  const { ring, bare, shapeGradient, textGradient: wantsTextGradient } = textLookFlags(slot);
+  const textGradient = wantsTextGradient && Boolean(gradientTo);
+  const hideText = bloom && !bare;
+  const liveEdit = editing && !bloom;
+  el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video");
+  el.classList.add("chip-text-field");
+  el.classList.toggle("chip-bare", bare || ring);
+  el.classList.toggle("is-editing", liveEdit);
+  if (bare || ring || shapeGradient) {
+    el.style.background = "transparent";
+    el.style.backgroundColor = "transparent";
+  } else {
+    el.style.backgroundImage = "none";
+    el.style.backgroundColor = fill;
+  }
+  el.style.border = "none";
+  el.style.color = hideText ? fill : ink;
+  el.style.fontFamily = `"${slot.fontFamily}", sans-serif`;
+  el.style.fontWeight = String(slot.fontWeight);
+  el.style.fontStyle = slot.italic ? "italic" : "normal";
+  el.style.fontSize = `${slot.fontSize}px`;
+  el.style.letterSpacing = `${tracking}em`;
+  stopBareCanvasTextAnimIn(el);
+  stopTextAnimIn(el);
+  el.querySelector(":scope > canvas")?.remove();
+
+  const label = textLabel(el, liveEdit);
+  if (label.parentElement !== el) mountLookChild(el, label);
+  for (const child of [...el.children]) {
+    if (
+      child === label ||
+      child.classList.contains("chip-fill") ||
+      child.classList.contains("chip-ring") ||
+      isChipChrome(child)
+    ) {
+      continue;
+    }
+    child.remove();
+  }
+  if (bare) {
+    el.querySelector(":scope > .chip-fill")?.remove();
+    el.querySelector(":scope > .chip-ring")?.remove();
+    el.style.boxShadow = "none";
+  } else {
+    paintFill(
+      el,
+      shapeGradient,
+      fill,
+      gradientTo || fill,
+      width,
+      height,
+      radius,
+      slot.gradientAngle,
+      slot.gradientScale,
+      Boolean(slot.animatedGradient),
+      slot.gradientSpeed,
+    );
+    paintStroke(el, ring, shapeGradient, slot.stroke, fill, label);
+  }
+  const pad = textFieldPad(slot, width, height, globalPad);
+  label.style.whiteSpace = "pre-wrap";
+  label.style.overflowWrap = "anywhere";
+  label.style.wordBreak = "break-word";
+  label.style.lineHeight = String(textFieldLineHeight(slot));
+  label.style.width = "100%";
+  label.style.height = "100%";
+  label.style.boxSizing = "border-box";
+  label.style.padding = `${pad.y}px ${pad.x}px`;
+  label.style.textAlign = textAlignOf(slot);
+  label.style.overflow = "hidden";
+  label.style.transform = `translateY(${shiftEm}em)`;
+  if (!liveEdit) {
+    if (hideText) label.textContent = "";
+    else label.textContent = slot.text || "";
+    if (textGradient && !hideText) {
+      paintBareTextCss(
+        label,
+        fill,
+        gradientTo,
+        slot.gradientAngle,
+        slot.gradientScale,
+        Boolean(slot.animatedGradient),
+        slot.gradientSpeed,
+        width,
+        height,
+      );
+      el.style.color = "transparent";
+    } else {
+      paintBareTextCss(label, "", "");
+    }
+  } else {
+    paintBareTextCss(label, "", "");
+    if (textGradient) el.style.color = fill;
+    label.style.caretColor = textGradient ? fill : ink;
+  }
+}
+
 /** Selection chrome that must survive look repaints so color/invert can CSS-fade. */
 export function isChipChrome(node: Element): boolean {
   return (
@@ -493,6 +605,7 @@ export function applyVisual(
   shiftEm = 0,
   gradientTo = "",
   editing = false,
+  globalPad = 14,
 ) {
   el.style.width = `${width}px`;
   el.style.height = `${height}px`;
@@ -502,7 +615,7 @@ export function applyVisual(
 
   // Bloom silhouette: skip near-black fills so dark shapes stay hard-edged.
   if (bloom && !chipContributesBloom(slot, fill, ink, gradientTo)) {
-    el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video", "chip-bare", "is-editing");
+    el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video", "chip-bare", "chip-text-field", "is-editing");
     el.style.background = "transparent";
     el.style.backgroundColor = "transparent";
     el.style.backgroundImage = "none";
@@ -522,6 +635,10 @@ export function applyVisual(
 
   if (slot.kind === "text") {
     sanitizeTextMotion(slot);
+    if (isTextField(slot)) {
+      paintTextField(el, slot, width, height, radius, fill, ink, tracking, bloom, shiftEm, gradientTo, editing, globalPad);
+      return;
+    }
     const { ring, bare, shapeGradient, textGradient: wantsTextGradient } = textLookFlags(slot);
     const textGradient = wantsTextGradient && Boolean(gradientTo);
     const hideText = bloom && !bare;
@@ -533,7 +650,7 @@ export function applyVisual(
       (Boolean(slot.textAnim) && !bare) ||
       (textGradient && liveEdit) ||
       (textGradient && Boolean(slot.animatedGradient) && !slot.textAnim);
-    el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video");
+    el.classList.remove("chip-image", "chip-emoji", "chip-youtube", "chip-video", "chip-text-field");
     el.classList.toggle("chip-bare", bare || ring);
     el.classList.toggle("is-editing", liveEdit);
     if (bare || ring || shapeGradient) {
@@ -547,6 +664,7 @@ export function applyVisual(
     el.style.border = "none";
     el.style.fontFamily = `"${slot.fontFamily}", sans-serif`;
     el.style.fontWeight = String(slot.fontWeight);
+    el.style.fontStyle = "normal";
     el.style.fontSize = `${slot.fontSize}px`;
     el.style.letterSpacing = `${tracking}em`;
 
@@ -711,7 +829,7 @@ export function applyVisual(
     return;
   }
 
-  el.classList.remove("is-editing");
+  el.classList.remove("is-editing", "chip-text-field");
 
   el.style.border = "none";
   el.style.boxShadow = "none";

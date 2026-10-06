@@ -1,4 +1,10 @@
 import { backgroundPaint } from "./background";
+import {
+  isMobileAccessGate,
+  MOBILE_ACCESS_GATE_QUERY,
+  MODE_SELECT_MOBILE_ASSET_SCALE,
+  modeSelectAssetScale,
+} from "./mobileGate";
 import { createPlaySession } from "./playSession";
 import { notFoundPreviewState } from "./modeSelectTheme";
 import { compositionScale } from "./uiScale";
@@ -6,9 +12,34 @@ import { createWorld } from "./world";
 import "./style.css";
 import "./notFoundPage.css";
 
-const HEADLINE = "Oops, I guess you fell out from the main experience";
 /** Same-origin home (ultrapilled.com in production). */
 const HOME_HREF = "/";
+
+function fillHeadline(el: Element, mobile: boolean) {
+  const words = ["Well", "that", "didn't", "land", "right"];
+  if (!mobile) {
+    el.textContent = words.join(" ");
+    return;
+  }
+  el.replaceChildren();
+  words.forEach((word, index) => {
+    const span = document.createElement("span");
+    span.className = "mode-select__word";
+    span.textContent = word;
+    el.append(span);
+    if (index < words.length - 1) el.append(document.createTextNode(" "));
+  });
+}
+
+function syncNotFoundMobile(host: HTMLElement) {
+  const mobile = isMobileAccessGate();
+  const wasMobile = host.classList.contains("is-mobile");
+  host.classList.toggle("is-mobile", mobile);
+  const headline = host.querySelector(".not-found__headline");
+  if (!headline) return;
+  if (wasMobile === mobile && headline.textContent) return;
+  fillHeadline(headline, mobile);
+}
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -75,9 +106,10 @@ function warmNotFoundPreview(host: HTMLElement, state: ReturnType<typeof notFoun
   const repeat = true;
 
   const previewScale = () => {
-    const view = compositionScale(1);
+    const mobile = isMobileAccessGate();
+    const view = mobile ? MODE_SELECT_MOBILE_ASSET_SCALE : compositionScale(1);
     world.setSimulationScale(view);
-    return state.masterScale * view;
+    return modeSelectAssetScale(state.masterScale, mobile);
   };
 
   const session = createPlaySession({
@@ -123,6 +155,7 @@ function warmNotFoundPreview(host: HTMLElement, state: ReturnType<typeof notFoun
 
   const onResize = () => {
     if (!alive) return;
+    syncNotFoundMobile(host);
     const w = playfield.clientWidth;
     const h = playfield.clientHeight;
     if (w < 8 || h < 8) return;
@@ -140,6 +173,8 @@ function warmNotFoundPreview(host: HTMLElement, state: ReturnType<typeof notFoun
     );
   };
   window.addEventListener("resize", onResize);
+  const gateMq = typeof matchMedia === "function" ? matchMedia(MOBILE_ACCESS_GATE_QUERY) : null;
+  gateMq?.addEventListener("change", onResize);
 
   requestAnimationFrame(session.frame);
   session.setRunning(true);
@@ -147,6 +182,7 @@ function warmNotFoundPreview(host: HTMLElement, state: ReturnType<typeof notFoun
   return () => {
     alive = false;
     window.removeEventListener("resize", onResize);
+    gateMq?.removeEventListener("change", onResize);
     session.setRunning(false);
     world.destroy();
   };
@@ -156,10 +192,11 @@ function mountOverlay(host: HTMLElement) {
   const overlay = document.createElement("div");
   overlay.className = "not-found__overlay";
   overlay.innerHTML = `
-    <h1 class="not-found__headline">${HEADLINE}</h1>
+    <h1 class="not-found__headline"></h1>
     <a class="pill not-found__home" href="${HOME_HREF}">Go back to ultrapilled.com</a>
   `;
   host.append(overlay);
+  syncNotFoundMobile(host);
 }
 
 function boot() {
@@ -168,11 +205,15 @@ function boot() {
 
   const host = document.createElement("div");
   host.className = "not-found-host";
+  syncNotFoundMobile(host);
   root.append(host);
 
   const state = notFoundPreviewState();
   warmNotFoundPreview(host, state);
   mountOverlay(host);
+
+  const gateMq = typeof matchMedia === "function" ? matchMedia(MOBILE_ACCESS_GATE_QUERY) : null;
+  gateMq?.addEventListener("change", () => syncNotFoundMobile(host));
 }
 
 boot();

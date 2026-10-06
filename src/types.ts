@@ -59,10 +59,61 @@ export type TextSlot = {
   /** Shadow ink. Unset keeps black. */
   dropShadowColor?: string;
   scale: number;
+  /** Wrapping paragraph box (no pill). Independent of single-word chips. */
+  textField?: boolean;
+  /** Unscaled box width. Used when `textField` is set. */
+  boxW?: number;
+  /** Unscaled box height. Used when `textField` is set. */
+  boxH?: number;
+  align?: TextAlign;
+  italic?: boolean;
+  /** 0–100. Line box for wrapping text fields. Unset keeps the default. */
+  lineHeight?: number;
 };
+
+export type TextAlign = "left" | "center" | "right";
+
+export const DEFAULT_TEXT_FIELD_W = 260;
+export const DEFAULT_TEXT_FIELD_H = 140;
+export const TEXT_FIELD_WORD_MAX = 250;
+export const TEXT_FIELD_BOX_MIN = 48;
+export const TEXT_FIELD_STARTER = "Paste or write your text...";
+export const TEXT_FIELD_LINE_HEIGHT_SLIDER = 50;
+
+export function isTextField(slot: Slot | null | undefined): slot is TextSlot & { textField: true } {
+  return Boolean(slot && slot.kind === "text" && slot.textField);
+}
+
+export function lineHeightSliderOf(slot: Pick<TextSlot, "lineHeight">): number {
+  const n = slot.lineHeight ?? TEXT_FIELD_LINE_HEIGHT_SLIDER;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/** CSS / canvas line-height. Slider 50 matches the previous 1.3 default. */
+export function textFieldLineHeight(slot: Pick<TextSlot, "lineHeight">): number {
+  return 0.8 + lineHeightSliderOf(slot) / 100;
+}
+
+export function textAlignOf(slot: Pick<TextSlot, "align">): TextAlign {
+  return slot.align === "center" || slot.align === "right" ? slot.align : "left";
+}
+
+export function textFieldBoxW(slot: Pick<TextSlot, "boxW">): number {
+  return Math.max(TEXT_FIELD_BOX_MIN, slot.boxW ?? DEFAULT_TEXT_FIELD_W);
+}
+
+export function textFieldBoxH(slot: Pick<TextSlot, "boxH">): number {
+  return Math.max(TEXT_FIELD_BOX_MIN, slot.boxH ?? DEFAULT_TEXT_FIELD_H);
+}
 
 /** Letter-cycle and animated gradient fight over the same DOM — keep only one. */
 export function sanitizeTextMotion(slot: TextSlot) {
+  if (slot.textField) {
+    slot.textAnim = undefined;
+    if (slot.shape === "pill") slot.shape = "box";
+  } else {
+    slot.lineHeight = undefined;
+  }
   if (slot.textAnim && slot.animatedGradient) slot.animatedGradient = undefined;
 }
 
@@ -128,6 +179,13 @@ export type ImageSlot = {
   youtube?: YouTubeClip;
   /** Local muted autoplay video (mp4). When set, `src` / emoji / youtube are unused. */
   video?: LocalVideo;
+  /** Unsplash / Giphy identity so blob URLs can be re-fetched after reconnect. */
+  remote?: ImageRemote;
+};
+
+export type ImageRemote = {
+  kind: "unsplash" | "giphy";
+  id: string;
 };
 
 /** Uploaded mp4 clip on the canvas. */
@@ -543,6 +601,21 @@ export function defaultTextSlot(partial: Partial<TextSlot> = {}): TextSlot {
 /** Free-standing type — no holding pill/box, ink-tight physics. */
 export function defaultTypeSlot(partial: Partial<TextSlot> = {}): TextSlot {
   return defaultTextSlot({ text: "TEXT", shape: "none", ...partial });
+}
+
+/** Wrapping text box. Size is the field, not the glyph ink. */
+export function defaultTextFieldSlot(partial: Partial<TextSlot> = {}): TextSlot {
+  return defaultTypeSlot({
+    text: TEXT_FIELD_STARTER,
+    textField: true,
+    fontSize: 18,
+    fontWeight: 400,
+    boxW: DEFAULT_TEXT_FIELD_W,
+    boxH: DEFAULT_TEXT_FIELD_H,
+    align: "left",
+    lineHeight: TEXT_FIELD_LINE_HEIGHT_SLIDER,
+    ...partial,
+  });
 }
 
 export function defaultImageSlot(partial: Partial<ImageSlot> = {}): ImageSlot {

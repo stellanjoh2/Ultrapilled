@@ -1,6 +1,6 @@
 import { measureEmojiBox } from "./emojis";
 import { peekTrim } from "./trim";
-import type { ImageSlot, Slot, TextSlot } from "./types";
+import { isTextField, textFieldBoxH, textFieldBoxW, type ImageSlot, type Slot, type TextSlot } from "./types";
 
 export type ChipSize = { width: number; height: number };
 
@@ -50,6 +50,27 @@ export function pillPadOf(slot: Slot, globalPad: number): number {
 /** A word's own tracking, or the global slider while it still follows that. */
 export function trackingOf(slot: Slot, globalTracking: number): number {
   return slot.kind === "text" && slot.tracking != null ? slot.tracking : globalTracking;
+}
+
+/** Inset for wrapped copy inside a text field (shape padding when a holding shape is on). */
+export function textFieldPad(
+  slot: TextSlot,
+  width: number,
+  height: number,
+  globalPad = 14,
+): { x: number; y: number } {
+  if (slot.shape === "none") {
+    const p = Math.max(2, slot.fontSize * 0.12);
+    return { x: p, y: p };
+  }
+  const pad = pillPadOf(slot, globalPad) / 50;
+  const y = Math.max(4, Math.round(slot.fontSize * 0.45 * pad));
+  let x = Math.max(y, Math.round(slot.fontSize * 0.85 * pad), 4);
+  if (slot.shape === "pill") x = Math.max(x, Math.round(Math.min(width, height) * 0.22));
+  return {
+    x: Math.max(2, Math.min(x, width / 2 - 2)),
+    y: Math.max(2, Math.min(y, height / 2 - 2)),
+  };
 }
 
 /** 50 is optically centered. Higher lifts the glyphs. */
@@ -129,6 +150,7 @@ export function measureTextInk(slot: TextSlot, tracking = 0.02): TextInk {
  * Use while typing so glyphs / caret aren't clipped by the chip box.
  */
 export function measureTextEditSize(slot: TextSlot, pad = 1, tracking = 0.02): ChipSize {
+  if (isTextField(slot)) return measureTextSlot(slot, pad, tracking);
   const caret = Math.max(2, Math.ceil(slot.fontSize * 0.08));
   if (slot.shape !== "none") {
     const base = measureTextSlot(slot, pad, tracking);
@@ -297,6 +319,12 @@ function measureLineWidth(text: string, fontSize: number, tracking: number): num
 }
 
 export function measureTextSlot(slot: TextSlot, pad = 1, tracking = 0.02): ChipSize {
+  if (isTextField(slot)) {
+    return {
+      width: Math.ceil(textFieldBoxW(slot)),
+      height: Math.ceil(textFieldBoxH(slot)),
+    };
+  }
   if (slot.shape === "none") {
     // Keep physics / selection on the ink AABB — letter travel clips in CSS, not by padding the chip.
     return measureTextInk(slot, tracking);
@@ -359,12 +387,17 @@ export function measureSlot(slot: Slot, pad = 1, tracking = 0.02): ChipSize {
 export function scaleSlot(slot: Slot, scale: number): Slot {
   const factor = scale * slot.scale;
   if (slot.kind === "text") {
-    return {
+    const next: TextSlot = {
       ...slot,
       fontSize: slot.fontSize * factor,
       radius: slot.radius * factor,
       stroke: slot.stroke * factor,
     };
+    if (isTextField(slot)) {
+      next.boxW = textFieldBoxW(slot) * factor;
+      next.boxH = textFieldBoxH(slot) * factor;
+    }
+    return next;
   }
   return {
     ...slot,

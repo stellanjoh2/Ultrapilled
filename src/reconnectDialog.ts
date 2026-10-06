@@ -24,7 +24,7 @@ export function askReconnect(): Promise<boolean> {
         </p>
         <div class="reconnect__actions">
           <button type="button" class="pill" data-reconnect="abandon">New Project</button>
-          <button type="button" class="pill is-on" data-reconnect="restore" autofocus>Reconnect</button>
+          <button type="button" class="pill pill--commit" data-reconnect="restore" autofocus>Reconnect</button>
         </div>
       </div>
     `;

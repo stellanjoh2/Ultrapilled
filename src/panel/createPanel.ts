@@ -3,6 +3,7 @@ import bugIcon from "@phosphor-icons/core/assets/regular/bug.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
+import textT from "@phosphor-icons/core/assets/regular/text-t.svg?raw";
 import { isCanvasRatio } from "../canvas";
 import { openAbout } from "../aboutPanel";
 import { openBugReport } from "../bugReport";
@@ -60,6 +61,7 @@ export type CreatePanelHost = SlotCardHost & {
   applySlotOrder(visualIds: string[]): void;
   addPillSlot(): void;
   addTypeSlot(): void;
+  addTextFieldSlot(): void;
   addShapeSlot(): void;
   addEmojiSlot(): void;
   pickImageFiles(multiple?: boolean): Promise<File[]>;
@@ -130,7 +132,7 @@ function sectionMarkupImpl(
   const open = openSections.has(id);
   const reset =
     options?.resetId && options.resetLabel && options.resetTip
-      ? `<button type="button" class="section-reset" id="${options.resetId}" aria-label="${options.resetLabel}" data-tip="${options.resetTip}"${options.dirty === false ? " hidden" : ""}>${RESET_ICON}</button>`
+      ? `<button type="button" class="section-reset icon-hover" id="${options.resetId}" aria-label="${options.resetLabel}" data-tip="${options.resetTip}"${options.dirty === false ? " hidden" : ""}>${RESET_ICON}</button>`
       : "";
   const domId = options?.sectionId ? ` id="${options.sectionId}"` : "";
   return `
@@ -214,7 +216,7 @@ panel.innerHTML = `
   <section class="section">
     <div class="templates-head">
       <h2 data-tip="Start empty or from a ready-made scene">Templates</h2>
-      <button type="button" class="section-reset" id="save-template" aria-label="Save theme" data-tip="Save the current scene as a custom template">${floppyDisk}</button>
+      <button type="button" class="section-reset icon-hover" id="save-template" aria-label="Save theme" data-tip="Save the current scene as a custom template">${floppyDisk}</button>
     </div>
     <div class="segment" role="group" aria-label="Templates">
       <button type="button" class="pill${H.state.template === "blank" ? " is-on" : ""}" id="template-blank" aria-pressed="${H.state.template === "blank"}" data-tip="Start from an empty canvas">Blank</button>
@@ -287,9 +289,13 @@ panel.innerHTML = `
         <span class="slot-add__icon" aria-hidden="true">${plus}</span>
         Add pill
       </button>
-      <button type="button" class="pill slot-add" id="add-type" data-tip="Add bare text without a pill shape">
+      <button type="button" class="pill slot-add" id="add-type" data-tip="Add a short word without a pill shape">
         <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-        Add text
+        Add word
+      </button>
+      <button type="button" class="pill slot-add" id="add-text-field" data-tip="Add a wrapping text box you can resize and paste into">
+        <span class="slot-add__icon" aria-hidden="true">${textT}</span>
+        Add Text
       </button>
       <button type="button" class="pill slot-add" id="add-shape" data-tip="Add a built-in shape from the library">
         <span class="slot-add__icon" aria-hidden="true">${plus}</span>
@@ -491,7 +497,8 @@ for (const slot of H.state.slots.slice().reverse()) slotStack.append(renderSlotC
 bindSlotDrag(slotStack, panel, H.applySlotOrder);
 
 panel.querySelector("#add-text")?.addEventListener("click", () => H.addPillSlot());
-panel.querySelector("#add-type")?.addEventListener("click", () => H.addTypeSlot());
+  panel.querySelector("#add-type")?.addEventListener("click", () => H.addTypeSlot());
+  panel.querySelector("#add-text-field")?.addEventListener("click", () => H.addTextFieldSlot());
 panel.querySelector("#add-shape")?.addEventListener("click", () => H.addShapeSlot());
 panel.querySelector("#add-emoji")?.addEventListener("click", () => H.addEmojiSlot());
 panel.querySelector("#add-photo")?.addEventListener("click", () => {

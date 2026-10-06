@@ -23,19 +23,28 @@ import {
   defaultImageSlot,
   defaultTextSlot,
   defaultTypeSlot,
+  defaultTextFieldSlot,
   demoState,
+  isTextField,
+  lineHeightSliderOf,
+  textFieldLineHeight,
+  textFieldBoxH,
+  textFieldBoxW,
+  TEXT_FIELD_BOX_MIN,
   shapeHasFill,
   uid,
   FALLBACK_WEIGHTS,
   FONTS,
   grainArithmeticAmount,
   type AppState,
+  type ImageRemote,
   type ImageSlot,
   type Slot,
   type TextSlot,
   sanitizeTextMotion,
   weightName,
 } from "./types";
+import { clampTextFieldWords } from "./textField";
 import { isMicActive, sampleOnset, startMic, stopMic } from "./audioReact";
 import { activateFamily, localWeights, queryLocalCatalog } from "./localFonts";
 import { closeBackgroundUi, mountBackgroundPanel } from "./backgroundPanel";
@@ -68,10 +77,12 @@ import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
 import playIcon from "@phosphor-icons/core/assets/regular/play.svg?raw";
 import pillIcon from "@phosphor-icons/core/assets/regular/pill.svg?raw";
 import textT from "@phosphor-icons/core/assets/regular/text-t.svg?raw";
+import textAa from "@phosphor-icons/core/assets/regular/text-aa.svg?raw";
 import shapesIcon from "@phosphor-icons/core/assets/regular/shapes.svg?raw";
 import smileyIcon from "@phosphor-icons/core/assets/regular/smiley.svg?raw";
 import uploadSimple from "@phosphor-icons/core/assets/regular/upload-simple.svg?raw";
 import imagesIcon from "@phosphor-icons/core/assets/regular/images.svg?raw";
+import gifIcon from "@phosphor-icons/core/assets/regular/gif.svg?raw";
 import youtubeLogo from "@phosphor-icons/core/assets/regular/youtube-logo.svg?raw";
 import eyeIcon from "@phosphor-icons/core/assets/regular/eye.svg?raw";
 import eyeSlash from "@phosphor-icons/core/assets/regular/eye-slash.svg?raw";
@@ -81,6 +92,7 @@ import { isAboutOpen } from "./aboutPanel";
 import { isBugReportOpen } from "./bugReport";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
 import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
+import { openGiphyImport, isGiphyOpen } from "./giphyPanel";
 import { openYouTubeImport, isYouTubeOpen } from "./youtubePanel";
 import {
   DEFAULT_YOUTUBE_SIZE,
@@ -88,7 +100,7 @@ import {
 } from "./youtube";
 import { checkInput } from "./checkBox";
 import { lsGet, lsSet } from "./legacyStorage";
-import { getPrefs } from "./prefs";
+import { getPrefs, setPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
 import { askModeSelect, handoffModeSelectPreview, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode } from "./modeSelect";
 import { askConfirm, askNotice, askPrompt } from "./confirmDialog";
@@ -102,8 +114,9 @@ import {
   serializePillProject,
   type PillProject,
 } from "./project/pillFormat";
+import { relinkProjectImages, relinkSlotImage } from "./remoteImage";
 import { ensureTrim, ensureTrims, peekTrim } from "./trim";
-import { isColorMask, isSvgSource } from "./chipKinds";
+import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
 import {
   clampScaleForFreeTransform,
   freeTransformScaleMax,
@@ -133,6 +146,15 @@ import {
   type SlotMenuHost,
 } from "./panel/slotMenu";
 import { createPlaySession, type PlaySession } from "./playSession";
+import {
+  clampPageIndex,
+  duplicatePage,
+  LAYOUT_PAGE_MAX,
+  pageFromLive,
+  type LayoutPage,
+} from "./layoutPages";
+import { mountLayoutPageStrip, paintLayoutPageStrip } from "./layoutPageStrip";
+import { paintPageThumb, paintPageThumbFromPage } from "./layoutPageThumb";
 
 syncUiScale();
 preloadModeSelectMedia();
@@ -156,6 +178,12 @@ let revealSlotId: string | null = null;
 let revealTheme = false;
 /** Keep restored chip poses on canvas; Trigger Physics lifts & re-falls them (no respawn). */
 let posePinned = false;
+/** Layout-mode slides. Live slots/background are always pages[pageIndex]. */
+let pages: LayoutPage[] = [];
+let pageIndex = 0;
+let presenting = false;
+const pageThumbs = new Map<string, string>();
+let pageThumbTimer = 0;
 /** Play/physics session; assigned once helpers below exist. */
 let session!: PlaySession;
 let draftTimer = 0;
@@ -216,6 +244,7 @@ app.innerHTML = `
         <div class="canvas-nudge" id="canvas-nudge" hidden aria-live="polite"></div>
       </div>
     </div>
+    <nav class="page-strip" id="page-strip" hidden aria-label="Pages"></nav>
     <header class="topbar">
       <button type="button" class="logotype" aria-label="Ultrapilled — start over" data-tip="Start over">
         <span class="logotype__label">Ultrapilled</span>
@@ -541,9 +570,9 @@ function openFontMenu(
   title.textContent = "Fonts";
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
-  closeBtn.className = "font-menu-close";
+  closeBtn.className = "font-menu-close icon-hover";
   closeBtn.setAttribute("aria-label", "Close");
-  closeBtn.textContent = "✕";
+  closeBtn.innerHTML = `<span aria-hidden="true">✕</span>`;
   head.append(title, closeBtn);
   const search = document.createElement("input");
   search.type = "search";
@@ -1295,13 +1324,17 @@ const exportController = {
 };
 
 function currentPillProject(): PillProject {
+  snapshotActivePage();
   const frame = currentFrame();
+  const current = pages[pageIndex];
   return {
     state: structuredClone(state),
-    poses: world.chipCount() > 0 ? world.poses() : [],
+    poses: current?.poses ?? (world.chipCount() > 0 ? world.poses() : []),
     frame: { width: frame.width, height: frame.height },
     images: [],
     loop: repeat,
+    pages: pages.map((page) => structuredClone(page)),
+    pageIndex,
   };
 }
 
@@ -1333,9 +1366,256 @@ async function writeDraftNow() {
   }
 }
 
+function liveFrameSize() {
+  const frame = currentFrame();
+  return { width: Math.max(1, frame.width), height: Math.max(1, frame.height) };
+}
+
+function snapshotActivePage() {
+  const cur = pages[pageIndex];
+  const poses =
+    state.slots.length === 0 ? [] : world.chipCount() > 0 ? world.poses() : (cur?.poses ?? []);
+  const page = pageFromLive({
+    id: cur?.id,
+    slots: state.slots,
+    poses,
+    background: state.background,
+    frame: liveFrameSize(),
+  });
+  if (!pages.length) {
+    pages = [page];
+    pageIndex = 0;
+    return;
+  }
+  pages[pageIndex] = page;
+}
+
+function captureLiveThumb(): Promise<string | null> {
+  if (!state.physics.layoutMode) return Promise.resolve(null);
+  const page = pages[pageIndex];
+  if (!page) return Promise.resolve(null);
+  const id = page.id;
+  const draws = world.draws();
+  const background = structuredClone(state.background);
+  const frame = liveFrameSize();
+  return paintPageThumb({
+    draws,
+    state,
+    background,
+    stageWidth: frame.width,
+    stageHeight: frame.height,
+  })
+    .then((url) => {
+      pageThumbs.set(id, url);
+      return url;
+    })
+    .catch(() => null);
+}
+
+function scheduleLiveThumb() {
+  if (!state.physics.layoutMode) return;
+  window.clearTimeout(pageThumbTimer);
+  pageThumbTimer = window.setTimeout(() => captureLiveThumb(), 400);
+}
+
+function peekPageThumb(index: number): string | null {
+  const id = pages[index]?.id;
+  return id ? (pageThumbs.get(id) ?? null) : null;
+}
+
+async function loadPageThumb(index: number): Promise<string | null> {
+  const page = pages[index];
+  if (!page) return null;
+  const cached = pageThumbs.get(page.id);
+  if (cached) return cached;
+  if (index === pageIndex) return captureLiveThumb();
+  try {
+    const url = await paintPageThumbFromPage(page, state);
+    pageThumbs.set(page.id, url);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function resetPages() {
+  pageThumbs.clear();
+  pages = [
+    pageFromLive({
+      slots: state.slots,
+      poses: world.chipCount() > 0 ? world.poses() : [],
+      background: state.background,
+      frame: liveFrameSize(),
+    }),
+  ];
+  pageIndex = 0;
+  void captureLiveThumb();
+  paintPages();
+}
+
+function pinRestoredPoses(poses: ChipPose[], frame: { width: number; height: number }) {
+  if (!poses.length) return false;
+  dismissWelcome();
+  posePinned = true;
+  running = true;
+  paused = false;
+  session.phase = "holding";
+  session.holdStarted = performance.now();
+  session.droppedAt = performance.now();
+  session.settledSince = 0;
+  world.restore(
+    state.slots,
+    state.physics,
+    stage,
+    fitScale(),
+    state.theme,
+    state.pillPad,
+    state.textTracking,
+    state.sizeRandom,
+    poses,
+    frame,
+  );
+  world.freezePile();
+  world.sync();
+  world.setRunning(true);
+  paintTransport();
+  return true;
+}
+
+function clearPickQuiet() {
+  endChipEdit(false);
+  closeSlotMenu();
+  pickedSlotId = null;
+  pickedSlotIds.clear();
+  world.setPicked(null);
+}
+
+async function applyActivePage() {
+  const page = pages[pageIndex];
+  if (!page) return;
+  clearPickQuiet();
+  openSlots.clear();
+  state.slots = structuredClone(page.slots);
+  state.background = normalizeBackground(page.background);
+  for (const slot of state.slots) {
+    if (slot.kind === "text") sanitizeTextMotion(slot);
+    captureBaseline(slot);
+  }
+  applyBackground();
+  await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
+  if (!pinRestoredPoses(page.poses, page.frame)) {
+    world.clear();
+    live();
+  } else {
+    live({ quiet: true });
+  }
+  renderPanel();
+  paintWelcome();
+  paintPages();
+  scheduleDraft();
+}
+
+function selectLayoutPage(index: number) {
+  if (!state.physics.layoutMode) return;
+  const next = clampPageIndex(index, pages.length);
+  if (!pages.length || next === pageIndex) return;
+  if (!presenting) remember();
+  snapshotActivePage();
+  void captureLiveThumb();
+  pageIndex = next;
+  playSwipe();
+  void applyActivePage();
+}
+
+function stepPresent(dir: number) {
+  if (!presenting || pages.length < 2) return;
+  selectLayoutPage((pageIndex + dir + pages.length) % pages.length);
+}
+
+function setPresenting(on: boolean) {
+  if (on && !state.physics.layoutMode) return;
+  if (on === presenting) return;
+  presenting = on;
+  if (on) {
+    shell.classList.remove("ui-hidden");
+    clearPickQuiet();
+    closeSlotMenu();
+    closeFontMenu();
+  }
+  shell.classList.toggle("is-presenting", on);
+  playTransition(!on);
+  resize();
+  paintPages();
+}
+
+function addLayoutPage() {
+  if (!state.physics.layoutMode || presenting) return;
+  snapshotActivePage();
+  if (pages.length >= LAYOUT_PAGE_MAX) return;
+  remember();
+  void captureLiveThumb();
+  const source = pages[pageIndex]!;
+  const copy = duplicatePage(source);
+  const thumb = pageThumbs.get(source.id);
+  if (thumb) pageThumbs.set(copy.id, thumb);
+  pages.splice(pageIndex + 1, 0, copy);
+  pageIndex += 1;
+  playCreate();
+  void applyActivePage();
+}
+
+function removeLayoutPage() {
+  if (!state.physics.layoutMode || presenting || pages.length < 2) return;
+  remember();
+  const gone = pages[pageIndex];
+  if (gone) pageThumbs.delete(gone.id);
+  pages.splice(pageIndex, 1);
+  pageIndex = clampPageIndex(pageIndex, pages.length);
+  playRemove();
+  void applyActivePage();
+}
+
+function paintPages() {
+  const root = app.querySelector<HTMLElement>("#page-strip");
+  if (!root) return;
+  paintLayoutPageStrip(root, pageStripHost);
+}
+
+const pageStripHost = {
+  layoutMode: () => state.physics.layoutMode,
+  presenting: () => presenting,
+  soundMuted: () => {
+    const prefs = getPrefs();
+    return !prefs.soundOn || !prefs.uiSounds;
+  },
+  count: () => Math.max(1, pages.length),
+  index: () => pageIndex,
+  select: selectLayoutPage,
+  add: addLayoutPage,
+  remove: removeLayoutPage,
+  present() {
+    setPresenting(!presenting);
+  },
+  toggleSound() {
+    const prefs = getPrefs();
+    const muted = !prefs.soundOn || !prefs.uiSounds;
+    if (muted) setPrefs({ soundOn: true, uiSounds: true });
+    else setPrefs({ uiSounds: false });
+    paintPages();
+  },
+  peekThumb: peekPageThumb,
+  loadThumb: loadPageThumb,
+};
+
 async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolean }) {
+  setPresenting(false);
+  await relinkProjectImages(project);
   hydratePillImages(project.images);
   adoptState(project.state);
+  pages = project.pages.length ? project.pages.map((page) => structuredClone(page)) : [];
+  pageIndex = clampPageIndex(project.pageIndex, pages.length);
+  pageThumbs.clear();
+  snapshotActivePage();
   repeat = project.loop;
   paintTransport();
   applyBackground();
@@ -1344,37 +1624,14 @@ async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolea
   await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
 
   const hasPoses = Boolean(opts?.pinPoses !== false && project.poses.length);
-  if (hasPoses) {
-    dismissWelcome();
-    posePinned = true;
-    running = true;
-    paused = false;
-    session.phase = "holding";
-    session.holdStarted = performance.now();
-    session.droppedAt = performance.now();
-    session.settledSince = 0;
-    world.restore(
-      state.slots,
-      state.physics,
-      stage,
-      fitScale(),
-      state.theme,
-      state.pillPad,
-      state.textTracking,
-      state.sizeRandom,
-      project.poses,
-      project.frame,
-    );
-    world.freezePile();
-    world.sync();
-    world.setRunning(true);
-    paintTransport();
-  } else {
+  if (hasPoses) pinRestoredPoses(project.poses, project.frame);
+  else {
     posePinned = false;
     session.setRunning(false);
   }
   renderPanel();
   live();
+  paintPages();
   scheduleDraft();
 }
 
@@ -1384,6 +1641,7 @@ const settingsController = {
     setProTipsEnabled(prefs.tipsOn);
     setTooltipsEnabled(prefs.tooltipsOn);
     applyPost();
+    paintPages();
     if (!prefs.rememberLast) {
       window.clearTimeout(draftTimer);
       lastDraftJson = "";
@@ -1564,6 +1822,7 @@ function slotMenuHost(): SlotMenuHost {
     canPasteSlotStyle,
     canMoveSlotLayer,
     moveSlotLayer,
+    relinkSlotContent,
   };
 }
 
@@ -1656,6 +1915,7 @@ function createPanelHost(): CreatePanelHost {
     applySlotOrder,
     addPillSlot,
     addTypeSlot,
+    addTextFieldSlot,
     addShapeSlot,
     addEmojiSlot,
     pickImageFiles,
@@ -1879,7 +2139,7 @@ function importSlotSize(nativeW: number, nativeH: number, opts?: { minWidth?: nu
 }
 
 /** Set slot image from a local file; awaits trim (and SVG collider match) so aspect updates before remesh. */
-function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
+function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Promise<void> {
   const url = URL.createObjectURL(file);
   const svg = isSvgFile(file);
   slot.src = url;
@@ -1887,6 +2147,7 @@ function assignImageFile(slot: ImageSlot, file: File): Promise<void> {
   slot.emoji = undefined;
   slot.youtube = undefined;
   slot.video = undefined;
+  slot.remote = remote;
   slot.collider = undefined;
   slot.tint = undefined;
   slot.inverted = undefined;
@@ -1947,6 +2208,7 @@ function assignVideoFile(slot: ImageSlot, file: File): Promise<void> {
   slot.name = file.name || "video";
   slot.emoji = undefined;
   slot.youtube = undefined;
+  slot.remote = undefined;
   slot.tint = undefined;
   slot.inverted = undefined;
   slot.exposure = undefined;
@@ -2027,7 +2289,11 @@ function assignVideoFile(slot: ImageSlot, file: File): Promise<void> {
   });
 }
 
-function addImagesFromFiles(files: Iterable<File>, at?: { clientX: number; clientY: number }) {
+function addImagesFromFiles(
+  files: Iterable<File>,
+  at?: { clientX: number; clientY: number },
+  remote?: ImageRemote,
+) {
   const media = [...files].filter(isMediaFile);
   if (!media.length) return;
   remember();
@@ -2044,7 +2310,9 @@ function addImagesFromFiles(files: Iterable<File>, at?: { clientX: number; clien
     captureBaseline(slot);
     state.slots.push(slot);
     slots.push(slot);
-    jobs.push(isVideoFile(file) ? assignVideoFile(slot, file) : assignImageFile(slot, file));
+    jobs.push(
+      isVideoFile(file) ? assignVideoFile(slot, file) : assignImageFile(slot, file, remote),
+    );
   }
   const last = slots[slots.length - 1]!;
   openOnly(last.id);
@@ -2148,6 +2416,30 @@ function addTypeSlot(at?: PlaceAt) {
   playCreate();
   renderPanel();
   live();
+}
+
+function addTextFieldSlot(at?: PlaceAt) {
+  remember();
+  dismissWelcome();
+  const font: Partial<TextSlot> = {};
+  if (appliedFont) {
+    font.fontFamily = appliedFont;
+    const weight = sharedFamily() === appliedFont ? sharedWeight() : null;
+    font.fontWeight = chosenWeight(appliedFont, weight ?? 400);
+  }
+  const slot = defaultTextFieldSlot({ colorIndex: state.slots.length % state.theme.length, ...font });
+  captureBaseline(slot);
+  state.slots.push(slot);
+  openOnly(slot.id);
+  focusSlotId = slot.id;
+  revealSlotId = slot.id;
+  armAppendInsert(slot.id);
+  armSlotPlace(slot.id, at);
+  playCreate();
+  renderPanel();
+  live();
+  showPick(slot.id);
+  editChipText(slot.id, "end");
 }
 
 function addShapeSlot(at?: PlaceAt) {
@@ -2553,6 +2845,7 @@ type TextBaseline = Pick<
   | "fontWeight"
   | "fontSize"
   | "textHeight"
+  | "lineHeight"
   | "shape"
   | "radius"
   | "stroked"
@@ -2634,6 +2927,7 @@ function captureBaseline(slot: Slot) {
       fontWeight: slot.fontWeight,
       fontSize: slot.fontSize,
       textHeight: slot.textHeight,
+      lineHeight: slot.lineHeight,
       shape: slot.shape,
       radius: slot.radius,
       stroked: slot.stroked,
@@ -2707,6 +3001,7 @@ function textBaseline(slot: TextSlot): TextBaseline {
     fontWeight: seed.fontWeight,
     fontSize: seed.fontSize,
     textHeight: seed.textHeight,
+    lineHeight: seed.lineHeight,
     shape: seed.shape,
     radius: seed.radius,
     stroked: seed.stroked,
@@ -2797,6 +3092,8 @@ function fieldDirty(slot: Slot, key: string): boolean {
         return slot.fontSize !== base.fontSize;
       case "textHeight":
         return slot.textHeight !== base.textHeight;
+      case "lineHeight":
+        return lineHeightSliderOf(slot) !== lineHeightSliderOf(base);
       case "pillPad":
         return slot.pillPad != null;
       case "tracking":
@@ -2912,7 +3209,7 @@ function paintFieldReset(root: ParentNode, slot: Slot, key: string) {
 }
 
 function resetControl(name: string, key: string, dirty: boolean): string {
-  return `<button type="button" class="field-reset" data-reset="${key}" aria-label="Reset ${escapeAttr(name.toLowerCase())}"${dirty ? "" : " hidden"}>${RESET_ICON}</button>`;
+  return `<button type="button" class="field-reset icon-hover" data-reset="${key}" aria-label="Reset ${escapeAttr(name.toLowerCase())}"${dirty ? "" : " hidden"}>${RESET_ICON}</button>`;
 }
 
 function settingLabel(slot: Slot, name: string, key: string, value?: string): string {
@@ -2980,6 +3277,7 @@ function applyFieldReset(slot: Slot, key: string) {
     } else if (key === "fontWeight") slot.fontWeight = chosenWeight(slot.fontFamily, base.fontWeight);
     else if (key === "fontSize") slot.fontSize = base.fontSize;
     else if (key === "textHeight") slot.textHeight = base.textHeight;
+    else if (key === "lineHeight") slot.lineHeight = base.lineHeight;
     else if (key === "pillPad") slot.pillPad = undefined;
     else if (key === "tracking") slot.tracking = undefined;
     else if (key === "shape") slot.shape = base.shape;
@@ -3255,6 +3553,11 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
           setRangeCaptionValue(caption, slot.scale.toFixed(2));
         }
       }
+      if (key === "lineHeight" && input instanceof HTMLInputElement && slot.kind === "text") {
+        slot.lineHeight = lineHeightSliderOf(slot);
+        const caption = input.closest("label")?.querySelector("[data-range-label]");
+        if (caption) setRangeCaptionValue(caption, textFieldLineHeight(slot).toFixed(2));
+      }
       paintFieldReset(input.closest(".field, .check-row") ?? root, slot, key);
       if (
         key === "shape" ||
@@ -3437,12 +3740,13 @@ function openCanvasMenu(x: number, y: number) {
   const at: PlaceAt = { clientX: x, clientY: y };
   const uiHidden = shell.classList.contains("ui-hidden");
   const entries: { label: string; icon: string; run: () => void; clear?: boolean }[] = [
-    { label: "Add pill", icon: pillIcon, run: () => addPillSlot(at) },
-    { label: "Add Text", icon: textT, run: () => addTypeSlot(at) },
-    { label: "Add shape", icon: shapesIcon, run: () => addShapeSlot(at) },
-    { label: "Add emoji", icon: smileyIcon, run: () => addEmojiSlot(at) },
+    { label: "Pill", icon: pillIcon, run: () => addPillSlot(at) },
+    { label: "Word", icon: textAa, run: () => addTypeSlot(at) },
+    { label: "Text", icon: textT, run: () => addTextFieldSlot(at) },
+    { label: "Shape", icon: shapesIcon, run: () => addShapeSlot(at) },
+    { label: "Emoji", icon: smileyIcon, run: () => addEmojiSlot(at) },
     {
-      label: "Upload image",
+      label: "Image",
       icon: uploadSimple,
       run: () => {
         void pickImageFiles(true).then((files) => {
@@ -3452,16 +3756,25 @@ function openCanvasMenu(x: number, y: number) {
       },
     },
     {
-      label: "Add from Unsplash",
+      label: "Unsplash",
       icon: imagesIcon,
       run: () => {
         openUnsplashImport({
-          onPick: (file) => addImagesFromFiles([file], at),
+          onPick: (file, remote) => addImagesFromFiles([file], at, remote),
         });
       },
     },
     {
-      label: "Add from YouTube",
+      label: "Giphy",
+      icon: gifIcon,
+      run: () => {
+        openGiphyImport({
+          onPick: (file, remote) => addImagesFromFiles([file], at, remote),
+        });
+      },
+    },
+    {
+      label: "YouTube",
       icon: youtubeLogo,
       run: () => {
         openYouTubeImport({
@@ -3535,8 +3848,10 @@ function endChipEdit(commit = true) {
 /** Empty contenteditable often hides the caret — keep a ZWSP placeholder while editing. */
 const EDIT_ZWSP = "\u200B";
 
-function readChipEditText(edit: HTMLElement): string {
-  return (edit.textContent ?? "").replaceAll(EDIT_ZWSP, "").replace(/\n/g, "");
+function readChipEditText(edit: HTMLElement, multiline = false): string {
+  const raw = (edit instanceof HTMLTextAreaElement ? edit.value : (edit.innerText ?? edit.textContent ?? ""))
+    .replaceAll(EDIT_ZWSP, "");
+  return multiline ? raw.replace(/\r\n/g, "\n") : raw.replace(/\n/g, "");
 }
 
 function writeChipEditText(edit: HTMLElement, text: string) {
@@ -3632,6 +3947,27 @@ function gradientWheelOf(id: string): { from: string; to: string; angle: number;
     angle: gradientAngleOf(slot.gradientAngle),
     scale: gradientScaleOf(slot.gradientScale),
   };
+}
+
+const textFieldBoxStart = new Map<string, { w: number; h: number }>();
+
+function resizeTextFieldBox(id: string, sx: number, sy: number, phase: "start" | "move" | "end") {
+  const slot = state.slots.find((item) => item.id === id);
+  if (!slot || !isTextField(slot)) return;
+  if (phase === "start") {
+    remember(`canvas-box:${id}`);
+    textFieldBoxStart.set(id, { w: textFieldBoxW(slot), h: textFieldBoxH(slot) });
+    return;
+  }
+  const start = textFieldBoxStart.get(id) ?? { w: textFieldBoxW(slot), h: textFieldBoxH(slot) };
+  slot.boxW = Math.max(TEXT_FIELD_BOX_MIN, start.w * sx);
+  slot.boxH = Math.max(TEXT_FIELD_BOX_MIN, start.h * sy);
+  liveChip(id, { quiet: true });
+  if (phase === "end") {
+    textFieldBoxStart.delete(id);
+    endGesture();
+    scheduleDraft();
+  }
 }
 
 function scaleChip(id: string, scale: number, phase: "start" | "move" | "end") {
@@ -3740,27 +4076,25 @@ function openGradWheelStop(id: string, stop: "from" | "to", anchor: HTMLElement)
   tintPicker = { anchor, close: picker.close };
 }
 
-function editChipText(id: string, wipe: boolean) {
+function editChipText(id: string, select: "all" | "end", at?: { x: number; y: number }) {
   const slot = state.slots.find((item) => item.id === id);
   if (!slot || slot.kind !== "text") return;
   closeSlotMenu();
-  if (world.editingId() === id && !wipe) {
+  if (world.editingId() === id) {
     const edit = world.chipEl(id)?.querySelector<HTMLElement>(":scope > .chip-edit");
     edit?.focus();
-    selectChipEdit(edit, false);
+    selectChipEdit(edit, select, at);
     return;
   }
   endChipEdit();
-  if (wipe) {
-    remember();
-    slot.text = "";
-  }
   world.setEditing(id);
-  // Drop the pick outline so it doesn't read as an edit chrome box.
-  world.setPicked(null);
-  pickedSlotId = null;
-  pickedSlotIds.clear();
-  panel.querySelectorAll(".slot-card.is-picked").forEach((el) => el.classList.remove("is-picked"));
+  // Text fields keep the selection box so you can size while the caret is in.
+  if (!isTextField(slot)) {
+    world.setPicked(null);
+    pickedSlotId = null;
+    pickedSlotIds.clear();
+    panel.querySelectorAll(".slot-card.is-picked").forEach((el) => el.classList.remove("is-picked"));
+  }
   liveChip(id);
 
   const edit = world.chipEl(id)?.querySelector<HTMLElement>(":scope > .chip-edit");
@@ -3780,7 +4114,8 @@ function editChipText(id: string, wipe: boolean) {
   const abort = new AbortController();
   chipEditAbort = abort;
   const { signal } = abort;
-  const panelInput = panel.querySelector<HTMLInputElement>(`[data-id="${id}"] .slot-live`);
+  const panelInput = panel.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-id="${id}"] .slot-live`);
+  const field = isTextField(slot);
   // Ignore blur from the double-click / focus handoff that started this edit.
   let armBlur = false;
   window.setTimeout(() => {
@@ -3791,11 +4126,16 @@ function editChipText(id: string, wipe: boolean) {
     "input",
     () => {
       remember(`canvas-text:${id}`);
-      slot.text = readChipEditText(edit);
+      let next = readChipEditText(edit, field);
+      if (field) {
+        next = clampTextFieldWords(next);
+        if (next !== readChipEditText(edit, true)) writeChipEditText(edit, next);
+      }
+      slot.text = next;
       // Keep a ZWSP so an emptied field still shows a caret.
-      if (!slot.text && edit.textContent !== EDIT_ZWSP) {
+      if (!slot.text && !field && edit.textContent !== EDIT_ZWSP) {
         writeChipEditText(edit, "");
-        selectChipEdit(edit, true);
+        selectChipEdit(edit, "start");
       }
       if (panelInput) panelInput.value = slot.text;
       liveChip(id);
@@ -3803,9 +4143,19 @@ function editChipText(id: string, wipe: boolean) {
     { signal },
   );
   edit.addEventListener(
+    "paste",
+    (event) => {
+      if (!field) return;
+      event.preventDefault();
+      const clip = event.clipboardData?.getData("text/plain") ?? "";
+      document.execCommand("insertText", false, clip);
+    },
+    { signal },
+  );
+  edit.addEventListener(
     "keydown",
     (event) => {
-      if (event.key === "Enter" || event.key === "Escape") {
+      if (event.key === "Escape" || (!field && event.key === "Enter")) {
         event.preventDefault();
         endChipEdit();
       }
@@ -3829,17 +4179,56 @@ function editChipText(id: string, wipe: boolean) {
   window.setTimeout(() => {
     if (world.editingId() !== id) return;
     edit.focus();
-    selectChipEdit(edit, wipe);
+    selectChipEdit(edit, select, at);
   }, 0);
 }
 
-function selectChipEdit(edit: HTMLElement | null | undefined, caretOnly: boolean) {
+function chipEditOffsetAfterWord(edit: HTMLElement, at: { x: number; y: number }): number {
+  const text = readChipEditText(edit);
+  let offset = text.length;
+  const pos = document.caretPositionFromPoint?.(at.x, at.y);
+  if (pos && edit.contains(pos.offsetNode)) {
+    const span = document.createRange();
+    span.selectNodeContents(edit);
+    span.setEnd(pos.offsetNode, pos.offset);
+    offset = span.toString().replaceAll(EDIT_ZWSP, "").length;
+  } else {
+    const hit = document.caretRangeFromPoint?.(at.x, at.y);
+    if (hit && edit.contains(hit.startContainer)) {
+      const span = document.createRange();
+      span.selectNodeContents(edit);
+      span.setEnd(hit.startContainer, hit.startOffset);
+      offset = span.toString().replaceAll(EDIT_ZWSP, "").length;
+    }
+  }
+  while (offset < text.length && !/\s/.test(text[offset]!)) offset += 1;
+  return offset;
+}
+
+function selectChipEdit(
+  edit: HTMLElement | null | undefined,
+  mode: "all" | "start" | "end",
+  at?: { x: number; y: number },
+) {
   if (!edit) return;
   const selection = window.getSelection();
   if (!selection) return;
   const range = document.createRange();
-  range.selectNodeContents(edit);
-  if (caretOnly) range.collapse(true);
+  if (mode === "end" && at) {
+    const node = edit.firstChild;
+    const offset = chipEditOffsetAfterWord(edit, at);
+    if (node?.nodeType === Node.TEXT_NODE) {
+      range.setStart(node, Math.max(0, Math.min(offset, node.textContent?.length ?? 0)));
+      range.collapse(true);
+    } else {
+      range.selectNodeContents(edit);
+      range.collapse(false);
+    }
+  } else {
+    range.selectNodeContents(edit);
+    if (mode === "start") range.collapse(true);
+    else if (mode === "end") range.collapse(false);
+  }
   selection.removeAllRanges();
   selection.addRange(range);
 }
@@ -3887,6 +4276,23 @@ function alignSlotStraight(id: string) {
   remember();
   world.alignChipsStraight(id);
   playSwitch(true);
+}
+
+async function relinkSlotContent(id: string): Promise<boolean> {
+  const slot = state.slots.find((item) => item.id === id);
+  if (!slot || slot.kind !== "image") return false;
+  const ok = await relinkSlotImage(slot);
+  if (!ok) {
+    void askNotice({
+      title: "Couldn’t re-link",
+      body: "That Unsplash or Giphy file couldn’t be fetched. Check the API key and try again.",
+    });
+    return false;
+  }
+  await ensureTrim(slot.src, slot.name).catch(() => {});
+  renderPanel();
+  live();
+  return true;
 }
 
 function duplicateSlot(id: string) {
@@ -3988,6 +4394,7 @@ function copySlotStyle(slot: Slot) {
         fontWeight: slot.fontWeight,
         fontSize: slot.fontSize,
         textHeight: slot.textHeight,
+        lineHeight: slot.lineHeight,
         pillPad: slot.pillPad,
         tracking: slot.tracking,
         shape: slot.shape,
@@ -4016,6 +4423,11 @@ function copySlotStyle(slot: Slot) {
         dropShadowOpacity: slot.dropShadowOpacity,
         dropShadowColor: slot.dropShadowColor,
         scale: slot.scale,
+        textField: slot.textField,
+        boxW: slot.boxW,
+        boxH: slot.boxH,
+        align: slot.align,
+        italic: slot.italic,
       },
     };
   } else {
@@ -4097,6 +4509,20 @@ function pasteSlotStyle(id: string) {
     slot.dropShadowOpacity = style.dropShadowOpacity;
     slot.dropShadowColor = style.dropShadowColor;
     slot.scale = style.scale;
+    if (isTextField(slot)) {
+      slot.textField = true;
+      slot.textAnim = undefined;
+      slot.align = style.align;
+      slot.italic = style.italic;
+      slot.lineHeight = style.lineHeight;
+      if (style.boxW != null) slot.boxW = style.boxW;
+      if (style.boxH != null) slot.boxH = style.boxH;
+    } else {
+      slot.textField = undefined;
+      slot.boxW = undefined;
+      slot.boxH = undefined;
+      slot.lineHeight = undefined;
+    }
     playClick();
     void settleFont(slot.fontFamily, slot.fontWeight).then(() => {
       renderPanel();
@@ -4576,6 +5002,7 @@ function live(opts?: { quiet?: boolean }) {
   };
   bump();
   void Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]).then(bump);
+  if (state.physics.layoutMode) scheduleLiveThumb();
 }
 
 function escapeAttr(value: string): string {
@@ -4793,7 +5220,7 @@ function workBox() {
   const width = stage.clientWidth;
   const height = stage.clientHeight;
   const full = { x: 0, y: 0, width, height };
-  if (shell.classList.contains("ui-hidden")) return full;
+  if (shell.classList.contains("ui-hidden") || presenting) return full;
   const stageRect = stage.getBoundingClientRect();
   let limitRight = width;
   let limitBottom = height;
@@ -5097,6 +5524,7 @@ session = createPlaySession({
 
 async function setLayoutMode(next: boolean, opts?: { skipConfirm?: boolean }) {
   if (next === state.physics.layoutMode) return;
+  if (!next) setPresenting(false);
 
   if (!opts?.skipConfirm && !next && world.chipCount() > 0 && world.chipsOverlap()) {
     const ok = await askConfirm({
@@ -5140,6 +5568,8 @@ async function setLayoutMode(next: boolean, opts?: { skipConfirm?: boolean }) {
   }
   renderPanel();
   paintWelcome();
+  snapshotActivePage();
+  paintPages();
   scheduleDraft();
 }
 
@@ -5224,6 +5654,8 @@ const UNDO_LIMIT = 50;
 
 type Snapshot = {
   doc: AppState;
+  pages: LayoutPage[];
+  pageIndex: number;
   appliedFont: string;
   machineFont: string;
 };
@@ -5234,8 +5666,11 @@ let gesture: string | null = null;
 let pointerHeld = false;
 
 function takeSnapshot(): Snapshot {
+  snapshotActivePage();
   return {
     doc: structuredClone(state),
+    pages: structuredClone(pages),
+    pageIndex,
     appliedFont,
     machineFont,
   };
@@ -5256,14 +5691,21 @@ function endGesture() {
 
 function restore(snap: Snapshot) {
   tintPicker?.close();
+  pages = structuredClone(snap.pages);
+  pageIndex = clampPageIndex(snap.pageIndex, pages.length);
   adoptState(snap.doc);
   appliedFont = snap.appliedFont;
   machineFont = snap.machineFont;
   applyBackground();
   applyPost();
   syncCanvas(world.chipCount() > 0);
+  const page = pages[pageIndex];
+  if (state.physics.layoutMode && page?.poses.length) {
+    pinRestoredPoses(page.poses, page.frame);
+  }
   renderPanel();
   live();
+  paintPages();
 }
 
 function undo() {
@@ -5381,6 +5823,11 @@ async function loadSavedTemplate(id: string) {
     return;
   }
   hydratePillImages(project.images);
+  if (project.pages.length > 1) {
+    remember();
+    await applyPillProject(project);
+    return;
+  }
   loadTemplate(project.state);
 }
 
@@ -5407,6 +5854,7 @@ async function removeCustomTemplate(id: string) {
 }
 
 function loadTemplate(next: AppState) {
+  setPresenting(false);
   clearCanvasNudge();
   closeFontMenu();
   remember();
@@ -5419,6 +5867,7 @@ function loadTemplate(next: AppState) {
   openSlots.clear();
   adoptState(keepSelectedCanvas(next, state.canvas));
   for (const slot of state.slots) captureBaseline(slot);
+  resetPages();
   applyBackground();
   applyPost();
   syncCanvas(false);
@@ -5458,6 +5907,7 @@ window.addEventListener("keydown", (event) => {
   if (document.body.classList.contains("is-exporting")) return;
   const meta = event.metaKey || event.ctrlKey;
   if (meta && !event.altKey && !editingText(event.target)) {
+    if (presenting) return;
     const key = event.key.toLowerCase();
     if (key === "z") {
       event.preventDefault();
@@ -5492,13 +5942,40 @@ window.addEventListener("keydown", (event) => {
   }
   if (typingInField(event.target)) return;
   if (document.body.classList.contains("is-exporting")) return;
-  if (isSettingsOpen() || isAboutOpen() || isBugReportOpen() || isUnsplashOpen() || isYouTubeOpen()) return;
+  if (isSettingsOpen() || isAboutOpen() || isBugReportOpen() || isUnsplashOpen() || isGiphyOpen() || isYouTubeOpen()) return;
   if (document.querySelector(".reconnect[aria-modal='true']")) return;
+  if (presenting) {
+    if (event.code === "Space" || event.key === "ArrowRight" || event.key === "PageDown") {
+      event.preventDefault();
+      if (!event.repeat) stepPresent(1);
+      return;
+    }
+    if (event.key === "ArrowLeft" || event.key === "PageUp") {
+      event.preventDefault();
+      if (!event.repeat) stepPresent(-1);
+      return;
+    }
+    if (event.key === "Escape" || event.key === "h" || event.key === "H") {
+      event.preventDefault();
+      setPresenting(false);
+      return;
+    }
+    event.preventDefault();
+    return;
+  }
   if (event.code === "Space") {
     event.preventDefault();
     if (event.repeat) return;
     playClick();
     session.togglePause();
+    return;
+  }
+  if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && state.physics.layoutMode) {
+    if (meta || event.altKey || event.repeat) return;
+    if (pages.length < 2) return;
+    event.preventDefault();
+    const dir = event.key === "ArrowRight" ? 1 : -1;
+    selectLayoutPage((pageIndex + dir + pages.length) % pages.length);
     return;
   }
   if (event.key === "p" || event.key === "P") {
@@ -5518,7 +5995,7 @@ window.addEventListener("keydown", (event) => {
     const slot = state.slots.find((item) => item.id === pickedSlotId);
     if (!slot || slot.kind !== "text") return;
     event.preventDefault();
-    editChipText(pickedSlotId, false);
+    editChipText(pickedSlotId, "all");
     return;
   }
   if (event.key === "Backspace" || event.key === "Delete") {
@@ -5746,13 +6223,31 @@ world.attach(
     if (id == null) openCanvasMenu(x, y);
     else openSlotMenu(x, y, id, slotMenuHost());
   },
-  (id) => editChipText(id, true),
+  (id, at) => editChipText(id, "end", at),
   (id) => state.slots.find((item) => item.id === id)?.scale ?? 1,
   scaleChip,
   rotateChip,
   gradientWheelOf,
   gradientWheelChip,
   openGradWheelStop,
+  resizeTextFieldBox,
+);
+stage.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (!presenting || event.button !== 0) return;
+    event.stopImmediatePropagation();
+    stepPresent(1);
+  },
+  true,
+);
+stage.addEventListener(
+  "contextmenu",
+  (event) => {
+    if (!presenting) return;
+    event.stopImmediatePropagation();
+  },
+  true,
 );
 
 {
@@ -5802,6 +6297,13 @@ resize();
 applyBackground();
 applyPost();
 renderPanel();
+{
+  const pageStripEl = app.querySelector<HTMLElement>("#page-strip");
+  if (pageStripEl) {
+    mountLayoutPageStrip(pageStripEl, pageStripHost);
+    paintPages();
+  }
+}
 void ensureTrims(state.slots);
 void ensureTextFonts(state.slots);
 document.fonts.addEventListener("loadingdone", () => {
@@ -5818,8 +6320,10 @@ window.addEventListener("pagehide", () => {
 
 async function applyStartupMode(mode: AppMode) {
   state.physics.layoutMode = mode === "layout";
+  snapshotActivePage();
   renderPanel();
   paintWelcome();
+  paintPages();
 }
 
 /** Clear the canvas and return to Mode Select (logotype click). */
@@ -5832,6 +6336,7 @@ async function resetToModeSelect() {
   });
   if (!ok) return;
 
+  setPresenting(false);
   endChipEdit(false);
   closeSlotMenu();
   closeFontMenu();
@@ -5857,6 +6362,7 @@ async function resetToModeSelect() {
   lastDraftJson = "";
   adoptState(blankState());
   for (const slot of state.slots) captureBaseline(slot);
+  resetPages();
   applyBackground();
   applyPost();
   syncCanvas(false);

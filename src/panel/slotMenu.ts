@@ -10,6 +10,7 @@ import eyedropper from "@phosphor-icons/core/assets/regular/eyedropper.svg?raw";
 import flipHorizontal from "@phosphor-icons/core/assets/regular/flip-horizontal.svg?raw";
 import flipVertical from "@phosphor-icons/core/assets/regular/flip-vertical.svg?raw";
 import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
+import linkSimple from "@phosphor-icons/core/assets/regular/link-simple.svg?raw";
 import paintBrush from "@phosphor-icons/core/assets/regular/paint-brush.svg?raw";
 import paintBucket from "@phosphor-icons/core/assets/regular/paint-bucket.svg?raw";
 import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
@@ -25,7 +26,8 @@ import { gradientEndIndex } from "../pillFill";
 import { playClick, playCreate, playSwitch } from "../uiSounds";
 import { placeZoomedFixed } from "../uiScale";
 import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
-import { sanitizeTextMotion } from "../types";
+import { isTextField, sanitizeTextMotion } from "../types";
+import { canRelinkSlot } from "../remoteImage";
 
 export type LayerMove = "front" | "forward" | "backward" | "back";
 
@@ -67,7 +69,7 @@ export type SlotMenuHost = {
   assignImageFile(slot: ImageSlot, file: File): Promise<void>;
   assignVideoFile(slot: ImageSlot, file: File): Promise<void>;
   isVideoFile(file: File): boolean;
-  editChipText(id: string, wipe: boolean): void;
+  editChipText(id: string, select: "all" | "end", at?: { x: number; y: number }): void;
   duplicateSlot(id: string): void;
   removeSlot(id: string): void;
   invertSlot(id: string): void;
@@ -78,6 +80,7 @@ export type SlotMenuHost = {
   canPasteSlotStyle(slot: Slot): boolean;
   canMoveSlotLayer(id: string, where: LayerMove): boolean;
   moveSlotLayer(id: string, where: LayerMove): boolean;
+  relinkSlotContent(id: string): Promise<boolean>;
 };
 
 let H: SlotMenuHost;
@@ -550,6 +553,16 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     stay?: boolean;
     disabled?: () => boolean;
   }[] = [];
+  if (slot?.kind === "image" && canRelinkSlot(slot, H.world.chipEl(slot.id))) {
+    actions.push({
+      id: "relink-content",
+      label: "Re-link content",
+      icon: linkSimple,
+      run: () => {
+        void H.relinkSlotContent(slot.id);
+      },
+    });
+  }
   if (slot?.kind === "image" && H.uploadedShape(slot)) {
     actions.push({
       id: "replace-image",
@@ -632,7 +645,7 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       id: "edit-text",
       label: "Edit text",
       icon: pencilSimple,
-      run: () => H.editChipText(id, false),
+      run: () => H.editChipText(id, "all"),
     });
   }
   // Invert: text/SVG/presets flip ink; rasters toggle pixel invert. Recolor is SVG-only.
@@ -663,7 +676,7 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       run: () => H.pasteSlotStyle(id),
     });
   }
-  if (slot?.kind === "text") {
+  if (slot?.kind === "text" && !isTextField(slot)) {
     // Authoritative slot flag only — a stale is-text-anim-host after Stop used to
     // keep the menu stuck on "Stop Animation" even though textAnim was cleared.
     const animating = Boolean(slot.textAnim);

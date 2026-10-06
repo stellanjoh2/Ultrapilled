@@ -39,7 +39,7 @@ function openDialog(opts: {
         ${inputHtml}
         <div class="reconnect__actions">
           ${cancel}
-          <button type="button" class="pill is-on" data-confirm="ok"${opts.input ? "" : " autofocus"}>${opts.confirmLabel}</button>
+          <button type="button" class="pill pill--commit" data-confirm="ok"${opts.input ? "" : " autofocus"}>${opts.confirmLabel}</button>
         </div>
       </div>
     `;

@@ -4,6 +4,7 @@ import { imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags, whiteB
 import { ICON_PRESETS } from "./icons";
 import {
   defaultImageSlot,
+  defaultTextFieldSlot,
   defaultTextSlot,
   defaultTypeSlot,
   grainArithmeticAmount,
@@ -63,6 +64,12 @@ describe("textLookFlags", () => {
       textGradient: false,
     });
     expect(textLookFlags(defaultTextSlot({ gradient: true }))).toEqual({
+      ring: false,
+      bare: false,
+      shapeGradient: true,
+      textGradient: false,
+    });
+    expect(textLookFlags(defaultTextFieldSlot({ shape: "box", gradient: true }))).toEqual({
       ring: false,
       bare: false,
       shapeGradient: true,

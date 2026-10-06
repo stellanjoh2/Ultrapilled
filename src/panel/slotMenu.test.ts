@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { demoState } from "../types";
+import { defaultImageSlot, demoState } from "../types";
 import { closeSlotMenu, openSlotMenu, type SlotMenuHost } from "./slotMenu";
 
 describe("layout layer order controls", () => {
@@ -83,6 +83,9 @@ describe("layout layer order controls", () => {
       moveSlotLayer() {
         return true;
       },
+      async relinkSlotContent() {
+        return false;
+      },
     };
   }
 
@@ -107,5 +110,33 @@ describe("layout layer order controls", () => {
     const host = hostFor(false);
     openSlotMenu(40, 40, host.state.slots[0].id, host);
     expect(document.querySelector(".slot-menu__layer")).toBeNull();
+  });
+
+  it("offers Re-link content when a remote image is missing", () => {
+    stubReducedMotion();
+    const host = hostFor(false);
+    const slot = defaultImageSlot({
+      id: "missing-gif",
+      name: "giphy-x-abc.gif",
+      src: "",
+      remote: { kind: "giphy", id: "abc" },
+    });
+    host.state.slots = [slot];
+    openSlotMenu(40, 40, slot.id, host);
+    expect(document.querySelector("[data-action='relink-content']")?.textContent).toContain("Re-link content");
+  });
+
+  it("hides Re-link content when the image is still available", () => {
+    stubReducedMotion();
+    const host = hostFor(false);
+    const slot = defaultImageSlot({
+      id: "live-gif",
+      name: "giphy-x-abc.gif",
+      src: "data:image/gif;base64,xx",
+      remote: { kind: "giphy", id: "abc" },
+    });
+    host.state.slots = [slot];
+    openSlotMenu(40, 40, slot.id, host);
+    expect(document.querySelector("[data-action='relink-content']")).toBeNull();
   });
 });

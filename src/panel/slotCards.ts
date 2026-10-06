@@ -3,6 +3,12 @@ import fileSvg from "@phosphor-icons/core/assets/regular/file-svg.svg?raw";
 import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?raw";
 import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
 import playIcon from "@phosphor-icons/core/assets/regular/play.svg?raw";
+import textB from "@phosphor-icons/core/assets/regular/text-b.svg?raw";
+import textItalic from "@phosphor-icons/core/assets/regular/text-italic.svg?raw";
+import textAlignLeft from "@phosphor-icons/core/assets/regular/text-align-left.svg?raw";
+import textAlignCenter from "@phosphor-icons/core/assets/regular/text-align-center.svg?raw";
+import textAlignRight from "@phosphor-icons/core/assets/regular/text-align-right.svg?raw";
+import textT from "@phosphor-icons/core/assets/regular/text-t.svg?raw";
 import { checkInput } from "../checkBox";
 import { FEATURED_EMOJI, searchEmoji, type EmojiItem } from "../emojis";
 import { ICON_PRESETS, IMAGE_COLLIDERS } from "../icons";
@@ -30,7 +36,14 @@ import {
   type ImageSlot,
   type Slot,
   type TextSlot,
+  isTextField,
+  TEXT_FIELD_WORD_MAX,
+  TEXT_FIELD_STARTER,
+  lineHeightSliderOf,
+  textFieldLineHeight,
+  textAlignOf,
 } from "../types";
+import { clampTextFieldWords, textFieldWordCount } from "../textField";
 import { YOUTUBE_LOOP_MAX, YOUTUBE_LOOP_MIN } from "../youtube";
 import { setRangeCaptionValue } from "../rangeCaption";
 
@@ -143,6 +156,11 @@ function textColorChip(slot: TextSlot): HTMLElement {
   const mark = document.createElement("span");
   mark.className = "slot-mark";
   mark.setAttribute("aria-hidden", "true");
+  if (isTextField(slot)) {
+    mark.classList.add("slot-mark--image");
+    mark.innerHTML = textT;
+    return mark;
+  }
   const chip = document.createElement("span");
   chip.className = "slot-chip";
   chip.style.background = H.chipPreview(slot);
@@ -155,23 +173,40 @@ function textColorChip(slot: TextSlot): HTMLElement {
   return mark;
 }
 
+function textFieldHeadline(slot: TextSlot): string {
+  return slot.text.trim().split("\n")[0] || "Text field";
+}
+
 function paintTextHeadline(toggle: HTMLElement, slot: TextSlot, open: boolean, focus: boolean) {
   toggle.replaceChildren();
   const chip = textColorChip(slot);
-  if (!open) {
+  if (isTextField(slot) || !open) {
     const name = document.createElement("span");
     name.className = "slot-name";
     const title = document.createElement("span");
     title.className = "slot-title";
-    const word = slot.text.trim();
-    title.textContent = word || "Empty";
-    if (!word) title.classList.add("is-empty");
-    const pen = document.createElement("span");
-    pen.className = "slot-pen";
-    pen.setAttribute("aria-hidden", "true");
-    pen.innerHTML = pencilSimple;
-    name.append(title, pen);
+    const word = isTextField(slot) ? textFieldHeadline(slot) : slot.text.trim();
+    title.textContent = word || (isTextField(slot) ? "Text field" : "Empty");
+    if (!slot.text.trim()) title.classList.add("is-empty");
+    if (!open) {
+      const pen = document.createElement("span");
+      pen.className = "slot-pen";
+      pen.setAttribute("aria-hidden", "true");
+      pen.innerHTML = pencilSimple;
+      name.append(title, pen);
+    } else {
+      name.append(title);
+    }
     toggle.append(chip, name);
+    if (open && focus && isTextField(slot)) {
+      queueMicrotask(() => {
+        const area = toggle.closest(".slot-card")?.querySelector<HTMLTextAreaElement>("[data-text-field]");
+        if (!area) return;
+        area.focus();
+        const end = area.value.length;
+        area.setSelectionRange(end, end);
+      });
+    }
     return;
   }
   const input = document.createElement("input");
@@ -302,7 +337,7 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
 
   const duplicate = document.createElement("button");
   duplicate.type = "button";
-  duplicate.className = "ghost icon-btn";
+  duplicate.className = "ghost icon-btn icon-hover";
   duplicate.setAttribute("aria-label", "Duplicate");
   duplicate.dataset.tip = "Duplicate this piece — Shift+D";
   duplicate.innerHTML = DUPLICATE_ICON;
@@ -310,11 +345,11 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
 
   const remove = document.createElement("button");
   remove.type = "button";
-  remove.className = "ghost icon-btn";
+  remove.className = "ghost icon-btn icon-hover";
   remove.dataset.remove = "";
   remove.setAttribute("aria-label", "Remove");
   remove.dataset.tip = "Remove this piece";
-  remove.textContent = "✕";
+  remove.innerHTML = `<span aria-hidden="true">✕</span>`;
   remove.addEventListener("click", () => H.removeSlot(slot.id));
   head.append(toggle, duplicate, remove);
   return head;
@@ -327,9 +362,26 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
   const editor = document.createElement("div");
   editor.className = "slot-editor";
   slot.fontWeight = H.chosenWeight(slot.fontFamily, slot.fontWeight);
+  const field = isTextField(slot);
+  const align = textAlignOf(slot);
+  const bold = slot.fontWeight >= 600;
+  const words = textFieldWordCount(slot.text);
+  const formatRow = field
+    ? `<textarea class="slot-live slot-live--field" data-text-field rows="5" aria-label="Text" placeholder="${H.escapeAttr(TEXT_FIELD_STARTER)}">${H.escapeAttr(slot.text)}</textarea>
+      <p class="text-field-count">${words} / ${TEXT_FIELD_WORD_MAX} words</p>
+      <div class="text-format" role="group" aria-label="Text formatting">
+        <button type="button" class="pill text-format__btn${bold ? " is-on" : ""}" data-text-bold aria-pressed="${bold}" data-tip="Bold">${textB}</button>
+        <button type="button" class="pill text-format__btn${slot.italic ? " is-on" : ""}" data-text-italic aria-pressed="${Boolean(slot.italic)}" data-tip="Italic">${textItalic}</button>
+        <span class="text-format__gap" aria-hidden="true"></span>
+        <button type="button" class="pill text-format__btn${align === "left" ? " is-on" : ""}" data-text-align="left" aria-pressed="${align === "left"}" data-tip="Align left">${textAlignLeft}</button>
+        <button type="button" class="pill text-format__btn${align === "center" ? " is-on" : ""}" data-text-align="center" aria-pressed="${align === "center"}" data-tip="Align center">${textAlignCenter}</button>
+        <button type="button" class="pill text-format__btn${align === "right" ? " is-on" : ""}" data-text-align="right" aria-pressed="${align === "right"}" data-tip="Align right">${textAlignRight}</button>
+      </div>`
+    : "";
   editor.innerHTML = `
     <div class="slot-group">
       <p class="slot-label">Text</p>
+      ${formatRow}
       <div class="row">
         <div class="field">${H.settingLabel(slot, "Typeface", "fontFamily")}
           <div class="font-pick" data-font-pick></div>
@@ -347,6 +399,13 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       <label class="field">${H.settingLabel(slot, "Letter spacing", "tracking", String(trackingOf(slot, H.state.textTracking)))}
         <input type="range" data-key="tracking" min="-400" max="500" step="1" value="${trackingOf(slot, H.state.textTracking)}" />
       </label>
+      ${
+        field
+          ? `<label class="field">${H.settingLabel(slot, "Line height", "lineHeight", textFieldLineHeight(slot).toFixed(2))}
+        <input type="range" data-key="lineHeight" min="0" max="100" step="1" value="${lineHeightSliderOf(slot)}" />
+      </label>`
+          : ""
+      }
       ${
         slot.shape !== "none"
           ? `<div class="field">${H.settingLabel(slot, "Text color", "textColor")}
@@ -368,7 +427,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         <label class="field">${H.settingLabel(slot, "Holding shape", "shape")}
           <select data-key="shape">
             <option value="none" ${slot.shape === "none" ? "selected" : ""}>None</option>
-            <option value="pill" ${slot.shape === "pill" ? "selected" : ""}>Pill</option>
+            <option value="pill" ${slot.shape === "pill" ? "selected" : ""}${field ? " disabled" : ""}>Pill</option>
             <option value="box" ${slot.shape === "box" ? "selected" : ""}>Box</option>
           </select>
         </label>
@@ -416,12 +475,18 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       ${H.blendField(slot)}
       ${H.dropShadowField(slot)}
     </div>
-    <div class="slot-group">
+    ${
+      field && !slot.gradient
+        ? ""
+        : `<div class="slot-group">
       <div class="slot-group-head">
         <p class="slot-label">Animation</p>
-        <button type="button" class="section-reset${H.assetAnimsFrozen ? " is-on" : ""}" data-freeze-anims aria-pressed="${H.assetAnimsFrozen}" aria-label="${H.assetAnimsFrozen ? "Resume animations" : "Pause animations"}" data-tip="${H.assetAnimsFrozen ? "Resume text and gradient animations" : "Freeze text and gradient animations on all assets"}">${H.assetAnimsFrozen ? playIcon : pauseIcon}</button>
+        <button type="button" class="section-reset icon-hover${H.assetAnimsFrozen ? " is-on" : ""}" data-freeze-anims aria-pressed="${H.assetAnimsFrozen}" aria-label="${H.assetAnimsFrozen ? "Resume animations" : "Pause animations"}" data-tip="${H.assetAnimsFrozen ? "Resume text and gradient animations" : "Freeze text and gradient animations on all assets"}">${H.assetAnimsFrozen ? playIcon : pauseIcon}</button>
       </div>
-      <div class="check-row">
+      ${
+        field
+          ? ""
+          : `<div class="check-row">
         <label class="check"${slot.animatedGradient ? ' data-tip="Turn off Animated Gradient to use Text animation"' : ""}>
           ${checkInput(`data-key="textAnim" ${slot.textAnim ? "checked" : ""} ${slot.animatedGradient ? "disabled" : ""}`)}
           Text animation
@@ -434,12 +499,13 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         <input type="range" data-key="textAnimSpeed" min="1" max="100" step="1" value="${textAnimSpeedOf(slot.textAnimSpeed)}" />
       </label>`
           : ""
+      }`
       }
       ${
         slot.gradient
           ? `<div class="check-row">
-        <label class="check"${slot.textAnim ? ' data-tip="Turn off Text animation to use Animated Gradient"' : ""}>
-          ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""} ${slot.textAnim ? "disabled" : ""}`)}
+        <label class="check"${!field && slot.textAnim ? ' data-tip="Turn off Text animation to use Animated Gradient"' : ""}>
+          ${checkInput(`data-key="animatedGradient" ${slot.animatedGradient ? "checked" : ""} ${!field && slot.textAnim ? "disabled" : ""}`)}
           Animated Gradient
         </label>
         ${H.resetControl("Animated Gradient", "animatedGradient", H.fieldDirty(slot, "animatedGradient"))}
@@ -453,7 +519,8 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       }`
           : ""
       }
-    </div>
+    </div>`
+    }
   `;
   placeFold(wrap, editor, open);
 
@@ -483,6 +550,50 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
   H.bindSlotInputs(editor, slot);
   H.bindTint(editor, slot);
   H.bindFreezeAnims(editor);
+  const fieldInput = editor.querySelector<HTMLTextAreaElement>("[data-text-field]");
+  if (fieldInput) {
+    fieldInput.addEventListener("input", () => {
+      H.remember(`text:${slot.id}`);
+      const next = clampTextFieldWords(fieldInput.value);
+      if (next !== fieldInput.value) fieldInput.value = next;
+      slot.text = next;
+      const count = editor.querySelector(".text-field-count");
+      if (count) count.textContent = `${textFieldWordCount(next)} / ${TEXT_FIELD_WORD_MAX} words`;
+      const title = wrap.querySelector(".slot-title");
+      if (title) {
+        title.textContent = textFieldHeadline(slot);
+        title.classList.toggle("is-empty", !next.trim());
+      }
+      H.live();
+    });
+    fieldInput.addEventListener("blur", () => {
+      if (H.pointerHeld) return;
+      if (H.gesture === `text:${slot.id}`) H.endGesture();
+    });
+  }
+  editor.querySelector("[data-text-bold]")?.addEventListener("click", () => {
+    H.remember();
+    slot.fontWeight = slot.fontWeight >= 600 ? H.chosenWeight(slot.fontFamily, 400) : H.chosenWeight(slot.fontFamily, 700);
+    H.reflectGlobalWeight();
+    H.renderPanel();
+    void H.settleFont(slot.fontFamily, slot.fontWeight).then(() => H.liveChip(slot.id));
+  });
+  editor.querySelector("[data-text-italic]")?.addEventListener("click", () => {
+    H.remember();
+    slot.italic = !slot.italic || undefined;
+    H.liveChip(slot.id);
+    H.renderPanel();
+  });
+  editor.querySelectorAll<HTMLButtonElement>("[data-text-align]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const next = btn.dataset.textAlign;
+      if (next !== "left" && next !== "center" && next !== "right") return;
+      H.remember();
+      slot.align = next;
+      H.liveChip(slot.id);
+      H.renderPanel();
+    });
+  });
   return wrap;
 }
 

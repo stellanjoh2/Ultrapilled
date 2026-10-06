@@ -65,8 +65,9 @@ async function apiGet(path: string): Promise<Response> {
   return res;
 }
 
-function mapPhotos(results: SearchResponse["results"]): UnsplashPhoto[] {
-  return (results ?? []).map((photo) => ({
+function mapPhoto(photo: SearchResponse["results"][number]): UnsplashPhoto | null {
+  if (!photo?.id || !photo.urls?.regular || !photo.links?.download_location) return null;
+  return {
     id: photo.id,
     alt: photo.alt_description || photo.description || photo.user.name,
     thumb: photo.urls.thumb || photo.urls.small,
@@ -75,7 +76,18 @@ function mapPhotos(results: SearchResponse["results"]): UnsplashPhoto[] {
     photographer: photo.user.name,
     profileUrl: withUnsplashUtm(photo.user.links.html),
     pageUrl: withUnsplashUtm(photo.links.html),
-  }));
+  };
+}
+
+function mapPhotos(results: SearchResponse["results"]): UnsplashPhoto[] {
+  return (results ?? []).map(mapPhoto).filter((photo): photo is UnsplashPhoto => Boolean(photo));
+}
+
+export async function getUnsplashPhoto(id: string): Promise<UnsplashPhoto> {
+  const res = await apiGet(`/photos/${encodeURIComponent(id)}`);
+  const mapped = mapPhoto((await res.json()) as SearchResponse["results"][number]);
+  if (!mapped) throw new Error("Photo missing");
+  return mapped;
 }
 
 export async function searchUnsplash(query: string, page = 1): Promise<UnsplashSearchPage> {
@@ -109,8 +121,8 @@ export async function trackUnsplashDownload(downloadLocation: string): Promise<v
   });
 }
 
-export async function unsplashPhotoFile(photo: UnsplashPhoto): Promise<File> {
-  await trackUnsplashDownload(photo.downloadLocation);
+export async function unsplashPhotoFile(photo: UnsplashPhoto, opts?: { track?: boolean }): Promise<File> {
+  if (opts?.track !== false) await trackUnsplashDownload(photo.downloadLocation);
   const res = await fetch(photo.regular);
   if (!res.ok) throw new Error(`Image fetch failed (${res.status})`);
   const blob = await res.blob();

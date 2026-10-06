@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { blankState } from "../templates";
-import { defaultTextSlot } from "../types";
+import { defaultImageSlot, defaultTextSlot } from "../types";
 import { parsePillProject, serializePillProject, type PillProject } from "./pillFormat";
 
 describe("pillFormat round-trip", () => {
@@ -12,6 +12,8 @@ describe("pillFormat round-trip", () => {
       frame: { width: 1280, height: 720 },
       images: [],
       loop: true,
+      pages: [],
+      pageIndex: 0,
     };
     const parsed = parsePillProject(serializePillProject(project));
     expect(parsed).not.toBeNull();
@@ -20,10 +22,72 @@ describe("pillFormat round-trip", () => {
     expect(parsed!.poses).toEqual(project.poses);
     expect(parsed!.state.slots).toHaveLength(1);
     expect(parsed!.state.slots[0]).toMatchObject({ id: "slot-a", kind: "text", text: "ROUND" });
+    expect(parsed!.pages).toHaveLength(1);
+    expect(parsed!.pageIndex).toBe(0);
+  });
+
+  it("round-trips extra layout pages", () => {
+    const a = defaultTextSlot({ id: "slot-a", text: "A" });
+    const b = defaultTextSlot({ id: "slot-b", text: "B" });
+    const state = { ...blankState(), slots: [b], template: "blank" };
+    const project: PillProject = {
+      state,
+      poses: [{ slotId: "slot-b", seqIndex: 0, sizeUnit: 0.2, x: 40, y: 50, angle: 0 }],
+      frame: { width: 800, height: 450 },
+      images: [],
+      loop: false,
+      pageIndex: 1,
+      pages: [
+        {
+          id: "p1",
+          slots: [a],
+          poses: [{ slotId: "slot-a", seqIndex: 0, sizeUnit: 0.3, x: 10, y: 12, angle: 0.2 }],
+          background: state.background,
+          frame: { width: 800, height: 450 },
+        },
+        {
+          id: "p2",
+          slots: [b],
+          poses: [{ slotId: "slot-b", seqIndex: 0, sizeUnit: 0.2, x: 40, y: 50, angle: 0 }],
+          background: state.background,
+          frame: { width: 800, height: 450 },
+        },
+      ],
+    };
+    const parsed = parsePillProject(serializePillProject(project));
+    expect(parsed).not.toBeNull();
+    expect(parsed!.pages).toHaveLength(2);
+    expect(parsed!.pageIndex).toBe(1);
+    expect(parsed!.state.slots[0]).toMatchObject({ id: "slot-b", text: "B" });
+    expect(parsed!.pages[0]!.slots[0]).toMatchObject({ id: "slot-a", text: "A" });
+    expect(parsed!.poses).toEqual(project.pages[1]!.poses);
   });
 
   it("rejects garbage", () => {
     expect(parsePillProject("{}")).toBeNull();
     expect(parsePillProject("not-json")).toBeNull();
+  });
+
+  it("round-trips Unsplash / Giphy remote ids", () => {
+    const slot = defaultImageSlot({
+      id: "gif-a",
+      name: "giphy-PBS-w-abc123.gif",
+      src: "blob:http://localhost/dead",
+      remote: { kind: "giphy", id: "abc123" },
+    });
+    const project: PillProject = {
+      state: { ...blankState(), slots: [slot], template: "blank" },
+      poses: [],
+      frame: { width: 1280, height: 720 },
+      images: [],
+      loop: false,
+      pages: [],
+      pageIndex: 0,
+    };
+    const parsed = parsePillProject(serializePillProject(project));
+    expect(parsed!.state.slots[0]).toMatchObject({
+      id: "gif-a",
+      remote: { kind: "giphy", id: "abc123" },
+    });
   });
 });
