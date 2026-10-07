@@ -42,8 +42,8 @@ function revealLayers(root: HTMLElement): RevealLayers | null {
 }
 
 /** Glyphs + pill, left→right by bbox so the ripple follows reading order. */
-function layerGlyphs(layer: HTMLElement): SVGElement[] {
-  const nodes = [...layer.querySelectorAll<SVGElement>(".logotype__glyph, .logotype__pill")];
+function layerGlyphs(layer: HTMLElement): SVGGraphicsElement[] {
+  const nodes = [...layer.querySelectorAll<SVGGraphicsElement>(".logotype__glyph, .logotype__pill")];
   return nodes.sort((a, b) => {
     try {
       return a.getBBox().x - b.getBBox().x;
