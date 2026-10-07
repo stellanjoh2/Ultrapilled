@@ -18,7 +18,7 @@ type Hint = {
 };
 
 const BLANK_FIRST: Hint = {
-  text: "Add your first asset in the Create tab — or right-click the canvas",
+  text: "Add your first object in the Create tab — or right-click the canvas",
 };
 
 const HINTS: Hint[] = [
@@ -28,14 +28,14 @@ const HINTS: Hint[] = [
   { text: "Need ideas? Explore the templates in the Create tab" },
   { text: "Hide the UI for a clean canvas", key: "H" },
   { text: "Toggle the guide grid", key: "G" },
-  { text: "Delete a selected piece with Backspace" },
+  { text: "Delete a selected object with Backspace" },
   { text: "Duplicate a selection with Shift+D — or ⌘D / Ctrl+D" },
-  { text: "Copy and paste assets with ⌘C / ⌘V or Ctrl+C / Ctrl+V" },
-  { text: "Invert the selected piece", key: "I" },
-  { text: "Click a piece to edit it" },
+  { text: "Copy and paste objects with ⌘C / ⌘V or Ctrl+C / Ctrl+V" },
+  { text: "Invert the selected object", key: "I" },
+  { text: "Click an object to edit it" },
   { text: "Double-click one shape in a group to edit it alone" },
   { text: "Double-click text to type on the canvas — or hit Enter" },
-  { text: "Right-click a piece to recolor, edit, duplicate, invert, or remove it" },
+  { text: "Right-click an object to recolor, edit, duplicate, invert, or remove it" },
   { text: "The more stuff you add the slower the app becomes" },
   { text: "Want to use bloom but it feels laggy? Try Performance mode in Settings" },
   { text: "Do you hate sound? You can turn that off in the Settings" },

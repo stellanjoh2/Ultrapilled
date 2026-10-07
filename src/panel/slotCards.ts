@@ -52,9 +52,9 @@ import { setRangeCaptionValue } from "../rangeCaption";
 const DUPLICATE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="4" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/><rect x="4" y="9" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>`;
 
 const TIPS = {
-  typeface: "Font family for this piece",
+  typeface: "Font family for this object",
   weight: "How heavy the letters are",
-  textScale: "Size of this text piece",
+  textScale: "Size of this text object",
   textHeight: "How tall the letters sit in the holding shape",
   tracking: "Space between letters",
   lineHeight: "Space between lines in this text box",
@@ -65,7 +65,7 @@ const TIPS = {
   stroked: "Draw an outline instead of a filled shape",
   stroke: "Thickness of the outline",
   strokeColor: "Color of the outline",
-  gradient: "Blend two colors across the piece",
+  gradient: "Blend two colors across the object",
   color: "Fill color — click the selected swatch again to pick any color",
   endColor: "Second color of the gradient",
   gradAngle: "Direction of the color blend",
@@ -76,7 +76,7 @@ const TIPS = {
   gradAnim: "Sweep the gradient so it looks like it is moving",
   gradAnimOff: "Turn off Text animation to use Animated Gradient",
   gradSpeed: "How fast the gradient sweeps",
-  shapeScale: "Size of this piece",
+  shapeScale: "Size of this object",
   amount: "How many copies drop into the frame",
   clipScale: "How much of the clip is cropped in the frame",
   loopSec: "How many seconds of the clip to loop",
@@ -392,7 +392,7 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
   duplicate.type = "button";
   duplicate.className = "ghost icon-btn icon-hover";
   duplicate.setAttribute("aria-label", "Duplicate");
-  duplicate.dataset.tip = "Duplicate this piece — Shift+D";
+  duplicate.dataset.tip = "Duplicate this object — Shift+D";
   duplicate.innerHTML = DUPLICATE_ICON;
   duplicate.addEventListener("click", () => H.duplicateSlot(slot.id));
 
@@ -401,7 +401,7 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
   remove.className = "ghost icon-btn icon-hover";
   remove.dataset.remove = "";
   remove.setAttribute("aria-label", "Remove");
-  remove.dataset.tip = "Remove this piece";
+  remove.dataset.tip = "Remove this object";
   remove.innerHTML = `<span aria-hidden="true">✕</span>`;
   remove.addEventListener("click", () => H.removeSlot(slot.id));
   head.append(toggle, duplicate, remove);
@@ -574,7 +574,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
         : `<div class="slot-group">
       <div class="slot-group-head">
         <p class="slot-label">Animation</p>
-        <button type="button" class="section-reset icon-hover${H.assetAnimsFrozen ? " is-on" : ""}" data-freeze-anims aria-pressed="${H.assetAnimsFrozen}" aria-label="${H.assetAnimsFrozen ? "Resume animations" : "Pause animations"}" data-tip="${H.assetAnimsFrozen ? "Resume text and gradient animations" : "Freeze text and gradient animations on all assets"}">${H.assetAnimsFrozen ? playIcon : pauseIcon}</button>
+        <button type="button" class="section-reset icon-hover${H.assetAnimsFrozen ? " is-on" : ""}" data-freeze-anims aria-pressed="${H.assetAnimsFrozen}" aria-label="${H.assetAnimsFrozen ? "Resume animations" : "Pause animations"}" data-tip="${H.assetAnimsFrozen ? "Resume text and gradient animations" : "Freeze text and gradient animations on all objects"}">${H.assetAnimsFrozen ? playIcon : pauseIcon}</button>
       </div>
       ${
         field

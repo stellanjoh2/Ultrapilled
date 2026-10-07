@@ -458,8 +458,8 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
             <input type="range" id="logo-scale" min="0.25" max="4" step="0.05" value="${scale}" />
           </label>
           <div class="segment" role="group" aria-label="Logo layer">
-            <button type="button" class="pill${!front ? " is-on" : ""}" data-logo-front="0" aria-pressed="${!front}" data-tip="Draw the logo under falling assets">Behind</button>
-            <button type="button" class="pill${front ? " is-on" : ""}" data-logo-front="1" aria-pressed="${front}" data-tip="Draw the logo over falling assets">In front</button>
+            <button type="button" class="pill${!front ? " is-on" : ""}" data-logo-front="0" aria-pressed="${!front}" data-tip="Draw the logo under falling objects">Behind</button>
+            <button type="button" class="pill${front ? " is-on" : ""}" data-logo-front="1" aria-pressed="${front}" data-tip="Draw the logo over falling objects">In front</button>
           </div>
           <label class="field" data-tip="How the logo mixes with the stage and grid. Normal follows the Create mix mode, so Difference shows the grid through a white mark.">Blend mode
             <select id="logo-blend">

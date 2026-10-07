@@ -1038,7 +1038,7 @@ html[data-theme="day"] .stage.is-portrait .playfield {
 
 @media (hover: hover) and (pointer: fine) {
   .bg-credit a:hover {
-    color: #fff;
+    color: var(--pill-fun-face);
   }
 }
 
@@ -2168,7 +2168,12 @@ button.pill.panel-util {
   text-transform: uppercase;
   box-shadow: none;
   isolation: isolate;
-  transition: all 0.25s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
 }
 
 button.pill.panel-util:hover:not(.is-on) {
@@ -2176,7 +2181,6 @@ button.pill.panel-util:hover:not(.is-on) {
   color: var(--pill-fun-ink);
   border-color: transparent;
   box-shadow: none;
-  filter: none;
 }
 
 button.pill.panel-util:active:not(.is-on) {
@@ -2816,7 +2820,7 @@ button.pill.smash-btn.is-on::after {
 
 .section-toggle {
   display: flex;
-  flex: 1;
+  flex: 0 1 auto;
   align-items: center;
   min-width: 0;
   margin: 0;
@@ -2829,6 +2833,11 @@ button.pill.smash-btn.is-on::after {
   cursor: pointer;
 }
 
+.section-toggle__label,
+.settings-modal__body .shortcuts-title {
+  transition: color 0.15s ease;
+}
+
 .section-chevron {
   flex: none;
   width: 0;
@@ -2837,7 +2846,22 @@ button.pill.smash-btn.is-on::after {
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
   border-top: 6px solid var(--ink-mute);
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    border-top-color 0.15s ease;
+}
+
+/* Hover only the control under the pointer — not the whole section-head row
+   (that made the chevron/reset corner go lime while still over the title). */
+@media (hover: hover) {
+  .section-toggle:hover .section-toggle__label,
+  .section-toggle:hover .shortcuts-title {
+    color: var(--pill-fun-face);
+  }
+
+  .section-chevron:hover {
+    border-top-color: var(--pill-fun-face);
+  }
 }
 
 .section.is-open .section-chevron {
@@ -2885,7 +2909,10 @@ button.pill.smash-btn.is-on::after {
 .section-reset {
   display: grid;
   place-items: center;
-  flex-shrink: 0;
+  flex: none;
+  align-self: center;
+  /* Park reset + chevron on the trailing edge; toggle stays label-sized. */
+  margin-left: auto;
   width: calc(22px * var(--ui-scale));
   height: calc(22px * var(--ui-scale));
   padding: 0;
@@ -2897,6 +2924,11 @@ button.pill.smash-btn.is-on::after {
   transition: color 0.15s ease;
 }
 
+/* When reset is hidden, keep the chevron on the trailing edge. */
+.section-reset[hidden] ~ .section-chevron {
+  margin-left: auto;
+}
+
 .section-reset svg {
   width: calc(14px * var(--ui-scale));
   height: calc(14px * var(--ui-scale));
@@ -2904,7 +2936,7 @@ button.pill.smash-btn.is-on::after {
 }
 
 .section-reset:hover {
-  color: var(--ink);
+  color: var(--pill-fun-face);
 }
 
 .section-reset.is-on {
@@ -3032,7 +3064,7 @@ html[data-theme="day"] input[type="text"].field-caption-input:focus {
 }
 
 .field-reset:hover {
-  color: var(--ink);
+  color: var(--pill-fun-face);
 }
 
 .field-reset[hidden] {
@@ -3095,6 +3127,17 @@ html[data-theme="day"] input[type="text"].field-caption-input:focus {
   user-select: none;
 }
 
+/* Master Sound off — dependent toggles look + act inert. */
+[data-sound-dependent].is-muted {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.check:has(input:disabled) {
+  cursor: default;
+  color: var(--ink-mute);
+}
+
 /* Uiverse Shoh2008/big-deer-80 — circular splash check, themed */
 .check__box {
   position: relative;
@@ -3116,6 +3159,11 @@ html[data-theme="day"] input[type="text"].field-caption-input:focus {
   background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.check__box input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .check__box input[type="checkbox"]:focus {
@@ -3461,7 +3509,7 @@ select:focus {
 }
 
 .font-menu-item__remove:hover {
-  color: var(--ink);
+  color: var(--pill-fun-face);
 }
 
 .font-menu-item:hover,
@@ -3526,7 +3574,7 @@ select:focus {
 }
 
 .font-menu-close:hover {
-  color: var(--ink);
+  color: var(--pill-fun-face);
 }
 
 .font-menu--fonts .font-menu-search {
@@ -3587,6 +3635,7 @@ input[type="range"] {
   --track: var(--primary-soft);
   --fill: var(--primary);
   --thumb: var(--primary);
+  --thumb-scale: 1;
   --pct: 0%;
   width: 100%;
   height: calc(16px * var(--ui-scale));
@@ -3596,6 +3645,22 @@ input[type="range"] {
   background: transparent;
   appearance: none;
   cursor: pointer;
+}
+
+/* Drive fill + thumb via vars on the input — leave --track (gray remainder) alone.
+   Vendor thumb pseudo-elements cannot share a selector list (WebKit drops ::-moz-* mixes). */
+@media (hover: hover) {
+  input[type="range"]:hover:not(:disabled):not(:active) {
+    --fill: #fff;
+    --thumb: #fff;
+    --thumb-scale: 1.1;
+  }
+}
+
+input[type="range"]:active:not(:disabled) {
+  --fill: var(--pill-fun-face);
+  --thumb: var(--pill-fun-face);
+  --thumb-scale: 1.2;
 }
 
 input[type="range"]:focus,
@@ -3618,13 +3683,18 @@ input[type="range"]::-webkit-slider-runnable-track {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: calc(16px * var(--ui-scale));
-  height: calc(16px * var(--ui-scale));
-  margin-top: -6px;
+  width: calc(16px * var(--ui-scale) * var(--thumb-scale));
+  height: calc(16px * var(--ui-scale) * var(--thumb-scale));
+  margin-top: calc((4px - 16px * var(--thumb-scale)) * var(--ui-scale) / 2);
   border: none;
   border-radius: 50%;
   background: var(--thumb);
   box-shadow: none;
+  transition:
+    width 0.15s ease,
+    height 0.15s ease,
+    margin-top 0.15s ease,
+    background 0.15s ease;
 }
 
 input[type="range"]::-moz-range-track {
@@ -3635,12 +3705,16 @@ input[type="range"]::-moz-range-track {
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: calc(16px * var(--ui-scale));
-  height: calc(16px * var(--ui-scale));
+  width: calc(16px * var(--ui-scale) * var(--thumb-scale));
+  height: calc(16px * var(--ui-scale) * var(--thumb-scale));
   border: none;
   border-radius: 50%;
   background: var(--thumb);
   box-shadow: none;
+  transition:
+    width 0.15s ease,
+    height 0.15s ease,
+    background 0.15s ease;
 }
 
 input[type="range"]:disabled {
@@ -3655,6 +3729,7 @@ input[type="range"]:disabled {
   --rail-gradient: linear-gradient(90deg, #1d5bff, #f6f2ff, #ffbb6b);
   --temp-thumb-size: calc(16px * var(--ui-scale));
   --temp-thumb-border: calc(2px * var(--ui-scale));
+  --temp-thumb-border-color: #fff;
 }
 
 .field--temperature input[type="range"]::-webkit-slider-runnable-track {
@@ -3665,7 +3740,11 @@ input[type="range"]:disabled {
   background: var(--rail-gradient);
 }
 
-.field--temperature input[type="range"]:is(:active, :focus-visible)::-webkit-slider-runnable-track,
+.field--temperature input[type="range"]:is(:active, :focus-visible)::-webkit-slider-runnable-track {
+  background: var(--rail-gradient);
+  filter: brightness(1.14);
+}
+
 .field--temperature input[type="range"]:is(:active, :focus-visible)::-moz-range-track {
   background: var(--rail-gradient);
   filter: brightness(1.14);
@@ -3673,14 +3752,33 @@ input[type="range"]:disabled {
 
 .field--temperature input[type="range"]::-webkit-slider-thumb {
   background: transparent;
-  border: var(--temp-thumb-border) solid #fff;
+  border: var(--temp-thumb-border) solid var(--temp-thumb-border-color);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transition:
+    width 0.15s ease,
+    height 0.15s ease,
+    margin-top 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .field--temperature input[type="range"]::-moz-range-thumb {
   background: transparent;
-  border: var(--temp-thumb-border) solid #fff;
+  border: var(--temp-thumb-border) solid var(--temp-thumb-border-color);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transition:
+    width 0.15s ease,
+    height 0.15s ease,
+    border-color 0.15s ease;
+}
+
+@media (hover: hover) {
+  .field--temperature input[type="range"]:hover:not(:disabled):not(:active) {
+    --temp-thumb-border-color: #fff;
+  }
+}
+
+.field--temperature input[type="range"]:active:not(:disabled) {
+  --temp-thumb-border-color: var(--pill-fun-face);
 }
 
 input[type="file"] {
@@ -3824,14 +3922,20 @@ button {
 }
 
 /* Idle pills = outline; solid fill is reserved for .is-on / .pill--commit.
-   Opt out: play/smash/slot-add/panel-util. Hover = Orby lime smash. */
+   Opt out: play/smash/slot-add/panel-util. Hover = Orby lime smash.
+   Prefer property lists over `transition: all` — Chrome can flicker filters/shadows. */
 button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit, .is-on)),
 a.pill:not(.pill--commit) {
   background: transparent;
   color: var(--ink);
   border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
   box-shadow: none;
-  transition: all 0.25s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
 }
 
 button.pill:not(:is(.play-btn, .smash-btn, .slot-add, .panel-util, .pill--commit)):hover:not(:disabled):not(.is-on),
@@ -3852,13 +3956,8 @@ a.pill:not(.pill--commit):active {
   transition: 100ms;
 }
 
-button.pill:hover {
-  background: var(--field-hover);
-}
-
-button.pill:active {
-  background: var(--primary-soft);
-}
+/* No generic button.pill:hover fill — outline pills use lime smash above;
+   specialized kinds (slot-add / play / smash / …) define their own hover. */
 
 button.pill.is-on {
   background: var(--primary);
@@ -3937,10 +4036,12 @@ button.ghost {
   place-items: center;
   line-height: 0;
   transition: transform 0.15s ease;
+  backface-visibility: hidden;
 }
 
 .icon-hover svg {
   display: block;
+  backface-visibility: hidden;
 }
 
 button.icon-btn {
@@ -3976,7 +4077,12 @@ button.icon-btn.panel-project {
   background: transparent;
   color: var(--ink-mute);
   box-shadow: none;
-  transition: all 0.25s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
 }
 
 button.icon-btn.panel-project svg {
@@ -3994,7 +4100,6 @@ button.icon-btn.panel-project[aria-expanded="true"] {
   color: var(--pill-fun-ink);
   border-color: transparent;
   box-shadow: none;
-  filter: none;
 }
 
 button.icon-btn.panel-project:active:not(:disabled) {
@@ -4008,7 +4113,7 @@ button.icon-btn.panel-project:active:not(:disabled) {
 
 @media (hover: hover) and (pointer: fine) {
   .icon-hover:hover:not(:disabled) {
-    color: var(--ink);
+    color: var(--pill-fun-face);
   }
 
   .icon-hover.is-on:hover:not(:disabled) {
@@ -4074,6 +4179,7 @@ button:focus-visible,
 
 button.pill.slot-add {
   position: relative;
+  z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4089,13 +4195,14 @@ button.pill.slot-add {
   text-transform: uppercase;
   white-space: nowrap;
   box-shadow: none;
+  /* No color tween — inherited currentColor was fighting the icon swap. */
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 button.pill.slot-add:hover {
   border-color: color-mix(in srgb, var(--ink) 40%, transparent);
   background: color-mix(in srgb, var(--ink) 5%, transparent);
-  color: var(--ink);
-  filter: none;
+  color: var(--pill-fun-face);
 }
 
 .slot-add__icon {
@@ -4110,16 +4217,75 @@ button.pill.slot-add:hover {
   border-radius: calc(9999px * var(--ui-scale));
   background: color-mix(in srgb, var(--ink) 12%, var(--field));
   color: var(--ink);
+  pointer-events: none;
+  isolation: isolate;
+}
+
+/* Soften only plain rows; create/clear snap (see below). */
+.slot-add:not(.is-create):not(.is-clear) .slot-add__icon {
   transition: background 0.15s ease;
 }
 
-.slot-add:hover .slot-add__icon {
+.slot-add:hover:not(.is-create):not(.is-clear) .slot-add__icon {
   background: color-mix(in srgb, var(--ink) 22%, var(--field));
+  color: var(--pill-fun-face);
 }
 
-.slot-add__icon svg {
+.slot-add__icon > svg,
+.slot-add__plus {
+  grid-area: 1 / 1;
+}
+
+.slot-add__icon > svg {
   width: calc(16px * var(--ui-scale));
   height: calc(16px * var(--ui-scale));
+  display: block;
+}
+
+.slot-add__plus {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+  visibility: hidden;
+  color: var(--pill-fun-ink);
+}
+
+.slot-add__plus svg {
+  display: block;
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
+}
+
+button.pill.slot-add.is-create .slot-add__icon,
+button.pill.slot-add.is-clear .slot-add__icon {
+  transition: none;
+}
+
+@media (hover: hover) {
+  /* One paint flip: lime disc + dark +, same smash as other pills. */
+  button.pill.slot-add.is-create:hover:not(:disabled) .slot-add__icon {
+    background: var(--pill-fun-face);
+    color: var(--pill-fun-ink);
+    box-shadow: none;
+  }
+
+  button.pill.slot-add.is-create:hover:not(:disabled) .slot-add__icon > svg {
+    visibility: hidden;
+  }
+
+  button.pill.slot-add.is-create:hover:not(:disabled) .slot-add__plus {
+    visibility: visible;
+  }
+
+  /* Clear canvas: trash → X on the red smash. */
+  button.pill.slot-add.is-clear:hover:not(:disabled) .slot-add__icon > svg {
+    visibility: hidden;
+  }
+
+  button.pill.slot-add.is-clear:hover:not(:disabled) .slot-add__plus {
+    visibility: visible;
+    color: #fff;
+  }
 }
 
 /* Empty-canvas right-click: solid pills only, no plate. */
@@ -4135,9 +4301,11 @@ button.pill.slot-add:hover {
   padding: 0;
   background: transparent;
   pointer-events: none;
+  isolation: isolate;
 }
 
 .canvas-add-menu > button.pill.slot-add {
+  --menu-hover-shift: calc(12px * var(--ui-scale));
   width: 100%;
   justify-content: flex-start;
   padding-left: calc(44px * var(--ui-scale));
@@ -4150,13 +4318,38 @@ button.pill.slot-add:hover {
   text-transform: uppercase;
   pointer-events: auto;
   box-shadow: var(--shadow-1);
+  overflow: visible;
+  transition:
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+/* Hit pad bridges gaps + slide distance so transform hover can’t thrash :hover. */
+.canvas-add-menu > button.pill.slot-add::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-1) / -2);
+  bottom: calc(var(--space-1) / -2);
+  left: calc(-1 * var(--menu-hover-shift));
+  right: calc(-1 * var(--menu-hover-shift));
 }
 
 .canvas-add-menu > button.pill.slot-add:hover {
+  z-index: 1;
   border-color: transparent;
   background: var(--field-hover);
-  color: var(--ink);
-  filter: none;
+  color: var(--pill-fun-face);
+  transform: translateX(var(--menu-hover-shift));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-add-menu > button.pill.slot-add {
+    transition: background 0.15s ease;
+  }
+
+  .canvas-add-menu > button.pill.slot-add:hover {
+    transform: none;
+  }
 }
 
 .canvas-add-menu > button.pill.slot-add.is-clear:hover {
@@ -4612,7 +4805,7 @@ input.slot-live:focus {
 }
 
 .color-pop-close:hover {
-  color: var(--ink);
+  color: var(--pill-fun-face);
 }
 
 .color-pop-sv {
@@ -4990,11 +5183,20 @@ html[data-theme="day"] .shape-swatch {
 }
 
 .panel-credit__s {
-  display: block;
+  display: grid;
+  place-items: center;
   width: calc(48px * 198 / 248.77);
   height: calc(48px * var(--ui-scale));
   margin: 0 auto var(--space-2);
-  background-color: var(--ink);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.panel-credit__s-mark {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: currentColor;
   -webkit-mask-image: url("./assets/s-logo.svg");
   mask-image: url("./assets/s-logo.svg");
   -webkit-mask-repeat: no-repeat;
@@ -5031,10 +5233,12 @@ html[data-theme="day"] .shape-swatch {
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--ink) 45%, transparent);
   text-underline-offset: 3px;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
 }
 
 .panel-credit__author:hover {
-  text-decoration-color: var(--ink);
+  color: var(--pill-fun-face);
+  text-decoration-color: var(--pill-fun-face);
 }
 
 .panel-credit__social {
@@ -5073,10 +5277,16 @@ html[data-theme="day"] .shape-swatch {
   inset: calc(var(--space-1) * -1);
 }
 
-.panel-credit__social a:hover,
-.panel-credit__social button:hover {
-  color: var(--ink);
-  opacity: 1;
+@media (hover: hover) {
+  a.panel-credit__s.icon-hover:hover {
+    color: var(--pill-fun-face);
+  }
+
+  .panel-credit__social a:hover,
+  .panel-credit__social button:hover {
+    color: var(--pill-fun-face);
+    opacity: 1;
+  }
 }
 
 .panel-credit svg,
@@ -5543,7 +5753,9 @@ html[data-theme="day"] .shape-swatch {
   line-height: 1.4;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .slot-menu__item-icon {
@@ -5581,9 +5793,10 @@ html[data-theme="day"] .shape-swatch {
   border-radius: inherit;
 }
 
-.slot-menu__item:hover,
-.slot-menu__item:focus-visible {
+.slot-menu__item:hover:not(:disabled),
+.slot-menu__item:focus-visible:not(:disabled) {
   background: var(--canvas-soft);
+  color: var(--pill-fun-face);
   outline: none;
 }
 
@@ -5796,8 +6009,10 @@ html[data-theme="day"] .shape-swatch {
   pointer-events: auto;
 }
 
-.pro-tip__stop:hover {
-  color: var(--ink);
+@media (hover: hover) {
+  .pro-tip__stop:hover {
+    color: var(--pill-fun-face);
+  }
 }
 
 .pro-tip__body kbd {
@@ -6152,7 +6367,7 @@ body.is-exporting .app {
 
 @media (hover: hover) and (pointer: fine) {
   .settings-modal__back:hover {
-    color: var(--ink);
+    color: var(--pill-fun-face);
   }
 }
 
@@ -6363,10 +6578,11 @@ html[data-theme="day"] .settings-modal__body .keycap {
 .about-overlay__links a {
   color: inherit;
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 .about-overlay__links a:hover {
-  color: #ffffff;
+  color: #c4ff00;
   text-decoration: underline;
   text-underline-offset: 0.12em;
 }
@@ -6484,10 +6700,12 @@ a.pill.about-project__launch {
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  transition: color 0.2s ease;
 }
 
 .about-overlay__ok:hover,
 .about-overlay__ok:focus-visible {
+  color: #c4ff00;
   text-decoration: underline;
   text-underline-offset: 0.12em;
 }
@@ -6535,6 +6753,11 @@ a.pill.about-project__launch {
 
 .report-card__copy a {
   color: inherit;
+  transition: color 0.2s ease;
+}
+
+.report-card__copy a:hover {
+  color: var(--pill-fun-face);
 }
 
 .report-card__open {
@@ -6552,10 +6775,12 @@ a.pill.about-project__launch {
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  transition: color 0.2s ease;
 }
 
 .report-card__open:hover,
 .report-card__open:focus-visible {
+  color: var(--pill-fun-face);
   text-decoration: underline;
   text-underline-offset: 0.12em;
 }
@@ -6628,7 +6853,7 @@ a.pill.about-project__launch {
 
 @media (hover: hover) and (pointer: fine) {
   .bug-report__x:hover {
-    color: var(--ink);
+    color: var(--pill-fun-face);
   }
 }
 
@@ -7062,6 +7287,11 @@ html[data-theme="day"] .bug-report__message {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+
+.unsplash-grid__by a:hover {
+  color: var(--pill-fun-face);
 }
 
 .unsplash-modal__foot {
@@ -7081,6 +7311,11 @@ html[data-theme="day"] .bug-report__message {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+
+.unsplash-modal__credit a:hover {
+  color: var(--pill-fun-face);
 }
 
 .youtube-modal .unsplash-modal__card {
@@ -7472,16 +7707,18 @@ input[type="file"].mode-select__file {
   transition: opacity 0.2s ease, color 0.2s ease;
 }
 
-.mode-select__social a::before,
-.mode-select__social button.mode-select__s::before {
+.mode-select__social a::before {
   content: "";
   position: absolute;
   inset: calc(var(--space-1) * -0.5);
 }
 
-.mode-select__social a:hover {
-  color: var(--ink);
-  opacity: 1;
+@media (hover: hover) {
+  .mode-select__social a:hover,
+  a.mode-select__s.icon-hover:hover {
+    color: var(--pill-fun-face);
+    opacity: 1;
+  }
 }
 
 .mode-select__social svg,
@@ -7503,22 +7740,17 @@ input[type="file"].mode-select__file {
   mask-size: contain;
 }
 
-button.mode-select__s {
-  appearance: none;
+a.mode-select__s {
   display: grid;
   place-items: center;
   width: calc(38px * 198 / 248.77 * var(--ui-scale));
   height: calc(38px * var(--ui-scale));
   margin: 0;
   padding: 0;
-  border: none;
   border-radius: calc(9999px * var(--ui-scale));
   color: #555;
   background: transparent;
-  cursor: pointer;
   z-index: 1;
-  opacity: 0.75;
-  transition: opacity 0.2s ease, color 0.2s ease;
 }
 
 .mode-select__s-mark {
@@ -7534,11 +7766,6 @@ button.mode-select__s {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
-}
-
-button.mode-select__s:hover {
-  color: var(--ink);
-  opacity: 1;
 }
 
 .mode-select__foot {
@@ -7562,7 +7789,7 @@ button.mode-select__s:hover {
 }
 
 .mode-select__foot a:hover {
-  color: #fff;
+  color: #c4ff00;
 }
 
 .mode-select__foot strong {

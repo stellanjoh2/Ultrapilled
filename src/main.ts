@@ -88,6 +88,7 @@ import youtubeLogo from "@phosphor-icons/core/assets/regular/youtube-logo.svg?ra
 import eyeIcon from "@phosphor-icons/core/assets/regular/eye.svg?raw";
 import eyeSlash from "@phosphor-icons/core/assets/regular/eye-slash.svg?raw";
 import trashSimple from "@phosphor-icons/core/assets/regular/trash-simple.svg?raw";
+import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import folderOpen from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
@@ -137,7 +138,7 @@ import {
 import { fitTextFieldBox, trackingEm, trackingOf } from "./measure";
 import { createWorld } from "./world";
 import { cancelSlotDrag } from "./slotDrag";
-import { bindUiClickSounds, bindUiTypeSounds, playButton, playCaution, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
+import { bindUiClickSounds, bindUiHoverSounds, bindUiTypeSounds, playButton, playCaution, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
 import gsap from "gsap";
 import "./style.css";
 import { compositionScale, placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
@@ -148,7 +149,7 @@ import {
   setRangeCaptionValue,
   wireRangeCaptions,
 } from "./rangeCaption";
-import { mountCreatePanel, paintAudioMic, paintSectionResets, RESET_ICON, setSectionOpen, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
+import { mountCreatePanel, paintAudioMic, paintSectionResets, RESET_ICON, setSectionOpen, slotAddIcon, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
 import { closeOtherSlots, replaceSlotCard, setSlotOpen } from "./panel/slotCards";
 import {
   assignCloseSlotMenu,
@@ -331,6 +332,7 @@ app.innerHTML = `
 `;
 
 bindUiClickSounds(app);
+bindUiHoverSounds(document);
 bindUiTypeSounds(app);
 
 const stage = app.querySelector<HTMLElement>("#stage")!;
@@ -359,7 +361,7 @@ function paintWelcome() {
   // First-shape nudge owns the empty canvas until Create / Templates adds something.
   if (state.slots.length > 0 || world.chipCount() > 0) clearCanvasNudge();
   canvasWelcome.textContent = state.physics.layoutMode
-    ? "Add pieces from Create, then place them on the canvas"
+    ? "Add objects from Create, then place them on the canvas"
     : "Press spacebar to trigger physics";
   const nudgeUp = !canvasNudge.hidden;
   const show = !welcomeDismissed && !running && !posePinned && world.chipCount() === 0 && !nudgeUp;
@@ -2020,6 +2022,21 @@ function createPanelHost(): CreatePanelHost {
     addEmojiSlot,
     pickImageFiles,
     addImagesFromFiles,
+    openUnsplashAdd() {
+      openUnsplashImport({
+        onPick: (file, remote) => addImagesFromFiles([file], undefined, remote),
+      });
+    },
+    openGiphyAdd() {
+      openGiphyImport({
+        onPick: (file, remote) => addImagesFromFiles([file], undefined, remote),
+      });
+    },
+    openYouTubeAdd() {
+      openYouTubeImport({
+        onPick: (clip) => addYouTubeSlot(clip),
+      });
+    },
     bindRange,
     paintPerfHints,
     syncInheritedPillPads,
@@ -3378,7 +3395,7 @@ function dropShadowField(slot: Slot): string {
   </div>
   ${
     on
-      ? `<label class="field" data-tip="How far the shadow sits from the piece">${settingLabel(slot, "Shadow distance", "dropShadowDistance", String(distance))}
+      ? `<label class="field" data-tip="How far the shadow sits from the object">${settingLabel(slot, "Shadow distance", "dropShadowDistance", String(distance))}
     <input type="range" data-key="dropShadowDistance" min="0" max="64" step="1" value="${distance}" />
   </label>
   <label class="field" data-tip="How soft the shadow edge is">${settingLabel(slot, "Shadow radius", "dropShadowRadius", String(radius))}
@@ -3405,13 +3422,13 @@ function attractorField(slot: Slot): string {
   const idle = Boolean(slot.attractorIdle);
   return `<div class="slot-group" data-attractor-settings>
     <p class="slot-label">Attractor Settings</p>
-    <label class="field" data-tip="How hard other assets chase this one">${settingLabel(slot, "Strength", "attractorStrength", String(strength))}
+    <label class="field" data-tip="How hard other objects chase this one">${settingLabel(slot, "Strength", "attractorStrength", String(strength))}
       <input type="range" data-key="attractorStrength" min="1" max="100" step="1" value="${strength}" />
     </label>
     <label class="field" data-tip="How far the pull reaches. 100 covers the whole canvas">${settingLabel(slot, "Reach", "attractorReach", String(reach))}
       <input type="range" data-key="attractorReach" min="1" max="100" step="1" value="${reach}" />
     </label>
-    <div class="check-row" data-tip="Keep pulling even when this asset is sitting still">
+    <div class="check-row" data-tip="Keep pulling even when this object is sitting still">
       <label class="check">
         ${checkInput(`data-key="attractorIdle" ${idle ? "checked" : ""}`)}
         Always pull
@@ -3534,7 +3551,7 @@ function paintFreezeAnimsButton(button: HTMLButtonElement) {
   button.setAttribute("aria-label", assetAnimsFrozen ? "Resume animations" : "Pause animations");
   button.dataset.tip = assetAnimsFrozen
     ? "Resume text and gradient animations"
-    : "Freeze text and gradient animations on all assets";
+    : "Freeze text and gradient animations on all objects";
   button.innerHTML = assetAnimsFrozen ? playIcon : pauseIcon;
 }
 
@@ -3892,6 +3909,7 @@ function clearCanvas() {
 
 function openCanvasMenu(x: number, y: number) {
   closeSlotMenu();
+  playTransition(true);
   const abort = new AbortController();
   const menu = document.createElement("div");
   menu.className = "canvas-add-menu";
@@ -3899,15 +3917,16 @@ function openCanvasMenu(x: number, y: number) {
 
   const at: PlaceAt = { clientX: x, clientY: y };
   const uiHidden = shell.classList.contains("ui-hidden");
-  const entries: { label: string; icon: string; run: () => void; clear?: boolean; tip: string }[] = [
-    { label: "Pill", icon: pillIcon, tip: "Add a text label inside a rounded pill", run: () => addPillSlot(at) },
-    { label: "Words", icon: textAa, tip: "One-line type sized to the letters — a few words, not a wrapping box", run: () => addTypeSlot(at) },
-    { label: "Longer text", icon: textT, tip: "A wrapping box you can resize and paste into — sentences and paragraphs", run: () => addTextFieldSlot(at) },
-    { label: "Shape", icon: shapesIcon, tip: "Add a built-in shape from the library", run: () => addShapeSlot(at) },
-    { label: "Emoji", icon: smileyIcon, tip: "Add an emoji", run: () => addEmojiSlot(at) },
+  const entries: { label: string; icon: string; run: () => void; clear?: boolean; create?: boolean; tip: string }[] = [
+    { label: "Pill", icon: pillIcon, create: true, tip: "Add a text label inside a rounded pill", run: () => addPillSlot(at) },
+    { label: "Words", icon: textAa, create: true, tip: "One-line type sized to the letters — a few words, not a wrapping box", run: () => addTypeSlot(at) },
+    { label: "Longer text", icon: textT, create: true, tip: "A wrapping box you can resize and paste into — sentences and paragraphs", run: () => addTextFieldSlot(at) },
+    { label: "Shape", icon: shapesIcon, create: true, tip: "Add a built-in shape from the library", run: () => addShapeSlot(at) },
+    { label: "Emoji", icon: smileyIcon, create: true, tip: "Add an emoji", run: () => addEmojiSlot(at) },
     {
       label: "Image",
       icon: uploadSimple,
+      create: true,
       tip: "Add an SVG, PNG, JPG, GIF, or MP4",
       run: () => {
         void pickImageFiles(true).then((files) => {
@@ -3919,6 +3938,7 @@ function openCanvasMenu(x: number, y: number) {
     {
       label: "Unsplash",
       icon: imagesIcon,
+      create: true,
       tip: "Search photos from Unsplash",
       run: () => {
         openUnsplashImport({
@@ -3929,6 +3949,7 @@ function openCanvasMenu(x: number, y: number) {
     {
       label: "Giphy",
       icon: gifIcon,
+      create: true,
       tip: "Search GIFs from Giphy",
       run: () => {
         openGiphyImport({
@@ -3939,6 +3960,7 @@ function openCanvasMenu(x: number, y: number) {
     {
       label: "YouTube",
       icon: youtubeLogo,
+      create: true,
       tip: "Embed a muted looping YouTube clip",
       run: () => {
         openYouTubeImport({
@@ -3957,17 +3979,29 @@ function openCanvasMenu(x: number, y: number) {
         resize();
       },
     },
-    { label: "Clear canvas", icon: trashSimple, clear: true, tip: "Remove every piece from the stage", run: () => clearCanvas() },
+    { label: "Clear canvas", icon: trashSimple, clear: true, tip: "Remove every object from the stage", run: () => clearCanvas() },
   ];
 
   const buttons: HTMLButtonElement[] = [];
   for (const entry of entries) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = entry.clear ? "pill slot-add is-clear" : "pill slot-add";
+    btn.className = [
+      "pill slot-add",
+      entry.create ? "is-create" : "",
+      entry.clear ? "is-clear" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     btn.setAttribute("role", "menuitem");
     btn.dataset.tip = entry.tip;
-    btn.innerHTML = `<span class="slot-add__icon" aria-hidden="true">${entry.icon}</span>${entry.label}`;
+    btn.innerHTML = `${
+      entry.create
+        ? slotAddIcon(entry.icon)
+        : entry.clear
+          ? slotAddIcon(entry.icon, xIcon)
+          : `<span class="slot-add__icon" aria-hidden="true">${entry.icon}</span>`
+    }${entry.label}`;
     btn.addEventListener("click", () => {
       closeSlotMenu();
       entry.run();
@@ -3984,18 +4018,56 @@ function openCanvasMenu(x: number, y: number) {
     gsap.fromTo(
       buttons,
       { autoAlpha: 0, y: -10 },
-      { autoAlpha: 1, y: 0, duration: 0.11, stagger: 0.025, ease: "power2.out" },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: 0.11,
+        stagger: 0.025,
+        ease: "power2.out",
+        // Drop inline transform/opacity so CSS hover isn’t fighting leftover tween props.
+        clearProps: "transform,opacity,visibility",
+      },
     );
   }
 
-  const closeCurrent = () => {
-    abort.abort();
-    gsap.killTweensOf(buttons);
+  let closed = false;
+  let closing = false;
+  const finishClose = () => {
+    if (closed) return;
+    closed = true;
+    gsap.killTweensOf([menu, ...buttons]);
     if (peekCloseSlotMenu() === closeCurrent) assignCloseSlotMenu(() => {});
     menu.remove();
   };
+
+  /** Instant for actions / reopen; `{ animate: true }` for dismiss with fade + close sound. */
+  const closeCurrent = (opts?: { animate?: boolean }) => {
+    const animate = Boolean(opts?.animate);
+    if (closing) {
+      if (!animate) finishClose();
+      return;
+    }
+    closing = true;
+    abort.abort();
+
+    if (animate) {
+      playTransition(false);
+      if (!reduceMotion) {
+        menu.style.pointerEvents = "none";
+        gsap.killTweensOf(buttons);
+        gsap.to(menu, {
+          autoAlpha: 0,
+          duration: 0.12,
+          ease: "power2.in",
+          onComplete: finishClose,
+        });
+        return;
+      }
+    }
+    finishClose();
+  };
   assignCloseSlotMenu(closeCurrent);
-  bindSlotMenuDismiss(menu, abort, closeCurrent);
+  bindSlotMenuDismiss(menu, abort, () => closeCurrent({ animate: true }));
 }
 
 function endChipEdit(commit = true) {
@@ -5628,7 +5700,7 @@ function showAddShapeNudge() {
 
   const title = document.createElement("div");
   title.className = "canvas-nudge__title";
-  const words = "Please add your first asset!".split(/\s+/);
+  const words = "Please add your first object!".split(/\s+/);
   for (const word of words) {
     const span = document.createElement("span");
     span.className = "canvas-nudge__word";
@@ -5724,7 +5796,7 @@ session = createPlaySession({
     const ok = await askConfirm({
       title: "Can't trigger physics",
       body: overlapping
-        ? "Layout mode is on. Activate Physics to tumble — overlapping pieces will push apart and your layout will change."
+        ? "Layout mode is on. Activate Physics to tumble — overlapping objects will push apart and your layout will change."
         : "Layout mode is on. Turn on Physics first.",
       confirmLabel: "Activate Physics",
       cancelLabel: "Got it",
@@ -5757,7 +5829,7 @@ async function setLayoutMode(next: boolean, opts?: { skipConfirm?: boolean }) {
   if (!opts?.skipConfirm && !next && world.chipCount() > 0 && world.chipsOverlap()) {
     const ok = await askConfirm({
       title: "Turn physics back on?",
-      body: "Overlapping pieces will push apart and your layout will change. Continue?",
+      body: "Overlapping objects will push apart and your layout will change. Continue?",
       confirmLabel: "Turn on physics",
       cancelLabel: "Keep layout",
     });
@@ -6511,7 +6583,7 @@ function dismissPick() {
   }
 }
 
-function pickSlot(id: string | null, opts?: { force?: boolean; additive?: boolean }) {
+function pickSlot(id: string | null, opts?: { force?: boolean; additive?: boolean; quiet?: boolean }) {
   if (!id) {
     dismissPick();
     return;
@@ -6532,7 +6604,7 @@ function pickSlot(id: string | null, opts?: { force?: boolean; additive?: boolea
     }
     applyWorldPick();
     syncPanelPicks();
-    playClick();
+    if (!opts.quiet) playClick();
     return;
   }
 
@@ -6565,7 +6637,7 @@ function pickSlot(id: string | null, opts?: { force?: boolean; additive?: boolea
   pickedSlotId = id;
   applyWorldPick();
   syncPanelPicks();
-  playClick();
+  if (!opts?.quiet) playClick();
   if (!openSlots.has(id)) setSlotOpen(toggle, slot, true, false);
   else closeOtherSlots(id);
   scrollPanelTo(card, shrinkAbove);

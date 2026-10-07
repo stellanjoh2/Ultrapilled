@@ -6,6 +6,7 @@ export type AppPrefs = {
   soundOn: boolean;
   bounceSounds: boolean;
   uiSounds: boolean;
+  hoverSounds: boolean;
   soundVolume: number;
   tipsOn: boolean;
   tooltipsOn: boolean;
@@ -18,6 +19,7 @@ const DEFAULTS: AppPrefs = {
   soundOn: true,
   bounceSounds: true,
   uiSounds: true,
+  hoverSounds: true,
   soundVolume: 80,
   tipsOn: true,
   tooltipsOn: true,
@@ -39,6 +41,7 @@ function read(): AppPrefs {
       soundOn: parsed.soundOn !== false,
       bounceSounds: parsed.bounceSounds !== false,
       uiSounds: parsed.uiSounds !== false,
+      hoverSounds: parsed.hoverSounds !== false,
       soundVolume: clampVolume(Number(parsed.soundVolume ?? DEFAULTS.soundVolume)),
       tipsOn: parsed.tipsOn !== false,
       tooltipsOn: parsed.tooltipsOn !== false,

@@ -76,7 +76,7 @@ function shortcutsMarkup(): string {
     shortcutRow("Hide UI", keycap("H")),
     shortcutRow("Toggle grid", keycap("G")),
     shortcutRow("Toggle Layout Mode", keycap("L")),
-    shortcutRow("Invert selection", keycap("I"), "Selected piece"),
+    shortcutRow("Invert selection", keycap("I"), "Selected object"),
     shortcutRow("Delete selection", `${keycap("⌫")}${keycap("Del")}`),
     shortcutRow("Duplicate", `${keycap("⇧")}${keycap("D")}${keycap(mod)}${keycap("D")}`),
     shortcutRow("Copy selection", `${keycap(mod)}${keycap("C")}`),
@@ -91,7 +91,7 @@ function shortcutsMarkup(): string {
       `${keycap("⇧")}${keycap(altKeyLabel())}`,
       "Hold during transform drag",
     ),
-    shortcutRow("Move in a straight line", keycap("⇧"), "Hold while dragging a piece"),
+    shortcutRow("Move in a straight line", keycap("⇧"), "Hold while dragging an object"),
     shortcutRow("Add to selection", `${keycap("⇧")}${keycap("Click")}`),
   ].join("");
   return `
@@ -131,7 +131,7 @@ function paintVolume() {
 
 function paintToggles(controller?: SettingsController) {
   const prefs = getPrefs();
-  panelEl?.querySelectorAll<HTMLInputElement>("#settings-sound, #settings-bounce-sounds, #settings-ui-sounds, #settings-tips, #settings-tooltips, #settings-remember, #settings-performance").forEach((input) => {
+  panelEl?.querySelectorAll<HTMLInputElement>("#settings-sound, #settings-bounce-sounds, #settings-ui-sounds, #settings-hover-sounds, #settings-tips, #settings-tooltips, #settings-remember, #settings-performance").forEach((input) => {
     if (input.id === "settings-sound") input.checked = prefs.soundOn;
     if (input.id === "settings-bounce-sounds") {
       input.checked = prefs.soundOn && prefs.bounceSounds;
@@ -141,10 +141,17 @@ function paintToggles(controller?: SettingsController) {
       input.checked = prefs.soundOn && prefs.uiSounds;
       input.disabled = !prefs.soundOn;
     }
+    if (input.id === "settings-hover-sounds") {
+      input.checked = prefs.soundOn && prefs.hoverSounds;
+      input.disabled = !prefs.soundOn;
+    }
     if (input.id === "settings-tips") input.checked = prefs.tipsOn;
     if (input.id === "settings-tooltips") input.checked = prefs.tooltipsOn;
     if (input.id === "settings-remember") input.checked = prefs.rememberLast;
     if (input.id === "settings-performance") input.checked = prefs.performance;
+  });
+  panelEl?.querySelectorAll<HTMLElement>("[data-sound-dependent]").forEach((row) => {
+    row.classList.toggle("is-muted", !prefs.soundOn);
   });
   panelEl?.querySelectorAll<HTMLButtonElement>("[data-theme-chrome]").forEach((button) => {
     const on = button.dataset.themeChrome === prefs.theme;
@@ -178,8 +185,8 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
     <section class="section">
       <h2 data-tip="Physics fall or free Layout placement — shortcut L">${sectionTitleIcon(layoutIcon)}Design Mode</h2>
       <div class="segment" role="group" aria-label="Design Mode">
-        <button type="button" class="pill${!layoutMode ? " is-on" : ""}" data-design-mode="physics" aria-pressed="${!layoutMode}" data-tip="Pieces fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${atomIcon}</span>Physics</button>
-        <button type="button" class="pill${layoutMode ? " is-on" : ""}" data-design-mode="layout" aria-pressed="${layoutMode}" data-tip="Place freely like Figma — no physics, pieces can overlap"><span class="theme-chrome__icon" aria-hidden="true">${gridFourIcon}</span>Layout</button>
+        <button type="button" class="pill${!layoutMode ? " is-on" : ""}" data-design-mode="physics" aria-pressed="${!layoutMode}" data-tip="Objects fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${atomIcon}</span>Physics</button>
+        <button type="button" class="pill${layoutMode ? " is-on" : ""}" data-design-mode="layout" aria-pressed="${layoutMode}" data-tip="Place freely like Figma — no physics, objects can overlap"><span class="theme-chrome__icon" aria-hidden="true">${gridFourIcon}</span>Layout</button>
       </div>
     </section>
     <section class="section">
@@ -190,19 +197,25 @@ function panelHtml(prefs: AppPrefs, layoutMode: boolean): string {
           Sound
         </label>
       </div>
-      <div class="check-row">
-        <label class="check" data-tip="Piece fall and collision impacts">
+      <div class="check-row" data-sound-dependent>
+        <label class="check" data-tip="Object fall and collision impacts">
           ${checkInput(`id="settings-bounce-sounds" ${prefs.soundOn && prefs.bounceSounds ? "checked" : ""} ${prefs.soundOn ? "" : "disabled"}`)}
           Bounce Sounds
         </label>
       </div>
-      <div class="check-row">
+      <div class="check-row" data-sound-dependent>
         <label class="check" data-tip="Clicks, toggles, typing, and other UI feedback">
           ${checkInput(`id="settings-ui-sounds" ${prefs.soundOn && prefs.uiSounds ? "checked" : ""} ${prefs.soundOn ? "" : "disabled"}`)}
           UI Sounds
         </label>
       </div>
-      <label class="field" data-tip="Master level for UI and impact sounds">${rangeCaptionHtml("settings-volume", "Volume", String(prefs.soundVolume))}
+      <div class="check-row" data-sound-dependent>
+        <label class="check" data-tip="Soft chirp when the pointer enters controls">
+          ${checkInput(`id="settings-hover-sounds" ${prefs.soundOn && prefs.hoverSounds ? "checked" : ""} ${prefs.soundOn ? "" : "disabled"}`)}
+          Hover Sound
+        </label>
+      </div>
+      <label class="field" data-sound-dependent data-tip="Master level for UI and impact sounds">${rangeCaptionHtml("settings-volume", "Volume", String(prefs.soundVolume))}
         <input type="range" id="settings-volume" min="0" max="100" step="1" value="${prefs.soundVolume}" ${prefs.soundOn ? "" : "disabled"} />
       </label>
     </section>
@@ -285,6 +298,7 @@ function mountSettingsBody(panel: HTMLElement, controller: SettingsController) {
   bindCheck(panel, "settings-sound", "soundOn", controller);
   bindCheck(panel, "settings-bounce-sounds", "bounceSounds", controller);
   bindCheck(panel, "settings-ui-sounds", "uiSounds", controller);
+  bindCheck(panel, "settings-hover-sounds", "hoverSounds", controller);
   bindCheck(panel, "settings-tips", "tipsOn", controller);
   bindCheck(panel, "settings-tooltips", "tooltipsOn", controller);
   bindCheck(panel, "settings-remember", "rememberLast", controller);

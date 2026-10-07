@@ -24,7 +24,7 @@ import { wrapCheckInput } from "../checkBox";
 import { mountColorPicker } from "../colorPicker";
 import { isSvgSource } from "../chipKinds";
 import { gradientEndIndex } from "../pillFill";
-import { playClick, playCreate, playSwitch } from "../uiSounds";
+import { playClick, playCreate, playSwitch, playTransition } from "../uiSounds";
 import { placeZoomedFixed } from "../uiScale";
 import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
 import { isTextField, sanitizeTextMotion } from "../types";
@@ -53,7 +53,7 @@ export type SlotMenuHost = {
   renderPanel(): void;
   liveChip(id: string, opts?: { quiet?: boolean }): void;
   openSlots: Set<string>;
-  pickSlot(id: string, opts?: { force?: boolean; additive?: boolean }): void;
+  pickSlot(id: string, opts?: { force?: boolean; additive?: boolean; quiet?: boolean }): void;
   get gesture(): string | null;
   get tintPicker(): { anchor: HTMLElement; close: () => void } | null;
   setTintPicker(value: { anchor: HTMLElement; close: () => void } | null): void;
@@ -214,7 +214,7 @@ function menuCheckRow(label: string, checked: boolean, onToggle: (next: boolean)
     (label === "Stroked"
       ? "Draw an outline instead of a filled shape"
       : label === "Gradient"
-        ? "Blend two colors across the piece"
+        ? "Blend two colors across the object"
         : "");
   if (hint) row.dataset.tip = hint;
   const input = document.createElement("input");
@@ -251,7 +251,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
   if (host) H = host;
   closeSlotMenu();
   // Select first (panel jump) before the menu listens for scroll-to-close.
-  H.pickSlot(id, { force: true });
+  // Quiet: menu plays the shelf-open transition instead of a pick click.
+  H.pickSlot(id, { force: true, quiet: true });
+  playTransition(true);
   const slot = H.state.slots.find((item) => item.id === id);
   const abort = new AbortController();
   const root = document.createElement("div");
@@ -856,9 +858,12 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
     );
   }
 
-  const closeCurrent = () => {
-    abort.abort();
-    gsap.killTweensOf(layerBtns);
+  let closed = false;
+  let closing = false;
+  const finishClose = () => {
+    if (closed) return;
+    closed = true;
+    gsap.killTweensOf([root, ...layerBtns]);
     if (getCloseSlotMenu() === closeCurrent) setCloseSlotMenu(() => {});
     if (H.tintPicker && menu.contains(H.tintPicker.anchor)) H.tintPicker.close();
     clearMenuStroke();
@@ -868,6 +873,34 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       H.renderPanel();
     }
   };
+
+  /** Instant for actions / reopen; `{ animate: true }` for dismiss with fade + close sound. */
+  const closeCurrent = (opts?: { animate?: boolean }) => {
+    const animate = Boolean(opts?.animate);
+    if (closing) {
+      if (!animate) finishClose();
+      return;
+    }
+    closing = true;
+    abort.abort();
+
+    if (animate) {
+      playTransition(false);
+      if (!reduceMotion) {
+        gsap.killTweensOf(layerBtns);
+        gsap.to(root, {
+          autoAlpha: 0,
+          duration: 0.12,
+          ease: "power2.in",
+          onComplete: finishClose,
+        });
+        return;
+      }
+    }
+    finishClose();
+  };
   setCloseSlotMenu(closeCurrent);
-  H.bindSlotMenuDismiss(root, abort, closeCurrent, { keepOnScroll: () => ignoreScroll > 0 });
+  H.bindSlotMenuDismiss(root, abort, () => closeCurrent({ animate: true }), {
+    keepOnScroll: () => ignoreScroll > 0,
+  });
 }

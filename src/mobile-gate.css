@@ -181,6 +181,11 @@ html.is-mobile-gate #app {
   font-weight: 500;
   letter-spacing: -0.02em;
   mix-blend-mode: difference;
+  transition: color 0.2s ease;
+}
+
+.mobile-overlay__privacy:hover {
+  color: #c4ff00;
 }
 
 .mobile-overlay__social {

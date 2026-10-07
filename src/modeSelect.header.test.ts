@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { closeAbout, isAboutOpen } from "./aboutPanel";
+import { isAboutOpen } from "./aboutPanel";
 import { closeBugReport, isBugReportOpen } from "./bugReport";
 import { askModeSelect, stopModeSelectPreview } from "./modeSelect";
 
 describe("mode select header actions", () => {
   afterEach(() => {
-    closeAbout();
     closeBugReport();
     stopModeSelectPreview();
     document.body.innerHTML = "";
@@ -62,16 +61,18 @@ describe("mode select header actions", () => {
     await expect(pending).resolves.toEqual({ kind: "mode", mode: "layout" });
   });
 
-  it("opens About from the S logo without leaving Mode Select", async () => {
+  it("links the S logo to LinkedIn without leaving Mode Select", async () => {
     stubReducedMotion();
     const pending = askModeSelect();
     const root = document.querySelector(".mode-select")!;
+    const s = root.querySelector<HTMLAnchorElement>(".mode-select__s");
 
-    root.querySelector("[data-open-about]")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(isAboutOpen()).toBe(true);
+    expect(s?.getAttribute("href")).toBe("https://www.linkedin.com/in/stellanj/");
+    expect(s?.getAttribute("target")).toBe("_blank");
+    expect(s?.getAttribute("aria-label")).toBe("LinkedIn");
+    expect(isAboutOpen()).toBe(false);
     expect(document.querySelector(".mode-select")).toBe(root);
 
-    closeAbout();
     root.querySelector<HTMLButtonElement>("[data-mode=physics]")?.click();
     await expect(pending).resolves.toEqual({ kind: "mode", mode: "physics" });
   });

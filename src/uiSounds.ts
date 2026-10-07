@@ -7,6 +7,8 @@ import { drop004Sound } from "@/sounds/drop-004";
 
 /** Collapse same-tick requests; block another play shortly after. */
 const SOUND_LOCK_MS = 50;
+/** Min gap between hover cues so sweeping the panel doesn’t chatter. */
+const HOVER_MIN_INTERVAL_MS = 120;
 
 /** Shape-fall impacts stay on Soundcn drops (drop-004 weighted twice). */
 const IMPACT_POOL: SoundAsset[] = [drop004Sound, drop002Sound, drop004Sound, drop001Sound];
@@ -16,22 +18,46 @@ const S = (name: string) => `/sounds/${name}.wav`;
 
 const TAP_URLS = [S("tap_01"), S("tap_02"), S("tap_03"), S("tap_04"), S("tap_05")];
 const TYPE_URLS = [S("type_01"), S("type_02"), S("type_03"), S("type_04"), S("type_05")];
+/** Mozayk project-owned hover cue. */
+const HOVER_URL = S("hover");
+
+/** Interactive chrome that should chirp on pointer enter. */
+const HOVER_SELECTOR = [
+  "button",
+  "[role='button']",
+  "a.pill",
+  "a.icon-hover",
+  ".panel-tabs__tab",
+  ".theme-swatch",
+  ".tint",
+  ".font-menu-item",
+  ".font-pick-trigger",
+  ".section-toggle",
+  "label.check",
+  ".panel-credit__author",
+  ".panel-credit__social a",
+  ".panel-credit__social button",
+].join(", ");
 
 const impactBySlot = new Map<string, string>();
 
 let pendingUri: string | null = null;
 let pendingVolume = 1;
 let pendingGate: () => boolean = () => false;
+let pendingImportant = false;
 let flushQueued = false;
 let lockedUntil = 0;
+let hoverUntil = 0;
 let unlockBound = false;
 /** Forced mute (e.g. audio-react mic). Overrides user sound prefs. */
 let forceMuted = false;
 let soundOn = getPrefs().soundOn;
 let bounceSounds = getPrefs().bounceSounds;
 let uiSounds = getPrefs().uiSounds;
+let hoverSounds = getPrefs().hoverSounds;
 let soundVolume = getPrefs().soundVolume;
 let typeBound = false;
+let hoverBound = false;
 let progressPlayback: SoundPlayback | null = null;
 
 onPrefsChange(() => {
@@ -39,6 +65,7 @@ onPrefsChange(() => {
   soundOn = prefs.soundOn;
   bounceSounds = prefs.bounceSounds;
   uiSounds = prefs.uiSounds;
+  hoverSounds = prefs.hoverSounds;
   soundVolume = prefs.soundVolume;
   if (!soundOn || !uiSounds || soundVolume <= 0 || forceMuted) stopProgress();
 });
@@ -62,6 +89,10 @@ function bounceAudible(): boolean {
   return masterAudible() && bounceSounds;
 }
 
+function hoverAudible(): boolean {
+  return masterAudible() && hoverSounds;
+}
+
 function gain(volume: number): number {
   return volume * (soundVolume / 100);
 }
@@ -70,15 +101,29 @@ function pick(urls: string[]): string {
   return urls[Math.floor(Math.random() * urls.length)]!;
 }
 
-function requestPlay(src: string, volume = 1, gate: () => boolean = uiAudible) {
+function requestPlay(
+  src: string,
+  volume = 1,
+  gate: () => boolean = uiAudible,
+  opts?: { important?: boolean },
+) {
   if (!gate()) return;
+  // Block hover for this event before the menu DOM appears under the pointer.
+  hoverUntil = Math.max(hoverUntil, performance.now() + HOVER_MIN_INTERVAL_MS);
   pendingUri = src;
   pendingVolume = volume;
   pendingGate = gate;
-  if (flushQueued) return;
+  const important = Boolean(opts?.important);
+  if (flushQueued) {
+    if (important) pendingImportant = true;
+    return;
+  }
+  pendingImportant = important;
   flushQueued = true;
   queueMicrotask(() => {
     flushQueued = false;
+    const force = pendingImportant;
+    pendingImportant = false;
     if (!pendingGate()) {
       pendingUri = null;
       return;
@@ -89,8 +134,10 @@ function requestPlay(src: string, volume = 1, gate: () => boolean = uiAudible) {
     pendingVolume = 1;
     if (!uri) return;
     const now = performance.now();
-    if (now < lockedUntil) return;
+    // Important cues (menu / shelf open) must win over a just-played pick click.
+    if (!force && now < lockedUntil) return;
     lockedUntil = now + SOUND_LOCK_MS;
+    hoverUntil = Math.max(hoverUntil, lockedUntil);
     void playSound(uri, { volume: gain(vol) });
   });
 }
@@ -157,9 +204,9 @@ export function playSwitch(on = true) {
   requestPlay(on ? S("toggle_on") : S("toggle_off"));
 }
 
-/** Slot accordion open / close. */
+/** Slot accordion / context menu open / close. */
 export function playTransition(up: boolean) {
-  requestPlay(up ? S("transition_up") : S("transition_down"));
+  requestPlay(up ? S("transition_up") : S("transition_down"), 1, uiAudible, { important: true });
 }
 
 /** Tab change / hide UI / invert — same light tap as other UI. */
@@ -180,6 +227,15 @@ export function playDisabled() {
 export function playType() {
   if (!uiAudible()) return;
   void playSound(pick(TYPE_URLS), { volume: gain(0.7) });
+}
+
+/** Soft chirp when the pointer enters interactive chrome. */
+export function playHover() {
+  if (!hoverAudible()) return;
+  const now = performance.now();
+  if (now < hoverUntil || now < lockedUntil) return;
+  hoverUntil = now + HOVER_MIN_INTERVAL_MS;
+  void playSound(HOVER_URL, { volume: gain(0.85) });
 }
 
 /** Looping bed while a long export runs. */
@@ -238,10 +294,11 @@ export function bindUiClickSounds(root: ParentNode = document) {
         playDisabled();
         return;
       }
-      // Explicit sounds elsewhere (tabs, slot accordion, Trigger Physics, mic).
+      // Explicit sounds elsewhere (tabs, slot accordion, section folds, Trigger Physics, mic).
       if (el.id === "play" || el.id === "audio-mic") return;
       if (el.classList.contains("panel-tabs__tab")) return;
       if (el.classList.contains("slot-toggle")) return;
+      if (el.classList.contains("section-toggle")) return;
       playClick();
     },
     true,
@@ -258,6 +315,38 @@ export function bindUiTypeSounds(root: ParentNode = document) {
     (event) => {
       if (!isTypingField(event.target)) return;
       playType();
+    },
+    true,
+  );
+}
+
+function shouldPlayHover(el: HTMLElement): boolean {
+  if (el instanceof HTMLButtonElement && el.disabled) return false;
+  if (el instanceof HTMLAnchorElement && el.getAttribute("aria-disabled") === "true") return false;
+  if (el.getAttribute("aria-disabled") === "true") return false;
+  if (el.classList.contains("check")) {
+    const input = el.querySelector("input");
+    if (input instanceof HTMLInputElement && input.disabled) return false;
+  }
+  return true;
+}
+
+/** Mozayk-style hover chirp on interactive UI chrome. */
+export function bindUiHoverSounds(root: ParentNode = document) {
+  if (hoverBound) return;
+  hoverBound = true;
+  bindAudioUnlock();
+  root.addEventListener(
+    "mouseover",
+    (event) => {
+      if (!(event instanceof MouseEvent)) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const el = target.closest(HOVER_SELECTOR);
+      if (!(el instanceof HTMLElement) || !shouldPlayHover(el)) return;
+      const related = event.relatedTarget;
+      if (related instanceof Node && el.contains(related)) return;
+      playHover();
     },
     true,
   );

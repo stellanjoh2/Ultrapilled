@@ -1,10 +1,23 @@
 import atomIcon from "@phosphor-icons/core/assets/regular/atom.svg?raw";
 import bugIcon from "@phosphor-icons/core/assets/regular/bug.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
+import gifIcon from "@phosphor-icons/core/assets/regular/gif.svg?raw";
 import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
+import imagesIcon from "@phosphor-icons/core/assets/regular/images.svg?raw";
+import pillIcon from "@phosphor-icons/core/assets/regular/pill.svg?raw";
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
+import shapesIcon from "@phosphor-icons/core/assets/regular/shapes.svg?raw";
+import smileyIcon from "@phosphor-icons/core/assets/regular/smiley.svg?raw";
+import textAa from "@phosphor-icons/core/assets/regular/text-aa.svg?raw";
+import textT from "@phosphor-icons/core/assets/regular/text-t.svg?raw";
+import uploadSimple from "@phosphor-icons/core/assets/regular/upload-simple.svg?raw";
+import youtubeLogo from "@phosphor-icons/core/assets/regular/youtube-logo.svg?raw";
+
+export function slotAddIcon(icon: string, hoverGlyph = plus) {
+  return `<span class="slot-add__icon" aria-hidden="true">${icon}<span class="slot-add__plus">${hoverGlyph}</span></span>`;
+}
 import { isCanvasRatio } from "../canvas";
-import { openAbout } from "../aboutPanel";
+import { LINKEDIN_HREF, openAbout } from "../aboutPanel";
 import { openBugReport } from "../bugReport";
 import { bindSlotDrag } from "../slotDrag";
 import {
@@ -67,6 +80,9 @@ export type CreatePanelHost = SlotCardHost & {
   addEmojiSlot(): void;
   pickImageFiles(multiple?: boolean): Promise<File[]>;
   addImagesFromFiles(files: File[]): void;
+  openUnsplashAdd(): void;
+  openGiphyAdd(): void;
+  openYouTubeAdd(): void;
   bindRange(
     id: string,
     label: string,
@@ -308,20 +324,20 @@ panel.innerHTML = `
   ${sectionMarkup(
     "composition",
     "Composition",
-    "Overall size and spacing of pieces",
-    `<label class="field" data-tip="Overall size of every piece">${rangeCaptionHtml("masterScale", "Scale", `${(H.state.masterScale * 10).toFixed(0)}`)}
+    "Overall size and spacing of objects",
+    `<label class="field" data-tip="Overall size of every object">${rangeCaptionHtml("masterScale", "Scale", `${(H.state.masterScale * 10).toFixed(0)}`)}
       <input type="range" id="masterScale" min="4" max="100" step="1" value="${H.state.masterScale * 10}" />
     </label>
-    <label class="field" data-tip="How much piece sizes vary">${rangeCaptionHtml("sizeRandom", "Size random", String(H.state.sizeRandom))}
+    <label class="field" data-tip="How much object sizes vary">${rangeCaptionHtml("sizeRandom", "Size random", String(H.state.sizeRandom))}
       <input type="range" id="sizeRandom" min="0" max="100" step="1" value="${H.state.sizeRandom}" />
     </label>
     <label class="field" data-tip="Space inside text holding shapes">${rangeCaptionHtml("pillPad", "Shape padding", String(H.state.pillPad))}
       <input type="range" id="pillPad" min="0" max="100" step="1" value="${H.state.pillPad}" />
     </label>
-    <label class="field" data-tip="How many pieces drop into the frame">${rangeCaptionHtml("shapeAmount", "Amount of shapes", String(H.state.shapeAmount))}
+    <label class="field" data-tip="How many objects drop into the frame">${rangeCaptionHtml("shapeAmount", "Amount of shapes", String(H.state.shapeAmount))}
       <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${H.state.shapeAmount}" />
     </label>
-    <p class="hint" id="amount-perf-hint"${H.state.shapeAmount >= H.SHAPE_PERF_WARN ? "" : " hidden"}>Many shapes can drop below 60 fps.</p>`,
+    <p class="hint" id="amount-perf-hint"${H.state.shapeAmount >= H.SHAPE_PERF_WARN ? "" : " hidden"}>Many objects can drop below 60 fps.</p>`,
     { resetId: "reset-master", resetLabel: "Reset composition", resetTip: "Reset composition sliders", dirty: !compositionAtDefault(H.state) },
   )}
   ${sectionMarkup(
@@ -342,7 +358,7 @@ panel.innerHTML = `
     "typeface",
     "Typeface",
     "Fonts for all text pills",
-    `<div class="field" data-tip="Apply one font to every text piece">All text
+    `<div class="field" data-tip="Apply one font to every text object">All text
       <div class="font-pick" id="global-font"></div>
     </div>
     <div class="field" data-tip="Default weight for all text">Weight
@@ -360,33 +376,45 @@ panel.innerHTML = `
   )}
   ${sectionMarkup(
     "what-falls",
-    "What falls down",
-    "The pieces that drop into the frame. In Layout mode, list order is layer order — top sits in front",
+    "Objects",
+    "Everything on the canvas. In Layout mode, list order is layer order — top sits in front",
     `<div class="slot-stack" id="slots"></div>
     <div class="slot-adds">
-      <button type="button" class="pill slot-add" id="add-text" data-tip="Add a text label inside a rounded pill">
-        <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-        Add pill
+      <button type="button" class="pill slot-add is-create" id="add-text" data-tip="Add a text label inside a rounded pill">
+        ${slotAddIcon(pillIcon)}
+        Pill
       </button>
-      <button type="button" class="pill slot-add" id="add-type" data-tip="One-line type sized to the letters — a few words, not a wrapping box">
-        <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-        Add words
+      <button type="button" class="pill slot-add is-create" id="add-type" data-tip="One-line type sized to the letters — a few words, not a wrapping box">
+        ${slotAddIcon(textAa)}
+        Words
       </button>
-      <button type="button" class="pill slot-add" id="add-text-field" data-tip="A wrapping box you can resize and paste into — sentences and paragraphs">
-        <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-        Add longer text
+      <button type="button" class="pill slot-add is-create" id="add-text-field" data-tip="A wrapping box you can resize and paste into — sentences and paragraphs">
+        ${slotAddIcon(textT)}
+        Longer text
       </button>
-      <button type="button" class="pill slot-add" id="add-shape" data-tip="Add a built-in shape from the library">
-        <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-        Add shape
+      <button type="button" class="pill slot-add is-create" id="add-shape" data-tip="Add a built-in shape from the library">
+        ${slotAddIcon(shapesIcon)}
+        Shape
       </button>
-      <button type="button" class="pill slot-add" id="add-emoji" data-tip="Add an emoji">
-        <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-        Add emoji
+      <button type="button" class="pill slot-add is-create" id="add-emoji" data-tip="Add an emoji">
+        ${slotAddIcon(smileyIcon)}
+        Emoji
       </button>
-      <button type="button" class="pill slot-add" id="add-photo" data-tip="Add an SVG, PNG, JPG, GIF, or MP4">
-        <span class="slot-add__icon" aria-hidden="true">${plus}</span>
-        Upload image
+      <button type="button" class="pill slot-add is-create" id="add-photo" data-tip="Add an SVG, PNG, JPG, GIF, or MP4">
+        ${slotAddIcon(uploadSimple)}
+        Image
+      </button>
+      <button type="button" class="pill slot-add is-create" id="add-unsplash" data-tip="Search photos from Unsplash">
+        ${slotAddIcon(imagesIcon)}
+        Unsplash
+      </button>
+      <button type="button" class="pill slot-add is-create" id="add-giphy" data-tip="Search GIFs from Giphy">
+        ${slotAddIcon(gifIcon)}
+        Giphy
+      </button>
+      <button type="button" class="pill slot-add is-create" id="add-youtube" data-tip="Embed a muted looping YouTube clip">
+        ${slotAddIcon(youtubeLogo)}
+        YouTube
       </button>
     </div>`,
     { sectionId: "shape-create" },
@@ -394,10 +422,10 @@ panel.innerHTML = `
   ${sectionMarkup(
     "physics",
     "Physics",
-    "How pieces fall, bounce, and settle — or place them freely",
+    "How objects fall, bounce, and settle — or place them freely",
     `<div class="segment" role="group" aria-label="Placement mode">
-      <button type="button" class="pill${!H.state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!H.state.physics.layoutMode}" data-tip="Pieces fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${atomIcon}</span>Physics</button>
-      <button type="button" class="pill${H.state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${H.state.physics.layoutMode}" data-tip="Place freely like Figma — no physics, no throws, pieces can overlap"><span class="theme-chrome__icon" aria-hidden="true">${gridFourIcon}</span>Layout</button>
+      <button type="button" class="pill${!H.state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="physics" aria-pressed="${!H.state.physics.layoutMode}" data-tip="Objects fall, bounce, and stack"><span class="theme-chrome__icon" aria-hidden="true">${atomIcon}</span>Physics</button>
+      <button type="button" class="pill${H.state.physics.layoutMode ? " is-on" : ""}" data-layout-mode="layout" aria-pressed="${H.state.physics.layoutMode}" data-tip="Place freely like Figma — no physics, no throws, objects can overlap"><span class="theme-chrome__icon" aria-hidden="true">${gridFourIcon}</span>Layout</button>
     </div>
     <div class="physics-dynamics"${H.state.physics.layoutMode ? " inert" : ""}>
     <label class="field" data-tip="Simple = boxes, Normal = circle/box, Ultra = traced icon shapes. Higher is heavier on the CPU.">Physics complexity
@@ -405,15 +433,15 @@ panel.innerHTML = `
         ${PHYSICS_COMPLEXITY.map((tier) => `<option value="${tier.id}"${H.state.physics.complexity === tier.id ? " selected" : ""}>${tier.label}</option>`).join("")}
       </select>
     </label>
-    <div class="field" data-tip="Where pieces enter — floor pause still opens as usual">Fall direction
+    <div class="field" data-tip="Where objects enter — floor pause still opens as usual">Fall direction
       <div class="segment is-3" role="group" aria-label="Fall direction">
-        <button type="button" class="pill${H.state.physics.fallDirection === "left" ? " is-on" : ""}" data-fall-direction="left" aria-pressed="${H.state.physics.fallDirection === "left"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Throw pieces in from the left">Left</button>
-        <button type="button" class="pill${H.state.physics.fallDirection === "down" ? " is-on" : ""}" data-fall-direction="down" aria-pressed="${H.state.physics.fallDirection === "down"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Drop pieces in from above">Down</button>
-        <button type="button" class="pill${H.state.physics.fallDirection === "right" ? " is-on" : ""}" data-fall-direction="right" aria-pressed="${H.state.physics.fallDirection === "right"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Throw pieces in from the right">Right</button>
+        <button type="button" class="pill${H.state.physics.fallDirection === "left" ? " is-on" : ""}" data-fall-direction="left" aria-pressed="${H.state.physics.fallDirection === "left"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Throw objects in from the left">Left</button>
+        <button type="button" class="pill${H.state.physics.fallDirection === "down" ? " is-on" : ""}" data-fall-direction="down" aria-pressed="${H.state.physics.fallDirection === "down"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Drop objects in from above">Down</button>
+        <button type="button" class="pill${H.state.physics.fallDirection === "right" ? " is-on" : ""}" data-fall-direction="right" aria-pressed="${H.state.physics.fallDirection === "right"}"${H.state.physics.layoutMode ? " disabled" : ""} data-tip="Throw objects in from the right">Right</button>
       </div>
     </div>
     <div class="row">
-      <label class="field" data-tip="How hard pieces pull downward">${rangeCaptionHtml("gravity", "Gravity", H.state.physics.gravity.toFixed(2))}
+      <label class="field" data-tip="How hard objects pull downward">${rangeCaptionHtml("gravity", "Gravity", H.state.physics.gravity.toFixed(2))}
         <input type="range" id="gravity" min="0" max="3" step="0.05" value="${H.state.physics.gravity}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
@@ -428,12 +456,12 @@ panel.innerHTML = `
       </label>
     </div>
     <div class="row">
-      <label class="field" data-tip="Slide resistance when pieces touch">${rangeCaptionHtml("friction", "Friction", H.state.physics.friction.toFixed(2))}
+      <label class="field" data-tip="Slide resistance when objects touch">${rangeCaptionHtml("friction", "Friction", H.state.physics.friction.toFixed(2))}
         <input type="range" id="friction" min="0" max="1" step="0.05" value="${H.state.physics.friction}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
     <div class="row">
-      <label class="field" data-tip="How much pieces stick while sliding">${rangeCaptionHtml("grip", "Grip", H.state.physics.grip.toFixed(2))}
+      <label class="field" data-tip="How much objects stick while sliding">${rangeCaptionHtml("grip", "Grip", H.state.physics.grip.toFixed(2))}
         <input type="range" id="grip" min="0" max="1" step="0.05" value="${H.state.physics.grip}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
@@ -470,7 +498,7 @@ panel.innerHTML = `
     <label class="field" data-tip="Color intensity">${rangeCaptionHtml("saturate", "Saturate", String(H.state.post.saturate))}
       <input type="range" id="saturate" min="40" max="180" step="1" value="${H.state.post.saturate}" />
     </label>
-    <label class="field" data-tip="How overlapping pieces mix colors">Blending mode
+    <label class="field" data-tip="How overlapping objects mix colors">Blending mode
       <select id="blend">
         ${BLEND_MODES.map((mode) => `<option value="${mode.id}"${H.state.post.blend === mode.id ? " selected" : ""}>${mode.label}</option>`).join("")}
       </select>
@@ -492,7 +520,7 @@ panel.innerHTML = `
     <label class="field" data-tip="How easily quiet sounds trigger a reaction">${rangeCaptionHtml("audioSensitivity", "Sensitivity", String(Math.round(H.state.audioReact.sensitivity)))}
       <input type="range" id="audioSensitivity" min="0" max="100" step="1" value="${H.state.audioReact.sensitivity}"${H.state.physics.layoutMode ? " disabled" : ""} />
     </label>
-    <label class="field" data-tip="How hard pieces hop on a hit">${rangeCaptionHtml("audioBounce", "Bounce intensity", `${H.state.audioReact.bounce.toFixed(1)}×`)}
+    <label class="field" data-tip="How hard objects hop on a hit">${rangeCaptionHtml("audioBounce", "Bounce intensity", `${H.state.audioReact.bounce.toFixed(1)}×`)}
       <input type="range" id="audioBounce" min="1" max="4" step="0.1" value="${H.state.audioReact.bounce}"${H.state.physics.layoutMode ? " disabled" : ""} />
     </label>
     <label class="field" data-tip="How much text pills swell on bass hits">${rangeCaptionHtml("audioBassBoost", "Bass boost", `+${Math.round(H.state.audioReact.bassBoost)}%`)}
@@ -505,7 +533,9 @@ panel.innerHTML = `
     { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react", dirty: !H.state.physics.layoutMode && !audioReactAtDefault(H.state.audioReact), muted: H.state.physics.layoutMode },
   )}
   <footer class="panel-credit">
-    <span class="panel-credit__s" aria-hidden="true"></span>
+    <a class="panel-credit__s icon-hover" href="${LINKEDIN_HREF}" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" data-tip="LinkedIn">
+      <span class="panel-credit__s-mark" aria-hidden="true"></span>
+    </a>
     <p>
       Ultrapilled™ is created by<br />
       <button type="button" class="panel-credit__author" id="open-about" data-tip="About the creator">Stellan Johansson</button>
@@ -595,6 +625,9 @@ panel.querySelector("#add-photo")?.addEventListener("click", () => {
     H.addImagesFromFiles(files);
   });
 });
+panel.querySelector("#add-unsplash")?.addEventListener("click", () => H.openUnsplashAdd());
+panel.querySelector("#add-giphy")?.addEventListener("click", () => H.openGiphyAdd());
+panel.querySelector("#add-youtube")?.addEventListener("click", () => H.openYouTubeAdd());
 
 H.bindRange("masterScale", "Scale", (v) => {
   H.state.masterScale = v / 10;

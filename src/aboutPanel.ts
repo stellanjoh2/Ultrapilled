@@ -12,8 +12,10 @@ const ABOUT_TEXT =
 const NAME_ACCENT = DEFAULT_THEME[1];
 const ABOUT_NAME = "Stellan Johansson";
 
+export const LINKEDIN_HREF = "https://www.linkedin.com/in/stellanj/";
+
 const ABOUT_LINKS = [
-  { text: "LinkedIn", href: "https://www.linkedin.com/in/stellanj/" },
+  { text: "LinkedIn", href: LINKEDIN_HREF },
   {
     text: "MobyGames",
     href: "https://www.mobygames.com/person/289121/stellan-johansson/credits/",

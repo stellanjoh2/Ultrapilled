@@ -1,0 +1,14 @@
+---
+description: Use “object” as the product word for anything on the canvas
+globs: src/**/*.{ts,css,html}
+alwaysApply: true
+---
+
+# Objects (product language)
+
+User-facing copy for anything you can add to the canvas (pills, words, shapes, emoji, images, GIFs, YouTube, etc.) uses **object** / **objects**.
+
+- Prefer: object, objects, this object, selected object, first object
+- Avoid in UI copy: piece, pieces, asset, assets (for canvas items)
+- Section title for the create list: **Objects**
+- Internal code names (`slot`, `chip`, `assetAnimsFrozen`, file paths) can stay; match UI strings when you touch them
