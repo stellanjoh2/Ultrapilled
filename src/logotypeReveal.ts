@@ -1,17 +1,30 @@
 import gsap from "gsap";
 import { LOGOTYPE_MARK_SVG, S_LOGOTYPE_MARK_SVG } from "./logotypeMark";
 
-/** Left→right wipe: purple → lime → white. */
+/** Layer wipe timings — topbar keeps purple; intro/Mode Select is lime → white only. */
 export const LOGOTYPE_REVEAL_MASK_S = 0.3;
 export const LOGOTYPE_REVEAL_STAGGER_S = 0.25;
 export const LOGOTYPE_REVEAL_HOLD_S = 1;
 export const LOGOTYPE_REVEAL_EASE = "power2.inOut";
+
+/** Per-glyph drop distance (px) — from above on enter, onward down on exit. */
+const GLYPH_DROP_PX = 150;
+/** Whole-mark master travel (px) — on `.logotype-reveal`, not the scale layer. */
+const GROUP_Y_PX = 200;
+/** One frame gap between group settle and group fall-away. */
+const GROUP_OUT_GAP_S = 1 / 60;
+/** Per-letter fade-up duration; wave spans the reveal window. */
+const GLYPH_RISE_S = 0.5;
+/** Enter: easeOutQuart. Exit: easeInCirc. */
+const GLYPH_RISE_EASE = "quart.out";
+const GLYPH_OUT_EASE = "circ.in";
 
 const HIDDEN_LEFT = "inset(0% 100% 0% 0%)";
 const VISIBLE = "inset(0% 0% 0% 0%)";
 const HIDDEN_RIGHT = "inset(0% 0% 0% 100%)";
 
 type RevealLayers = {
+  groupEl: HTMLElement;
   scaleEl: HTMLElement;
   purple: HTMLElement;
   lime: HTMLElement;
@@ -19,12 +32,30 @@ type RevealLayers = {
 };
 
 function revealLayers(root: HTMLElement): RevealLayers | null {
+  const groupEl = root.querySelector<HTMLElement>(".logotype-reveal");
   const scaleEl = root.querySelector<HTMLElement>(".logotype-reveal__scale");
   const purple = root.querySelector<HTMLElement>(".logotype-reveal__layer--purple");
   const lime = root.querySelector<HTMLElement>(".logotype-reveal__layer--lime");
   const white = root.querySelector<HTMLElement>(".logotype-reveal__layer--white");
-  if (!scaleEl || !purple || !lime || !white) return null;
-  return { scaleEl, purple, lime, white };
+  if (!groupEl || !scaleEl || !purple || !lime || !white) return null;
+  return { groupEl, scaleEl, purple, lime, white };
+}
+
+/** Glyphs + pill, left→right by bbox so the ripple follows reading order. */
+function layerGlyphs(layer: HTMLElement): SVGElement[] {
+  const nodes = [...layer.querySelectorAll<SVGElement>(".logotype__glyph, .logotype__pill")];
+  return nodes.sort((a, b) => {
+    try {
+      return a.getBBox().x - b.getBBox().x;
+    } catch {
+      return 0;
+    }
+  });
+}
+
+/** Shared intro/outro window — lime wipe, glyph ripple, and group nudge. */
+function logotypeRevealDurationS(): number {
+  return LOGOTYPE_REVEAL_STAGGER_S * 2 + LOGOTYPE_REVEAL_MASK_S;
 }
 
 function reducedMotion(): boolean {
@@ -75,9 +106,12 @@ export function xRevealMarkup(): string {
 export function settleLogotypeReveal(root: HTMLElement) {
   const layers = revealLayers(root);
   if (!layers) return;
-  gsap.killTweensOf([layers.purple, layers.lime, layers.white, layers.scaleEl]);
+  const glyphs = [layers.purple, layers.lime, layers.white].flatMap(layerGlyphs);
+  gsap.killTweensOf([layers.groupEl, layers.purple, layers.lime, layers.white, layers.scaleEl, ...glyphs]);
   gsap.set([layers.purple, layers.lime], { clipPath: HIDDEN_LEFT });
   gsap.set(layers.white, { clipPath: VISIBLE });
+  gsap.set(layers.groupEl, { clearProps: "transform" });
+  gsap.set(glyphs, { clearProps: "transform,opacity" });
 }
 
 export type LogotypeRevealOpts = {
@@ -90,34 +124,56 @@ export type LogotypeRevealOpts = {
 };
 
 /**
- * Mask the wordmark in (purple → lime → white).
- * With `maskOut`, holds then wipes out (white → lime → purple).
+ * Green → white land (no blue), letters drop in from above L→R.
+ * Master group travels on `.logotype-reveal` (separate from scale): settles at
+ * mid-sequence, then ease-in falls away one frame later when `maskOut`.
  */
 export function playLogotypeReveal(root: HTMLElement, opts: LogotypeRevealOpts = {}): Promise<void> {
   const layers = revealLayers(root);
   if (!layers) return Promise.resolve();
-  const { scaleEl, purple, lime, white } = layers;
+  const { groupEl, scaleEl, purple, lime, white } = layers;
 
   const maskOut = Boolean(opts.maskOut);
   const holdS = opts.holdS ?? LOGOTYPE_REVEAL_HOLD_S;
   const scaleFrom = opts.scaleFrom;
   const scaleTo = opts.scaleTo;
   const scaleEase = opts.scaleEase ?? "none";
-  const revealS = LOGOTYPE_REVEAL_STAGGER_S * 2 + LOGOTYPE_REVEAL_MASK_S;
-  const totalS = maskOut
-    ? revealS + holdS + LOGOTYPE_REVEAL_STAGGER_S * 2 + LOGOTYPE_REVEAL_MASK_S
-    : revealS;
-  const whiteAt = LOGOTYPE_REVEAL_STAGGER_S * 2;
+  const revealS = logotypeRevealDurationS();
+  const outWaveS = LOGOTYPE_REVEAL_STAGGER_S + LOGOTYPE_REVEAL_MASK_S;
+  const totalS = maskOut ? revealS + holdS + Math.max(outWaveS, revealS) : revealS;
+  const whiteAt = LOGOTYPE_REVEAL_STAGGER_S;
+  // Master settle hits the midpoint of the full logo sequence, then falls away.
+  const groupSettleAt = totalS / 2;
+  const groupOutAt = groupSettleAt + GROUP_OUT_GAP_S;
+  const groupOutS = Math.max(0.01, totalS - groupOutAt);
+
+  // Matching glyphs on lime + white so the ripple stays aligned under the land.
+  const glyphSets = [lime, white].map(layerGlyphs);
+  const glyphCount = glyphSets[0]?.length ?? 0;
+  const allGlyphs = glyphSets.flat();
+  // Overlapping wave: each letter moves while neighbors are still settling.
+  const glyphDur = Math.min(GLYPH_RISE_S, revealS);
+  const glyphEach = glyphCount > 1 ? (revealS - glyphDur) / (glyphCount - 1) : 0;
 
   return new Promise((resolve) => {
-    gsap.set([purple, lime, white], { clipPath: HIDDEN_LEFT });
+    // Blue stays parked — anim is lime → white only.
+    gsap.set(purple, { clipPath: HIDDEN_LEFT });
+    gsap.set([lime, white], { clipPath: HIDDEN_LEFT });
+    gsap.set(allGlyphs, { y: -GLYPH_DROP_PX, opacity: 0 });
+    // Group y lives above scale so the 200px travel isn't crushed by scale tweens.
+    gsap.set(groupEl, { y: -GROUP_Y_PX });
     if (scaleFrom != null) gsap.set(scaleEl, { scale: scaleFrom });
 
     const tl = gsap.timeline({
       onComplete: () => {
+        gsap.set(allGlyphs, { clearProps: "transform,opacity" });
+        gsap.set(groupEl, { clearProps: "transform" });
+        gsap.set(scaleEl, { clearProps: "transform" });
         if (maskOut) {
-          gsap.set(scaleEl, { clearProps: "transform" });
           gsap.set([purple, lime, white], { clearProps: "clipPath" });
+        } else {
+          gsap.set([purple, lime], { clipPath: HIDDEN_LEFT });
+          gsap.set(white, { clipPath: VISIBLE });
         }
         resolve();
       },
@@ -127,16 +183,38 @@ export function playLogotypeReveal(root: HTMLElement, opts: LogotypeRevealOpts =
       tl.to(scaleEl, { scale: scaleTo, duration: totalS, ease: scaleEase }, 0);
     }
 
-    tl.to(purple, { clipPath: VISIBLE, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, 0);
-    tl.to(lime, { clipPath: VISIBLE, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, LOGOTYPE_REVEAL_STAGGER_S);
+    // Green in, then land white — glyph ripple on its own clock.
+    tl.to(lime, { clipPath: VISIBLE, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, 0);
     tl.to(white, { clipPath: VISIBLE, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, whiteAt);
+    tl.to(groupEl, { y: 0, duration: groupSettleAt, ease: GLYPH_RISE_EASE }, 0);
+
+    for (let i = 0; i < glyphCount; i++) {
+      const pair = glyphSets.map((set) => set[i]);
+      tl.to(
+        pair,
+        { y: 0, opacity: 1, duration: glyphDur, ease: GLYPH_RISE_EASE },
+        i * glyphEach,
+      );
+    }
 
     if (!maskOut) return;
 
     const outAt = revealS + holdS;
+    // White lifts off first so green shows again, then green exits with the glyphs.
     tl.to(white, { clipPath: HIDDEN_RIGHT, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, outAt);
     tl.to(lime, { clipPath: HIDDEN_RIGHT, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, outAt + LOGOTYPE_REVEAL_STAGGER_S);
-    tl.to(purple, { clipPath: HIDDEN_RIGHT, duration: LOGOTYPE_REVEAL_MASK_S, ease: LOGOTYPE_REVEAL_EASE }, outAt + LOGOTYPE_REVEAL_STAGGER_S * 2);
+    // Master fall starts the frame after mid-sequence settle.
+    tl.to(groupEl, { y: GROUP_Y_PX, duration: groupOutS, ease: GLYPH_OUT_EASE }, groupOutAt);
+
+    // L→R fall — first letter leads so the drop reads with the enter wave.
+    for (let i = 0; i < glyphCount; i++) {
+      const pair = glyphSets.map((set) => set[i]);
+      tl.to(
+        pair,
+        { y: GLYPH_DROP_PX, opacity: 0, duration: glyphDur, ease: GLYPH_OUT_EASE },
+        outAt + i * glyphEach,
+      );
+    }
   });
 }
 

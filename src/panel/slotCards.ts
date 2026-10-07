@@ -8,7 +8,7 @@ import textItalic from "@phosphor-icons/core/assets/regular/text-italic.svg?raw"
 import textAlignLeft from "@phosphor-icons/core/assets/regular/text-align-left.svg?raw";
 import textAlignCenter from "@phosphor-icons/core/assets/regular/text-align-center.svg?raw";
 import textAlignRight from "@phosphor-icons/core/assets/regular/text-align-right.svg?raw";
-import textT from "@phosphor-icons/core/assets/regular/text-t.svg?raw";
+import articleIcon from "@phosphor-icons/core/assets/regular/article.svg?raw";
 import { checkInput } from "../checkBox";
 import { FEATURED_EMOJI, searchEmoji, warmEmojiCatalog, type EmojiItem } from "../emojis";
 import { ICON_PRESETS, IMAGE_COLLIDERS } from "../icons";
@@ -211,7 +211,7 @@ function textColorChip(slot: TextSlot): HTMLElement {
   mark.setAttribute("aria-hidden", "true");
   if (isTextField(slot)) {
     mark.classList.add("slot-mark--image");
-    mark.innerHTML = textT;
+    mark.innerHTML = articleIcon;
     return mark;
   }
   const chip = document.createElement("span");
@@ -255,7 +255,7 @@ function paintTextHeadline(toggle: HTMLElement, slot: TextSlot, open: boolean, f
       queueMicrotask(() => {
         const area = toggle.closest(".slot-card")?.querySelector<HTMLTextAreaElement>("[data-text-field]");
         if (!area) return;
-        area.focus();
+        area.focus({ preventScroll: true });
         const end = area.value.length;
         area.setSelectionRange(end, end);
       });
@@ -286,7 +286,7 @@ function paintTextHeadline(toggle: HTMLElement, slot: TextSlot, open: boolean, f
   toggle.append(chip, input);
   if (focus) {
     queueMicrotask(() => {
-      input.focus();
+      input.focus({ preventScroll: true });
       const end = input.value.length;
       input.setSelectionRange(end, end);
     });

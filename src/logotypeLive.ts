@@ -52,6 +52,16 @@ function contrasts(hex: string, backdrop: string): boolean {
 }
 
 /**
+ * True when a swatch would read as uncolored ink — same paint, not merely
+ * similar luminance (neon lime sits near white in luma but stays chrome-green).
+ */
+function readsAsInk(swatch: string, ink: string): boolean {
+  const [sr, sg, sb] = parseHex(swatch);
+  const [ir, ig, ib] = parseHex(ink);
+  return Math.hypot(sr - ir, sg - ig, sb - ib) / 255 < 0.18;
+}
+
+/**
  * Ink for uncolored letters and the TM. White on a dark canvas, near-black on a
  * light one — whichever clears the luminance gap.
  */
@@ -74,11 +84,11 @@ function shiftUntil(hex: string, backdrop: string): string {
 }
 
 /** Shuffled theme accents for resting lit letters — keep each hue (shift if needed), never borrow. */
-function paletteLit(theme: readonly string[], backdrop: string): string[] {
+export function paletteLit(theme: readonly string[], backdrop: string): string[] {
   const src = theme.length ? theme : ["#ffffff"];
   const ink = logotypeInk(backdrop);
   // Drop ink-matching swatches (theme white on a dark stage) so they don't read as uncolored.
-  const accents = src.filter((swatch) => lumGap(swatch, ink) >= LOGOTYPE_MIN_LUM_GAP);
+  const accents = src.filter((swatch) => !readsAsInk(swatch, ink));
   const pool = accents.length ? accents : src;
 
   const out: string[] = [];
@@ -161,11 +171,11 @@ function tmPaths(root: HTMLElement): SVGPathElement[] {
  * the color theme changes.
  * Every fill is checked against the canvas backdrop: a swatch within
  * LOGOTYPE_MIN_LUM_GAP is luminance-shifted in place so the hue stays.
- * Resting accents shuffle the theme (skipping ink-matching white) and keep each
- * hue via luminance shift — never borrow another swatch, or pink/purple collapse
- * onto cyan. Hover reassigns a random theme color on every letterform every
- * 333ms, then the resting set returns. Reduced motion does not run the hover
- * cycle.
+ * Resting accents shuffle the theme (skipping ink-matching white by colour
+ * distance — luma alone would also drop neon lime) and keep each hue via
+ * luminance shift — never borrow another swatch, or pink/purple collapse onto
+ * cyan. Hover reassigns a random theme color on every letterform every 333ms,
+ * then the resting set returns. Reduced motion does not run the hover cycle.
  */
 export function mountHeaderLogotype(root: HTMLElement, read: () => HeaderLogotypeSource): HeaderLogotype {
   const letters = letterPaths(root);

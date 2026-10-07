@@ -1,6 +1,7 @@
 import exclamationMark from "@phosphor-icons/core/assets/regular/exclamation-mark.svg?raw";
 import { lsGet, lsSet } from "./legacyStorage";
 import { setPrefs } from "./prefs";
+import { hugTipWidth } from "./tipHug";
 
 const AFTER_READY_MS = 2000;
 const HOLD_MS = 5000;
@@ -22,6 +23,7 @@ const BLANK_FIRST: Hint = {
 
 const HINTS: Hint[] = [
   { text: "Hit", key: "Space", after: "to play" },
+  { text: "Hit", key: "P", after: "to re-trigger physics" },
   { text: "Do you hate bouncy stuff? Try Layout Mode — or hit", key: "L" },
   { text: "Need ideas? Explore the templates in the Create tab" },
   { text: "Hide the UI for a clean canvas", key: "H" },
@@ -171,6 +173,7 @@ function paintCard(opts: { title: string; hint: Hint; index?: number; oneOff?: b
     node.append(stop);
   }
   hostEl.append(node);
+  hugTipWidth(node);
   tip = node;
   document.addEventListener("keydown", onKey);
 

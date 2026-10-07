@@ -621,7 +621,7 @@ export function ultrapilledState(): AppState {
       ],
       imageId: "",
       logoId: ULTRAPILLED_LOGO_ID,
-      // Intro mark is 50vw, and the opening frame scales it by 1.5, so 75% of the frame width.
+      // Intro mark is 55vw, and the opening frame scales it by 1.5, so ~82.5% of the frame width.
       logoScale: 8 / 3,
       logoOriginal: "#ffffff",
       logoTint: null,

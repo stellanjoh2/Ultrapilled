@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LOGOTYPE_MIN_LUM_GAP, logotypeHoverFill } from "./logotypeLive";
+import { LOGOTYPE_MIN_LUM_GAP, logotypeHoverFill, paletteLit } from "./logotypeLive";
 import { fillLuminance } from "./theme";
 
 /** Orby White, Lime, Purple, Blue, Pink. */
@@ -51,5 +51,14 @@ describe("logotype hover palette", () => {
     expect(gap(onBlack, "#000000")).toBeGreaterThanOrEqual(LOGOTYPE_MIN_LUM_GAP - 1e-9);
     expect(fillLuminance(onBlack)).toBeGreaterThan(0.2);
     expect(onBlack.toLowerCase()).not.toBe("#ffffff");
+  });
+});
+
+describe("logotype resting palette", () => {
+  it("keeps Orby lime among resting accents on the dark stage", () => {
+    const fills = paletteLit([...ORBY], STAGE);
+    expect(fills.map((f) => f.toLowerCase())).toContain("#c4ff00");
+    // Theme white matches ink and must not crowd out real accents.
+    expect(fills.every((f) => f.toLowerCase() !== "#ffffff")).toBe(true);
   });
 });

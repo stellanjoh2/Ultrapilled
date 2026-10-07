@@ -1,3 +1,5 @@
+import { hugTipWidth } from "./tipHug";
+
 const SHOW_MS = 380;
 const HIDE_MS = 180;
 const GAP = 8;
@@ -66,8 +68,10 @@ function place(el: HTMLElement) {
     hide();
     return;
   }
+  tip.style.width = "";
   tip.textContent = text;
   tip.hidden = false;
+  hugTipWidth(tip);
   const rect = el.getBoundingClientRect();
   const tw = tip.offsetWidth;
   const th = tip.offsetHeight;

@@ -164,7 +164,7 @@ export function modeSelectPreviewState(): AppState {
     physics: {
       ...DEFAULT_PHYSICS,
       weight: 1,
-      gravity: 0.9,
+      gravity: 1.40625,
       speed: 1,
       bounce: 1.05,
       friction: 0.1,

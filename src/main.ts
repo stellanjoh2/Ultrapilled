@@ -88,6 +88,8 @@ import youtubeLogo from "@phosphor-icons/core/assets/regular/youtube-logo.svg?ra
 import eyeIcon from "@phosphor-icons/core/assets/regular/eye.svg?raw";
 import eyeSlash from "@phosphor-icons/core/assets/regular/eye-slash.svg?raw";
 import trashSimple from "@phosphor-icons/core/assets/regular/trash-simple.svg?raw";
+import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
+import folderOpen from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
 import { isAboutOpen } from "./aboutPanel";
 import { isBugReportOpen } from "./bugReport";
@@ -111,6 +113,7 @@ import {
   defaultPillFileName,
   downloadPillJson,
   hydratePillImages,
+  isPillFile,
   parsePillProject,
   readPillFile,
   serializePillProject,
@@ -134,7 +137,7 @@ import {
 import { fitTextFieldBox, trackingEm, trackingOf } from "./measure";
 import { createWorld } from "./world";
 import { cancelSlotDrag } from "./slotDrag";
-import { bindUiClickSounds, bindUiTypeSounds, playButton, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
+import { bindUiClickSounds, bindUiTypeSounds, playButton, playCaution, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
 import gsap from "gsap";
 import "./style.css";
 import { compositionScale, placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
@@ -310,6 +313,9 @@ app.innerHTML = `
           </button>
           <button type="button" class="pill panel-util" id="reset-defaults" data-tip="Restore default sliders and options">Reset</button>
           <button type="button" class="pill panel-util" id="open-settings" data-tip="Sound, theme, and preferences">Settings</button>
+          <button type="button" class="icon-btn icon-hover panel-project" id="open-project" aria-label="Load or save project" aria-haspopup="menu" aria-expanded="false" data-tip="Load or save a .pill project">
+            <span aria-hidden="true">${floppyDisk}</span>
+          </button>
         </div>
         <button type="button" class="pill" id="copy-settings" hidden data-tip="Copy the current settings as text">Copy settings</button>
       </div>
@@ -4745,7 +4751,11 @@ const INSERT_MS = 280;
 
 function growInsertedSlot(motion: InsertMotion) {
   const card = panel.querySelector<HTMLElement>(`[data-id="${motion.id}"]`);
-  if (!card || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (!card) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    scrollPanelTo(card);
+    return;
+  }
   const gap = parseFloat(getComputedStyle(card.parentElement ?? card).rowGap) || 0;
   const box = getComputedStyle(card);
   const full = card.getBoundingClientRect().height;
@@ -4761,12 +4771,21 @@ function growInsertedSlot(motion: InsertMotion) {
   const anchor = motion.anchorId
     ? panel.querySelector<HTMLElement>(`[data-id="${motion.anchorId}"]`)
     : panel.querySelector<HTMLElement>(".slot-adds");
+  let holdTop = motion.anchorTop;
   if (anchor) {
     const scrollDelta = panel.scrollTop - motion.scroll;
     const error = anchor.getBoundingClientRect().top - (motion.anchorTop - scrollDelta);
     if (Math.abs(error) > 0.5) card.style.marginBottom = `${-gap - error}px`;
+    holdTop = anchor.getBoundingClientRect().top;
   }
 
+  const pinAnchor = () => {
+    if (!anchor) return;
+    const drift = anchor.getBoundingClientRect().top - holdTop;
+    if (Math.abs(drift) > 0.5) panel.scrollTop += drift;
+  };
+
+  panel.style.overflowAnchor = "none";
   const anim = card.animate(
     [
       {
@@ -4784,8 +4803,16 @@ function growInsertedSlot(motion: InsertMotion) {
     ],
     { duration: INSERT_MS, easing: INSERT_EASE, fill: "forwards" },
   );
+  let pinFrame = 0;
+  const pinLoop = () => {
+    pinAnchor();
+    if (anim.playState === "running") pinFrame = requestAnimationFrame(pinLoop);
+  };
+  pinFrame = requestAnimationFrame(pinLoop);
   anim.finished
     .then(() => {
+      cancelAnimationFrame(pinFrame);
+      pinAnchor();
       card.style.height = "";
       card.style.minHeight = "";
       card.style.paddingTop = "";
@@ -4793,10 +4820,15 @@ function growInsertedSlot(motion: InsertMotion) {
       card.style.marginBottom = "";
       card.style.overflow = "";
       anim.cancel();
+      pinAnchor();
+      panel.style.overflowAnchor = "";
       scrollPanelTo(card);
       pinPageScroll();
     })
-    .catch(() => {});
+    .catch(() => {
+      cancelAnimationFrame(pinFrame);
+      panel.style.overflowAnchor = "";
+    });
 }
 
 function removeSlot(id: string) {
@@ -5627,12 +5659,12 @@ function showAddShapeNudge() {
   } else {
     gsap.fromTo(
       wordEls,
-      { y: 22, autoAlpha: 0 },
+      { y: -22, autoAlpha: 0 },
       { y: 0, autoAlpha: 1, duration: 0.75, stagger: 0.075, ease: "power2.out" },
     );
     gsap.fromTo(
       hint,
-      { y: 10, autoAlpha: 0 },
+      { y: -10, autoAlpha: 0 },
       { y: 0, autoAlpha: 1, duration: 0.55, delay: 0.35, ease: "power2.out" },
     );
   }
@@ -5973,6 +6005,136 @@ for (const id of ["physics", "background", "export"] as const) {
 app.querySelector("#open-settings")?.addEventListener("click", () => {
   openSettings(settingsController);
 });
+
+const projectBtn = app.querySelector<HTMLButtonElement>("#open-project")!;
+let closeProjectMenu: (() => void) | null = null;
+let projectFileInput: HTMLInputElement | null = null;
+
+function ensureProjectFileInput(): HTMLInputElement {
+  if (projectFileInput) return projectFileInput;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".pill,application/x-ultrapilled-project";
+  input.className = "bg-file";
+  input.hidden = true;
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    if (!isPillFile(file)) {
+      playCaution();
+      void askNotice({
+        title: "Couldn’t load project",
+        body: "Only .pill files can be loaded.",
+      });
+      return;
+    }
+    void (async () => {
+      try {
+        await exportController.loadProject(file);
+        playNotify();
+      } catch (error) {
+        playCaution();
+        void askNotice({
+          title: "Couldn’t load project",
+          body: error instanceof Error ? error.message : "Could not load this .pill file.",
+        });
+      }
+    })();
+  });
+  document.body.append(input);
+  projectFileInput = input;
+  return input;
+}
+
+function openProjectMenu() {
+  closeProjectMenu?.();
+  closeSlotMenu();
+  closeFontMenu();
+  const abort = new AbortController();
+  const root = document.createElement("div");
+  root.className = "slot-menu-host";
+  const menu = document.createElement("div");
+  menu.className = "slot-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "Project");
+
+  const addItem = (label: string, icon: string, run: () => void) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "slot-menu__item";
+    btn.setAttribute("role", "menuitem");
+    btn.innerHTML = `<span class="slot-menu__item-icon" aria-hidden="true">${icon}</span><span class="slot-menu__item-label">${label}</span>`;
+    btn.addEventListener("click", () => {
+      close();
+      run();
+    });
+    menu.append(btn);
+  };
+
+  addItem("Save .pill", floppyDisk, () => {
+    void (async () => {
+      try {
+        await exportController.saveProject();
+        playNotify();
+      } catch {
+        playCaution();
+        void askNotice({
+          title: "Couldn’t save project",
+          body: "The .pill file couldn’t be written.",
+        });
+      }
+    })();
+  });
+  addItem("Load .pill", folderOpen, () => {
+    ensureProjectFileInput().click();
+  });
+
+  root.append(menu);
+  const close = () => {
+    abort.abort();
+    root.remove();
+    projectBtn.setAttribute("aria-expanded", "false");
+    if (closeProjectMenu === close) closeProjectMenu = null;
+  };
+  closeProjectMenu = close;
+  projectBtn.setAttribute("aria-expanded", "true");
+  document.body.append(root);
+  const rect = projectBtn.getBoundingClientRect();
+  // Right-align under the sphere; measure after mount so min-width is real.
+  placeZoomedFixed(root, rect.right - Math.max(root.offsetWidth, menu.offsetWidth), rect.bottom + 6, 8);
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduceMotion) menu.classList.add("is-in");
+  else requestAnimationFrame(() => menu.classList.add("is-in"));
+
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (root.contains(target) || projectBtn.contains(target)) return;
+      close();
+    },
+    { signal: abort.signal, capture: true },
+  );
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Escape") close();
+    },
+    { signal: abort.signal },
+  );
+  window.addEventListener("resize", close, { signal: abort.signal });
+}
+
+projectBtn.addEventListener("click", () => {
+  if (closeProjectMenu) {
+    closeProjectMenu();
+    return;
+  }
+  openProjectMenu();
+});
+
 paintTransport();
 paintWelcome();
 app.querySelector("#reset-defaults")?.addEventListener("click", () => {
@@ -6282,12 +6444,12 @@ function scrollPanelTo(card: HTMLElement, shrinkAbove = 0) {
     panel.scrollTop = dest;
     return;
   }
-  const duration = Math.min(720, Math.max(280, Math.abs(delta) * 0.85));
+  const duration = 500;
   const start = performance.now();
   panel.style.overflowAnchor = "none";
   const step = (now: number) => {
     const t = Math.min(1, (now - start) / duration);
-    const eased = 1 - (1 - t) ** 3;
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
     panel.scrollTop = from + delta * eased;
     if (t < 1) {
       panelScrollFrame = requestAnimationFrame(step);

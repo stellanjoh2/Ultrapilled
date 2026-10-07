@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { closeAbout, isAboutOpen } from "./aboutPanel";
 import { closeBugReport, isBugReportOpen } from "./bugReport";
 import { askModeSelect, stopModeSelectPreview } from "./modeSelect";
 
 describe("mode select header actions", () => {
   afterEach(() => {
+    closeAbout();
     closeBugReport();
     stopModeSelectPreview();
     document.body.innerHTML = "";
@@ -58,6 +60,20 @@ describe("mode select header actions", () => {
 
     root.querySelector<HTMLButtonElement>("[data-mode=layout]")?.click();
     await expect(pending).resolves.toEqual({ kind: "mode", mode: "layout" });
+  });
+
+  it("opens About from the S logo without leaving Mode Select", async () => {
+    stubReducedMotion();
+    const pending = askModeSelect();
+    const root = document.querySelector(".mode-select")!;
+
+    root.querySelector("[data-open-about]")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(isAboutOpen()).toBe(true);
+    expect(document.querySelector(".mode-select")).toBe(root);
+
+    closeAbout();
+    root.querySelector<HTMLButtonElement>("[data-mode=physics]")?.click();
+    await expect(pending).resolves.toEqual({ kind: "mode", mode: "physics" });
   });
 
   it("opens a .pill picker from Load Project", async () => {

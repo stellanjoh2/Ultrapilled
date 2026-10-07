@@ -38,12 +38,12 @@ const home = document.querySelector<HTMLElement>(".home");
 if (reduce) {
   gsap.set([back, title, lede, heads, copy, home], { autoAlpha: 1, y: 0 });
 } else {
-  gsap.set(back, { autoAlpha: 0, y: 12 });
-  gsap.set(title, { autoAlpha: 0, y: 20 });
-  gsap.set(lede, { autoAlpha: 0, y: 18 });
-  gsap.set(heads, { autoAlpha: 0, y: 16 });
-  gsap.set(copy, { autoAlpha: 0, y: 16 });
-  gsap.set(home, { autoAlpha: 0, y: 16 });
+  gsap.set(back, { autoAlpha: 0, y: -12 });
+  gsap.set(title, { autoAlpha: 0, y: -20 });
+  gsap.set(lede, { autoAlpha: 0, y: -18 });
+  gsap.set(heads, { autoAlpha: 0, y: -16 });
+  gsap.set(copy, { autoAlpha: 0, y: -16 });
+  gsap.set(home, { autoAlpha: 0, y: -16 });
 
   const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
   tl.to(back, { autoAlpha: 1, y: 0, duration: 0.5 }, 0.04);

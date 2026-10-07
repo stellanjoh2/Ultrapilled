@@ -1,6 +1,9 @@
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { DEFAULT_THEME } from "./theme";
 import { playRemove, playTransition } from "./uiSounds";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const ABOUT_TEXT =
   "Hi, I'm Stellan Johansson, a creative director and brand designer with 20+ years across games, 3D, motion, UI and visual identity — shipping titles at studios, running agencies, and shaping platforms used by millions of creators. Ultrapilled™ is one of my sideprojects.";
@@ -64,6 +67,7 @@ let closing = false;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
 let openTl: gsap.core.Timeline | null = null;
 let blurTween: gsap.core.Tween | null = null;
+let projectTriggers: ScrollTrigger[] = [];
 
 const ABOUT_BLUR_PX = 14;
 
@@ -147,14 +151,16 @@ function fillBio(el: HTMLElement): HTMLElement[] {
 }
 
 function projectsHtml(): string {
-  const cards = ABOUT_PROJECTS.map((project) => {
+  const cards = ABOUT_PROJECTS.map((project, index) => {
     const external = project.href.startsWith("http");
     const extra = external ? ` target="_blank" rel="noopener noreferrer"` : "";
     const cta = "cta" in project ? project.cta : `Launch ${project.name}`;
+    // Eager + decode — scroll reveals stay smooth; lazy would hitch mid-tween.
+    const priority = index === 0 ? ` fetchpriority="high"` : "";
     return `
       <article class="about-project">
         <a class="about-project__media" href="${project.href}"${extra} aria-label="${cta}">
-          <img class="about-project__image" src="${project.image}" alt="${project.imageAlt}" width="1600" height="900" loading="lazy" decoding="async" />
+          <img class="about-project__image" src="${project.image}" alt="${project.imageAlt}" width="1600" height="900" loading="eager" decoding="async"${priority} />
         </a>
         <h3 class="about-project__title">${project.title}</h3>
         <p class="about-project__lede">${project.lede}</p>
@@ -168,6 +174,105 @@ function projectsHtml(): string {
       <div class="about-overlay__projects-list">${cards}</div>
     </section>
   `;
+}
+
+function projectBits(card: HTMLElement): HTMLElement[] {
+  return [
+    card.querySelector<HTMLElement>(".about-project__media"),
+    card.querySelector<HTMLElement>(".about-project__title"),
+    card.querySelector<HTMLElement>(".about-project__lede"),
+    card.querySelector<HTMLElement>(".about-project__launch"),
+  ].filter((el): el is HTMLElement => Boolean(el));
+}
+
+async function ensureImageReady(img: HTMLImageElement | null): Promise<void> {
+  if (!img) return;
+  if (!img.complete) {
+    await new Promise<void>((resolve) => {
+      img.addEventListener("load", () => resolve(), { once: true });
+      img.addEventListener("error", () => resolve(), { once: true });
+    });
+  }
+  try {
+    await img.decode();
+  } catch {
+    /* decode can reject on error — reveal still proceeds */
+  }
+}
+
+/** Kick decode for every still so later cards are warm by the time they enter view. */
+function warmProjectImages(root: HTMLElement): void {
+  for (const img of root.querySelectorAll<HTMLImageElement>(".about-project__image")) {
+    void ensureImageReady(img);
+  }
+}
+
+function killProjectTriggers(): void {
+  for (const st of projectTriggers) st.kill();
+  projectTriggers = [];
+}
+
+function armProjectScrollReveals(
+  root: HTMLElement,
+  scroller: HTMLElement,
+  cards: HTMLElement[],
+  doneBtn: HTMLElement,
+): void {
+  killProjectTriggers();
+  const clearBlend = "opacity,visibility,transform";
+
+  for (const card of cards) {
+    const bits = projectBits(card);
+    const media = bits[0];
+    const rest = bits.slice(1);
+    const img = card.querySelector<HTMLImageElement>(".about-project__image");
+
+    const st = ScrollTrigger.create({
+      scroller,
+      trigger: card,
+      start: "top 88%",
+      once: true,
+      onEnter: () => {
+        void (async () => {
+          await ensureImageReady(img);
+          if (modalRoot !== root || closing) return;
+          const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+          if (media) {
+            tl.to(media, { autoAlpha: 1, y: 0, duration: 0.65, clearProps: clearBlend });
+          }
+          if (rest.length) {
+            tl.to(
+              rest,
+              { autoAlpha: 1, y: 0, duration: 0.5, stagger: 0.08, clearProps: clearBlend },
+              media ? "-=0.4" : 0,
+            );
+          }
+        })();
+      },
+    });
+    projectTriggers.push(st);
+  }
+
+  projectTriggers.push(
+    ScrollTrigger.create({
+      scroller,
+      trigger: doneBtn,
+      start: "top 92%",
+      once: true,
+      onEnter: () => {
+        if (modalRoot !== root || closing) return;
+        gsap.to(doneBtn, {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.5,
+          ease: "power3.out",
+          clearProps: clearBlend,
+        });
+      },
+    }),
+  );
+
+  ScrollTrigger.refresh();
 }
 
 function bodyHtml(): string {
@@ -195,6 +300,7 @@ export function closeAbout(): void {
   const scroll = root.querySelector<HTMLElement>(".about-overlay__scroll");
   openTl?.kill();
   openTl = null;
+  killProjectTriggers();
   if (onKey) window.removeEventListener("keydown", onKey);
   onKey = null;
   playRemove();
@@ -239,6 +345,7 @@ export function openAbout(): void {
   const links = root.querySelector<HTMLElement>(".about-overlay__links")!;
   const projectsTitle = root.querySelector<HTMLElement>(".about-overlay__projects-title")!;
   const projectCards = [...root.querySelectorAll<HTMLElement>(".about-project")];
+  const projectRevealBits = projectCards.flatMap(projectBits);
   const doneBtn = root.querySelector<HTMLButtonElement>(".about-overlay__ok")!;
   const scroll = root.querySelector<HTMLElement>(".about-overlay__scroll")!;
   const scrim = root.querySelector<HTMLElement>(".about-overlay__scrim")!;
@@ -268,20 +375,26 @@ export function openAbout(): void {
   playTransition(true);
   doneBtn.focus({ preventScroll: true });
 
-  const sequence = [links, projectsTitle, ...projectCards, doneBtn];
+  const intro = [links, projectsTitle];
 
   if (reducedMotion()) {
     tweenAboutBlur(true, 0);
-    gsap.set([words, ...sequence], { clearProps: "all", autoAlpha: 1, y: 0 });
+    gsap.set([words, ...intro, ...projectRevealBits, doneBtn], {
+      clearProps: "all",
+      autoAlpha: 1,
+      y: 0,
+    });
+    warmProjectImages(root);
     return;
   }
 
   const clearBlend = "opacity,visibility,transform";
-  gsap.set(words, { autoAlpha: 0, y: 22 });
-  gsap.set(sequence, { autoAlpha: 0, y: 28 });
+  gsap.set(words, { autoAlpha: 0, y: -22 });
+  gsap.set(intro, { autoAlpha: 0, y: -28 });
+  gsap.set([...projectRevealBits, doneBtn], { autoAlpha: 0, y: -28 });
   gsap.set(scrim, { autoAlpha: 0 });
 
-  // Soften stage + dim together, then stagger copy.
+  // Soften stage + dim together, then stagger copy. Projects wait for scroll.
   tweenAboutBlur(true, 0.55);
   openTl = gsap.timeline({ defaults: { ease: "power3.out" } });
   openTl.to(scrim, { autoAlpha: 1, duration: 0.55, ease: "power2.out" }, 0);
@@ -291,11 +404,13 @@ export function openAbout(): void {
     0.12,
   );
   openTl.to(links, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, ">");
+  // Projects (incl. the first still in view) wait until bio + social finish.
+  openTl.add(() => {
+    if (modalRoot !== root || closing) return;
+    armProjectScrollReveals(root, scroll, projectCards, doneBtn);
+  });
   openTl.to(projectsTitle, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, ">");
-  openTl.to(
-    projectCards,
-    { autoAlpha: 1, y: 0, duration: 0.65, stagger: 0.18, clearProps: clearBlend },
-    ">",
-  );
-  openTl.to(doneBtn, { autoAlpha: 1, y: 0, duration: 0.5, clearProps: clearBlend }, ">");
+
+  // Eager imgs + decode ahead of the scroller; each reveal still waits on its own decode.
+  warmProjectImages(root);
 }

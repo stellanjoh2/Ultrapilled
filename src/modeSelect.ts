@@ -16,6 +16,7 @@ import { DEFAULT_STAGE, DEFAULT_THEME } from "./theme";
 import bugIcon from "@phosphor-icons/core/assets/regular/bug.svg?raw";
 import folderOpenIcon from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
 import { PRIVACY_HREF } from "./privacy";
+import { isAboutOpen, openAbout } from "./aboutPanel";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { mountHeaderLogotype } from "./logotypeLive";
 import { isPillFile } from "./project/pillFormat";
@@ -400,7 +401,7 @@ export function mountMobileAccessOverlay() {
   ok.addEventListener("click", dismiss);
 
   const clearBlend = "opacity,visibility,transform";
-  if (!reducedMotion()) gsap.set([...words, ok], { autoAlpha: 0, y: 22 });
+  if (!reducedMotion()) gsap.set([...words, ok], { autoAlpha: 0, y: -22 });
   host.append(overlay);
 
   if (reducedMotion()) {
@@ -509,7 +510,9 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
               <path fill="currentColor" d="M41.4395 69.3848C28.8066 67.8535 19.9062 58.7617 19.9062 46.9902C19.9062 42.2051 21.6289 37.0371 24.5 33.5918C23.2559 30.4336 23.4473 23.7344 24.8828 20.959C28.7109 20.4805 33.8789 22.4902 36.9414 25.2656C40.5781 24.1172 44.4062 23.543 49.0957 23.543C53.7852 23.543 57.6133 24.1172 61.0586 25.1699C64.0254 22.4902 69.2891 20.4805 73.1172 20.959C74.457 23.543 74.6484 30.2422 73.4043 33.4961C76.4668 37.1328 78.0937 42.0137 78.0937 46.9902C78.0937 58.7617 69.1934 67.6621 56.3691 69.2891C59.623 71.3945 61.8242 75.9883 61.8242 81.252L61.8242 91.2051C61.8242 94.0762 64.2168 95.7031 67.0879 94.5547C84.4102 87.9512 98 70.6289 98 49.1914C98 22.1074 75.9883 6.69539e-07 48.9043 4.309e-07C21.8203 1.92261e-07 -1.9479e-07 22.1074 -4.3343e-07 49.1914C-6.20631e-07 70.4375 13.4941 88.0469 31.6777 94.6504C34.2617 95.6074 36.75 93.8848 36.75 91.3008L36.75 83.6445C35.4102 84.2188 33.6875 84.6016 32.1562 84.6016C25.8398 84.6016 22.1074 81.1563 19.4277 74.7441C18.375 72.1602 17.2266 70.6289 15.0254 70.3418C13.877 70.2461 13.4941 69.7676 13.4941 69.1934C13.4941 68.0449 15.4082 67.1836 17.3223 67.1836C20.0977 67.1836 22.4902 68.9063 24.9785 72.4473C26.8926 75.2227 28.9023 76.4668 31.2949 76.4668C33.6875 76.4668 35.2187 75.6055 37.4199 73.4043C39.0469 71.7773 40.291 70.3418 41.4395 69.3848Z" />
             </svg>
           </a>
-          <a href="https://www.linkedin.com/in/stellanj/" target="_blank" rel="noopener noreferrer" class="mode-select__s" aria-label="LinkedIn" data-tip="LinkedIn"></a>
+          <button type="button" class="mode-select__s icon-hover" data-open-about aria-label="About" data-tip="About">
+            <span class="mode-select__s-mark" aria-hidden="true"></span>
+          </button>
         </p>
         <p class="mode-select__foot">
           Ultrapilled™ is a free physics playground for dropping text, icons, and images into motion.<br />
@@ -523,11 +526,20 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
     fillHeadline(headline);
     const words = [...headline.querySelectorAll<HTMLElement>(".mode-select__word")];
     const cards = [...root.querySelectorAll<HTMLButtonElement>(".mode-select__card")];
+    const cardParts = cards.map((card) => ({
+      media: card.querySelector<HTMLElement>(".mode-select__media")!,
+      name: card.querySelector<HTMLElement>(".mode-select__name")!,
+      desc: card.querySelector<HTMLElement>(".mode-select__desc")!,
+    }));
+    const cardBits = cardParts.flatMap((part) => [part.media, part.name, part.desc]);
     const actions = root.querySelector<HTMLElement>(".mode-select__actions")!;
+    const actionBtns = [...actions.querySelectorAll<HTMLButtonElement>(".mode-select__action")];
     const fileInput = root.querySelector<HTMLInputElement>(".mode-select__file")!;
     const social = root.querySelector<HTMLElement>(".mode-select__social")!;
     const foot = root.querySelector<HTMLElement>(".mode-select__foot")!;
     const footer = [social, foot];
+    // Fade the actions wrap on exit only — enter animates the buttons themselves so a
+    // parent opacity/transform doesn’t become a backdrop root and kill frosted glass.
     const chrome = [actions, ...footer];
     const video = root.querySelector<HTMLVideoElement>(".mode-select__video");
     const ink = [mark, headline, ...root.querySelectorAll<HTMLElement>(".mode-select__name, .mode-select__desc")];
@@ -579,7 +591,17 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
     };
 
     const onKey = (event: KeyboardEvent) => {
-      if (isBugReportOpen()) return;
+      if (isBugReportOpen() || isAboutOpen()) return;
+      // Programmatic land-focus mustn’t look “preselected” — only show the ring after real key nav.
+      if (
+        event.key === "Tab" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight" ||
+        event.key === "ArrowUp" ||
+        event.key === "ArrowDown"
+      ) {
+        root.classList.add("is-key-nav");
+      }
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
         const i = cards.indexOf(document.activeElement as HTMLButtonElement);
@@ -599,6 +621,11 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
     root.addEventListener("click", (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
+      if (target.closest("[data-open-about]")) {
+        event.preventDefault();
+        openAbout();
+        return;
+      }
       if (target.closest("[data-open-bug-report]")) {
         event.preventDefault();
         openBugReport();
@@ -634,12 +661,13 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
 
     // Animate pieces — clear opacity/transform after so mix-blend-mode can reach the preview.
     const clearBlend = "opacity,visibility,transform";
-    gsap.set([...words, ...cards, ...chrome], { autoAlpha: 0, y: 22 });
+    gsap.set([...words, ...cardBits, ...footer, ...actionBtns], { autoAlpha: 0, y: -22 });
     gsap.set(mark, { autoAlpha: 1, y: 0 });
 
     if (reducedMotion()) {
       gsap.set(mark.querySelectorAll(".logotype-reveal__layer"), { clipPath: "inset(0% 0% 0% 0%)" });
-      gsap.set([mark, ...words, ...cards, ...chrome], { clearProps: "all", autoAlpha: 1, y: 0 });
+      // clearProps only — re-applying autoAlpha/y leaves inline opacity/transform and kills frost.
+      gsap.set([mark, ...words, ...cardBits, ...footer, ...actionBtns], { clearProps: "all" });
       startModeSelectLogotype(mark);
       return;
     }
@@ -657,8 +685,15 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
       const reveal = { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend };
       const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
       tl.to(words, reveal);
-      tl.to(actions, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, "<");
-      tl.to(cards, reveal, ">");
+      tl.to(actionBtns, { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend }, "<");
+      // Cards: media → name → desc (absolute offsets — nested += labels collapse to one beat).
+      tl.add("cards");
+      cardParts.forEach((part, i) => {
+        const base = i * 0.2;
+        tl.to(part.media, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, `cards+=${base}`);
+        tl.to(part.name, { autoAlpha: 1, y: 0, duration: 0.5, clearProps: clearBlend }, `cards+=${base + 0.28}`);
+        tl.to(part.desc, { autoAlpha: 1, y: 0, duration: 0.45, clearProps: clearBlend }, `cards+=${base + 0.48}`);
+      });
       tl.to(footer, { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.05, clearProps: clearBlend }, ">");
       tl.add(() => {
         gsap.set(ink, { clearProps: clearBlend });

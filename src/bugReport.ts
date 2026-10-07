@@ -151,9 +151,9 @@ function revealThankYou() {
     gsap.set(message, { autoAlpha: 1 });
     const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
     if (words.length) {
-      tl.fromTo(words, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.025 });
+      tl.fromTo(words, { opacity: 0, y: -14 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.025 });
     } else {
-      tl.fromTo(message, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.3 });
+      tl.fromTo(message, { opacity: 0, y: -14 }, { opacity: 1, y: 0, duration: 0.3 });
     }
     tl.fromTo(ok, { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.28, ease: "power3.out" }, "-=0.14");
   };

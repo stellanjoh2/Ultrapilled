@@ -184,19 +184,19 @@ body,
   }
 }
 
-/* Centered splash wordmark — 50vw ≈ 1280px on a 2560 display. */
+/* Centered splash wordmark — 55vw ≈ 1408px on a 2560 display. */
 .app-intro__logo {
   position: absolute;
   top: 50%;
   left: 50%;
   translate: -50% -50%;
-  width: 50vw;
+  width: 55vw;
   pointer-events: none;
   visibility: hidden;
   opacity: 0;
 }
 
-/* Shared purple → lime → white mask layers (intro + mode select). */
+/* Stacked mark layers — intro/Mode Select anim is lime → white (purple unused there). */
 .logotype-reveal {
   width: 100%;
   overflow: visible;
@@ -544,7 +544,7 @@ body:has(.app.is-presenting) .ui-tip {
 .mode-select__mark.logotype {
   display: flex;
   align-items: center;
-  width: calc(240px * var(--ui-scale));
+  width: calc(264px * var(--ui-scale));
   height: auto;
   color: #ffffff;
 }
@@ -2143,7 +2143,7 @@ html.is-asset-anims-frozen .mode-select__vibe.is-text-gradient.is-gradient-anima
 
 .panel-actions__bar {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: var(--space-1);
   align-items: stretch;
 }
@@ -2773,7 +2773,7 @@ button.pill.smash-btn.is-on::after {
 @keyframes theme-swatch-reveal {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(-8px);
   }
 
   to {
@@ -3964,6 +3964,46 @@ button.icon-btn {
 button.icon-btn svg {
   display: block;
   transition: transform 0.15s ease;
+}
+
+/* Floppy project control — same rest chrome as .panel-util, circular hit. */
+button.icon-btn.panel-project {
+  align-self: stretch;
+  width: calc(36px * var(--ui-scale));
+  min-height: calc(36px * var(--ui-scale));
+  height: auto;
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  background: transparent;
+  color: var(--ink-mute);
+  box-shadow: none;
+  transition: all 0.25s ease;
+}
+
+button.icon-btn.panel-project svg {
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
+}
+
+html[data-theme="day"] button.icon-btn.panel-project {
+  box-shadow: none;
+}
+
+button.icon-btn.panel-project:hover:not(:disabled),
+button.icon-btn.panel-project[aria-expanded="true"] {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  border-color: transparent;
+  box-shadow: none;
+  filter: none;
+}
+
+button.icon-btn.panel-project:active:not(:disabled) {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  border-color: transparent;
+  box-shadow: none;
+  transform: translateY(calc(4px * var(--ui-scale)));
+  transition: 100ms;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -5552,8 +5592,8 @@ html[data-theme="day"] .shape-swatch {
   top: 0;
   left: 0;
   z-index: 100;
-  width: max-content;
-  max-width: min(calc(240px * var(--ui-scale)), calc(100vw - 16px));
+  width: fit-content;
+  max-width: min(calc(200px * var(--ui-scale)), calc(100vw - 16px));
   margin: 0;
   padding: calc(8px * var(--ui-scale)) calc(10px * var(--ui-scale));
   border-radius: calc(10px * var(--ui-scale));
@@ -5564,6 +5604,7 @@ html[data-theme="day"] .shape-swatch {
   font-weight: 400;
   line-height: 1.45;
   letter-spacing: -0.2px;
+  text-wrap: balance;
   pointer-events: none;
   opacity: 1;
   transform: translate(-9999px, -9999px);
@@ -5600,8 +5641,8 @@ html[data-theme="day"] .shape-swatch {
   z-index: 60;
   left: max(var(--panel-inset), env(safe-area-inset-left, 0px));
   bottom: max(var(--panel-inset), env(safe-area-inset-bottom, 0px));
-  width: max-content;
-  max-width: min(475px, calc(var(--ui-vw) - (var(--space-2) * 2)));
+  width: fit-content;
+  max-width: min(calc(380px * var(--ui-scale)), calc(var(--ui-vw) - (var(--space-2) * 2)));
   margin: 0;
   padding: var(--panel-pad);
   border-radius: var(--radius-tip);
@@ -5732,6 +5773,7 @@ html[data-theme="day"] .shape-swatch {
   font-size: calc(18.75px * var(--ui-scale));
   font-weight: 300;
   line-height: 1.4;
+  text-wrap: balance;
 }
 
 .pro-tip__stop {
@@ -5779,8 +5821,8 @@ html[data-theme="day"] .shape-swatch {
     left: max(var(--panel-inset), env(safe-area-inset-left, 0px));
     right: auto;
     bottom: calc(46vh + (var(--panel-inset) * 2));
-    width: max-content;
-    max-width: min(475px, calc(var(--ui-vw) - (var(--space-2) * 2)));
+    width: fit-content;
+    max-width: min(calc(380px * var(--ui-scale)), calc(var(--ui-vw) - (var(--space-2) * 2)));
   }
 
   .topbar {
@@ -7430,7 +7472,8 @@ input[type="file"].mode-select__file {
   transition: opacity 0.2s ease, color 0.2s ease;
 }
 
-.mode-select__social a::before {
+.mode-select__social a::before,
+.mode-select__social button.mode-select__s::before {
   content: "";
   position: absolute;
   inset: calc(var(--space-1) * -0.5);
@@ -7460,11 +7503,28 @@ input[type="file"].mode-select__file {
   mask-size: contain;
 }
 
-.mode-select__s {
-  display: block;
+button.mode-select__s {
+  appearance: none;
+  display: grid;
+  place-items: center;
   width: calc(38px * 198 / 248.77 * var(--ui-scale));
   height: calc(38px * var(--ui-scale));
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
   color: #555;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.mode-select__s-mark {
+  display: block;
+  width: 100%;
+  height: 100%;
   background-color: currentColor;
   -webkit-mask-image: url("./assets/s-logo.svg");
   mask-image: url("./assets/s-logo.svg");
@@ -7474,14 +7534,9 @@ input[type="file"].mode-select__file {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
-  cursor: pointer;
-  text-decoration: none;
-  z-index: 1;
-  opacity: 0.75;
-  transition: opacity 0.2s ease, color 0.2s ease;
 }
 
-.mode-select__s:hover {
+button.mode-select__s:hover {
   color: var(--ink);
   opacity: 1;
 }
@@ -7533,8 +7588,14 @@ button.pill.mode-select__action:not(.pill--commit):not(.is-on) {
   color: #f5f5f5;
   border: 1px solid color-mix(in srgb, #f5f5f5 40%, transparent);
   box-shadow: none;
-  backdrop-filter: blur(8px);
+  /* -webkit- first: LightningCSS drops the unprefixed property when it comes second.
+     Don't use transition:all — Chrome drops backdrop-filter when `all`/`transform` tween. */
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition:
+    background 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease;
 }
 
 button.pill.mode-select__action:not(.pill--commit):hover:not(:disabled):not(.is-on),
@@ -7625,7 +7686,8 @@ button.pill.mode-select__action:not(.pill--commit):active:not(:disabled):not(.is
   outline: none;
 }
 
-.mode-select__card:focus-visible .mode-select__name {
+/* Only after Tab/arrows — land focuses Physics for Enter, but mustn’t paint a “selected” ring. */
+.mode-select.is-key-nav .mode-select__card:focus-visible .mode-select__name {
   outline: calc(2px * var(--ui-scale)) solid var(--loop-stroke-a);
   outline-offset: calc(4px * var(--ui-scale));
 }
@@ -7658,8 +7720,8 @@ button.pill.mode-select__action:not(.pill--commit):active:not(:disabled):not(.is
 
 .mode-select__card:hover .mode-select__video,
 .mode-select__card:hover .mode-select__image,
-.mode-select__card:focus-visible .mode-select__video,
-.mode-select__card:focus-visible .mode-select__image {
+.mode-select.is-key-nav .mode-select__card:focus-visible .mode-select__video,
+.mode-select.is-key-nav .mode-select__card:focus-visible .mode-select__image {
   scale: 1.08;
 }
 
@@ -7671,8 +7733,8 @@ button.pill.mode-select__action:not(.pill--commit):active:not(:disabled):not(.is
 
   .mode-select__card:hover .mode-select__video,
   .mode-select__card:hover .mode-select__image,
-  .mode-select__card:focus-visible .mode-select__video,
-  .mode-select__card:focus-visible .mode-select__image {
+  .mode-select.is-key-nav .mode-select__card:focus-visible .mode-select__video,
+  .mode-select.is-key-nav .mode-select__card:focus-visible .mode-select__image {
     scale: 1;
   }
 }
@@ -7719,7 +7781,7 @@ button.pill.mode-select__action:not(.pill--commit):active:not(:disabled):not(.is
 }
 
 .mode-select__card:hover .mode-select__stroke,
-.mode-select__card:focus-visible .mode-select__stroke {
+.mode-select.is-key-nav .mode-select__card:focus-visible .mode-select__stroke {
   opacity: 1;
 }
 
