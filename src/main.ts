@@ -6296,7 +6296,7 @@ async function loadSavedTemplate(id: string) {
     await applyPillProject(project);
     return;
   }
-  loadTemplate(project.state);
+  await loadTemplate(project.state);
 }
 
 async function removeCustomTemplate(id: string) {
@@ -6321,7 +6321,7 @@ async function removeCustomTemplate(id: string) {
   }
 }
 
-function loadTemplate(next: AppState) {
+async function loadTemplate(next: AppState) {
   setPresenting(false);
   clearCanvasNudge();
   closeFontMenu();
@@ -6334,6 +6334,15 @@ function loadTemplate(next: AppState) {
   world.setPicked(null);
   openSlots.clear();
   adoptState(keepSelectedCanvas(next, state.canvas));
+  await relinkProjectImages({
+    state,
+    poses: [],
+    frame: { width: 0, height: 0 },
+    images: [],
+    loop: false,
+    pages: [],
+    pageIndex: 0,
+  });
   for (const slot of state.slots) captureBaseline(slot);
   resetPages();
   applyBackground();

@@ -61,7 +61,7 @@ export type CreatePanelHost = SlotCardHost & {
   SHAPE_PERF_WARN: number;
   selectCanvas(next: import("../canvas").CanvasRatio): void;
   openCanvasStagePicker(btn: HTMLButtonElement): void;
-  loadTemplate(next: AppState): void;
+  loadTemplate(next: AppState): void | Promise<void>;
   saveCurrentAsTemplate(): void;
   closeFontMenu(): void;
   removeCustomTemplate(id: string): void;
