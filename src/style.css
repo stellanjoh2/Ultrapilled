@@ -4208,7 +4208,7 @@ button.pill.slot-add:hover {
 .slot-add__icon {
   position: absolute;
   top: 50%;
-  left: calc(4px * var(--ui-scale));
+  left: calc(3px * var(--ui-scale));
   transform: translateY(-50%);
   display: grid;
   place-items: center;
@@ -4219,11 +4219,13 @@ button.pill.slot-add:hover {
   color: var(--ink);
   pointer-events: none;
   isolation: isolate;
+  /* 32 → 40 covers the full pill, including the 1px dashed stroke. */
+  transition: transform 0.12s ease;
 }
 
-/* Soften only plain rows; create/clear snap (see below). */
+/* Soften only plain rows; create/clear snap color (see below). */
 .slot-add:not(.is-create):not(.is-clear) .slot-add__icon {
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.12s ease;
 }
 
 .slot-add:hover:not(.is-create):not(.is-clear) .slot-add__icon {
@@ -4258,10 +4260,20 @@ button.pill.slot-add:hover {
 
 button.pill.slot-add.is-create .slot-add__icon,
 button.pill.slot-add.is-clear .slot-add__icon {
-  transition: none;
+  /* Color still snaps; grow keeps the short transform tween. */
+  transition: transform 0.12s ease;
 }
 
 @media (hover: hover) {
+  /* Side panel: fill the dashed pill (incl. stroke). Context menu stays subtler. */
+  .slot-adds button.pill.slot-add:hover:not(:disabled) .slot-add__icon {
+    transform: translateY(-50%) scale(1.25);
+  }
+
+  .canvas-add-menu > button.pill.slot-add:hover:not(:disabled) .slot-add__icon {
+    transform: translateY(-50%) scale(1.1875);
+  }
+
   /* One paint flip: lime disc + dark +, same smash as other pills. */
   button.pill.slot-add.is-create:hover:not(:disabled) .slot-add__icon {
     background: var(--pill-fun-face);
@@ -4288,6 +4300,22 @@ button.pill.slot-add.is-clear .slot-add__icon {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .slot-add__icon {
+    transition: none;
+  }
+
+  .slot-add:not(.is-create):not(.is-clear) .slot-add__icon {
+    transition: background 0.15s ease;
+  }
+
+  @media (hover: hover) {
+    button.pill.slot-add:hover:not(:disabled) .slot-add__icon {
+      transform: translateY(-50%);
+    }
+  }
+}
+
 /* Empty-canvas right-click: solid pills only, no plate. */
 .canvas-add-menu {
   position: fixed;
@@ -4308,7 +4336,8 @@ button.pill.slot-add.is-clear .slot-add__icon {
   --menu-hover-shift: calc(12px * var(--ui-scale));
   width: 100%;
   justify-content: flex-start;
-  padding-left: calc(44px * var(--ui-scale));
+  /* Room for the hover-grown sphere (was 44). */
+  padding-left: calc(48px * var(--ui-scale));
   padding-right: var(--space-2);
   border: none;
   background: var(--field);

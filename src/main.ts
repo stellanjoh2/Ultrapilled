@@ -4003,7 +4003,7 @@ function openCanvasMenu(x: number, y: number) {
           : `<span class="slot-add__icon" aria-hidden="true">${entry.icon}</span>`
     }${entry.label}`;
     btn.addEventListener("click", () => {
-      closeSlotMenu();
+      closeCurrent({ picked: btn });
       entry.run();
     });
     menu.append(btn);
@@ -4040,24 +4040,55 @@ function openCanvasMenu(x: number, y: number) {
     menu.remove();
   };
 
-  /** Instant for actions / reopen; `{ animate: true }` for dismiss with fade + close sound. */
-  const closeCurrent = (opts?: { animate?: boolean }) => {
+  /**
+   * Instant for reopen / forced close.
+   * `{ animate: true }` — dismiss fade + close sound.
+   * `{ picked }` — selection: others fade out, picked lingers at 3× duration.
+   */
+  const closeCurrent = (opts?: { animate?: boolean; picked?: HTMLButtonElement }) => {
     const animate = Boolean(opts?.animate);
+    const picked = opts?.picked;
     if (closing) {
-      if (!animate) finishClose();
+      if (!animate && !picked) finishClose();
       return;
     }
     closing = true;
     abort.abort();
 
-    if (animate) {
-      playTransition(false);
+    if (animate || picked) {
+      if (animate) playTransition(false);
       if (!reduceMotion) {
+        gsap.killTweensOf([menu, ...buttons]);
+        const fade = 0.12;
+        if (picked) {
+          // Drop the shared closer so renderPanel → closeSlotMenu won’t abort the fade.
+          if (peekCloseSlotMenu() === closeCurrent) assignCloseSlotMenu(() => {});
+          // Freeze hover shift before pointer-events:none clears :hover (which would slide left).
+          for (const btn of buttons) {
+            btn.style.transition = "none";
+            btn.style.transform = getComputedStyle(btn).transform;
+          }
+          menu.style.pointerEvents = "none";
+          const others = buttons.filter((btn) => btn !== picked);
+          if (others.length) {
+            gsap.to(others, {
+              autoAlpha: 0,
+              duration: fade * 1.25,
+              ease: "power2.in",
+            });
+          }
+          gsap.to(picked, {
+            autoAlpha: 0,
+            duration: fade * 3 * 1.25,
+            ease: "power2.in",
+            onComplete: finishClose,
+          });
+          return;
+        }
         menu.style.pointerEvents = "none";
-        gsap.killTweensOf(buttons);
         gsap.to(menu, {
           autoAlpha: 0,
-          duration: 0.12,
+          duration: fade,
           ease: "power2.in",
           onComplete: finishClose,
         });
