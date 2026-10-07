@@ -46,13 +46,13 @@ describe("mobile access overlay", () => {
     expect(host?.querySelector(".mobile-overlay__message")?.textContent).toBe(
       "Not available on mobile",
     );
-    expect(host?.querySelector(".mobile-overlay__ok")?.textContent).toBe("I understand");
+    expect(host?.querySelector(".mobile-overlay__ok")?.textContent).toBe("I WANT TO TOUCH");
+    expect(host?.querySelector(".mobile-overlay__privacy")).toBeNull();
     const github = host?.querySelector<HTMLAnchorElement>(".mobile-overlay__github");
     expect(github?.getAttribute("href")).toBe("https://github.com/stellanjoh2/Ultrapilled");
     expect(github?.querySelector(".logotype__mark")?.getAttribute("viewBox")).toBe("0 0 98 96");
     const x = host?.querySelector<HTMLAnchorElement>(".mobile-overlay__x");
     expect(x?.getAttribute("href")).toBe("https://x.com/johstell");
-    expect(host?.querySelector(".mobile-overlay__privacy")?.getAttribute("href")).toBe("/privacy.html");
     expect(x?.querySelector(".logotype__mark")?.getAttribute("viewBox")).toBe("0 0 1200 1227");
     expect(document.querySelector(".panel")).toBeNull();
     expect(document.querySelector(".topbar")).toBeNull();
@@ -60,7 +60,7 @@ describe("mobile access overlay", () => {
     expect(document.querySelector(".reconnect")).toBeNull();
   });
 
-  it("hides the overlay when I understand is pressed so the pile can be touched", () => {
+  it("hides the overlay when I WANT TO TOUCH is pressed so the pile can be touched", () => {
     vi.stubGlobal(
       "matchMedia",
       vi.fn().mockReturnValue({

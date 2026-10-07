@@ -378,8 +378,7 @@ export function mountMobileAccessOverlay() {
     <div class="mobile-overlay__s logotype" aria-hidden="true">${sLogotypeRevealMarkup()}</div>
     <div class="mobile-overlay__mark logotype" aria-hidden="true">${logotypeRevealMarkup()}</div>
     <p class="mobile-overlay__message" id="mobile-overlay-title"></p>
-    <button type="button" class="mobile-overlay__ok">I understand</button>
-    <a class="mobile-overlay__privacy" href="${PRIVACY_HREF}">Privacy</a>
+    <button type="button" class="mobile-overlay__ok">I WANT TO TOUCH</button>
     <div class="mobile-overlay__social">
       <a class="mobile-overlay__x" href="https://x.com/johstell" target="_blank" rel="noopener noreferrer" aria-label="X" data-tip="X">${xRevealMarkup()}</a>
       <a class="mobile-overlay__github" href="https://github.com/stellanjoh2/Ultrapilled" target="_blank" rel="noopener noreferrer" aria-label="GitHub" data-tip="GitHub">${githubRevealMarkup()}</a>
