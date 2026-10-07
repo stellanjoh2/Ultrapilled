@@ -1,5 +1,6 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
 import { DEFAULT_THEME } from "./theme";
 import { playRemove, playTransition } from "./uiSounds";
 
@@ -71,7 +72,7 @@ let openTl: gsap.core.Timeline | null = null;
 let blurTween: gsap.core.Tween | null = null;
 let projectTriggers: ScrollTrigger[] = [];
 
-const ABOUT_BLUR_PX = 14;
+const ABOUT_BLUR_PX = 21;
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -312,6 +313,7 @@ export function closeAbout(): void {
     document.body.classList.remove("is-about-open");
     modalRoot = null;
     closing = false;
+    releasePhysicsForOverlay();
   };
 
   tweenAboutBlur(false, reducedMotion() ? 0 : 0.35);
@@ -374,6 +376,7 @@ export function openAbout(): void {
   document.body.append(root);
   modalRoot = root;
   document.body.classList.add("is-about-open");
+  holdPhysicsForOverlay();
   playTransition(true);
   doneBtn.focus({ preventScroll: true });
 

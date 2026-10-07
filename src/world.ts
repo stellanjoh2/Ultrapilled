@@ -41,6 +41,7 @@ import { playImpact } from "./uiSounds";
 import { beginScrub, endScrub } from "./scrub";
 import { hideTooltip, suggestTooltip } from "./tooltip";
 import { applyAttractors, bodyAttractors, followAttractorFor, setBodyAttractors } from "./attractors";
+import { isPhysicsHeldByOverlay, registerPhysicsWorld } from "./physicsOverlayHold";
 
 export type { ChipDraw, ChipPose } from "./chipKinds";
 
@@ -591,6 +592,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   const engine = Engine.create({ enableSleeping: true });
   const runner = Runner.create();
   let running = false;
+  let unregisterOverlayHold: (() => void) | null = null;
   let spinDrag = 0;
   let contactSteps = 1;
   /** Live-frame cap on contactSteps (lowered when rAF dt is heavy). */
@@ -748,6 +750,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function setRunning(on: boolean) {
+    // Overlay hold owns the runner — ignore wakeups until About / blur modals close.
+    if (on && isPhysicsHeldByOverlay()) return;
     if (on && !running) {
       Runner.run(runner, engine);
       running = true;
@@ -757,6 +761,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     }
   }
 
+  unregisterOverlayHold = registerPhysicsWorld({ setRunning });
   if (!options?.paused) setRunning(true);
 
   function noteSpan(width: number, height: number) {
@@ -4687,6 +4692,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function destroy() {
+    unregisterOverlayHold?.();
+    unregisterOverlayHold = null;
     Runner.stop(runner);
     Engine.clear(engine);
     clear();

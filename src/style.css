@@ -1987,12 +1987,12 @@ textarea.slot-live--field:focus {
   }
 }
 
-html.is-asset-anims-frozen .chip-fill-band,
-html.is-asset-anims-frozen .slot-chip.is-gradient-animated,
-html.is-asset-anims-frozen .shape-swatch.is-gradient-animated,
-html.is-asset-anims-frozen .chip-label.is-text-gradient.is-gradient-animated,
-html.is-asset-anims-frozen .chip-edit.is-text-gradient.is-gradient-animated,
-html.is-asset-anims-frozen .mode-select__vibe.is-text-gradient.is-gradient-animated {
+html:is(.is-asset-anims-frozen, .is-overlay-anims-frozen) .chip-fill-band,
+html:is(.is-asset-anims-frozen, .is-overlay-anims-frozen) .slot-chip.is-gradient-animated,
+html:is(.is-asset-anims-frozen, .is-overlay-anims-frozen) .shape-swatch.is-gradient-animated,
+html:is(.is-asset-anims-frozen, .is-overlay-anims-frozen) .chip-label.is-text-gradient.is-gradient-animated,
+html:is(.is-asset-anims-frozen, .is-overlay-anims-frozen) .chip-edit.is-text-gradient.is-gradient-animated,
+html:is(.is-asset-anims-frozen, .is-overlay-anims-frozen) .mode-select__vibe.is-text-gradient.is-gradient-animated {
   animation-play-state: paused;
 }
 
@@ -5617,8 +5617,8 @@ html[data-theme="day"] .shape-swatch {
   background: color-mix(in srgb, var(--canvas) 52%, transparent);
   color: color-mix(in srgb, var(--ink) 42%, transparent);
   box-shadow: var(--shadow-1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
-  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(21px) saturate(1.15);
+  backdrop-filter: blur(21px) saturate(1.15);
   cursor: default;
 }
 
@@ -7041,8 +7041,8 @@ html[data-theme="day"] .bug-report__message {
 
 .bug-report.is-thanks .bug-report__scrim {
   background: color-mix(in srgb, #080808 55%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(15px);
+  backdrop-filter: blur(15px);
   cursor: pointer;
 }
 
@@ -7817,8 +7817,8 @@ button.pill.mode-select__action:not(.pill--commit):not(.is-on) {
   box-shadow: none;
   /* -webkit- first: LightningCSS drops the unprefixed property when it comes second.
      Don't use transition:all — Chrome drops backdrop-filter when `all`/`transform` tween. */
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   transition:
     background 0.25s ease,
     color 0.25s ease,

@@ -1,6 +1,7 @@
 import gsap from "gsap";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
+import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
 import { PRIVACY_HREF } from "./privacy";
 import { playNotify, playRemove, playTransition } from "./uiSounds";
 
@@ -40,6 +41,7 @@ let modalRoot: HTMLElement | null = null;
 let closing = false;
 let sending = false;
 let thanksMode = false;
+let overlayPhysicsHeld = false;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
 
 function reducedMotion(): boolean {
@@ -134,6 +136,10 @@ function revealThankYou() {
         </button>
       </div>
     `;
+    if (!overlayPhysicsHeld) {
+      holdPhysicsForOverlay();
+      overlayPhysicsHeld = true;
+    }
 
     const scrim = root.querySelector<HTMLElement>(".bug-report__scrim")!;
     const message = root.querySelector<HTMLElement>(".bug-report-thanks__message")!;
@@ -191,6 +197,10 @@ export function closeBugReport(): void {
     closing = false;
     sending = false;
     thanksMode = false;
+    if (overlayPhysicsHeld) {
+      releasePhysicsForOverlay();
+      overlayPhysicsHeld = false;
+    }
   };
 
   if (reducedMotion() || !scrim) {

@@ -1,3 +1,4 @@
+import { isPhysicsHeldByOverlay } from "./physicsOverlayHold";
 import type { AppState } from "./types";
 import type { WorldHandle } from "./world";
 
@@ -181,11 +182,28 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     host.world.setRunning(!next);
   }
 
+  let overlayHeld = false;
+
   function frame(now: number) {
     const dt = prevFrame ? now - prevFrame : 0;
     prevFrame = now;
     if (dt > 0) host.world.adaptFrameBudget(dt);
     host.tickAudioReact(now);
+
+    // Full-screen blur overlays: freeze the level (no Matter, no hold/dump clocks).
+    const heldByOverlay = isPhysicsHeldByOverlay();
+    if (heldByOverlay) {
+      overlayHeld = true;
+      host.world.setRunning(false);
+      if (host.shouldContinue?.() === false) return;
+      requestAnimationFrame(frame);
+      return;
+    }
+    if (overlayHeld) {
+      overlayHeld = false;
+      if (host.getRunning() && !host.getPaused()) host.world.setRunning(true);
+    }
+
     if (host.getPaused()) {
       host.world.setRunning(false);
       holdSequenceClock(dt);

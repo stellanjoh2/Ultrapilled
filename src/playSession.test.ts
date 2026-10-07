@@ -1,5 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { createPlaySession, type PlaySessionHost } from "./playSession";
+import {
+  holdPhysicsForOverlay,
+  releasePhysicsForOverlay,
+  resetPhysicsOverlayHoldForTests,
+} from "./physicsOverlayHold";
 import type { AppState } from "./types";
 import { defaultTextSlot } from "./types";
 import { blankState } from "./templates";
@@ -150,6 +155,37 @@ describe("playSession drop / triggerPhysics", () => {
 
     expect(world.play).toHaveBeenCalledTimes(1);
     expect(world.redeployFall).not.toHaveBeenCalled();
+  });
+});
+
+describe("playSession overlay hold", () => {
+  beforeEach(() => {
+    vi.stubGlobal("requestAnimationFrame", vi.fn());
+    resetPhysicsOverlayHoldForTests();
+  });
+
+  afterEach(() => {
+    resetPhysicsOverlayHoldForTests();
+  });
+
+  it("freezes the runner while held and resumes after release when still playing", () => {
+    const state = blankState();
+    state.slots = [defaultTextSlot({ text: "HELLO" })];
+    const world = stubWorld({ chipCount: () => 1, isQuiet: () => false });
+    const host = stubHost(world, state);
+    host.setRunningFlag(true);
+    const session = createPlaySession(host);
+    session.phase = "falling";
+
+    holdPhysicsForOverlay();
+    session.frame(1000);
+    expect(world.setRunning).toHaveBeenCalledWith(false);
+    expect(world.sync).not.toHaveBeenCalled();
+
+    vi.mocked(world.setRunning).mockClear();
+    releasePhysicsForOverlay();
+    session.frame(1016);
+    expect(world.setRunning).toHaveBeenCalledWith(true);
   });
 });
 
