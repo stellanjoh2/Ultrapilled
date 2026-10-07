@@ -2059,7 +2059,7 @@ function createPanelHost(): CreatePanelHost {
     setLayoutMode,
     setAudioReactEnabled,
     openThemes() {
-      themeShelf.open();
+      themeShelf.toggle();
     },
     openThemeSwatch,
     consumeRevealTheme() {

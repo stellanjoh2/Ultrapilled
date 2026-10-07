@@ -45,6 +45,7 @@ export function createThemeShelf(options: {
   onApply: (colors: string[], stage?: string) => void;
 }): {
   open: () => void;
+  toggle: () => void;
   refresh: () => void;
 } {
   const { panel, getColors, onApply } = options;
@@ -278,8 +279,18 @@ export function createThemeShelf(options: {
     });
   };
 
+  const toggle = () => {
+    if (root && !closing) {
+      playRemove();
+      close();
+      return;
+    }
+    open();
+  };
+
   return {
     open,
+    toggle,
     refresh: () => {
       if (root && !closing) paintGallery();
     },
