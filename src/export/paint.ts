@@ -697,7 +697,8 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
     paintBackdrop(ctx, scene.width, scene.height, scene.stageColor, scene.background, scene.canvas, backdrop);
     paintGrid(ctx, scene.width, scene.height, scene.background, scene.canvas);
   }
-  const logoFile = backgroundImage(scene.background.logoId);
+  // Logo is stage chrome — keep it off clear-background exports.
+  const logoFile = scene.transparent ? null : backgroundImage(scene.background.logoId);
   const logo = logoFile ? await loadImage(logoFile.src) : null;
   const blend = canvasBlend(scene.post.blend);
   const logoBlend = canvasBlend(
@@ -720,7 +721,11 @@ export async function paintFrame(canvas: HTMLCanvasElement, draws: ChipDraw[], s
     for (const chip of draws) {
       ctx.save();
       // Bloom is a silhouette pass — keep source-over so blur stays clean.
-      if (!bloomPass) ctx.globalCompositeOperation = canvasBlend(blendMode(chip.slot.blend));
+      // Per-object mix only in layout mode (same as live .chip mix-blend-mode).
+      if (!bloomPass) {
+        const mix = scene.layoutMode ? blendMode(chip.slot.blend) : "normal";
+        ctx.globalCompositeOperation = canvasBlend(mix);
+      }
       drawChip(ctx, chip, scale, bloomPass, ready, scene.theme, timeMs, scene.layoutMode, scene.pillPad ?? 14);
       ctx.restore();
     }

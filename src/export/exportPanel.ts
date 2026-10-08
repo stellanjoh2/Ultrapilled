@@ -221,12 +221,12 @@ function videoPaneHtml(): string {
       <p class="hint">Renders a full loop of the current scene. Includes bounce sounds when Sound is on.</p>
       <div class="segment" role="group" aria-label="Video format">
         <button type="button" class="pill" data-video-format="mp4" data-tip="Wide compatibility. Includes bounce sounds when Sound is on.">.MP4</button>
-        <button type="button" class="pill" data-video-format="mov" data-tip="Good for editing apps. Includes bounce sounds when Sound is on.">.MOV</button>
+        <button type="button" class="pill" data-video-format="mov" data-tip="ProRes for editing apps. Larger files. Includes bounce sounds when Sound is on.">.MOV</button>
       </div>
       <h2 data-tip="Keep the background clear in the file">Transparent</h2>
       <div class="segment" role="group" aria-label="Video transparency">
         <button type="button" class="pill" data-video-alpha="0" data-tip="Keep the composition background">No</button>
-        <button type="button" class="pill" data-video-alpha="1" data-tip="Clear background. MOV only.">Yes</button>
+        <button type="button" class="pill" data-video-alpha="1" data-tip="Clear background. ProRes 4444 MOV.">Yes</button>
       </div>
       <label class="field" data-tip="Pixel size for MP4 and MOV. Up to 4K.">Resolution
         <select id="video-size">${optionsHtml(VIDEO_SIZE_PRESETS, videoPreset)}</select>

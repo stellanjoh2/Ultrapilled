@@ -14,7 +14,13 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ["gsap"],
+    // Pre-bundle so a lazy export import does not trigger a Vite rebundle mid-export.
+    include: [
+      "gsap",
+      "prores-wasm-encoder",
+      "prores-wasm-encoder/parallel",
+      "prores-wasm-encoder/mediabunny",
+    ],
   },
   // Production Orby CORS only allows ultrapilled.com / orby.studio — proxy so
   // localhost POST stays same-origin and isn't blocked by the browser.

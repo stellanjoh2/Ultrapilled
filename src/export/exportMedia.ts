@@ -83,6 +83,34 @@ function sceneOf(
   };
 }
 
+/**
+ * Fall-from-above parks the pile above y=0. Opaque stills still show the stage;
+ * transparent ones would download empty. When nothing intersects the stage, slide
+ * the pile into frame for the still only.
+ */
+function drawsForTransparentStill(draws: ChipDraw[], stageWidth: number, stageHeight: number): ChipDraw[] {
+  if (draws.length === 0 || stageWidth < 2 || stageHeight < 2) return draws;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const chip of draws) {
+    const pad = Math.max(chip.width, chip.height);
+    minX = Math.min(minX, chip.x - pad);
+    minY = Math.min(minY, chip.y - pad);
+    maxX = Math.max(maxX, chip.x + pad);
+    maxY = Math.max(maxY, chip.y + pad);
+  }
+  if (!(Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY))) {
+    return draws;
+  }
+  const hitsStage = maxX > 0 && minX < stageWidth && maxY > 0 && minY < stageHeight;
+  if (hitsStage) return draws;
+  const dx = stageWidth / 2 - (minX + maxX) / 2;
+  const dy = stageHeight / 2 - (minY + maxY) / 2;
+  return draws.map((chip) => ({ ...chip, x: chip.x + dx, y: chip.y + dy }));
+}
+
 export async function exportStill(options: {
   draws: ChipDraw[];
   state: AppState;
@@ -94,9 +122,13 @@ export async function exportStill(options: {
 }): Promise<void> {
   const { width, height } = frameSize(options.stageWidth, options.stageHeight, options.preset);
   const canvas = document.createElement("canvas");
+  const draws =
+    options.transparent && options.kind === "png"
+      ? drawsForTransparentStill(options.draws, options.stageWidth, options.stageHeight)
+      : options.draws;
   await paintFrame(
     canvas,
-    options.draws,
+    draws,
     sceneOf(options.state, options.stageWidth, options.stageHeight, width, height, options.transparent),
   );
   if (options.kind === "jpg") {
@@ -207,6 +239,15 @@ async function exportVideo(options: {
   return encodeVideoFile({ ...options, withAudio: false });
 }
 
+let proresEncoderReady: Promise<void> | null = null;
+
+function ensureProResEncoder(): Promise<void> {
+  proresEncoderReady ??= import("prores-wasm-encoder/mediabunny").then(({ registerProResEncoder }) => {
+    registerProResEncoder();
+  });
+  return proresEncoderReady;
+}
+
 async function encodeVideoFile(options: {
   state: AppState;
   stageWidth: number;
@@ -240,20 +281,41 @@ async function encodeVideoFile(options: {
 
   const videoQuality = new Quality("high");
   const audioQuality = new Quality("high");
-  const codec = options.transparent
-    ? await (async () => {
-        for (const next of ["prores", "hevc", "vp9"] as const) {
+  type VideoCodec = "avc" | "prores" | "hevc" | "vp9";
+  let codec: VideoCodec;
+  let fullCodecString: string | undefined;
+  if (options.format === "mov") {
+    await ensureProResEncoder();
+    // ap4h = ProRes 4444 (alpha); apch = ProRes 422 HQ (opaque editing master).
+    fullCodecString = options.transparent ? "ap4h" : "apch";
+    const proresOk = await canEncodeVideo("prores", {
+      width,
+      height,
+      quality: videoQuality,
+      fullCodecString,
+      ...(options.transparent ? { alpha: "keep" as const } : {}),
+    });
+    if (proresOk) {
+      codec = "prores";
+    } else if (options.transparent) {
+      codec = await (async () => {
+        for (const next of ["hevc", "vp9"] as const) {
           if (await canEncodeVideo(next, { alpha: "keep", quality: videoQuality, width, height })) return next;
         }
-        throw new Error("Transparent MOV needs a browser codec with alpha (ProRes, HEVC, or VP9)");
-      })()
-    : "avc";
-  if (!options.transparent && !(await canEncodeVideo("avc", { width, height }))) {
-    throw new Error(
-      options.format === "mp4"
-        ? "MP4 export needs H.264 in this browser"
-        : "MOV export needs H.264 in this browser",
-    );
+        throw new Error("Transparent MOV needs ProRes, HEVC, or VP9 with alpha");
+      })();
+      fullCodecString = undefined;
+    } else if (await canEncodeVideo("avc", { width, height })) {
+      codec = "avc";
+      fullCodecString = undefined;
+    } else {
+      throw new Error("MOV export needs ProRes or H.264 in this browser");
+    }
+  } else {
+    if (!(await canEncodeVideo("avc", { width, height }))) {
+      throw new Error("MP4 export needs H.264 in this browser");
+    }
+    codec = "avc";
   }
 
   const canvas = document.createElement("canvas");
@@ -271,6 +333,7 @@ async function encodeVideoFile(options: {
     codec,
     quality: videoQuality,
     keyFrameInterval: 1 / options.fps,
+    ...(fullCodecString ? { fullCodecString } : {}),
     ...(options.transparent ? { alpha: "keep" as const } : {}),
   });
   output.addVideoTrack(video, { frameRate: options.fps });

@@ -44,6 +44,10 @@ npx shadcn add https://soundcn.xyz/r/<sound-name>.json
 
 **Le Murmure** — used for the Ultrapilled logotype. [Le Murmure](https://velvetyne.fr/fonts/le-murmure/) by Jérémy Landes, published by [Velvetyne](https://velvetyne.fr/). SIL Open Font License 1.1.
 
+## Video export
+
+**ProRes MOV** — [prores-wasm-encoder](https://github.com/OlivierEstevez/ProRes-WASM-encoder) by [Olivier Estevez](https://github.com/OlivierEstevez). Thank you, Oli — real ProRes (including transparent 4444) in the browser made our editing exports possible. LGPL-2.1-or-later.
+
 ## Template photo credits
 
 Bundled under `public/templates/<id>/`. Full per-file notes also live in each folder’s `CREDITS.txt`.
@@ -92,6 +96,7 @@ Original Ultrapilled code and original assets are under [CC BY 4.0](https://crea
   - [Matter.js](https://brm.io/matter-js/)
   - [GSAP](https://gsap.com/standard-license/)
   - [Phosphor Icons](https://github.com/phosphor-icons/core)
+  - [prores-wasm-encoder](https://github.com/OlivierEstevez/ProRes-WASM-encoder) by Olivier Estevez (LGPL-2.1-or-later; see [Video export](#video-export))
   - Mattone (`public/fonts/Mattone-LICENSE.txt`, SIL Open Font License 1.1)
   - [Le Murmure](https://velvetyne.fr/fonts/le-murmure/) (Ultrapilled logotype, SIL Open Font License 1.1)
   - Template photos (tables above / each folder’s `CREDITS.txt`)
