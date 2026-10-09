@@ -52,7 +52,7 @@ const ABOUT_PROJECTS = [
     lede: "Mozayk™ is a free mosaic generator for random abstract visuals — start on a blank canvas, generate a clean layout, or import a photo or video. Scramble, restyle, and export. Shape palettes, colour, overlays, and a timeline, then ship stills or a short animation.",
     image: "/images/projects/mozayk.jpg",
     imageAlt: "Mozayk mosaic generator — abstract grid mosaics",
-    href: "https://stellanjoh2.github.io/mozayk/",
+    href: "https://mozayk.design/",
   },
   {
     id: "lx01",

@@ -5212,12 +5212,17 @@ html[data-theme="day"] .shape-swatch {
 }
 
 .panel-credit__s {
+  appearance: none;
   display: grid;
   place-items: center;
   width: calc(48px * 198 / 248.77);
   height: calc(48px * var(--ui-scale));
   margin: 0 auto var(--space-2);
+  padding: 0;
+  border: none;
   color: var(--ink);
+  background: none;
+  cursor: pointer;
   text-decoration: none;
 }
 
@@ -5307,7 +5312,7 @@ html[data-theme="day"] .shape-swatch {
 }
 
 @media (hover: hover) {
-  a.panel-credit__s.icon-hover:hover {
+  .panel-credit__s.icon-hover:hover:not(:disabled) {
     color: var(--pill-fun-face);
   }
 

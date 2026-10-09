@@ -17,7 +17,7 @@ export function slotAddIcon(icon: string, hoverGlyph = plus) {
   return `<span class="slot-add__icon" aria-hidden="true">${icon}<span class="slot-add__plus">${hoverGlyph}</span></span>`;
 }
 import { isCanvasRatio } from "../canvas";
-import { LINKEDIN_HREF, openAbout } from "../aboutPanel";
+import { openAbout } from "../aboutPanel";
 import { openBugReport } from "../bugReport";
 import { bindSlotDrag } from "../slotDrag";
 import {
@@ -533,9 +533,9 @@ panel.innerHTML = `
     { resetId: "reset-audio-react", resetLabel: "Reset audio react", resetTip: "Reset audio react", dirty: !H.state.physics.layoutMode && !audioReactAtDefault(H.state.audioReact), muted: H.state.physics.layoutMode },
   )}
   <footer class="panel-credit">
-    <a class="panel-credit__s icon-hover" href="${LINKEDIN_HREF}" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" data-tip="LinkedIn">
+    <button type="button" class="panel-credit__s icon-hover" id="open-about-s" aria-label="About the creator" data-tip="About the creator">
       <span class="panel-credit__s-mark" aria-hidden="true"></span>
-    </a>
+    </button>
     <p>
       Ultrapilled™ is created by<br />
       <button type="button" class="panel-credit__author" id="open-about" data-tip="About the creator">Stellan Johansson</button>
@@ -559,8 +559,10 @@ panel.innerHTML = `
 
 bindSectionFolds(panel, openSections, panel);
 
-panel.querySelector("#open-about")?.addEventListener("click", () => {
-  openAbout();
+panel.querySelectorAll("#open-about, #open-about-s").forEach((el) => {
+  el.addEventListener("click", () => {
+    openAbout();
+  });
 });
 panel.querySelector("#open-bug-report")?.addEventListener("click", () => {
   openBugReport();
