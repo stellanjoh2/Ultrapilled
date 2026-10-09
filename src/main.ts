@@ -350,27 +350,26 @@ let nudgeFadeTimer = 0;
 let shapeBlinkTimer = 0;
 
 const WELCOME_KEY = "welcomeDismissed";
+/** Separate from welcomeDismissed — that key is set on first add/play, so returning users would never see this tip. */
+const FIRST_OBJECT_NUDGE_KEY = "firstObjectNudgeDismissed";
 let welcomeDismissed = false;
+let firstObjectNudgeDismissed = false;
+/** Auto first-object nudge waits until the boot grid fade finishes. */
+let autoObjectNudgeReady = false;
 try {
   welcomeDismissed = lsGet(WELCOME_KEY) === "1";
+  firstObjectNudgeDismissed = lsGet(FIRST_OBJECT_NUDGE_KEY) === "1";
 } catch {
   /* private mode */
 }
 
-function paintWelcome() {
-  // First-shape nudge owns the empty canvas until Create / Templates adds something.
-  if (state.slots.length > 0 || world.chipCount() > 0) clearCanvasNudge();
-  canvasWelcome.textContent = state.physics.layoutMode
-    ? "Add objects from Create, then place them on the canvas"
-    : "Press spacebar to trigger physics";
-  const nudgeUp = !canvasNudge.hidden;
-  const show = !welcomeDismissed && !running && !posePinned && world.chipCount() === 0 && !nudgeUp;
+function releaseAutoObjectNudge() {
+  autoObjectNudgeReady = true;
+  paintWelcome();
+}
+
+function hideCanvasWelcome() {
   gsap.killTweensOf(canvasWelcome);
-  if (show) {
-    canvasWelcome.hidden = false;
-    gsap.set(canvasWelcome, { autoAlpha: 1 });
-    return;
-  }
   if (canvasWelcome.hidden) return;
   if (reducedMotion()) {
     canvasWelcome.hidden = true;
@@ -386,6 +385,56 @@ function paintWelcome() {
       gsap.set(canvasWelcome, { clearProps: "opacity,visibility" });
     },
   });
+}
+
+function paintWelcome() {
+  // First-object nudge owns the empty physics canvas until Create / Templates adds something.
+  if (state.slots.length > 0 || world.chipCount() > 0) {
+    clearCanvasNudge();
+    hideCanvasWelcome();
+    return;
+  }
+
+  const canTeach = !running && !posePinned && world.chipCount() === 0;
+  if (!canTeach) {
+    hideCanvasWelcome();
+    if (canvasNudge.dataset.kind === "auto") clearCanvasNudge();
+    return;
+  }
+
+  if (state.physics.layoutMode) {
+    if (canvasNudge.dataset.kind === "auto") clearCanvasNudge();
+    canvasWelcome.textContent = "Add objects from Create, then place them on the canvas";
+    gsap.killTweensOf(canvasWelcome);
+    if (!welcomeDismissed) {
+      canvasWelcome.hidden = false;
+      gsap.set(canvasWelcome, { autoAlpha: 1 });
+      return;
+    }
+    hideCanvasWelcome();
+    return;
+  }
+
+  // Physics: loud first-object nudge replaces the quiet spacebar line.
+  hideCanvasWelcome();
+  if (!firstObjectNudgeDismissed) {
+    if (!autoObjectNudgeReady) return;
+    if (!canvasNudge.hidden && canvasNudge.dataset.kind === "auto") return;
+    showAddShapeNudge({ auto: true });
+    return;
+  }
+  if (canvasNudge.dataset.kind === "auto") clearCanvasNudge();
+}
+
+function dismissFirstObjectNudge() {
+  firstObjectNudgeDismissed = true;
+  try {
+    lsSet(FIRST_OBJECT_NUDGE_KEY, "1");
+  } catch {
+    /* private mode */
+  }
+  clearCanvasNudge();
+  paintWelcome();
 }
 
 function dismissWelcome() {
@@ -1130,6 +1179,7 @@ function bootRevealGrid() {
     applyGrid();
     if (state.background.logoId) applyLogo();
     releaseProTips();
+    releaseAutoObjectNudge();
     return;
   }
   const { background, canvas } = state;
@@ -1155,6 +1205,7 @@ function bootRevealGrid() {
         gsap.set(layer, { clearProps: "opacity" });
         layer.style.setProperty("--grid-reveal", "1");
         releaseProTips();
+        releaseAutoObjectNudge();
       },
     },
   );
@@ -5421,6 +5472,7 @@ function finishIntro() {
     if (!modeSelectContinuity) {
       if (state.background.logoId) applyLogo();
       releaseProTips();
+      releaseAutoObjectNudge();
     }
     resize();
     dismissIntro();
@@ -5712,8 +5764,11 @@ function reducedMotion(): boolean {
 function clearCanvasNudge() {
   window.clearTimeout(nudgeFadeTimer);
   gsap.killTweensOf(canvasNudge);
-  gsap.killTweensOf(canvasNudge.querySelectorAll(".canvas-nudge__word, .canvas-nudge__hint"));
+  gsap.killTweensOf(
+    canvasNudge.querySelectorAll(".canvas-nudge__word, .canvas-nudge__hint, .canvas-nudge__dismiss"),
+  );
   canvasNudge.hidden = true;
+  delete canvasNudge.dataset.kind;
   canvasNudge.replaceChildren();
   gsap.set(canvasNudge, { clearProps: "all" });
 }
@@ -5725,9 +5780,12 @@ function nudgeAccent(label: string): HTMLElement {
   return el;
 }
 
-function showAddShapeNudge() {
+function showAddShapeNudge(opts?: { auto?: boolean }) {
+  const auto = Boolean(opts?.auto);
   clearCanvasNudge();
+  gsap.killTweensOf(canvasWelcome);
   canvasWelcome.hidden = true;
+  gsap.set(canvasWelcome, { clearProps: "opacity,visibility" });
 
   const title = document.createElement("div");
   title.className = "canvas-nudge__title";
@@ -5754,11 +5812,27 @@ function showAddShapeNudge() {
   );
 
   canvasNudge.append(title, hint);
+
+  let dismiss: HTMLButtonElement | null = null;
+  if (auto) {
+    dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "canvas-nudge__dismiss";
+    dismiss.textContent = "(Don't show me this again)";
+    dismiss.addEventListener("click", (event) => {
+      event.stopPropagation();
+      dismissFirstObjectNudge();
+    });
+    canvasNudge.append(dismiss);
+  }
+
+  canvasNudge.dataset.kind = auto ? "auto" : "reactive";
   canvasNudge.hidden = false;
 
   const wordEls = title.querySelectorAll<HTMLElement>(".canvas-nudge__word");
+  const fadeEls = dismiss ? [hint, dismiss] : [hint];
   if (reducedMotion()) {
-    gsap.set([wordEls, hint], { autoAlpha: 1, y: 0 });
+    gsap.set([wordEls, ...fadeEls], { autoAlpha: 1, y: 0 });
   } else {
     gsap.fromTo(
       wordEls,
@@ -5766,9 +5840,9 @@ function showAddShapeNudge() {
       { y: 0, autoAlpha: 1, duration: 0.75, stagger: 0.075, ease: "power2.out" },
     );
     gsap.fromTo(
-      hint,
+      fadeEls,
       { y: -10, autoAlpha: 0 },
-      { y: 0, autoAlpha: 1, duration: 0.55, delay: 0.35, ease: "power2.out" },
+      { y: 0, autoAlpha: 1, duration: 0.55, delay: 0.35, stagger: 0.08, ease: "power2.out" },
     );
   }
 }
@@ -6867,6 +6941,7 @@ async function resetToModeSelect() {
   warmModeSelectPreview();
   modeSelectContinuity = true;
   gridHoldForHandoff = true;
+  autoObjectNudgeReady = false;
   const choice = await askModeSelect();
   await applyModeSelectChoice(choice);
   handoffModeSelectPreview(() => bootRevealGrid());

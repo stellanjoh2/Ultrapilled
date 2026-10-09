@@ -1070,6 +1070,31 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   color: var(--logotype-pill, var(--play-face));
 }
 
+.canvas-nudge__dismiss {
+  appearance: none;
+  pointer-events: auto;
+  margin: 0.35em 0 0;
+  padding: 0;
+  border: none;
+  color: rgb(255 255 255 / 0.5);
+  font-family: Inter, "SF Pro Display", system-ui, -apple-system, sans-serif;
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 400;
+  font-synthesis: none;
+  line-height: 1.4;
+  letter-spacing: 0;
+  background: none;
+  cursor: pointer;
+  text-shadow: 0 1px calc(10px * var(--ui-scale)) rgb(0 0 0 / 0.45);
+  transition: color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .canvas-nudge__dismiss:hover:not(:disabled) {
+    color: var(--pill-fun-face);
+  }
+}
+
 .dev-panel {
   position: fixed;
   top: calc(var(--panel-inset) + 48px * var(--ui-scale) + var(--space-1));
