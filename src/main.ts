@@ -390,7 +390,7 @@ function hideCanvasWelcome() {
 function paintWelcome() {
   // First-object nudge owns the empty physics canvas until Create / Templates adds something.
   if (state.slots.length > 0 || world.chipCount() > 0) {
-    clearCanvasNudge();
+    fadeOutCanvasNudge();
     hideCanvasWelcome();
     return;
   }
@@ -398,12 +398,12 @@ function paintWelcome() {
   const canTeach = !running && !posePinned && world.chipCount() === 0;
   if (!canTeach) {
     hideCanvasWelcome();
-    if (canvasNudge.dataset.kind === "auto") clearCanvasNudge();
+    if (canvasNudge.dataset.kind === "auto") fadeOutCanvasNudge();
     return;
   }
 
   if (state.physics.layoutMode) {
-    if (canvasNudge.dataset.kind === "auto") clearCanvasNudge();
+    if (canvasNudge.dataset.kind === "auto") fadeOutCanvasNudge();
     canvasWelcome.textContent = "Add objects from Create, then place them on the canvas";
     gsap.killTweensOf(canvasWelcome);
     if (!welcomeDismissed) {
@@ -419,11 +419,13 @@ function paintWelcome() {
   hideCanvasWelcome();
   if (!firstObjectNudgeDismissed) {
     if (!autoObjectNudgeReady) return;
-    if (!canvasNudge.hidden && canvasNudge.dataset.kind === "auto") return;
+    if ((!canvasNudge.hidden || canvasNudge.dataset.fading === "1") && canvasNudge.dataset.kind === "auto") {
+      return;
+    }
     showAddShapeNudge({ auto: true });
     return;
   }
-  if (canvasNudge.dataset.kind === "auto") clearCanvasNudge();
+  if (canvasNudge.dataset.kind === "auto") fadeOutCanvasNudge();
 }
 
 function dismissFirstObjectNudge() {
@@ -433,12 +435,12 @@ function dismissFirstObjectNudge() {
   } catch {
     /* private mode */
   }
-  clearCanvasNudge();
+  fadeOutCanvasNudge();
   paintWelcome();
 }
 
 function dismissWelcome() {
-  clearCanvasNudge();
+  fadeOutCanvasNudge();
   if (welcomeDismissed) {
     paintWelcome();
     return;
@@ -5769,8 +5771,32 @@ function clearCanvasNudge() {
   );
   canvasNudge.hidden = true;
   delete canvasNudge.dataset.kind;
+  delete canvasNudge.dataset.fading;
   canvasNudge.replaceChildren();
   gsap.set(canvasNudge, { clearProps: "all" });
+}
+
+/** Match confirm / About scrim close — quick fade, not a hard cut. */
+function fadeOutCanvasNudge() {
+  if (canvasNudge.hidden || canvasNudge.dataset.fading === "1") return;
+  window.clearTimeout(nudgeFadeTimer);
+  gsap.killTweensOf(canvasNudge);
+  gsap.killTweensOf(
+    canvasNudge.querySelectorAll(".canvas-nudge__word, .canvas-nudge__hint, .canvas-nudge__dismiss"),
+  );
+  if (reducedMotion()) {
+    clearCanvasNudge();
+    return;
+  }
+  canvasNudge.dataset.fading = "1";
+  gsap.to(canvasNudge, {
+    autoAlpha: 0,
+    duration: 0.28,
+    ease: "power1.in",
+    onComplete: () => {
+      clearCanvasNudge();
+    },
+  });
 }
 
 function nudgeAccent(label: string): HTMLElement {
