@@ -14,6 +14,7 @@ import { FEATURED_EMOJI, searchEmoji, warmEmojiCatalog, type EmojiItem } from ".
 import { ICON_PRESETS, IMAGE_COLLIDERS } from "../icons";
 import { isColorMask, isSvgSource } from "../chipKinds";
 import { pillPadOf, trackingOf } from "../measure";
+import { gifIsTransparent } from "../trim";
 import {
   gradientAngleOf,
   gradientScaleOf,
@@ -80,7 +81,7 @@ const TIPS = {
   amount: "How many copies drop into the frame",
   clipScale: "How much of the clip is cropped in the frame",
   loopSec: "How many seconds of the clip to loop",
-  collider: "Physics hit shape — box or circle",
+  collider: "Physics hit shape for this object — box or sphere",
   recolor: "Tint this SVG with theme colors",
   emojiSearch: "Filter emoji by name",
   replaceImage: "Swap this file without losing other settings",
@@ -115,6 +116,7 @@ export type SlotCardHost = {
   shapeSwatch(src: string, color: string): HTMLElement;
   settingLabel(slot: Slot, name: string, key: string, value?: string): string;
   resetControl(name: string, key: string, dirty: boolean): string;
+  collisionBoxesToggle(): string;
   fieldDirty(slot: Slot, key: string): boolean;
   textTintRow(slot: TextSlot): string;
   tintRow(slot: Slot, legend?: string): string;
@@ -1063,14 +1065,17 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     }
     ${H.blendField(slot)}
     ${photoReplaceControl(slot)}
-    <label class="field" data-tip="${TIPS.collider}">${H.settingLabel(slot, "Collision", "collider")}
+    <label class="field" data-tip="${TIPS.collider}"><span class="field-label"><span class="field-label-start"><span>Collision type</span>${H.collisionBoxesToggle()}</span>${H.resetControl("Collision type", "collider", H.fieldDirty(slot, "collider"))}</span>
       <select data-key="collider">
         ${IMAGE_COLLIDERS.map((icon) => `<option value="${icon.id}"${H.colliderOf(slot) === icon.id ? " selected" : ""}>${icon.label}</option>`).join("")}
       </select>
     </label>
     ${
       H.isRasterUpload(slot)
-        ? `<div class="check-row" data-tip="${TIPS.stroked}">
+        ? `${
+            gifIsTransparent(slot.src, slot.name)
+              ? ""
+              : `<div class="check-row" data-tip="${TIPS.stroked}">
       <label class="check">
         ${checkInput(`data-key="stroked" ${slot.stroked ? "checked" : ""}`)}
         Stroked
@@ -1086,7 +1091,8 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
       ${H.tintRow(slot, "Stroke color")}
     </div>`
         : ""
-    }
+    }`
+          }
     ${H.dropShadowField(slot)}
     <label class="field" data-tip="${TIPS.radius}">${H.settingLabel(slot, "Corner radius", "radius", String(Math.round(slot.radius ?? 0)))}
       <input type="range" data-key="radius" min="0" max="40" step="1" value="${slot.radius ?? 0}" />

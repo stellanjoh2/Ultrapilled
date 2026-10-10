@@ -40,7 +40,7 @@ describe("settings panel close targets", () => {
     expect(isSettingsOpen()).toBe(false);
   });
 
-  it("lists Shift+D for duplicate and hides Dev mode", () => {
+  it("lists Shift+D for duplicate, C for collision boxes, and hides Dev mode", () => {
     stubReducedMotion();
 
     openSettings({
@@ -51,10 +51,14 @@ describe("settings panel close targets", () => {
 
     const rows = [...document.querySelectorAll(".shortcut-list__row")];
     const duplicate = rows.find((row) => row.querySelector(".shortcut-list__label")?.textContent === "Duplicate");
+    const collision = rows.find(
+      (row) => row.querySelector(".shortcut-list__label")?.textContent === "Toggle collision boxes",
+    );
     const dev = rows.find((row) => row.querySelector(".shortcut-list__label")?.textContent === "Dev mode");
     expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toContain("⇧");
     expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toContain("D");
     expect(duplicate?.querySelector(".shortcut-list__keys")?.textContent).toMatch(/⌘|Ctrl/);
+    expect(collision?.querySelector(".shortcut-list__keys")?.textContent).toContain("C");
     expect(dev).toBeUndefined();
   });
 

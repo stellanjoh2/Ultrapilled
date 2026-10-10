@@ -7,6 +7,8 @@ export type ImageTrim = {
   /** Intrinsic pixel size of the source (for import sizing). */
   nativeW: number;
   nativeH: number;
+  /** GIF first-frame probe: true when any sampled pixel is not fully opaque. */
+  transparent?: boolean;
 };
 
 const ready = new Map<string, ImageTrim>();
@@ -47,6 +49,33 @@ function isGifSrc(src: string, name = ""): boolean {
     src.includes("image/gif") ||
     /\.gif(\?|$)/i.test(src)
   );
+}
+
+/** True once trim has flagged this GIF as having transparency. */
+export function gifIsTransparent(src: string, name = ""): boolean {
+  if (!src || !isGifSrc(src, name)) return false;
+  return peekTrim(src)?.transparent === true;
+}
+
+/** Sample the drawn frame for any not-fully-opaque pixel (GIF palette index / alpha). */
+function frameHasTransparency(img: HTMLImageElement, naturalW: number, naturalH: number): boolean {
+  const probeScale = Math.min(1, 128 / Math.max(naturalW, naturalH));
+  const w = Math.max(1, Math.round(naturalW * probeScale));
+  const h = Math.max(1, Math.round(naturalH * probeScale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return false;
+  ctx.drawImage(img, 0, 0, w, h);
+  const step = Math.max(1, Math.floor(Math.max(w, h) / 80));
+  const { data } = ctx.getImageData(0, 0, w, h);
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      if (data[(y * w + x) * 4 + 3] < 250) return true;
+    }
+  }
+  return false;
 }
 
 function isSvgSrc(src: string, name = ""): boolean {
@@ -148,6 +177,7 @@ async function computeTrim(src: string, name = ""): Promise<ImageTrim | null> {
         displaySrc: src,
         nativeW: naturalW,
         nativeH: naturalH,
+        transparent: frameHasTransparency(img, naturalW, naturalH),
       };
     }
 

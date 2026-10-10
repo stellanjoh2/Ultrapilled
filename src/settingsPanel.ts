@@ -75,6 +75,7 @@ function shortcutsMarkup(): string {
     shortcutRow("Trigger physics", keycap("P")),
     shortcutRow("Hide UI", keycap("H")),
     shortcutRow("Toggle grid", keycap("G")),
+    shortcutRow("Toggle collision boxes", keycap("C")),
     shortcutRow("Toggle Layout Mode", keycap("L")),
     shortcutRow("Invert selection", keycap("I"), "Selected object"),
     shortcutRow("Delete selection", `${keycap("⌫")}${keycap("Del")}`),

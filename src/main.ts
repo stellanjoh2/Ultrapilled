@@ -345,7 +345,8 @@ const canvasNudge = app.querySelector<HTMLElement>("#canvas-nudge")!;
 const bgCredit = playfield.querySelector<HTMLElement>("#bg-credit")!;
 bgCredit.addEventListener("pointerdown", (event) => event.stopPropagation());
 bgCredit.addEventListener("click", (event) => event.stopPropagation());
-let physDebugOn = false;
+let collisionBoxesOn = false;
+let devModeOn = false;
 let nudgeFadeTimer = 0;
 let shapeBlinkTimer = 0;
 
@@ -2019,6 +2020,7 @@ function createPanelHost(): CreatePanelHost {
     shapeSwatch,
     settingLabel,
     resetControl,
+    collisionBoxesToggle: collisionBoxesToggleHtml,
     fieldDirty,
     textTintRow,
     tintRow,
@@ -2355,6 +2357,8 @@ function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Pro
       if (slot.src !== url) return null;
       if (trim) {
         slot.size = importSlotSize(trim.nativeW, trim.nativeH, svg ? { minWidth: IMPORT_SVG_MIN_WIDTH_PX } : undefined);
+        // Inner stroke reads as a box around cutout GIFs — drop it when alpha is present.
+        if (trim.transparent) slot.stroked = undefined;
       }
       if (!svg) return null;
       return matchCollider(peekTrim(url)?.displaySrc ?? url);
@@ -3636,6 +3640,15 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       const key = btn.dataset.reset;
       if (!key) return;
       applyFieldReset(slot, key);
+    });
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-collision-boxes]").forEach((button) => {
+    paintCollisionBoxesButton(button);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setCollisionBoxes(!collisionBoxesOn);
+      playSwitch(collisionBoxesOn);
     });
   });
   root.querySelectorAll<HTMLButtonElement>("[data-shadow-color]").forEach((btn) => {
@@ -5722,8 +5735,32 @@ function paintMicTextAnim() {
   }
 }
 
+function collisionBoxesTip(): string {
+  return collisionBoxesOn
+    ? "Hide collision boxes — shortcut C"
+    : "Show collision boxes — shortcut C";
+}
+
+function collisionBoxesToggleHtml(): string {
+  const tip = collisionBoxesTip();
+  return `<button type="button" class="field-reset icon-hover${collisionBoxesOn ? " is-on" : ""}" data-collision-boxes aria-pressed="${collisionBoxesOn}" aria-label="${tip}" data-tip="${tip}"><span aria-hidden="true">${collisionBoxesOn ? eyeIcon : eyeSlash}</span></button>`;
+}
+
+function paintCollisionBoxesButton(button: HTMLButtonElement) {
+  const tip = collisionBoxesTip();
+  button.classList.toggle("is-on", collisionBoxesOn);
+  button.setAttribute("aria-pressed", String(collisionBoxesOn));
+  button.setAttribute("aria-label", tip);
+  button.dataset.tip = tip;
+  button.innerHTML = `<span aria-hidden="true">${collisionBoxesOn ? eyeIcon : eyeSlash}</span>`;
+}
+
+function paintCollisionBoxesButtons() {
+  panel.querySelectorAll<HTMLButtonElement>("[data-collision-boxes]").forEach(paintCollisionBoxesButton);
+}
+
 function paintPhysDebug() {
-  if (!physDebugOn) return;
+  if (!collisionBoxesOn) return;
   const width = playfield.clientWidth;
   const height = playfield.clientHeight;
   if (width < 2 || height < 2) return;
@@ -5748,16 +5785,23 @@ function paintPhysDebug() {
   }
 }
 
-function setPhysDebug(on: boolean) {
-  physDebugOn = on;
+function setCollisionBoxes(on: boolean) {
+  collisionBoxesOn = on;
   physDebugCanvas.hidden = !on;
-  copyBtn.hidden = !on;
-  devPanel.hidden = !on;
   if (on) paintPhysDebug();
   else {
     const ctx = physDebugCanvas.getContext("2d");
     ctx?.clearRect(0, 0, physDebugCanvas.width, physDebugCanvas.height);
   }
+  paintCollisionBoxesButtons();
+}
+
+/** Secret chrome-radius panel; also mirrors collision boxes so K stays a one-key toggle. */
+function setDevMode(on: boolean) {
+  devModeOn = on;
+  copyBtn.hidden = !on;
+  devPanel.hidden = !on;
+  setCollisionBoxes(on);
 }
 
 function reducedMotion(): boolean {
@@ -6600,7 +6644,14 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "k" || event.key === "K") {
     if (meta || event.altKey || event.shiftKey || event.repeat) return;
     event.preventDefault();
-    setPhysDebug(!physDebugOn);
+    setDevMode(!devModeOn);
+    return;
+  }
+  if (event.key === "c" || event.key === "C") {
+    if (meta || event.altKey || event.shiftKey || event.repeat) return;
+    event.preventDefault();
+    setCollisionBoxes(!collisionBoxesOn);
+    playSwitch(collisionBoxesOn);
     return;
   }
   if (event.key === "g" || event.key === "G") {

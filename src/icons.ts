@@ -102,10 +102,11 @@ export const ICON_PRESETS: IconPreset[] = [
   })),
 ];
 
-/** Hitbox choices for uploaded images — box + circle cover photos; gallery silhouettes stay on shapes. */
-export const IMAGE_COLLIDERS: IconPreset[] = PRIMITIVES.filter(
-  (icon) => icon.id === "block" || icon.id === "sphere",
-);
+/** Hitbox choices for uploaded images — singular labels (one collider per object). */
+export const IMAGE_COLLIDERS: IconPreset[] = (["block", "sphere"] as const).map((id) => {
+  const src = PRIMITIVES.find((icon) => icon.id === id)!.src;
+  return { id, label: id === "block" ? "Box" : "Sphere", src };
+});
 
 export function imageColliderId(id: string | undefined): "block" | "sphere" {
   return id === "sphere" ? "sphere" : "block";

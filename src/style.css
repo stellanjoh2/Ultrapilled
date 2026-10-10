@@ -2981,6 +2981,31 @@ button.pill.smash-btn.is-on::after {
   /* Match .field-reset height so unhiding reset doesn't grow the row ~1px. */
   min-height: calc(22px * var(--ui-scale));
 }
+
+.field-label-start {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(4px * var(--ui-scale));
+  min-width: 0;
+}
+
+/* Collision-box eye: hug the glyph; always lime on hover (not --on-primary). */
+[data-collision-boxes].field-reset {
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
+}
+
+[data-collision-boxes].field-reset svg {
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-collision-boxes].icon-hover:hover:not(:disabled),
+  [data-collision-boxes].icon-hover.is-on:hover:not(:disabled) {
+    color: var(--pill-fun-face);
+  }
+}
 .field-caption {
   display: inline-flex;
   align-items: baseline;

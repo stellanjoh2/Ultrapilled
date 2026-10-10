@@ -26,6 +26,7 @@ import { isSvgSource } from "../chipKinds";
 import { gradientEndIndex } from "../pillFill";
 import { playClick, playCreate, playSwitch, playTransition } from "../uiSounds";
 import { placeZoomedFixed } from "../uiScale";
+import { gifIsTransparent } from "../trim";
 import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
 import { isTextField, sanitizeTextMotion } from "../types";
 import { canRelinkSlot } from "../remoteImage";
@@ -321,22 +322,25 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       clearMenuInk(menu);
       const nodes: HTMLElement[] = [];
       if (H.isRasterUpload(slot) || slot.youtube || slot.video) {
-        if (slot.stroked) {
+        const allowStroke = !gifIsTransparent(slot.src, slot.name);
+        if (allowStroke && slot.stroked) {
           nodes.push(
             menuColorRow("Stroke Color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),
           );
         }
-        nodes.push(
-          menuCheckRow("Stroked", Boolean(slot.stroked), (next) => {
-            H.remember();
-            slot.stroked = next;
-            if (next && slot.stroke == null) slot.stroke = 4;
-            panelNeedsSync = true;
-            holdScrollClose(() => H.liveChip(slot.id));
-            mountImageInk();
-            placeSlotMenu(root, x, y);
-          }),
-        );
+        if (allowStroke) {
+          nodes.push(
+            menuCheckRow("Stroked", Boolean(slot.stroked), (next) => {
+              H.remember();
+              slot.stroked = next;
+              if (next && slot.stroke == null) slot.stroke = 4;
+              panelNeedsSync = true;
+              holdScrollClose(() => H.liveChip(slot.id));
+              mountImageInk();
+              placeSlotMenu(root, x, y);
+            }),
+          );
+        }
       } else if (H.iconCanGradient(slot)) {
         if (slot.gradient) {
           nodes.push(
