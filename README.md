@@ -1,6 +1,6 @@
 # Ultrapilled™
 
-A desktop web physics playground for text, icons, images, and short video clips. Live at [ultrapilled.com](https://ultrapilled.com/). Built on [Matter.js](https://brm.io/matter-js/).
+A desktop web physics playground for playful motion graphics. Drop pills, words, longer text, shapes, emoji, uploads, Unsplash photos, Giphy GIFs, and muted YouTube or MP4 clips into **Physics** (fall, bounce, stack) or **Layout** (place freely, multi-page). Theme with palettes, fonts, and look FX—including optional mic-driven Audio react—then export stills, sequences, GIF, MP4, or transparent ProRes, or save a local `.pill` project. Live at [ultrapilled.com](https://ultrapilled.com/). Built on [Matter.js](https://brm.io/matter-js/).
 
 **Desktop browsers only.** Phones and most tablets are gated at the door. Privacy: [ultrapilled.com/privacy.html](https://ultrapilled.com/privacy.html) (also in this repo as [`privacy.html`](privacy.html)).
 
