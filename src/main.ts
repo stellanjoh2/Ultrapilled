@@ -53,7 +53,7 @@ import { backgroundImage, backgroundPaint, gridDivisions, logoBackdropColor, log
 import { mountColorPicker } from "./colorPicker";
 import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
 import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
-import { logotypePillColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
+import { logotypePillColor, pickGridColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import {
   LOGOTYPE_REVEAL_EASE,
   LOGOTYPE_REVEAL_MASK_S,
@@ -465,6 +465,7 @@ const themeShelf = createThemeShelf({
     if (stage) {
       state.stageColor = stage;
       state.background.kind = "solid";
+      state.background.gridColor = pickGridColor(colors, stage);
       applyBackground();
     }
     for (const slot of state.slots) {

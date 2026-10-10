@@ -1,4 +1,4 @@
-import { DEFAULT_STAGE, DEFAULT_THEME } from "./theme";
+import { DEFAULT_STAGE, DEFAULT_THEME, resolveThemeStage } from "./theme";
 
 export type PaletteCategory = "common" | "retro" | "feral";
 
@@ -8,9 +8,17 @@ export type PalettePreset = {
   category: PaletteCategory;
   colors: string[];
   colorAmounts?: number[];
-  /** Stage colour applied with the palette, when the brand pairing needs it. */
-  stage?: string;
+  /** Dedicated stage/background colour — not one of the five object swatches. */
+  stage: string;
 };
+
+/** Lift authored stages + keep them distinct from theme swatches. */
+function withResolvedStages(presets: PalettePreset[]): PalettePreset[] {
+  return presets.map((preset) => ({
+    ...preset,
+    stage: resolveThemeStage(preset.stage, preset.colors),
+  }));
+}
 
 export const PALETTE_PRESET_COLOR_COUNT = 5;
 
@@ -97,115 +105,132 @@ export function sortColorsForPreview(colors: string[]): string[] {
 }
 
 /** Trendy palette presets inspired by curated colour collections. */
-export const COMMON_PALETTE_PRESETS: PalettePreset[] = [
+export const COMMON_PALETTE_PRESETS: PalettePreset[] = withResolvedStages([
   {
     id: "sunset-glow",
     label: "Sunset Glow",
     category: "common",
     colors: ["#FF6B6B", "#FFE66D", "#FF8E53", "#C44569", "#FFA502"],
+    stage: "#14080a",
   },
   {
     id: "ocean-mist",
     label: "Ocean Mist",
     category: "common",
     colors: ["#264653", "#2A9D8F", "#E9C46A", "#F4A261", "#E76F51"],
+    stage: "#061016",
   },
   {
     id: "midnight-bloom",
     label: "Midnight Bloom",
     category: "common",
     colors: ["#03045E", "#7209B7", "#F72585", "#4CC9F0", "#4361EE"],
+    stage: "#0c0616",
   },
   {
     id: "forest-walk",
     label: "Forest Walk",
     category: "common",
     colors: ["#606C38", "#283618", "#FEFAE0", "#DDA15E", "#BC6C25"],
+    stage: "#050704",
   },
   {
     id: "pastel-dream",
     label: "Pastel Dream",
     category: "common",
     colors: ["#FFC8DD", "#FFAFCC", "#BDE0FE", "#A2D2FF", "#CDB4DB"],
+    stage: "#16101c",
   },
   {
     id: "neon-nights",
     label: "Neon Nights",
     category: "common",
     colors: ["#00F5D4", "#9B5DE5", "#F15BB5", "#FEE440", "#00BBF9"],
+    stage: "#07040f",
   },
   {
     id: "jungle-canopy",
     label: "Jungle Canopy",
     category: "common",
     colors: ["#081C15", "#1B4332", "#40916C", "#74C69D", "#D8F3DC"],
+    stage: "#03100a",
   },
   {
     id: "berry-crush",
     label: "Berry Crush",
     category: "common",
     colors: ["#590D22", "#800F2F", "#C9184A", "#FF4D6D", "#FF758F"],
+    stage: "#100308",
   },
   {
     id: "arctic-frost",
     label: "Arctic Frost",
     category: "common",
     colors: ["#CAF0F8", "#90E0EF", "#0077B6", "#03045E", "#48CAE4"],
+    stage: "#030912",
   },
   {
     id: "sage-stone",
     label: "Sage & Stone",
     category: "common",
     colors: ["#D8E2DC", "#A8DADC", "#6C757D", "#495057", "#457B9D"],
+    stage: "#0c0e10",
   },
   {
     id: "lavender-haze",
     label: "Lavender Haze",
     category: "common",
     colors: ["#E0AAFF", "#C77DFF", "#9D4EDD", "#7B2CBF", "#5A189A"],
+    stage: "#0a0414",
   },
   {
     id: "terracotta",
     label: "Terracotta",
     category: "common",
     colors: ["#E07A5F", "#F2CC8F", "#81B29A", "#3D405B", "#F4A261"],
+    stage: "#120c08",
   },
-];
+]);
 
 /**
  * Retro console palettes — 5-colour picks from Orby Shader Lab hardware decodes.
  * @see https://github.com/stellanjoh2/orby scripts/render/creativeLook*Art.js
  */
-export const RETRO_PALETTE_PRESETS: PalettePreset[] = [
+export const RETRO_PALETTE_PRESETS: PalettePreset[] = withResolvedStages([
   {
     id: "nes-hero",
     label: "NES Hero",
     category: "retro",
     colors: ["#0000FC", "#F83800", "#00B800", "#F8B800", "#F8F8F8"],
+    stage: "#06060a",
   },
   {
     id: "nes-soft",
     label: "NES Soft",
     category: "retro",
     colors: ["#3CBCFC", "#F878F8", "#F87858", "#B8F818", "#FCFCFC"],
+    stage: "#0a0a14",
   },
   {
     id: "c64-classic",
     label: "C64 Classic",
     category: "retro",
     colors: ["#880000", "#00CC55", "#0000AA", "#EEEE77", "#FFFFFF"],
+    stage: "#0c0822",
   },
   {
     id: "c64-neon",
     label: "C64 Neon",
     category: "retro",
     colors: ["#FF7777", "#AAFF66", "#0088FF", "#EEEE77", "#BBBBBB"],
+    stage: "#0a0a1c",
   },
   {
     id: "gameboy-dmg",
     label: "Game Boy DMG",
     category: "retro",
     colors: ["#9BBC0F", "#8BAC0F", "#306230", "#0F380F", "#071821"],
+    stage: "#050a08",
   },
   {
     id: "gameboy-color",
@@ -213,32 +238,36 @@ export const RETRO_PALETTE_PRESETS: PalettePreset[] = [
     category: "retro",
     // Native CGB RGB555 (Pokémon Crystal overworld objects), not DMG greenscale.
     colors: ["#FFFFFF", "#FF9C52", "#FF3908", "#524AFF", "#39BD18"],
+    stage: "#080612",
   },
   {
     id: "ega-bright",
     label: "EGA Bright",
     category: "retro",
     colors: ["#5555FF", "#55FF55", "#FF5555", "#FFFF55", "#FF55FF"],
+    stage: "#060606",
   },
   {
     id: "intellivision",
     label: "Intellivision",
     category: "retro",
     colors: ["#002DFF", "#FF3E00", "#00A720", "#FAEA27", "#FFFCFF"],
+    stage: "#040610",
   },
   {
     id: "vectrex",
     label: "Vectrex",
     category: "retro",
     colors: ["#33FF55", "#22CC44", "#118833", "#006622", "#001100"],
+    stage: "#000a00",
   },
-];
+]);
 
 /**
  * Feral transmission palettes — glitch, signal breakdown, destroyed tech.
  * Colour language inspired by Marathon-era cyberpunk comms aesthetics.
  */
-export const FERAL_PALETTE_PRESETS: PalettePreset[] = [
+export const FERAL_PALETTE_PRESETS: PalettePreset[] = withResolvedStages([
   {
     id: "orby",
     label: "Orby",
@@ -251,62 +280,72 @@ export const FERAL_PALETTE_PRESETS: PalettePreset[] = [
     label: "Carrier Wave",
     category: "feral",
     colors: ["#D4FF00", "#F5F5F0", "#0A0A0A", "#9933FF", "#2A2A2A"],
+    stage: "#080808",
   },
   {
     id: "corrupted-frame",
     label: "Corrupted Frame",
     category: "feral",
     colors: ["#DFFF00", "#3D0040", "#FF1493", "#6B006B", "#1A001A"],
+    stage: "#120018",
   },
   {
     id: "sideband",
     label: "Sideband",
     category: "feral",
     colors: ["#FF5500", "#0033FF", "#00EEFF", "#E8E8E8", "#001A66"],
+    stage: "#000a1c",
   },
   {
     id: "signal-loss",
     label: "Signal Loss",
     category: "feral",
     colors: ["#FFB830", "#506080", "#283848", "#101820", "#050508"],
+    stage: "#080810",
   },
   {
     id: "ghost-signal",
     label: "Ghost Signal",
     category: "feral",
     colors: ["#020802", "#0A1A0A", "#1B4D1B", "#39FF14", "#A0FFA0"],
+    stage: "#040a04",
   },
   {
     id: "dead-channel",
     label: "Dead Channel",
     category: "feral",
     colors: ["#050505", "#141414", "#282828", "#404040", "#FF1133"],
+    stage: "#0e0e0e",
   },
   {
     id: "predator",
     label: "Predator",
     category: "feral",
     colors: ["#FFEE00", "#FF5500", "#EE0000", "#880033", "#0A0055"],
+    stage: "#060018",
   },
   {
     id: "white-noise",
     label: "White Noise",
     category: "feral",
     colors: ["#FFFFFF", "#C8C8C8", "#808080", "#404040", "#000000"],
+    stage: "#0c0c0c",
   },
   {
     id: "feedback",
     label: "Feedback",
     category: "feral",
     colors: ["#FF006E", "#FF2D00", "#FF8800", "#FF0044", "#CC0033"],
+    stage: "#12040a",
   },
   {
     id: "jam",
     label: "Jam",
     category: "feral",
     colors: ["#FF0040", "#C8FF00", "#0044CC", "#FF6600", "#FF00FF"],
+    stage: "#05030c",
   },
-];
+]);
 
 export const PALETTE_PRESETS: PalettePreset[] = [
   ...COMMON_PALETTE_PRESETS,
