@@ -65,6 +65,7 @@ describe("layout layer order controls", () => {
       },
       async assignImageFile() {},
       async assignVideoFile() {},
+      replaceImageSlot() {},
       isVideoFile() {
         return false;
       },

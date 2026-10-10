@@ -1,5 +1,7 @@
 import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
 import fileSvg from "@phosphor-icons/core/assets/regular/file-svg.svg?raw";
+import lockSimple from "@phosphor-icons/core/assets/regular/lock-simple.svg?raw";
+import lockSimpleOpen from "@phosphor-icons/core/assets/regular/lock-simple-open.svg?raw";
 import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?raw";
 import pauseIcon from "@phosphor-icons/core/assets/regular/pause.svg?raw";
 import playIcon from "@phosphor-icons/core/assets/regular/play.svg?raw";
@@ -14,6 +16,7 @@ import { FEATURED_EMOJI, searchEmoji, warmEmojiCatalog, type EmojiItem } from ".
 import { ICON_PRESETS, IMAGE_COLLIDERS } from "../icons";
 import { isColorMask, isSvgSource } from "../chipKinds";
 import { pillPadOf, trackingOf } from "../measure";
+import { imageRemoteOf } from "../remoteImage";
 import { gifIsTransparent } from "../trim";
 import {
   gradientAngleOf,
@@ -22,7 +25,7 @@ import {
   gradientPeriodMs,
 } from "../pillFill";
 import { textAnimSpeedOf } from "../textAnim";
-import { playCreate, playTransition } from "../uiSounds";
+import { playCreate, playSwitch, playTransition } from "../uiSounds";
 import {
   IMAGE_TEMPERATURE_MAX_K,
   IMAGE_TEMPERATURE_MIN_K,
@@ -153,6 +156,8 @@ export type SlotCardHost = {
   isVideoFile(file: File): boolean;
   assignImageFile(slot: ImageSlot, file: File): Promise<void>;
   assignVideoFile(slot: ImageSlot, file: File): Promise<void>;
+  /** Swap image in place — Unsplash/Giphy reopen search; uploads use the file picker. */
+  replaceImageSlot(slot: ImageSlot): void;
   slotScaleSliderMax(slot: Slot): number;
   escapeAttr(value: string): string;
   IMAGE_FILE_ACCEPT: string;
@@ -390,6 +395,37 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
     toggleOpen(true);
   });
 
+  const actions = document.createElement("div");
+  actions.className = "slot-head__actions";
+
+  if (H.state.physics.layoutMode) {
+    const locked = Boolean(slot.locked);
+    const lock = document.createElement("button");
+    lock.type = "button";
+    lock.className = `ghost icon-btn icon-hover${locked ? " is-on" : ""}`;
+    lock.setAttribute("aria-label", locked ? "Unlock" : "Lock");
+    lock.setAttribute("aria-pressed", String(locked));
+    lock.dataset.tip = locked
+      ? "Unlock — allow moving this object on the canvas"
+      : "Lock — prevent accidental moves on the canvas";
+    lock.innerHTML = `<span aria-hidden="true">${locked ? lockSimple : lockSimpleOpen}</span>`;
+    lock.addEventListener("click", () => {
+      H.remember();
+      const next = !Boolean(slot.locked);
+      slot.locked = next || undefined;
+      playSwitch(next);
+      lock.classList.toggle("is-on", next);
+      lock.setAttribute("aria-pressed", String(next));
+      lock.setAttribute("aria-label", next ? "Unlock" : "Lock");
+      lock.dataset.tip = next
+        ? "Unlock — allow moving this object on the canvas"
+        : "Lock — prevent accidental moves on the canvas";
+      lock.innerHTML = `<span aria-hidden="true">${next ? lockSimple : lockSimpleOpen}</span>`;
+      H.live({ quiet: true });
+    });
+    actions.append(lock);
+  }
+
   const duplicate = document.createElement("button");
   duplicate.type = "button";
   duplicate.className = "ghost icon-btn icon-hover";
@@ -406,7 +442,8 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
   remove.dataset.tip = "Remove this object";
   remove.innerHTML = `<span aria-hidden="true">✕</span>`;
   remove.addEventListener("click", () => H.removeSlot(slot.id));
-  head.append(toggle, duplicate, remove);
+  actions.append(duplicate, remove);
+  head.append(toggle, actions);
   return head;
 }
 
@@ -1133,6 +1170,9 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
   placeFold(wrap, editor, open);
 
   if (canTint || (H.isRasterUpload(slot) && slot.stroked)) H.bindTint(editor, slot);
+  editor.querySelector<HTMLButtonElement>("[data-replace-remote]")?.addEventListener("click", () => {
+    H.replaceImageSlot(slot);
+  });
   editor.querySelector<HTMLInputElement>("[data-file]")?.addEventListener("change", (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file || !H.isMediaFile(file)) return;
@@ -1181,8 +1221,19 @@ function pickPreview(slot: ImageSlot): string {
 
 function photoReplaceControl(slot: ImageSlot): string {
   const src = H.iconSrc(slot);
+  const remote = imageRemoteOf(slot);
+  const reset = H.resetControl("Image", "icon", H.fieldDirty(slot, "icon"));
+  if (remote?.kind === "unsplash" || remote?.kind === "giphy") {
+    const label = remote.kind === "unsplash" ? "Unsplash" : "Giphy";
+    return `<div class="field file-replace" data-tip="${TIPS.replaceImage}">
+    <span class="field-label"><span>Replace image</span>${reset}</span>
+    <button type="button" class="file-replace__btn" style="background-image:url(&quot;${H.escapeAttr(src)}&quot;)" data-replace-remote data-tip="${H.escapeAttr(`Search ${label}`)}">
+      <span class="file-replace__text">Search ${label}</span>
+    </button>
+  </div>`;
+  }
   return `<label class="field file-replace" data-tip="${TIPS.replaceImage}">
-    <span class="field-label"><span>Replace image</span>${H.resetControl("Image", "icon", H.fieldDirty(slot, "icon"))}</span>
+    <span class="field-label"><span>Replace image</span>${reset}</span>
     <span class="file-replace__btn" style="background-image:url(&quot;${H.escapeAttr(src)}&quot;)" data-tip="${H.escapeAttr(slot.name)}">
       <span class="file-replace__text">Browse</span>
     </span>

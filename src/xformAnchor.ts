@@ -14,9 +14,32 @@ const OPPOSITE: Record<XformCorner, XformCorner> = {
   sw: "ne",
 };
 
+const CORNER_SIGNS: Record<XformCorner, { sx: 1 | -1; sy: 1 | -1 }> = {
+  se: { sx: 1, sy: 1 },
+  ne: { sx: 1, sy: -1 },
+  nw: { sx: -1, sy: -1 },
+  sw: { sx: -1, sy: 1 },
+};
+
 /** Corner opposite the grabbed handle — the fixed anchor in default scale. */
 export function oppositeXformCorner(corner: XformCorner): XformCorner {
   return OPPOSITE[corner];
+}
+
+/**
+ * Local corner signs after Figma-style flip. CSS `scale(-1)` on the chip mirrors
+ * handle DOM, so proximity / pivots must use the same signs.
+ */
+export function xformCornerSigns(
+  corner: XformCorner,
+  flipX = false,
+  flipY = false,
+): { sx: 1 | -1; sy: 1 | -1 } {
+  const base = CORNER_SIGNS[corner];
+  return {
+    sx: (base.sx * (flipX ? -1 : 1)) as 1 | -1,
+    sy: (base.sy * (flipY ? -1 : 1)) as 1 | -1,
+  };
 }
 
 /**

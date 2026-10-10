@@ -12,8 +12,8 @@ import {
   stopTextAnimIn,
 } from "./textAnim";
 import { inkOn } from "./theme";
-import { peekTrim } from "./trim";
-import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, isTextField, sanitizeTextMotion, textAlignOf, textFieldLineHeight, type Slot, type TextSlot } from "./types";
+import { isGifSrc, peekTrim } from "./trim";
+import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, isTextField, sanitizeTextMotion, textAlignOf, textFieldLineHeight, type ImageSlot, type Slot, type TextSlot } from "./types";
 import { armYouTubeLoop, clearYouTubeLoop, youtubeEmbedKey, youtubeEmbedSrc } from "./youtube";
 
 export function paintSweepBand(
@@ -108,6 +108,13 @@ export function paintStroke(el: HTMLElement, ring: boolean, gradient: boolean, s
   ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, stroke)}px ${fill}`;
 }
 
+function paintRasterLeafFilter(el: HTMLElement, slot: Slot, extra = "") {
+  const leaf = el.querySelector(":scope > img, :scope > canvas");
+  if (!(leaf instanceof HTMLImageElement || leaf instanceof HTMLCanvasElement)) return;
+  if (slot.kind !== "image") return;
+  leaf.style.filter = imageRasterFilter(slot, extra);
+}
+
 /** Layout-only soft shadow — skipped in physics so tumbling piles stay cheap. */
 export function paintDropShadow(el: HTMLElement, slot: Slot, enabled: boolean) {
   if (!enabled || !slot.dropShadow) {
@@ -116,10 +123,7 @@ export function paintDropShadow(el: HTMLElement, slot: Slot, enabled: boolean) {
       el.style.removeProperty("--drop-blur");
       el.style.removeProperty("--drop-y");
       el.style.removeProperty("--drop-color");
-      const img = el.querySelector(":scope > img");
-      if (img instanceof HTMLImageElement && slot.kind === "image") {
-        img.style.filter = imageRasterFilter(slot);
-      }
+      paintRasterLeafFilter(el, slot);
     }
     return;
   }
@@ -136,11 +140,8 @@ export function paintDropShadow(el: HTMLElement, slot: Slot, enabled: boolean) {
   el.style.setProperty("--drop-blur", `${blur}px`);
   el.style.setProperty("--drop-y", `${y}px`);
   el.style.setProperty("--drop-color", color);
-  // Img invert is inline — compose drop-shadow here so it isn't overwritten.
-  const img = el.querySelector(":scope > img");
-  if (img instanceof HTMLImageElement && slot.kind === "image") {
-    img.style.filter = imageRasterFilter(slot, `drop-shadow(0 ${y}px ${blur}px ${color})`);
-  }
+  // Img/canvas invert is inline — compose drop-shadow here so it isn't overwritten.
+  paintRasterLeafFilter(el, slot, `drop-shadow(0 ${y}px ${blur}px ${color})`);
 }
 
 export function paintBareText(
@@ -221,6 +222,270 @@ export function blitBareTextCanvas(fromEl: HTMLElement, toEl: HTMLElement): bool
   return true;
 }
 
+/**
+ * Animated GIF + bloom: browsers won't feed live GIF frames through canvas
+ * `drawImage(img)`, and a second `<img src=gif>` runs its own clock (drift).
+ * When ImageDecoder exists we drive face + glow canvases from one decode loop.
+ */
+type GifBloomTarget = { width: number; height: number };
+
+type GifBloomPlayer = {
+  src: string;
+  decoder: ImageDecoder | null;
+  frameCount: number;
+  index: number;
+  due: number;
+  targets: Map<HTMLCanvasElement, GifBloomTarget>;
+  faces: Set<HTMLElement>;
+  generation: number;
+  pumping: boolean;
+};
+
+const gifBloomPlayers = new Map<string, GifBloomPlayer>();
+const gifBloomCanvasSrc = new WeakMap<HTMLCanvasElement, string>();
+const gifBloomFaces = new WeakSet<HTMLElement>();
+/** Srcs that failed decode — fall back to dual `<img>` for the session. */
+const gifBloomFailedSrc = new Set<string>();
+
+function gifImageDecoderAvailable(): boolean {
+  return typeof ImageDecoder !== "undefined";
+}
+
+/** Raster GIF that needs a shared face/glow clock when bloom is live. */
+export function isGifBloomSlot(slot: Slot): slot is ImageSlot {
+  return (
+    slot.kind === "image" &&
+    !slot.emoji &&
+    !slot.youtube &&
+    !slot.video &&
+    !isColorMask(slot) &&
+    isGifSrc(slot.src, slot.name)
+  );
+}
+
+export function gifBloomOwnsFace(el: HTMLElement): boolean {
+  return gifBloomFaces.has(el);
+}
+
+function styleGifBloomCanvas(canvas: HTMLCanvasElement, radius: number, filterCss: string) {
+  canvas.style.borderRadius = `${radius}px`;
+  canvas.style.filter = filterCss;
+  canvas.style.width = "100%";
+  canvas.style.height = "100%";
+  canvas.style.display = "block";
+  canvas.style.pointerEvents = "none";
+  canvas.style.transform = "translateZ(0)";
+  canvas.style.objectFit = "contain";
+}
+
+function ensureGifBloomCanvas(el: HTMLElement, radius: number, filterCss: string): HTMLCanvasElement {
+  const found = el.querySelector(":scope > canvas");
+  const canvas = found instanceof HTMLCanvasElement ? found : document.createElement("canvas");
+  stripLookChildren(el, canvas);
+  styleGifBloomCanvas(canvas, radius, filterCss);
+  mountLookChild(el, canvas);
+  return canvas;
+}
+
+function paintGifFrameToCanvas(frame: CanvasImageSource, nw: number, nh: number, canvas: HTMLCanvasElement, width: number, height: number) {
+  if (nw < 1 || nh < 1) return;
+  const w = Math.max(1, Math.round(width));
+  const h = Math.max(1, Math.round(height));
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const scale = Math.min(w / nw, h / nh);
+  const dw = nw * scale;
+  const dh = nh * scale;
+  ctx.drawImage(frame, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+
+function releaseGifBloomPlayer(player: GifBloomPlayer) {
+  player.generation += 1;
+  player.pumping = false;
+  player.targets.clear();
+  for (const face of player.faces) gifBloomFaces.delete(face);
+  player.faces.clear();
+  try {
+    player.decoder?.close();
+  } catch {
+    /* already closed */
+  }
+  player.decoder = null;
+  gifBloomPlayers.delete(player.src);
+}
+
+function unregisterGifBloomCanvas(canvas: HTMLCanvasElement) {
+  const src = gifBloomCanvasSrc.get(canvas);
+  if (!src) return;
+  gifBloomCanvasSrc.delete(canvas);
+  const player = gifBloomPlayers.get(src);
+  if (!player) return;
+  player.targets.delete(canvas);
+  if (player.targets.size === 0) releaseGifBloomPlayer(player);
+}
+
+async function pumpGifBloomPlayer(player: GifBloomPlayer) {
+  if (player.pumping) return;
+  player.pumping = true;
+  const gen = player.generation;
+  try {
+    while (gen === player.generation && player.targets.size > 0 && player.decoder) {
+      const now = performance.now();
+      if (now < player.due) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, Math.max(0, player.due - performance.now()));
+        });
+        continue;
+      }
+
+      for (const canvas of [...player.targets.keys()]) {
+        if (!canvas.isConnected) unregisterGifBloomCanvas(canvas);
+      }
+      if (player.targets.size === 0 || !player.decoder || gen !== player.generation) break;
+
+      const { image } = await player.decoder.decode({ frameIndex: player.index });
+      if (gen !== player.generation || !player.decoder) {
+        image.close();
+        break;
+      }
+      const nw = image.displayWidth || image.codedWidth;
+      const nh = image.displayHeight || image.codedHeight;
+      for (const [canvas, size] of player.targets) {
+        if (!canvas.isConnected) {
+          unregisterGifBloomCanvas(canvas);
+          continue;
+        }
+        paintGifFrameToCanvas(image, nw, nh, canvas, size.width, size.height);
+      }
+      const durationMs = Math.max(20, (image.duration ?? 100_000) / 1000);
+      image.close();
+      player.index = player.frameCount > 0 ? (player.index + 1) % player.frameCount : 0;
+      player.due = performance.now() + durationMs;
+    }
+  } catch {
+    // Decode / close races — drop the player; next paint falls back to dual <img>.
+    if (gen === player.generation) {
+      gifBloomFailedSrc.add(player.src);
+      releaseGifBloomPlayer(player);
+    }
+  } finally {
+    if (gen === player.generation) player.pumping = false;
+  }
+}
+
+async function ensureGifBloomPlayer(src: string): Promise<GifBloomPlayer | null> {
+  const existing = gifBloomPlayers.get(src);
+  if (existing?.decoder) return existing;
+  if (!gifImageDecoderAvailable()) return null;
+
+  const player: GifBloomPlayer = existing ?? {
+    src,
+    decoder: null,
+    frameCount: 0,
+    index: 0,
+    due: 0,
+    targets: new Map(),
+    faces: new Set(),
+    generation: 0,
+    pumping: false,
+  };
+  gifBloomPlayers.set(src, player);
+
+  try {
+    const res = await fetch(src);
+    if (!res.ok) throw new Error("gif fetch failed");
+    const data = await res.arrayBuffer();
+    if (!gifBloomPlayers.has(src)) return null;
+    const decoder = new ImageDecoder({ data, type: "image/gif", preferAnimation: true });
+    await decoder.tracks.ready;
+    if (gifBloomPlayers.get(src) !== player) {
+      decoder.close();
+      return null;
+    }
+    const track = decoder.tracks.selectedTrack;
+    if (!track || track.frameCount < 1) {
+      decoder.close();
+      releaseGifBloomPlayer(player);
+      return null;
+    }
+    player.decoder = decoder;
+    player.frameCount = track.frameCount;
+    player.index = 0;
+    player.due = 0;
+    void pumpGifBloomPlayer(player);
+    return player;
+  } catch {
+    gifBloomFailedSrc.add(src);
+    releaseGifBloomPlayer(player);
+    return null;
+  }
+}
+
+/**
+ * Drive face + glow from one ImageDecoder clock.
+ * Returns false when ImageDecoder is unavailable — caller should keep dual `<img>`.
+ */
+export function bindGifBloomPair(
+  faceEl: HTMLElement,
+  glowEl: HTMLElement,
+  src: string,
+  width: number,
+  height: number,
+  radius: number,
+  filterCss: string,
+): boolean {
+  if (!src || !gifImageDecoderAvailable() || gifBloomFailedSrc.has(src)) return false;
+
+  const faceCanvas = ensureGifBloomCanvas(faceEl, radius, filterCss);
+  const glowCanvas = ensureGifBloomCanvas(glowEl, radius, filterCss);
+  gifBloomFaces.add(faceEl);
+
+  // Drop prior src links if this pair moved.
+  if (gifBloomCanvasSrc.get(faceCanvas) !== src) unregisterGifBloomCanvas(faceCanvas);
+  if (gifBloomCanvasSrc.get(glowCanvas) !== src) unregisterGifBloomCanvas(glowCanvas);
+
+  let player = gifBloomPlayers.get(src);
+  if (!player) {
+    player = {
+      src,
+      decoder: null,
+      frameCount: 0,
+      index: 0,
+      due: 0,
+      targets: new Map(),
+      faces: new Set(),
+      generation: 0,
+      pumping: false,
+    };
+    gifBloomPlayers.set(src, player);
+  }
+  player.faces.add(faceEl);
+  player.targets.set(faceCanvas, { width, height });
+  player.targets.set(glowCanvas, { width, height });
+  gifBloomCanvasSrc.set(faceCanvas, src);
+  gifBloomCanvasSrc.set(glowCanvas, src);
+
+  if (player.decoder) {
+    void pumpGifBloomPlayer(player);
+  } else {
+    void ensureGifBloomPlayer(src);
+  }
+  return true;
+}
+
+/** Tear down shared GIF canvases for a face/glow pair (bloom off / chip gone). */
+export function unbindGifBloomPair(faceEl: HTMLElement, glowEl: HTMLElement) {
+  gifBloomFaces.delete(faceEl);
+  const faceCanvas = faceEl.querySelector(":scope > canvas");
+  const glowCanvas = glowEl.querySelector(":scope > canvas");
+  if (faceCanvas instanceof HTMLCanvasElement) unregisterGifBloomCanvas(faceCanvas);
+  if (glowCanvas instanceof HTMLCanvasElement) unregisterGifBloomCanvas(glowCanvas);
+  for (const player of gifBloomPlayers.values()) player.faces.delete(faceEl);
+}
 
 function clearBareGradientSeat(label: HTMLElement) {
   for (const prop of ["position", "left", "top", "width", "height", "overflow", "padding", "box-sizing", "margin", "text-align"] as const) {
@@ -1028,6 +1293,51 @@ export function applyVisual(
   }
 
   if (!isColorMask(slot)) {
+    // Face/glow canvases owned by the shared GIF decoder — don't remount a competing <img>.
+    if (!bloom && gifBloomOwnsFace(el) && isGifSrc(slot.src, slot.name)) {
+      const canvas = el.querySelector(":scope > canvas");
+      if (canvas instanceof HTMLCanvasElement) {
+        styleGifBloomCanvas(canvas, radius, imageRasterFilter(slot));
+        const playerSrc = gifBloomCanvasSrc.get(canvas);
+        const player = playerSrc ? gifBloomPlayers.get(playerSrc) : undefined;
+        const size = player?.targets.get(canvas);
+        if (size) {
+          size.width = width;
+          size.height = height;
+        }
+        if (rasterRing(slot)) {
+          const foundRing = el.querySelector(":scope > .chip-ring");
+          const ringEl = foundRing instanceof HTMLElement ? foundRing : document.createElement("div");
+          if (ringEl.parentElement !== el) {
+            ringEl.className = "chip-ring";
+            ringEl.setAttribute("aria-hidden", "true");
+          }
+          ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, slot.stroke ?? 4)}px ${fill}`;
+          mountLookChild(el, ringEl);
+        } else {
+          el.querySelector(":scope > .chip-ring")?.remove();
+        }
+        return;
+      }
+    }
+    // Bloom pass must not mount a second GIF <img> — independent decoders drift.
+    // syncChipGlow owns the shared decoder canvases; leave a sized shell if called directly.
+    if (bloom && isGifSrc(slot.src, slot.name)) {
+      ensureGifBloomCanvas(el, radius, imageRasterFilter(slot));
+      if (rasterRing(slot)) {
+        const foundRing = el.querySelector(":scope > .chip-ring");
+        const ringEl = foundRing instanceof HTMLElement ? foundRing : document.createElement("div");
+        if (ringEl.parentElement !== el) {
+          ringEl.className = "chip-ring";
+          ringEl.setAttribute("aria-hidden", "true");
+        }
+        ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, slot.stroke ?? 4)}px ${fill}`;
+        mountLookChild(el, ringEl);
+      } else {
+        el.querySelector(":scope > .chip-ring")?.remove();
+      }
+      return;
+    }
     const foundImg = el.querySelector(":scope > img");
     const img = foundImg instanceof HTMLImageElement ? foundImg : document.createElement("img");
     stripLookChildren(el, img);

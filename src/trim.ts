@@ -42,7 +42,7 @@ export function ensureTrims(slots: Slot[]): Promise<void> {
   ).then(() => undefined);
 }
 
-function isGifSrc(src: string, name = ""): boolean {
+export function isGifSrc(src: string, name = ""): boolean {
   return (
     /\.gif$/i.test(name) ||
     src.startsWith("data:image/gif") ||

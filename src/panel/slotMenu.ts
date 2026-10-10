@@ -72,6 +72,8 @@ export type SlotMenuHost = {
   pickImageFiles(multiple?: boolean): Promise<File[]>;
   assignImageFile(slot: ImageSlot, file: File): Promise<void>;
   assignVideoFile(slot: ImageSlot, file: File): Promise<void>;
+  /** Swap image in place — Unsplash/Giphy reopen search; uploads use the file picker. */
+  replaceImageSlot(slot: ImageSlot): void;
   isVideoFile(file: File): boolean;
   editChipText(id: string, select: "all" | "end", at?: { x: number; y: number }): void;
   duplicateSlot(id: string): void;
@@ -587,17 +589,7 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       label: "Replace image",
       icon: imageIcon,
       run: () => {
-        void H.pickImageFiles(false).then((files) => {
-          const file = files[0];
-          if (!file) return;
-          H.remember();
-          playCreate();
-          const job = H.isVideoFile(file) ? H.assignVideoFile(slot, file) : H.assignImageFile(slot, file);
-          void job.then(() => {
-            H.renderPanel();
-            H.live();
-          });
-        });
+        H.replaceImageSlot(slot);
       },
     });
   }

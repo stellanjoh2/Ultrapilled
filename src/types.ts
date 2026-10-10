@@ -67,6 +67,8 @@ export type TextSlot = {
   attractorReach?: number;
   /** Keep pulling while this asset is sitting still. */
   attractorIdle?: boolean;
+  /** Layout mode: block canvas move / transform (layers panel still works). */
+  locked?: boolean;
   /** Wrapping paragraph box (no pill). Independent of single-word chips. */
   textField?: boolean;
   /** Unscaled box width. Used when `textField` is set. */
@@ -195,6 +197,8 @@ export type ImageSlot = {
   attractorReach?: number;
   /** Keep pulling while this asset is sitting still. */
   attractorIdle?: boolean;
+  /** Layout mode: block canvas move / transform (layers panel still works). */
+  locked?: boolean;
   /** Muted autoplay YouTube iframe loop. When set, `src` / emoji are unused. */
   youtube?: YouTubeClip;
   /** Local muted autoplay video (mp4). When set, `src` / emoji / youtube are unused. */

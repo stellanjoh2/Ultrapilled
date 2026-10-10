@@ -4,6 +4,7 @@ import {
   reanchorStartDist,
   scaleFromPivotRatio,
   scaleXformReleaseImpulse,
+  xformCornerSigns,
   XFORM_RELEASE_IMPULSE,
   type XformCorner,
 } from "./xformAnchor";
@@ -20,6 +21,19 @@ describe("oppositeXformCorner", () => {
       expect(oppositeXformCorner(from)).toBe(to);
       expect(oppositeXformCorner(to)).toBe(from);
     }
+  });
+});
+
+describe("xformCornerSigns", () => {
+  it("keeps unflipped corner signs", () => {
+    expect(xformCornerSigns("se")).toEqual({ sx: 1, sy: 1 });
+    expect(xformCornerSigns("nw")).toEqual({ sx: -1, sy: -1 });
+  });
+
+  it("mirrors horizontal / vertical like CSS scale on the chip", () => {
+    expect(xformCornerSigns("se", true, false)).toEqual({ sx: -1, sy: 1 });
+    expect(xformCornerSigns("se", false, true)).toEqual({ sx: 1, sy: -1 });
+    expect(xformCornerSigns("ne", true, true)).toEqual({ sx: -1, sy: 1 });
   });
 });
 

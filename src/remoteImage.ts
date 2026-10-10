@@ -67,6 +67,9 @@ export function imageLooksMissing(slot: ImageSlot, chipEl?: HTMLElement | null):
   if (!slot.src) return true;
   const img = chipEl?.querySelector(":scope > img");
   if (img instanceof HTMLImageElement) return img.complete && img.naturalWidth === 0;
+  // Bloom-synced GIFs paint to a canvas (no <img>).
+  const canvas = chipEl?.querySelector(":scope > canvas");
+  if (canvas instanceof HTMLCanvasElement) return canvas.width < 1 || canvas.height < 1;
   return slot.src.startsWith("blob:");
 }
 

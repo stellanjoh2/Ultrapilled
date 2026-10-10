@@ -5,15 +5,19 @@ import { imageColliderId } from "./icons";
 import { isColorMask, type ChipDraw, type ChipPose } from "./chipKinds";
 import {
   applyVisual,
+  bindGifBloomPair,
   blitBareTextCanvas,
   isChipChrome,
+  isGifBloomSlot,
   paintBareText,
   paintBareTextCss,
   paintDropShadow,
   paintFill,
   paintSweepBand,
+  unbindGifBloomPair,
 } from "./chipDomPaint";
-import { chipContributesBloom } from "./chipLook";
+import { chipContributesBloom, imageRasterFilter, rasterRing } from "./chipLook";
+import { peekTrim } from "./trim";
 import { createColliderBody, presetIdForSrc, simpleColliderKind } from "./iconMesh";
 import {
   cornerRadius,
@@ -31,6 +35,7 @@ import {
   reanchorStartDist,
   scaleFromPivotRatio,
   scaleXformReleaseImpulse,
+  xformCornerSigns,
   type XformCorner,
 } from "./xformAnchor";
 import { fillSample, gradientAngleOf, gradientEnd, gradientScaleOf, pillGradient } from "./pillFill";
@@ -1044,10 +1049,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     pending = null;
     clickChip = null;
     const { chip, pointerId, x, y, originX, originY } = armed;
+    if (chipLocked(chip)) return;
     dropPin();
     // Multi-select (distinct slots) moves together; Amount copies stay independent via soloBodyId.
     const targets = xformTargets(chip.slotId);
-    const group = targets.some((item) => item.body.id === chip.body.id) ? targets : [chip];
+    const group = (targets.some((item) => item.body.id === chip.body.id) ? targets : [chip]).filter(
+      (item) => !chipLocked(item),
+    );
+    if (!group.length) return;
     const pins = group.map((item) => {
       const body = item.body;
       const ox = body.position.x - x;
@@ -1548,10 +1557,31 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function detachGlow(chip: DroppedChip) {
     if (!chip.glow.isConnected) return;
+    const look = chip.look;
+    const wasGifBloom = Boolean(look && isGifBloomSlot(look.slot));
+    if (wasGifBloom) unbindGifBloomPair(chip.el, chip.glow);
     const glowCanvas = chip.glow.querySelector(":scope > canvas");
     if (glowCanvas instanceof HTMLCanvasElement) unmirrorBareCanvas(glowCanvas);
     stopTextAnimIn(chip.glow);
     chip.glow.remove();
+    // Shared GIF decoder replaced the face <img> with a canvas — restore browser playback.
+    if (wasGifBloom && look) {
+      applyVisual(
+        chip.el,
+        look.slot,
+        chip.width,
+        chip.height,
+        look.radius,
+        look.fill,
+        look.ink,
+        look.tracking,
+        false,
+        look.shiftEm,
+        look.gradientTo,
+        chip.slotId === editingId,
+        lookPad,
+      );
+    }
   }
 
   function attachGlow(chip: DroppedChip) {
@@ -1649,6 +1679,39 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         paintDropShadow(chip.glow, slot, false);
         return;
       }
+    }
+    // Animated GIFs: one ImageDecoder paints face + glow (dual <img> drifts; canvas←img is static).
+    if (isGifBloomSlot(slot)) {
+      const src = peekTrim(slot.src)?.displaySrc ?? slot.src;
+      chip.glow.style.width = `${size.width}px`;
+      chip.glow.style.height = `${size.height}px`;
+      chip.glow.style.borderRadius = `${radius}px`;
+      chip.glow.style.background = "transparent";
+      chip.glow.style.backgroundColor = "transparent";
+      chip.glow.classList.add("chip-image");
+      chip.glow.classList.remove("chip-bare", "chip-emoji", "chip-youtube", "chip-video", "is-editing", "is-text-anim-host");
+      if (bindGifBloomPair(chip.el, chip.glow, src, size.width, size.height, radius, imageRasterFilter(slot))) {
+        if (rasterRing(slot)) {
+          const foundRing = chip.glow.querySelector(":scope > .chip-ring");
+          const ringEl = foundRing instanceof HTMLElement ? foundRing : document.createElement("div");
+          if (ringEl.parentElement !== chip.glow) {
+            ringEl.className = "chip-ring";
+            ringEl.setAttribute("aria-hidden", "true");
+          }
+          ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, slot.stroke ?? 4)}px ${fill}`;
+          chip.glow.append(ringEl);
+        } else {
+          chip.glow.querySelector(":scope > .chip-ring")?.remove();
+        }
+        const mix = layoutMode ? blendMode(slot.blend) : "normal";
+        if (mix === "normal") chip.glow.style.removeProperty("mix-blend-mode");
+        else chip.glow.style.mixBlendMode = mix;
+        paintDropShadow(chip.glow, slot, false);
+        return;
+      }
+      // No ImageDecoder — fall through to dual <img> (animated, may drift).
+    } else {
+      unbindGifBloomPair(chip.el, chip.glow);
     }
     applyVisual(chip.glow, slot, size.width, size.height, radius, fill, ink, tracking, true, shiftEm, gradientTo, false, lookPad);
     const mix = layoutMode ? blendMode(slot.blend) : "normal";
@@ -2549,14 +2612,24 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       // Mount chrome before flipping is-picked so opacity/scale can fade in.
       if (on) {
         const frameHost = ensureChrome(chip);
+        const locked = chipLocked(chip);
         const needFrame = !frameHost.querySelector(":scope > .chip-xform-frame");
-        const needHandles = frameHost.querySelectorAll(":scope > .chip-xform-handle").length !== 4;
+        const needHandles =
+          !locked && frameHost.querySelectorAll(":scope > .chip-xform-handle").length !== 4;
         const hadWheel = Boolean(frameHost.querySelector(":scope > .chip-grad-wheel"));
         ensureXformFrame(frameHost);
-        ensureXformHandle(chip);
-        syncGradWheel(chip);
+        if (locked) {
+          for (const node of frameHost.querySelectorAll(
+            ":scope > .chip-xform-handle, :scope > .chip-grad-wheel",
+          )) {
+            node.remove();
+          }
+        } else {
+          ensureXformHandle(chip);
+          syncGradWheel(chip);
+        }
         const createdWheel =
-          !hadWheel && Boolean(frameHost.querySelector(":scope > .chip-grad-wheel"));
+          !locked && !hadWheel && Boolean(frameHost.querySelector(":scope > .chip-grad-wheel"));
         // Newly inserted nodes need a layout pass or the fade-in is skipped.
         if (!chip.el.classList.contains("is-picked") && (needFrame || needHandles || createdWheel)) {
           void chip.el.offsetWidth;
@@ -2565,8 +2638,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         chip.el.classList.add("is-picked");
         frameHost.classList.add("is-picked");
         syncChromeSeat(chip);
-        syncXformHandleSide(chip, chipCssMul(chip));
-        syncGradWheelNear(chip);
+        if (!locked) {
+          syncXformHandleSide(chip, chipCssMul(chip));
+          syncGradWheelNear(chip);
+        }
       } else {
         chip.el.classList.remove("is-picked");
         const host = chip.chrome;
@@ -2629,10 +2704,20 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
    * Prefer this over DOM hit-testing — layout mix-blend-mode + the selection
    * overlay often make `event.target` miss the chip you clicked.
    */
-  function topChipAtStagePoint(x: number, y: number): DroppedChip | undefined {
+  /** Layout lock — skip canvas grab / transform; layers panel can still select. */
+  function chipLocked(chip: DroppedChip): boolean {
+    return layoutMode && Boolean(chip.look?.slot.locked);
+  }
+
+  function topChipAtStagePoint(
+    x: number,
+    y: number,
+    opts?: { interactive?: boolean },
+  ): DroppedChip | undefined {
     const point = { x, y };
     for (let i = chips.length - 1; i >= 0; i--) {
       const chip = chips[i]!;
+      if (opts?.interactive && chipLocked(chip)) continue;
       if (Query.point([chip.body], point).length > 0) return chip;
     }
     return undefined;
@@ -2706,7 +2791,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
    */
   function xformTargets(slotId: string) {
     if (pickedIds.size > 1 && pickedIds.has(slotId) && soloBodyId == null) {
-      return chips.filter((chip) => pickedIds.has(chip.slotId));
+      return chips.filter((chip) => pickedIds.has(chip.slotId) && !chipLocked(chip));
     }
     if (soloBodyId != null) {
       const solo = chips.find(
@@ -2819,11 +2904,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   /** Frame-corner world position (pad inset), scaled by live CSS mul. */
   function xformCornerWorld(chip: DroppedChip, corner: XformCorner, mul: number, pad = 12) {
-    const entry = XFORM_CORNERS.find((item) => item.id === corner)!;
+    const { sx, sy } = xformCornerSigns(corner, chip.flipX, chip.flipY);
     const cos = Math.cos(chip.body.angle);
     const sin = Math.sin(chip.body.angle);
-    const vx = (chip.width / 2 + pad) * mul * entry.sx;
-    const vy = (chip.height / 2 + pad) * mul * entry.sy;
+    const vx = (chip.width / 2 + pad) * mul * sx;
+    const vy = (chip.height / 2 + pad) * mul * sy;
     return {
       x: chip.body.position.x + vx * cos - vy * sin,
       y: chip.body.position.y + vx * sin + vy * cos,
@@ -3546,9 +3631,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const dy = point.y - pivot.y;
     const lx = dx * cos - dy * sin;
     const ly = dx * sin + dy * cos;
-    const entry = XFORM_CORNERS.find((item) => item.id === corner)!;
-    const nextW = centerAnchored ? Math.abs(lx) * 2 : lx * entry.sx;
-    const nextH = centerAnchored ? Math.abs(ly) * 2 : ly * entry.sy;
+    const { sx, sy } = xformCornerSigns(corner, chip.flipX, chip.flipY);
+    const nextW = centerAnchored ? Math.abs(lx) * 2 : lx * sx;
+    const nextH = centerAnchored ? Math.abs(ly) * 2 : ly * sy;
     const minW = 48;
     const minH = 32;
     return {
@@ -3918,7 +4003,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const el = gradStop.closest(".chip, .chip-chrome");
       if (!(el instanceof HTMLElement) || el.closest(".bloom-layer")) return;
       const chip = chipFromEl(el);
-      if (!chip || chip.slotId === editingId) return;
+      if (!chip || chip.slotId === editingId || chipLocked(chip)) return;
       const info = gradientOf?.(chip.slotId);
       if (!info) return;
       event.preventDefault();
@@ -3963,7 +4048,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const host = xformHandle.closest(".chip, .chip-chrome");
       if (!(host instanceof HTMLElement) || host.closest(".bloom-layer")) return;
       const chip = chipFromEl(host);
-      if (!chip || chip.slotId === editingId) return;
+      if (!chip || chip.slotId === editingId || chipLocked(chip)) return;
       event.preventDefault();
       event.stopPropagation();
       blank = null;
@@ -3977,8 +4062,9 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
     // Resolve the chip from stage coords — not event.target. Layout blend modes and
     // the selection overlay regularly make DOM hit-testing miss the piece under the pointer.
+    // Locked layers are click-through (Figma-style) so the object behind can be grabbed.
     const point = stagePoint(event);
-    const chip = topChipAtStagePoint(point.x, point.y);
+    const chip = topChipAtStagePoint(point.x, point.y, { interactive: true });
     if (!chip) {
       clickChip = null;
       if (event.currentTarget === stageEl) blank = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
@@ -4010,7 +4096,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   function onContextMenu(event: MouseEvent) {
     const point = stagePoint(event);
-    const chip = topChipAtStagePoint(point.x, point.y);
+    const chip = topChipAtStagePoint(point.x, point.y, { interactive: true });
     if (chip) {
       event.preventDefault();
       onMenu?.(chip.slotId, event.clientX, event.clientY);
@@ -4429,10 +4515,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (chip.glow.isConnected) copyLook(chip.glow, mirror.glow);
     }
     if (isPickPainted(chip)) {
-      ensureXformFrame(ensureChrome(chip));
-      ensureXformHandle(chip);
-      syncXformHandleSide(chip, chipCssMul(chip));
-      syncGradWheel(chip);
+      const host = ensureChrome(chip);
+      ensureXformFrame(host);
+      if (chipLocked(chip)) {
+        for (const node of host.querySelectorAll(
+          ":scope > .chip-xform-handle, :scope > .chip-grad-wheel",
+        )) {
+          node.remove();
+        }
+      } else {
+        ensureXformHandle(chip);
+        syncXformHandleSide(chip, chipCssMul(chip));
+        syncGradWheel(chip);
+      }
       syncChromeSeat(chip);
       // Selection chrome tracks the painted box immediately; body remesh may follow.
       if (chip.chrome && chip.chrome !== chip.el) {

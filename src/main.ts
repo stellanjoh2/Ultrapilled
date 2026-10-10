@@ -120,7 +120,7 @@ import {
   serializePillProject,
   type PillProject,
 } from "./project/pillFormat";
-import { relinkProjectImages, relinkSlotImage } from "./remoteImage";
+import { imageRemoteOf, relinkProjectImages, relinkSlotImage } from "./remoteImage";
 import { ensureTrim, ensureTrims, peekTrim } from "./trim";
 import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
 import {
@@ -1965,6 +1965,7 @@ function slotMenuHost(): SlotMenuHost {
     pickImageFiles,
     assignImageFile,
     assignVideoFile,
+    replaceImageSlot,
     isVideoFile,
     editChipText,
     duplicateSlot,
@@ -2046,6 +2047,7 @@ function createPanelHost(): CreatePanelHost {
     isVideoFile,
     assignImageFile,
     assignVideoFile,
+    replaceImageSlot,
     slotScaleSliderMax,
     escapeAttr,
     IMAGE_FILE_ACCEPT: MEDIA_FILE_ACCEPT,
@@ -2329,6 +2331,48 @@ function importSlotSize(nativeW: number, nativeH: number, opts?: { minWidth?: nu
   return Math.max(8, displayLong / scale);
 }
 
+/** Keep Reset→Image from reverting uploads to the default shape preset. */
+function syncImageIconBaseline(slot: ImageSlot) {
+  const base = imageBaselines.get(slot.id);
+  if (!base) {
+    captureBaseline(slot);
+    return;
+  }
+  base.src = slot.src;
+  base.name = slot.name;
+  base.emoji = slot.emoji;
+}
+
+/**
+ * Swap an image in place. Unsplash / Giphy chips reopen their search modal;
+ * local uploads keep the file picker.
+ */
+function replaceImageSlot(slot: ImageSlot): void {
+  const apply = (file: File, remote?: ImageRemote) => {
+    remember();
+    playCreate();
+    const job = isVideoFile(file) ? assignVideoFile(slot, file) : assignImageFile(slot, file, remote);
+    void job.then(() => {
+      refreshSlotCard(slot.id);
+      live();
+    });
+  };
+  const remote = imageRemoteOf(slot);
+  if (remote?.kind === "unsplash") {
+    openUnsplashImport({ onPick: (file, next) => apply(file, next) });
+    return;
+  }
+  if (remote?.kind === "giphy") {
+    openGiphyImport({ onPick: (file, next) => apply(file, next) });
+    return;
+  }
+  void pickImageFiles(false).then((files) => {
+    const file = files[0];
+    if (!file) return;
+    apply(file);
+  });
+}
+
 /** Set slot image from a local file; awaits trim (and SVG collider match) so aspect updates before remesh. */
 function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Promise<void> {
   const url = URL.createObjectURL(file);
@@ -2347,6 +2391,7 @@ function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Pro
   slot.saturation = undefined;
   slot.hue = undefined;
   slot.temperature = undefined;
+  syncImageIconBaseline(slot);
   if (svg) {
     slot.radius = 0;
     slot.stroked = undefined;

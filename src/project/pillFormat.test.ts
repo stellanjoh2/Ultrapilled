@@ -68,6 +68,32 @@ describe("pillFormat round-trip", () => {
     expect(parsePillProject("not-json")).toBeNull();
   });
 
+  it("round-trips layout lock on a slot", () => {
+    const slot = defaultImageSlot({
+      id: "img-a",
+      name: "locked.png",
+      src: "data:image/png;base64,aa",
+      locked: true,
+    });
+    const project: PillProject = {
+      state: {
+        ...blankState(),
+        slots: [slot],
+        template: "blank",
+        physics: { ...blankState().physics, layoutMode: true },
+      },
+      poses: [],
+      frame: { width: 1280, height: 720 },
+      images: [],
+      loop: false,
+      pages: [],
+      pageIndex: 0,
+    };
+    const parsed = parsePillProject(serializePillProject(project));
+    expect(parsed!.state.slots[0]).toMatchObject({ id: "img-a", locked: true });
+    expect(parsed!.state.physics.layoutMode).toBe(true);
+  });
+
   it("round-trips Unsplash / Giphy remote ids", () => {
     const slot = defaultImageSlot({
       id: "gif-a",
