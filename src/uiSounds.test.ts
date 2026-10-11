@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stop = vi.fn();
-const playSound = vi.fn(async () => ({ stop }));
+const playSound = vi.fn(async (..._args: unknown[]) => ({ stop }));
 
 vi.mock("@/lib/sound-engine", () => ({
   playSound: (...args: unknown[]) => playSound(...args),
@@ -12,7 +12,7 @@ describe("uiSounds priority", () => {
   beforeEach(async () => {
     stop.mockClear();
     playSound.mockClear();
-    playSound.mockImplementation(async () => ({ stop }));
+    playSound.mockImplementation(async (..._args: unknown[]) => ({ stop }));
     vi.resetModules();
   });
 
