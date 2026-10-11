@@ -25,8 +25,7 @@ const HOVER_URL = S("hover");
 const HOVER_SELECTOR = [
   "button",
   "[role='button']",
-  "a.pill",
-  "a.icon-hover",
+  "a[href]",
   ".panel-tabs__tab",
   ".theme-swatch",
   ".tint",
@@ -35,7 +34,6 @@ const HOVER_SELECTOR = [
   ".section-toggle",
   "label.check",
   ".panel-credit__author",
-  ".panel-credit__social a",
   ".panel-credit__social button",
 ].join(", ");
 
@@ -49,6 +47,9 @@ let flushQueued = false;
 let lockedUntil = 0;
 let hoverUntil = 0;
 let unlockBound = false;
+/** Stops a just-started tap when an open/close cue wins in the lock window. */
+let activePlayback: SoundPlayback | null = null;
+let playEpoch = 0;
 /** Forced mute (e.g. audio-react mic). Overrides user sound prefs. */
 let forceMuted = false;
 let soundOn = getPrefs().soundOn;
@@ -74,6 +75,9 @@ onPrefsChange(() => {
 export function setUiSoundsMuted(next: boolean) {
   forceMuted = next;
   pendingUri = null;
+  activePlayback?.stop();
+  activePlayback = null;
+  playEpoch += 1;
   stopProgress();
 }
 
@@ -110,14 +114,19 @@ function requestPlay(
   if (!gate()) return;
   // Block hover for this event before the menu DOM appears under the pointer.
   hoverUntil = Math.max(hoverUntil, performance.now() + HOVER_MIN_INTERVAL_MS);
-  pendingUri = src;
-  pendingVolume = volume;
-  pendingGate = gate;
   const important = Boolean(opts?.important);
   if (flushQueued) {
+    // Pending open/close must not be replaced by a generic click (or vice versa: open wins).
+    if (pendingImportant && !important) return;
+    pendingUri = src;
+    pendingVolume = volume;
+    pendingGate = gate;
     if (important) pendingImportant = true;
     return;
   }
+  pendingUri = src;
+  pendingVolume = volume;
+  pendingGate = gate;
   pendingImportant = important;
   flushQueued = true;
   queueMicrotask(() => {
@@ -134,11 +143,23 @@ function requestPlay(
     pendingVolume = 1;
     if (!uri) return;
     const now = performance.now();
-    // Important cues (menu / shelf open) must win over a just-played pick click.
+    // Generic clicks yield to a cue already playing in the lock window.
     if (!force && now < lockedUntil) return;
+    // Open/close replaces a just-started tap instead of layering on top.
+    if (force && now < lockedUntil) {
+      activePlayback?.stop();
+      activePlayback = null;
+    }
     lockedUntil = now + SOUND_LOCK_MS;
     hoverUntil = Math.max(hoverUntil, lockedUntil);
-    void playSound(uri, { volume: gain(vol) });
+    const epoch = ++playEpoch;
+    void playSound(uri, { volume: gain(vol) }).then((playback) => {
+      if (epoch !== playEpoch) {
+        playback.stop();
+        return;
+      }
+      activePlayback = playback;
+    });
   });
 }
 
@@ -183,9 +204,9 @@ export function playImpact(slotId: string, bounceIndex: number, speedFactor: num
   requestPlay(uri, volume, bounceAudible);
 }
 
-/** Remove / dismiss / deselect. */
+/** Remove / dismiss / deselect — same priority as open so it beats the auto click. */
 export function playRemove() {
-  requestPlay(S("transition_down"));
+  requestPlay(S("transition_down"), 1, uiAudible, { important: true });
 }
 
 /** Soft success (clipboard, quick confirm) — notification.wav retired. */
@@ -324,6 +345,8 @@ function shouldPlayHover(el: HTMLElement): boolean {
   if (el instanceof HTMLButtonElement && el.disabled) return false;
   if (el instanceof HTMLAnchorElement && el.getAttribute("aria-disabled") === "true") return false;
   if (el.getAttribute("aria-disabled") === "true") return false;
+  // Media thumbs aren't text links — skip so sweeping the About reel doesn't chatter.
+  if (el.classList.contains("about-project__media")) return false;
   if (el.classList.contains("check")) {
     const input = el.querySelector("input");
     if (input instanceof HTMLInputElement && input.disabled) return false;

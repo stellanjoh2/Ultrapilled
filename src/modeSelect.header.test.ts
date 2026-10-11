@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isAboutOpen } from "./aboutPanel";
+import { closeAbout, isAboutOpen } from "./aboutPanel";
 import { closeBugReport, isBugReportOpen } from "./bugReport";
 import { askModeSelect, stopModeSelectPreview } from "./modeSelect";
 
 describe("mode select header actions", () => {
   afterEach(() => {
+    closeAbout();
     closeBugReport();
     stopModeSelectPreview();
     document.body.innerHTML = "";
@@ -61,20 +62,23 @@ describe("mode select header actions", () => {
     await expect(pending).resolves.toEqual({ kind: "mode", mode: "layout" });
   });
 
-  it("links the S logo to LinkedIn without leaving Mode Select", async () => {
+  it("opens About from the S logo without leaving Mode Select", async () => {
     stubReducedMotion();
     const pending = askModeSelect();
     const root = document.querySelector(".mode-select")!;
-    const s = root.querySelector<HTMLAnchorElement>(".mode-select__s");
+    const s = root.querySelector<HTMLButtonElement>(".mode-select__s");
 
-    expect(s?.getAttribute("href")).toBe("https://www.linkedin.com/in/stellanj/");
-    expect(s?.getAttribute("target")).toBe("_blank");
-    expect(s?.getAttribute("aria-label")).toBe("LinkedIn");
-    expect(isAboutOpen()).toBe(false);
+    expect(s?.getAttribute("data-open-about")).toBe("");
+    expect(s?.getAttribute("aria-label")).toBe("About the creator");
+    expect(root.querySelector(".mode-select__lower > .mode-select__s")).toBe(s);
+    expect(root.querySelector(".mode-select__social .mode-select__s")).toBeNull();
+
+    s!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(isAboutOpen()).toBe(true);
     expect(document.querySelector(".mode-select")).toBe(root);
 
-    root.querySelector<HTMLButtonElement>("[data-mode=physics]")?.click();
-    await expect(pending).resolves.toEqual({ kind: "mode", mode: "physics" });
+    root.querySelector<HTMLButtonElement>("[data-mode=layout]")?.click();
+    await expect(pending).resolves.toEqual({ kind: "mode", mode: "layout" });
   });
 
   it("opens a .pill picker from Load Project", async () => {

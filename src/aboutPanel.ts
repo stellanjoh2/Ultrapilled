@@ -14,17 +14,36 @@ const NAME_ACCENT = DEFAULT_THEME[1];
 const ABOUT_NAME = "Stellan Johansson";
 
 export const LINKEDIN_HREF = "https://www.linkedin.com/in/stellanj/";
+const GITHUB_HREF = "https://github.com/stellanjoh2/Ultrapilled";
 
 const ABOUT_LINKS = [
   { text: "LinkedIn", href: LINKEDIN_HREF },
+  { text: "GitHub", href: GITHUB_HREF },
   {
     text: "MobyGames",
     href: "https://www.mobygames.com/person/289121/stellan-johansson/credits/",
   },
   { text: "X", href: "https://x.com/johstell" },
+  { text: "Instagram", href: "https://www.instagram.com/stellanj/" },
 ] as const;
 
-/** Sideprojects + showreel — stills from Orby marketing / promo captures. */
+/** Ritual past-work cycle — 1 frame/sec, each still once. */
+const RITUAL_CYCLE = [
+  "/images/projects/ritual/01-really.jpg",
+  "/images/projects/ritual/02-quixel.jpg",
+  "/images/projects/ritual/03-coffee.jpg",
+  "/images/projects/ritual/04-hazelight.jpg",
+  "/images/projects/ritual/05-fractal.jpg",
+  "/images/projects/ritual/06-afterlife.jpg",
+  "/images/projects/ritual/07-awayout.jpg",
+  "/images/projects/ritual/08-ascent.jpg",
+] as const;
+
+/**
+ * Sideprojects + showreel. Optional `video` uses Orby-style muted loop autoplay
+ * (muted/playsInline as properties + poster until painted). Optional `images`
+ * stacks JPGs and crossfades once per second (GIF-style still cycle).
+ */
 const ABOUT_PROJECTS = [
   {
     id: "showreel",
@@ -32,8 +51,9 @@ const ABOUT_PROJECTS = [
     cta: "Watch showreel",
     title: "Showreel 2020-2026",
     lede: "Highlights from those years — a small selection of projects I touched as Creative Director and Principal Designer, from Quixel Megascans and Unreal Engine through to Fortnite.",
-    image: "/images/projects/showreel.jpg",
+    image: "/media/about-sjreel.jpg",
     imageAlt: "Showreel 2020–2026 — Stellan Johansson",
+    video: "/media/about-sjreel.mp4",
     href: "https://www.youtube.com/watch?v=SXf1NswrDpw",
   },
   {
@@ -46,6 +66,15 @@ const ABOUT_PROJECTS = [
     href: "https://orby.studio/",
   },
   {
+    id: "lx01",
+    name: "LX01",
+    title: "LX01 — Text in, cyborg out",
+    lede: "LX01™ is a free browser speech synthesizer for robotic voices — type a line, pick from four voice engines, or dial in a classic reciter preset. Vocode, crush, and reshape. Tune formants, EQ, and pronunciation, then ship synthetic speech or a fully vocoded take.",
+    image: "/images/projects/lx01.webp",
+    imageAlt: "LX01 speech synthesizer — robotic voice vocoder",
+    href: "https://stellanjoh2.github.io/Cyborg/",
+  },
+  {
     id: "mozayk",
     name: "Mozayk",
     title: "Mozayk — Complex visuals, made easy",
@@ -55,15 +84,21 @@ const ABOUT_PROJECTS = [
     href: "https://mozayk.design/",
   },
   {
-    id: "lx01",
-    name: "LX01",
-    title: "LX01 — Text in, cyborg out",
-    lede: "LX01™ is a free browser speech synthesizer for robotic voices — type a line, pick from four voice engines, or dial in a classic reciter preset. Vocode, crush, and reshape. Tune formants, EQ, and pronunciation, then ship synthetic speech or a fully vocoded take.",
-    image: "/images/projects/lx01.jpg",
-    imageAlt: "LX01 speech synthesizer — robotic voice vocoder",
-    href: "https://stellanjoh2.github.io/Cyborg/",
+    id: "ritual",
+    name: "Ritual",
+    cta: "Visit Ritual",
+    title: "Ritual Design & Development",
+    lede: "Work from Ritual, the design-driven digital agency I co-founded in Gothenburg in 2018 — brand systems, logotypes, and interactive experiences for studios and clients from Hazelight to Fractal Design.",
+    image: RITUAL_CYCLE[0],
+    images: RITUAL_CYCLE,
+    imageAlt: "Ritual Design & Development — past projects from the Gothenburg design agency",
+    href: "https://madebyritual.com/",
   },
 ] as const;
+
+/** Inline attrs shared with Orby marketing loops — Safari needs properties too (see primeAboutVideo). */
+const ABOUT_VIDEO_HTML_ATTRS =
+  'autoplay playsinline webkit-playsinline muted loop preload="auto"';
 
 let modalRoot: HTMLElement | null = null;
 let closing = false;
@@ -71,6 +106,9 @@ let onKey: ((event: KeyboardEvent) => void) | null = null;
 let openTl: gsap.core.Timeline | null = null;
 let blurTween: gsap.core.Tween | null = null;
 let projectTriggers: ScrollTrigger[] = [];
+let cycleTimers: number[] = [];
+
+const CYCLE_MS = 1000;
 
 const ABOUT_BLUR_PX = 21;
 
@@ -78,41 +116,63 @@ function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function appEl(): HTMLElement | null {
-  return document.querySelector<HTMLElement>("#app");
+/** Stage + Mode Select host (sibling of #app) — whichever is behind About. */
+function aboutBlurTargets(): HTMLElement[] {
+  const targets: HTMLElement[] = [];
+  const app = document.querySelector<HTMLElement>("#app");
+  if (app) targets.push(app);
+  const gate = document.querySelector<HTMLElement>(".mode-select-host");
+  if (gate) targets.push(gate);
+  return targets;
 }
 
-/** Soften the stage under About — tween blur so open/close isn’t a hard cut. */
-function tweenAboutBlur(on: boolean, duration: number): void {
-  const app = appEl();
-  if (!app) return;
-  blurTween?.kill();
-  blurTween = null;
-  if (reducedMotion()) {
-    if (on) app.style.filter = `blur(${ABOUT_BLUR_PX}px)`;
-    else {
-      app.style.removeProperty("filter");
-      gsap.set(app, { clearProps: "filter" });
+/**
+ * Apply underlay blur. Uses filter + -webkit-filter (Safari), numeric tween (not
+ * GSAP’s filter string), and clears entirely when off so Mode Select frost /
+ * mix-blend aren’t stuck under a permanent filter containing block.
+ */
+function setAboutBlurPx(targets: HTMLElement[], px: number): void {
+  if (px <= 0.05) {
+    for (const el of targets) {
+      el.style.removeProperty("filter");
+      el.style.removeProperty("-webkit-filter");
     }
     return;
   }
-  if (on) {
-    blurTween = gsap.fromTo(
-      app,
-      { filter: "blur(0px)" },
-      { filter: `blur(${ABOUT_BLUR_PX}px)`, duration, ease: "power2.out" },
-    );
-  } else {
-    blurTween = gsap.to(app, {
-      filter: "blur(0px)",
-      duration,
-      ease: "power1.in",
-      onComplete: () => {
-        gsap.set(app, { clearProps: "filter" });
-        blurTween = null;
-      },
-    });
+  const value = `blur(${px}px)`;
+  for (const el of targets) {
+    el.style.filter = value;
+    el.style.setProperty("-webkit-filter", value);
   }
+}
+
+/** Soften whatever sits under About — tween blur so open/close isn’t a hard cut. */
+function tweenAboutBlur(on: boolean, duration: number): void {
+  const targets = aboutBlurTargets();
+  if (!targets.length) return;
+  blurTween?.kill();
+  blurTween = null;
+
+  const from = on ? 0 : ABOUT_BLUR_PX;
+  const to = on ? ABOUT_BLUR_PX : 0;
+
+  if (reducedMotion() || duration <= 0) {
+    setAboutBlurPx(targets, to);
+    return;
+  }
+
+  const state = { px: from };
+  setAboutBlurPx(targets, from);
+  blurTween = gsap.to(state, {
+    px: to,
+    duration,
+    ease: on ? "power2.out" : "power1.in",
+    onUpdate: () => setAboutBlurPx(targets, state.px),
+    onComplete: () => {
+      setAboutBlurPx(targets, to);
+      blurTween = null;
+    },
+  });
 }
 
 function fillBio(el: HTMLElement): HTMLElement[] {
@@ -153,19 +213,40 @@ function fillBio(el: HTMLElement): HTMLElement[] {
   return words;
 }
 
+function projectMediaHtml(
+  project: (typeof ABOUT_PROJECTS)[number],
+  index: number,
+): string {
+  // Eager + decode — scroll reveals stay smooth; lazy would hitch mid-tween.
+  const priority = index === 0 ? ` fetchpriority="high"` : "";
+  if ("video" in project && project.video) {
+    return `<video class="about-project__image about-project__video" src="${project.video}" poster="${project.image}" width="1600" height="900" ${ABOUT_VIDEO_HTML_ATTRS} aria-label="${project.imageAlt}"></video>`;
+  }
+  if ("images" in project && project.images && project.images.length > 1) {
+    const frames = project.images
+      .map(
+        (src, i) =>
+          `<img class="about-project__image${i === 0 ? " is-on" : ""}" src="${src}" alt="" width="1600" height="900" loading="eager" decoding="async"${i === 0 ? priority : ""} />`,
+      )
+      .join("");
+    return `<span class="about-project__cycle" role="img" aria-label="${project.imageAlt}">${frames}</span>`;
+  }
+  return `<img class="about-project__image" src="${project.image}" alt="${project.imageAlt}" width="1600" height="900" loading="eager" decoding="async"${priority} />`;
+}
+
 function projectsHtml(): string {
   const cards = ABOUT_PROJECTS.map((project, index) => {
     const external = project.href.startsWith("http");
     const extra = external ? ` target="_blank" rel="noopener noreferrer"` : "";
     const cta = "cta" in project ? project.cta : `Launch ${project.name}`;
-    // Eager + decode — scroll reveals stay smooth; lazy would hitch mid-tween.
-    const priority = index === 0 ? ` fetchpriority="high"` : "";
     return `
       <article class="about-project">
         <a class="about-project__media" href="${project.href}"${extra} aria-label="${cta}">
-          <img class="about-project__image" src="${project.image}" alt="${project.imageAlt}" width="1600" height="900" loading="eager" decoding="async"${priority} />
+          ${projectMediaHtml(project, index)}
         </a>
-        <h3 class="about-project__title">${project.title}</h3>
+        <h3 class="about-project__title">
+          <a class="about-project__title-link" href="${project.href}"${extra}>${project.title}</a>
+        </h3>
         <p class="about-project__lede">${project.lede}</p>
         <a class="pill about-project__launch" href="${project.href}"${extra}>${cta}</a>
       </article>
@@ -203,11 +284,150 @@ async function ensureImageReady(img: HTMLImageElement | null): Promise<void> {
   }
 }
 
-/** Kick decode for every still so later cards are warm by the time they enter view. */
-function warmProjectImages(root: HTMLElement): void {
-  for (const img of root.querySelectorAll<HTMLImageElement>(".about-project__image")) {
+/** Safari: muted/playsInline must be properties, not only HTML attributes (Orby marketing). */
+function primeAboutVideo(video: HTMLVideoElement): void {
+  video.muted = true;
+  video.defaultMuted = true;
+  video.playsInline = true;
+  video.loop = true;
+  video.setAttribute("muted", "");
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
+  video.setAttribute("autoplay", "");
+  video.setAttribute("loop", "");
+}
+
+/** Ensure .src is a real property — Safari can ignore attribute-only src. */
+function ensureAboutVideoLoaded(video: HTMLVideoElement): void {
+  primeAboutVideo(video);
+  const attr = video.getAttribute("src") || "";
+  if (!attr) return;
+  let resolved = attr;
+  try {
+    resolved = new URL(attr, document.baseURI || window.location.href).href;
+  } catch {
+    /* keep attr */
+  }
+  if (video.error || (video.src !== resolved && video.currentSrc !== resolved)) {
+    video.src = attr;
+  }
+  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) video.load();
+}
+
+/**
+ * Orby marketing play path — keep poster until decoded pixels, then retry play on reject.
+ * Reduced-motion leaves the poster JPG only.
+ */
+function playAboutVideo(video: HTMLVideoElement): void {
+  if (reducedMotion()) return;
+  ensureAboutVideoLoaded(video);
+
+  const dropPosterWhenPainted = () => {
+    if (video.videoWidth > 0 && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      video.removeAttribute("poster");
+      video.removeEventListener("loadeddata", dropPosterWhenPainted);
+      video.removeEventListener("playing", dropPosterWhenPainted);
+    }
+  };
+  video.addEventListener("loadeddata", dropPosterWhenPainted);
+  video.addEventListener("playing", dropPosterWhenPainted);
+
+  const attemptPlay = () => {
+    if (video.error) ensureAboutVideoLoaded(video);
+    if (video.error) return;
+    const result = video.play();
+    if (result && typeof result.then === "function") {
+      result.catch(() => {
+        ensureAboutVideoLoaded(video);
+        window.setTimeout(() => {
+          if (!video.error) void video.play().catch(() => {});
+        }, 120);
+      });
+    }
+  };
+
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    attemptPlay();
+    return;
+  }
+  video.addEventListener("loadeddata", attemptPlay, { once: true });
+  video.addEventListener("canplay", attemptPlay, { once: true });
+}
+
+async function ensureVideoReady(video: HTMLVideoElement | null): Promise<void> {
+  if (!video) return;
+  ensureAboutVideoLoaded(video);
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) return;
+  await new Promise<void>((resolve) => {
+    const done = () => resolve();
+    video.addEventListener("loadeddata", done, { once: true });
+    video.addEventListener("error", done, { once: true });
+    // Poster paints immediately; don't block the reveal forever on a slow mp4.
+    window.setTimeout(done, 2500);
+  });
+}
+
+async function ensureProjectMediaReady(card: HTMLElement): Promise<void> {
+  const video = card.querySelector<HTMLVideoElement>(".about-project__video");
+  if (video) {
+    await ensureVideoReady(video);
+    return;
+  }
+  const cycle = card.querySelector(".about-project__cycle");
+  if (cycle) {
+    const frames = [...cycle.querySelectorAll<HTMLImageElement>("img.about-project__image")];
+    await Promise.all(frames.map((img) => ensureImageReady(img)));
+    return;
+  }
+  await ensureImageReady(card.querySelector<HTMLImageElement>(".about-project__image"));
+}
+
+/** Kick decode / fetch so later cards are warm by the time they enter view. */
+function warmProjectMedia(root: HTMLElement): void {
+  for (const img of root.querySelectorAll<HTMLImageElement>("img.about-project__image")) {
     void ensureImageReady(img);
   }
+  for (const video of root.querySelectorAll<HTMLVideoElement>(".about-project__video")) {
+    primeAboutVideo(video);
+    if (!reducedMotion()) void ensureVideoReady(video);
+  }
+}
+
+function pauseAboutVideos(root: HTMLElement): void {
+  for (const video of root.querySelectorAll<HTMLVideoElement>(".about-project__video")) {
+    video.pause();
+    try {
+      video.currentTime = 0;
+    } catch {
+      /* seek unsupported on partial buffers */
+    }
+  }
+}
+
+function stopAboutCycles(): void {
+  for (const id of cycleTimers) window.clearInterval(id);
+  cycleTimers = [];
+}
+
+/** JPG stack crossfade — 1 frame/sec; reduced-motion keeps the first still. */
+function startAboutCycle(card: HTMLElement): void {
+  if (reducedMotion()) return;
+  const cycle = card.querySelector<HTMLElement>(".about-project__cycle");
+  if (!cycle || cycle.dataset.cycling === "1") return;
+  const frames = [...cycle.querySelectorAll<HTMLImageElement>("img.about-project__image")];
+  if (frames.length < 2) return;
+  cycle.dataset.cycling = "1";
+  let index = frames.findIndex((img) => img.classList.contains("is-on"));
+  if (index < 0) {
+    index = 0;
+    frames[0]!.classList.add("is-on");
+  }
+  const id = window.setInterval(() => {
+    frames[index]!.classList.remove("is-on");
+    index = (index + 1) % frames.length;
+    frames[index]!.classList.add("is-on");
+  }, CYCLE_MS);
+  cycleTimers.push(id);
 }
 
 function killProjectTriggers(): void {
@@ -228,7 +448,8 @@ function armProjectScrollReveals(
     const bits = projectBits(card);
     const media = bits[0];
     const rest = bits.slice(1);
-    const img = card.querySelector<HTMLImageElement>(".about-project__image");
+    const video = card.querySelector<HTMLVideoElement>(".about-project__video");
+    const hasCycle = Boolean(card.querySelector(".about-project__cycle"));
 
     const st = ScrollTrigger.create({
       scroller,
@@ -237,7 +458,7 @@ function armProjectScrollReveals(
       once: true,
       onEnter: () => {
         void (async () => {
-          await ensureImageReady(img);
+          await ensureProjectMediaReady(card);
           if (modalRoot !== root || closing) return;
           const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
           if (media) {
@@ -250,6 +471,8 @@ function armProjectScrollReveals(
               media ? "-=0.4" : 0,
             );
           }
+          if (video) tl.add(() => playAboutVideo(video), media ? "-=0.5" : 0);
+          if (hasCycle) tl.add(() => startAboutCycle(card), media ? "-=0.5" : 0);
         })();
       },
     });
@@ -304,6 +527,8 @@ export function closeAbout(): void {
   openTl?.kill();
   openTl = null;
   killProjectTriggers();
+  stopAboutCycles();
+  pauseAboutVideos(root);
   if (onKey) window.removeEventListener("keydown", onKey);
   onKey = null;
   playRemove();
@@ -389,7 +614,7 @@ export function openAbout(): void {
       autoAlpha: 1,
       y: 0,
     });
-    warmProjectImages(root);
+    warmProjectMedia(root);
     return;
   }
 
@@ -416,6 +641,6 @@ export function openAbout(): void {
   });
   openTl.to(projectsTitle, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, ">");
 
-  // Eager imgs + decode ahead of the scroller; each reveal still waits on its own decode.
-  warmProjectImages(root);
+  // Eager media + decode ahead of the scroller; each reveal still waits on its own ready.
+  warmProjectMedia(root);
 }
