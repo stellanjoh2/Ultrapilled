@@ -523,8 +523,8 @@ export function halloweenState(): AppState {
   const bare = "none" as const;
   const creep = { fontFamily: "Creepster", fontWeight: 400 as const };
   const quest = { fontFamily: "Mystery Quest", fontWeight: 400 as const };
-  const heavy = { fontFamily: "Archivo Black", fontWeight: 400 as const };
-  const swiss = (fontWeight: number) => ({ fontFamily: "Inter", fontWeight });
+  const consent = { fontFamily: "Manufacturing Consent", fontWeight: 400 as const };
+  const jolly = { fontFamily: "Jolly Lodger", fontWeight: 400 as const };
   const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
   const slots = [
     // Short horror words stay large; long lines stay under ~stage width so they
@@ -561,11 +561,11 @@ export function halloweenState(): AppState {
     text({ text: "Something wicked this way comes.", ...quest, shape: bare, colorIndex: SLIME, scale: 0.85 }),
     emoji("🦇", "Bat", 2, 0.7),
     text({ text: "Haunted", ...creep, shape: bare, colorIndex: PURPLE, scale: 2.4, tracking: -30 }),
-    text({ text: "Beware of the witch’s curse!", ...swiss(700), shape: "pill", colorIndex: PURPLE, textColor: "#ffffff", scale: 0.55, pillPad: 40 }),
+    text({ text: "Beware of the witch’s curse!", ...jolly, shape: "pill", colorIndex: PURPLE, textColor: "#ffffff", scale: 0.55, pillPad: 40 }),
     presetIcon("Spots", 1, PURPLE, { scale: 0.55 }),
     text({ text: "Death", ...quest, shape: "pill", colorIndex: SLIME, textColorIndex: BLACK, scale: 1.2, pillPad: 48 }),
     emoji("💀", "Skeleton", 2, 0.75),
-    text({ text: "Don’t go into the basement alone.", ...swiss(600), shape: "pill", stroked: true, stroke: 2, colorIndex: ORANGE, scale: 0.4, pillPad: 72 }),
+    text({ text: "Don’t go into the basement alone.", ...jolly, shape: "pill", stroked: true, stroke: 2, colorIndex: ORANGE, scale: 0.4, pillPad: 72 }),
     photo("halloween", "friday-the-13th.jpg", "Friday the 13th", 115, 8, 1.05),
     emoji("🕷️", "Spider", 2, 0.65),
     text({ text: "Graveyard", ...creep, shape: bare, colorIndex: SLIME, scale: 1.9 }),
@@ -596,7 +596,7 @@ export function halloweenState(): AppState {
       pillPad: 71,
     }),
     emoji("🍬", "Candy", 2, 0.6),
-    text({ text: "Vampire", ...heavy, shape: bare, colorIndex: ORANGE, scale: 1.8, tracking: -80 }),
+    text({ text: "Vampire", ...consent, shape: bare, colorIndex: ORANGE, scale: 1.8, tracking: -80 }),
     photo("halloween", "carroll-borland.jpg", "Carroll Borland", 115, 12, 1.1),
     text({ text: "Sweet dreams... if you dare!", ...quest, shape: "pill", colorIndex: ORANGE, textColorIndex: BLACK, scale: 0.75, textAnim: true, pillPad: 36 }),
     emoji("🧙‍♀️", "Witch", 1, 0.9),
@@ -604,7 +604,7 @@ export function halloweenState(): AppState {
     presetIcon("Blooms", 1, ORANGE, { scale: 0.65 }),
     text({
       text: "Who’s that knocking at my door?",
-      ...swiss(700),
+      ...jolly,
       shape: "pill",
       stroked: true,
       stroke: 2,
@@ -616,7 +616,7 @@ export function halloweenState(): AppState {
     text({ text: "Cauldron", ...quest, shape: bare, colorIndex: CANDY, scale: 1.4 }),
     text({
       text: "Stir the cauldron three times.",
-      ...heavy,
+      ...consent,
       shape: "box",
       radius: 40,
       colorIndex: SLIME,
