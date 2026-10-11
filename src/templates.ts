@@ -663,7 +663,7 @@ export function halloweenState(): AppState {
     physics: { ...DEFAULT_PHYSICS },
     masterScale: 2.9,
     sizeRandom: 100,
-    shapeAmount: 24,
+    shapeAmount: 23,
     pillPad: 24,
     textTracking: 0,
     template: "halloween",

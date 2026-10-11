@@ -347,10 +347,10 @@ export const DEFAULT_PHYSICS: PhysicsSettings = {
   speed: 1,
   /** Matter.js body default — piles ease to rest instead of springing forever. */
   bounce: 0,
-  /** Matter.js body default — slow slides that still reach sleep. */
-  friction: 0.1,
-  /** Matter.js frictionStatic default. */
-  grip: 0.5,
+  /** Sticky slides so piles settle instead of skating. */
+  friction: 0.8,
+  /** High static friction so resting stacks stay put. */
+  grip: 0.8,
   /** Enough drag to kill leftover spin without muting tumbles mid-fall. */
   spin: 0.06,
   hold: 0.8,
