@@ -36,6 +36,8 @@ const PHYSICS_SRC = "/media/Mode-Select-Physics.mp4";
 const LAYOUT_SRC = "/media/Mode-Select-Static.webp";
 /** Orby Lime accent on "Choose your vibe:" */
 const VIBE_ACCENT = DEFAULT_THEME[1];
+/** Orby Pink accent on privacy foot copy */
+const PRIVACY_ACCENT = DEFAULT_THEME[4];
 
 /** Keep preloaded media alive so the browser doesn't drop the cache entry. */
 let modeSelectVideoWarm: HTMLVideoElement | null = null;
@@ -514,8 +516,8 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
           </a>
         </p>
         <p class="mode-select__foot">
-          Ultrapilled™ is a free physics playground for dropping text, icons, and images into motion.<br />
-          We don’t use your files to train AI. <a href="${PRIVACY_HREF}">How we handle data</a>.
+          Ultrapilled™ is a <span class="mode-select__playground" style="color: ${VIBE_ACCENT}">free physics playground</span> for dropping text, icons, and images into motion.<br />
+          Everything stays in your browser — <span class="mode-select__privacy" style="color: ${PRIVACY_ACCENT}">we don’t upload your files or use them to train AI</span>. <a href="${PRIVACY_HREF}">How we handle data</a>.
         </p>
       </div>
     `;

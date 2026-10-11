@@ -111,3 +111,11 @@ export const IMAGE_COLLIDERS: IconPreset[] = (["block", "sphere"] as const).map(
 export function imageColliderId(id: string | undefined): "block" | "sphere" {
   return id === "sphere" ? "sphere" : "block";
 }
+
+/**
+ * Normal-complexity circle proxy radius for sphere colliders.
+ * Circumscribes the chip AABB (max side / 2) so visuals sit inside the hit circle.
+ */
+export function circleProxyRadius(width: number, height: number): number {
+  return Math.max(1, Math.max(width, height) / 2);
+}

@@ -151,6 +151,7 @@ import {
   wireRangeCaptions,
 } from "./rangeCaption";
 import { mountCreatePanel, paintAudioMic, paintSectionResets, RESET_ICON, setSectionOpen, slotAddIcon, type CreatePanelHost, type InsertMotion } from "./panel/createPanel";
+import { shouldArmAppendInsert } from "./panel/slotReveal";
 import { closeOtherSlots, replaceSlotCard, setSlotOpen } from "./panel/slotCards";
 import {
   assignCloseSlotMenu,
@@ -2570,9 +2571,7 @@ function addImagesFromFiles(
     );
   }
   const last = slots[slots.length - 1]!;
-  openOnly(last.id);
-  revealSlotId = last.id;
-  if (slots.length === 1) armAppendInsert(last.id);
+  armSlotReveal(last.id, { grow: shouldArmAppendInsert(state.slots.length, slots.length) });
   playCreate();
   // Paint loading chips immediately so heavy mp4s show the loader on canvas.
   renderPanel();
@@ -2589,6 +2588,8 @@ function addImagesFromFiles(
   const ids = slots.map((slot) => slot.id);
   void Promise.all(jobs).then(() => {
     resize();
+    // Remount after trim/decode can drop the insert grow; re-reveal the open card.
+    revealSlotId = last.id;
     renderPanel();
     if (at) {
       const { x, y } = playfieldPoint(at.clientX, at.clientY);
@@ -2621,6 +2622,21 @@ function armAppendInsert(id: string) {
   };
 }
 
+/**
+ * Expand this object in Create → Objects and scroll its card into view on the next paint.
+ * The first object skips grow-pin so revealSlotId → scrollPanelTo runs; pinning .slot-adds
+ * while the open fold is still at 0fr leaves settings below the fold.
+ */
+function armSlotReveal(id: string, opts?: { focus?: boolean; grow?: boolean }) {
+  if (panelTab !== "physics") panelTab = "physics";
+  openSections.add("what-falls");
+  openOnly(id);
+  if (opts?.focus) focusSlotId = id;
+  revealSlotId = id;
+  const grow = opts?.grow ?? shouldArmAppendInsert(state.slots.length);
+  if (grow) armAppendInsert(id);
+}
+
 function armSlotPlace(id: string, at?: PlaceAt) {
   if (!at) return;
   const { x, y } = playfieldPoint(at.clientX, at.clientY);
@@ -2640,10 +2656,7 @@ function addPillSlot(at?: PlaceAt) {
   const slot = defaultTextSlot({ colorIndex: state.slots.length % state.theme.length, ...font, ...prefab });
   captureBaseline(slot);
   state.slots.push(slot);
-  openOnly(slot.id);
-  focusSlotId = slot.id;
-  revealSlotId = slot.id;
-  armAppendInsert(slot.id);
+  armSlotReveal(slot.id, { focus: true });
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -2663,10 +2676,7 @@ function addTypeSlot(at?: PlaceAt) {
   const slot = defaultTypeSlot({ colorIndex: state.slots.length % state.theme.length, ...font, ...prefab });
   captureBaseline(slot);
   state.slots.push(slot);
-  openOnly(slot.id);
-  focusSlotId = slot.id;
-  revealSlotId = slot.id;
-  armAppendInsert(slot.id);
+  armSlotReveal(slot.id, { focus: true });
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -2685,10 +2695,7 @@ function addTextFieldSlot(at?: PlaceAt) {
   const slot = defaultTextFieldSlot({ colorIndex: state.slots.length % state.theme.length, ...font });
   captureBaseline(slot);
   state.slots.push(slot);
-  openOnly(slot.id);
-  focusSlotId = slot.id;
-  revealSlotId = slot.id;
-  armAppendInsert(slot.id);
+  armSlotReveal(slot.id, { focus: true });
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -2711,9 +2718,7 @@ function addShapeSlot(at?: PlaceAt) {
   });
   captureBaseline(slot);
   state.slots.push(slot);
-  openOnly(slot.id);
-  revealSlotId = slot.id;
-  armAppendInsert(slot.id);
+  armSlotReveal(slot.id);
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -2733,9 +2738,7 @@ function addEmojiSlot(at?: PlaceAt) {
   });
   captureBaseline(slot);
   state.slots.push(slot);
-  openOnly(slot.id);
-  revealSlotId = slot.id;
-  armAppendInsert(slot.id);
+  armSlotReveal(slot.id);
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -2756,9 +2759,7 @@ function addYouTubeSlot(clip: YouTubeClip, at?: PlaceAt) {
   });
   captureBaseline(slot);
   state.slots.push(slot);
-  openOnly(slot.id);
-  revealSlotId = slot.id;
-  armAppendInsert(slot.id);
+  armSlotReveal(slot.id);
   armSlotPlace(slot.id, at);
   playCreate();
   renderPanel();
@@ -4980,9 +4981,20 @@ function pasteSlotStyle(id: string) {
 const INSERT_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 const INSERT_MS = 280;
 
+/** Snap an already-open slot fold to its full height so measure/scroll see settings, not 0fr. */
+function flushOpenSlotFold(card: HTMLElement) {
+  if (!card.classList.contains("is-open")) return;
+  const fold = card.querySelector<HTMLElement>(".slot-fold");
+  if (!fold) return;
+  fold.style.transition = "none";
+  void card.offsetHeight;
+  fold.style.removeProperty("transition");
+}
+
 function growInsertedSlot(motion: InsertMotion) {
   const card = panel.querySelector<HTMLElement>(`[data-id="${motion.id}"]`);
   if (!card) return;
+  flushOpenSlotFold(card);
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     scrollPanelTo(card);
     return;
@@ -6813,6 +6825,7 @@ function stopPanelScroll() {
 }
 
 function scrollPanelTo(card: HTMLElement, shrinkAbove = 0) {
+  flushOpenSlotFold(card);
   const pad = 12;
   const panelRect = panel.getBoundingClientRect();
   const cardRect = card.getBoundingClientRect();

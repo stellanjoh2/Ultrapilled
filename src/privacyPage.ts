@@ -4,18 +4,60 @@ import { logotypeRevealMarkup } from "./logotypeReveal";
 import { DEFAULT_THEME } from "./theme";
 import "./privacyPage.css";
 
+/**
+ * Split text into animatable letter/word spans; keep accent wrappers intact.
+ * Spaces must stay as separate text nodes — trailing whitespace inside
+ * `display: inline-block` spans collapses, which concatenates words
+ * (e.g. "What stays here" → "Whatstayshere").
+ */
 function wrap(el: HTMLElement, kind: "letter" | "word"): HTMLElement[] {
-  const raw = (el.textContent ?? "").trim();
+  const source = el.cloneNode(true);
   el.textContent = "";
-  const parts = kind === "letter" ? [...raw] : raw.split(/\s+/);
   const nodes: HTMLElement[] = [];
-  parts.forEach((part, index) => {
-    const span = document.createElement("span");
-    span.className = kind;
-    span.textContent = kind === "word" && index < parts.length - 1 ? `${part} ` : part;
-    el.append(span);
-    nodes.push(span);
-  });
+
+  const flushText = (raw: string, into: HTMLElement) => {
+    if (!raw) return;
+    if (kind === "letter") {
+      for (const ch of raw) {
+        if (/\s/.test(ch)) {
+          into.append(document.createTextNode(ch));
+          continue;
+        }
+        const span = document.createElement("span");
+        span.className = "letter";
+        span.textContent = ch;
+        into.append(span);
+        nodes.push(span);
+      }
+      return;
+    }
+    for (const bit of raw.split(/(\s+)/)) {
+      if (!bit) continue;
+      if (/^\s+$/.test(bit)) {
+        into.append(document.createTextNode(bit));
+        continue;
+      }
+      const span = document.createElement("span");
+      span.className = "word";
+      span.textContent = bit;
+      into.append(span);
+      nodes.push(span);
+    }
+  };
+
+  const walk = (from: Node, into: HTMLElement) => {
+    for (const child of [...from.childNodes]) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        flushText(child.textContent ?? "", into);
+      } else if (child instanceof HTMLElement) {
+        const keep = child.cloneNode(false) as HTMLElement;
+        into.append(keep);
+        walk(child, keep);
+      }
+    }
+  };
+
+  walk(source, el);
   return nodes;
 }
 

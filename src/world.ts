@@ -1,7 +1,7 @@
 import Matter from "matter-js";
 import handGrabbing from "@phosphor-icons/core/assets/regular/hand-grabbing.svg?raw";
 import boundingBoxIcon from "@phosphor-icons/core/assets/regular/bounding-box.svg?raw";
-import { imageColliderId } from "./icons";
+import { circleProxyRadius, imageColliderId } from "./icons";
 import { isColorMask, type ChipDraw, type ChipPose } from "./chipKinds";
 import {
   applyVisual,
@@ -446,8 +446,7 @@ function chipBody(
   let body = preset?.body ?? null;
   let anchor = preset?.anchor ?? { x: 0, y: 0 };
   if (!body && id && complexity !== "simple" && simpleColliderKind(id) === "circle") {
-    const radius = Math.min(width, height) / 2;
-    body = Bodies.circle(x, y, Math.max(1, radius), props);
+    body = Bodies.circle(x, y, circleProxyRadius(width, height), props);
   }
   if (!body) {
     const rounded =

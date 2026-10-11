@@ -8,6 +8,9 @@
 
 :root {
   color-scheme: dark;
+  /* Orby lime (DEFAULT_THEME[1]); Orby pink (DEFAULT_THEME[4]) for caution phrases */
+  --privacy-nice: #c4ff00;
+  --privacy-warn: #ff00c4;
 }
 
 * {
@@ -180,6 +183,16 @@ li a:hover {
 .letter,
 .word {
   display: inline-block;
+}
+
+/* Nice / benign callouts (service names, local-only reassurances). */
+.privacy-nice {
+  color: var(--privacy-nice);
+}
+
+/* Sparse risk callouts — what we don’t do, third-party cookie risk. */
+.privacy-warn {
+  color: var(--privacy-warn);
 }
 
 .home {
