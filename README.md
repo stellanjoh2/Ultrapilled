@@ -76,13 +76,14 @@ Bundled under `public/templates/<id>/`. Full per-file notes also live in each fo
 | `coast-guard.jpg` | [Reagan visit to USCGC Dauntless](https://commons.wikimedia.org/wiki/File:President_Ronald_Reagan_Visit_to_Us_Coast_Guard_Cutter_Dauntless_Miami_Beach_Florida_Speaking_at_Podium_-_DPLA_-_0999c396e6877565b8d4b748419005ec.jpg) (1982) | White House Photographic Office | Public domain |
 | `metrorail.jpg` | [Passengers aboard the Metrorail in Miami](https://commons.wikimedia.org/wiki/File:Passengers_aboard_the_Metrorail_in_Miami.jpg) (1980s) | Florida Film Bureau | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
-**Berlin** (13 September 2004; CC0)
+**Berlin** (photos + Sketchfab-derived render; **CC0 / CC BY**)
 
 | File | Work | Author | License |
 |------|------|--------|---------|
 | `moma-queue.jpg` | [MoMa Ausstellung in Berlin 2004 RIMG0457](https://commons.wikimedia.org/wiki/File:MoMa_Ausstellung_in_Berlin_2004_RIMG0457.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `balloon.jpg` | [Potsdamer Platz Berlin RIMG0463](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0463.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `towers.jpg` | [Potsdamer Platz Berlin RIMG0464](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0464.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `skull-downloadable.gif` | [Skull downloadable](https://sketchfab.com/3d-models/skull-downloadable-1a9db900738d44298b0bc59f68123393) | [martinjario](https://sketchfab.com/martinjario) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
 **Halloween** (photos + Sketchfab-derived renders; **CC BY / CC BY-SA / public domain**)
 

@@ -476,6 +476,11 @@ export function berlinState(): AppState {
       scale: 1.5,
       tracking: -60,
     }),
+    photo("berlin", "skull-downloadable.gif", "Skull", 114, 0, 1, {
+      exposure: 51,
+      saturation: -75,
+      temperature: 4050,
+    }),
     presetIcon("Chevrons", 1, ACID, { scale: 0.7 }),
     emoji("🖤", "Black Heart", 2, 0.6),
     text({ text: "Türsteher", ...swiss(700), shape: bare, colorIndex: WHITE, scale: 1.6, tracking: -100 }),
@@ -491,7 +496,7 @@ export function berlinState(): AppState {
   return {
     ...demoState(),
     stageColor: "#000000",
-    shapeAmount: 16,
+    shapeAmount: 17,
     background: {
       ...defaultBackground(),
       kind: "solid",
