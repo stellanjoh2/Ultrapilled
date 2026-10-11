@@ -204,7 +204,7 @@ function show(index: number) {
   paintCard({ title: "Pro Tip", hint, index, stop: true });
 }
 
-/** One-time canvas notice: GIFs / YouTube are live-only and skip video export. */
+/** One-time canvas notice: YouTube / uploaded video skip raster export. */
 export function hintMediaExportOnce() {
   if (lsGet(MEDIA_EXPORT_HINT_KEY) === "1" || !hostEl) return;
   lsSet(MEDIA_EXPORT_HINT_KEY, "1");
@@ -215,7 +215,7 @@ export function hintMediaExportOnce() {
   remove();
   paintCard({
     title: "Hint",
-    hint: { text: "GIFs and YouTube clips won’t export in videos" },
+    hint: { text: "YouTube and video clips won’t export in videos" },
     oneOff: true,
   });
 }

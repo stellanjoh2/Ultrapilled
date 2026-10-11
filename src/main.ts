@@ -92,6 +92,7 @@ import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import folderOpen from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
+import { warmGifTracks } from "./export/gifFrames";
 import { isAboutOpen } from "./aboutPanel";
 import { isBugReportOpen } from "./bugReport";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
@@ -1049,8 +1050,9 @@ function openChoiceMenu<T>(
     const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
     const spaceAbove = rect.top - gap - 8;
     const openUp = spaceBelow < 160 * s && spaceAbove > spaceBelow;
+    const available = openUp ? spaceAbove : spaceBelow;
     menu.style.width = `${rect.width}px`;
-    menu.style.maxHeight = `${Math.max(120 * s, Math.min(280 * s, openUp ? spaceAbove : spaceBelow))}px`;
+    menu.style.maxHeight = `${Math.max(120 * s, available)}px`;
     menu.style.left = `${Math.max(8, rect.left)}px`;
     if (openUp) {
       menu.style.top = "auto";
@@ -1429,6 +1431,8 @@ function applyPost() {
 const exportController = {
   prepare: async () => {
     await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
+    // Decode GIF tracks before the encode loop so a failed first try isn’t racing paint.
+    await warmGifTracks(state.slots);
   },
   stageSize: () => {
     const frame = currentFrame();
@@ -2407,7 +2411,6 @@ function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Pro
     slot.stroked = undefined;
   }
   if (isGifFile(file)) {
-    hintMediaExportOnce();
     // Stroke rings the file bounds — useless on GIF cutouts.
     slot.stroked = undefined;
   }

@@ -32,7 +32,7 @@ describe("hintMediaExportOnce", () => {
     expect(card).toBeTruthy();
     expect(card?.querySelector(".pro-tip__title")?.textContent).toBe("Hint");
     expect(card?.querySelector(".pro-tip__body")?.textContent).toContain(
-      "GIFs and YouTube clips won’t export in videos",
+      "YouTube and video clips won’t export in videos",
     );
     expect(card?.querySelector(".pro-tip__stop")).toBeNull();
 

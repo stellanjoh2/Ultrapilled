@@ -8,8 +8,13 @@ const STEP_MS = 1000 / 60;
 const MIN_CYCLE_MS = 1200;
 const SETTLE_CONFIRM_MS = 1600;
 const MAX_FRAMES = 7200;
-/** Sim-time cap so a pile that never sleeps cannot run for tens of minutes. */
-const MAX_FALL_MS = 20_000;
+/**
+ * Sim-time fall cap (fps-agnostic). After this, force hold + bake even if chips
+ * keep jiggling — ~12s of bounce is plenty for social loops; 60fps just means
+ * more frames for the same clock time, not a longer clip.
+ */
+const MAX_FALL_MS = 12_000;
+/** Wall-clock escape hatch when each 1080p frame is expensive (grain, GIFs). */
 const MAX_WALL_MS = 90_000;
 
 export class ExportCancelled extends Error {

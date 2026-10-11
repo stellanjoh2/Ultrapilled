@@ -374,6 +374,7 @@ async function encodeVideoFile(options: {
         await video.add((result.frames + i) * frameDuration, frameDuration);
       }
       options.onProgress?.("Mixing bounce audio…");
+      await yieldToUi();
       const mixed = await mixBounceTrack(result.impacts, contentDurationSec);
       if (mixed.duration > contentDurationSec + 1e-3) {
         throw new Error("Bounce audio bed longer than video");
@@ -381,6 +382,7 @@ async function encodeVideoFile(options: {
       await audio.add(mixed);
     }
     options.onProgress?.("Packaging…");
+    await yieldToUi();
     await output.finalize();
     const buffer = output.target.buffer;
     if (!buffer) throw new Error("Export failed");

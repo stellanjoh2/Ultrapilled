@@ -5,13 +5,16 @@ function reducedMotion(): boolean {
 }
 
 let root: HTMLElement | null = null;
+let titleEl: HTMLElement | null = null;
 let countEl: HTMLElement | null = null;
+let cancelBtn: HTMLButtonElement | null = null;
 let onCancel: (() => void) | null = null;
 
 function onKey(event: KeyboardEvent) {
   if (event.key !== "Escape") return;
   event.preventDefault();
   event.stopImmediatePropagation();
+  if (cancelBtn?.disabled) return;
   onCancel?.();
 }
 
@@ -29,15 +32,33 @@ function noteHtml(toFolder: boolean): string {
     ? "Frames are writing into the folder you chose. If the tab dies, run .PNG sequence again."
     : "If the tab dies, use .PNG sequence. Frame by frame, the reliable path.";
   const estimate =
-    "The fall follows your layer stack, same hierarchy each trigger. Settle timing can still shift a little, so we can’t say exactly how many frames it’ll be, but they’ll be done soon.";
+    "Falls stop after about 12 seconds of bounce if the pile never settles — same clock time at 30 or 60 fps. Packaging the file can take a moment after the last frame.";
   return `<p class="export-progress__note">${wait} ${frames}</p><p class="export-progress__note">${estimate}</p>`;
 }
 
 export function setExportFrame(frame: number) {
-  if (!countEl) return;
+  if (!titleEl || !countEl) return;
+  titleEl.textContent = "Rendering frame:";
   const text = String(Math.max(0, Math.floor(frame)));
-  if (countEl.textContent === text) return;
-  countEl.textContent = text;
+  if (countEl.textContent !== text) countEl.textContent = text;
+  countEl.hidden = false;
+  if (cancelBtn) {
+    cancelBtn.disabled = false;
+    cancelBtn.dataset.tip = "Stop rendering and keep the scene";
+  }
+}
+
+/** Non-frame phases (packaging, audio mix, GIF encode). Cancel can’t abort mux. */
+export function setExportProgressStatus(message: string) {
+  if (!titleEl || !countEl) return;
+  const text = message.replace(/\u2026/g, "…").trim() || "Working…";
+  titleEl.textContent = text.endsWith("…") || text.endsWith("...") ? text : `${text}…`;
+  countEl.textContent = "";
+  countEl.hidden = true;
+  if (cancelBtn) {
+    cancelBtn.disabled = true;
+    cancelBtn.dataset.tip = "Almost done — finishing the file";
+  }
 }
 
 export function openExportProgress(cancel: () => void, opts?: { toFolder?: boolean }) {
@@ -68,10 +89,15 @@ export function openExportProgress(cancel: () => void, opts?: { toFolder?: boole
   const count = node.querySelector<HTMLElement>(".export-progress__n")!;
   const notes = [...node.querySelectorAll<HTMLElement>(".export-progress__note")];
   const button = node.querySelector<HTMLButtonElement>(".export-progress__cancel")!;
-  button.addEventListener("click", () => onCancel?.());
+  button.addEventListener("click", () => {
+    if (button.disabled) return;
+    onCancel?.();
+  });
 
   root = node;
+  titleEl = title;
   countEl = count;
+  cancelBtn = button;
   document.body.append(node);
   lockApp(true);
   window.addEventListener("keydown", onKey, true);
@@ -95,7 +121,9 @@ export function closeExportProgress(immediate = false) {
   const node = root;
   window.removeEventListener("keydown", onKey, true);
   onCancel = null;
+  titleEl = null;
   countEl = null;
+  cancelBtn = null;
   root = null;
   if (!node) {
     lockApp(false);

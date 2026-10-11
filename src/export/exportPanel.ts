@@ -15,7 +15,12 @@ import {
 } from "./size";
 import { askConfirm } from "../confirmDialog";
 import { playCaution, playCelebrate, playNotify, startProgress, stopProgress } from "../uiSounds";
-import { closeExportProgress, openExportProgress, setExportFrame } from "./exportProgress";
+import {
+  closeExportProgress,
+  openExportProgress,
+  setExportFrame,
+  setExportProgressStatus,
+} from "./exportProgress";
 import { canPickFrameFolder, pickFrameFolder } from "./frameFolder";
 
 export type ExportController = {
@@ -57,6 +62,7 @@ function setStatus(message: string) {
   if (node) node.textContent = message;
   const match = FRAME_PROGRESS.exec(message);
   if (match) setExportFrame(Number(match[1]));
+  else if (/packaging|mixing|encoding|audio/i.test(message)) setExportProgressStatus(message);
 }
 
 function applyBusy() {
@@ -143,7 +149,7 @@ function doneMessage(note: LoopResult, fps: FrameRate, toFolder = false): string
   const count = `${note.frames} ${note.frames === 1 ? "frame" : "frames"} at ${fps} fps`;
   if (toFolder) return `Wrote ${count} to the folder.`;
   if (note.truncated) return `Exported ${count}. GIF stopped early so the tab could encode it.`;
-  if (note.limited) return `Exported ${count}. Stopped at the frame limit.`;
+  if (note.limited) return `Exported ${count}. Cut short so a restless pile couldn’t run forever.`;
   return `Exported ${count}.`;
 }
 

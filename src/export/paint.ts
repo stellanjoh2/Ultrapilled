@@ -3,12 +3,16 @@ import { gradientEnd, gradientLine, gradientPhase, pillGradientStops, pillSweepS
 import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
 import { measureTextInk, measureTrackedTextWidth, paintTextInk, textFieldPad, textInkGlyphStarts } from "../measure";
-import { peekTrim } from "../trim";
+import { isGifSrc, peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
 import { chipContributesBloom, applyWhiteBalance, imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags, whiteBalanceGains } from "../chipLook";
 import { textAnimCharPose, textAnimTravel } from "../textAnim";
 import { blendMode, canvasBlend, dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, grainArithmeticAmount, isTextField, sanitizeTextMotion, textAlignOf, textFieldLineHeight, type BackgroundSettings, type ImageSlot, type PostSettings, type TextSlot } from "../types";
 import { wrapTextFieldLines } from "../textField";
+import { gifFrameAt, loadGifTrack, type GifTrack } from "./gifFrames";
+
+/** Still photo or decoded GIF frame — both expose width/height for contain fit. */
+type RasterSource = HTMLImageElement | ImageBitmap;
 
 /** Grayscale stitched fractal — same generator as the live SVG grain filter. */
 const GRAIN_URL =
@@ -58,9 +62,17 @@ function imageSrc(slot: ImageSlot): string {
   return peekTrim(slot.src)?.displaySrc ?? slot.src;
 }
 
-async function preload(draws: ChipDraw[], post: PostSettings): Promise<Map<string, HTMLImageElement>> {
-  const ready = new Map<string, HTMLImageElement>();
+type PreloadReady = {
+  images: Map<string, HTMLImageElement>;
+  gifs: Map<string, GifTrack>;
+};
+
+async function preload(draws: ChipDraw[], post: PostSettings): Promise<PreloadReady> {
+  const images = new Map<string, HTMLImageElement>();
+  const gifs = new Map<string, GifTrack>();
   const srcs = new Set<string>();
+  /** paintSrc → original GIF bytes URL (never a PNG trim). */
+  const gifByPaintSrc = new Map<string, string>();
   for (const chip of draws) {
     if (
       chip.slot.kind === "image" &&
@@ -69,17 +81,30 @@ async function preload(draws: ChipDraw[], post: PostSettings): Promise<Map<strin
       !chip.slot.video &&
       chip.slot.src
     ) {
-      srcs.add(imageSrc(chip.slot));
+      const paintSrc = imageSrc(chip.slot);
+      srcs.add(paintSrc);
+      // Detect + decode from the slot’s real GIF URL (name may be the only .gif signal for blobs).
+      if (isGifSrc(chip.slot.src, chip.slot.name)) gifByPaintSrc.set(paintSrc, chip.slot.src);
     }
   }
-  await Promise.all(
-    [...srcs].map(async (src) => {
+  await Promise.all([
+    ...[...srcs].map(async (src) => {
       const img = await loadImage(src);
-      if (img) ready.set(src, img);
+      if (img) images.set(src, img);
     }),
-  );
+    ...[...gifByPaintSrc].map(async ([paintSrc, gifSrc]) => {
+      const track = await loadGifTrack(gifSrc);
+      if (track) gifs.set(paintSrc, track);
+    }),
+  ]);
   if (post.grain > 0) await loadImage(GRAIN_URL);
-  return ready;
+  return { images, gifs };
+}
+
+function rasterAt(src: string, ready: PreloadReady, timeMs: number): RasterSource | undefined {
+  const track = ready.gifs.get(src);
+  if (track) return gifFrameAt(track, timeMs);
+  return ready.images.get(src);
 }
 
 function scratchContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
@@ -143,7 +168,7 @@ function round(ctx: CanvasRenderingContext2D, width: number, height: number, rad
   ctx.roundRect(0, 0, width, height, Math.max(0, Math.min(radius, width / 2, height / 2)));
 }
 
-function drawContain(ctx: CanvasRenderingContext2D, img: HTMLImageElement, width: number, height: number) {
+function drawContain(ctx: CanvasRenderingContext2D, img: RasterSource, width: number, height: number) {
   const ratio = img.width / img.height;
   if (!Number.isFinite(ratio) || ratio <= 0) return;
   const box = width / height;
@@ -154,7 +179,7 @@ function drawContain(ctx: CanvasRenderingContext2D, img: HTMLImageElement, width
 
 function drawMask(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: RasterSource,
   fill: string,
   width: number,
   height: number,
@@ -472,7 +497,7 @@ function drawChip(
   chip: ChipDraw,
   scale: number,
   bloom: boolean,
-  ready: Map<string, HTMLImageElement>,
+  ready: PreloadReady,
   theme: string[],
   timeMs = 0,
   layoutMode = false,
@@ -535,7 +560,7 @@ function drawChip(
         ctx.fillText(slot.emoji, width / 2, height / 2);
         return;
       }
-      const img = ready.get(imageSrc(slot));
+      const img = rasterAt(imageSrc(slot), ready, timeMs);
       if (!img) return;
       if (isColorMask(slot)) {
         const phase = slot.gradient && slot.animatedGradient ? gradientPhase(slot.gradientSpeed, timeMs) : undefined;
@@ -580,7 +605,7 @@ function wbLayer(width: number, height: number): CanvasRenderingContext2D {
 
 function paintRasterPhoto(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: RasterSource,
   slot: ImageSlot,
   width: number,
   height: number,
