@@ -100,6 +100,26 @@ function stubHost(
   };
 }
 
+describe("playSession halt", () => {
+  it("stops the run without clearing chips", () => {
+    const state = blankState();
+    state.slots = [defaultTextSlot({ text: "HELLO" })];
+    const world = stubWorld({ chipCount: () => 3 });
+    const host = stubHost(world, state);
+    const session = createPlaySession(host);
+    host.setRunningFlag(true);
+    session.phase = "falling";
+
+    session.halt();
+
+    expect(host.getRunning()).toBe(false);
+    expect(world.setRunning).toHaveBeenCalledWith(false);
+    expect(world.setFloorOpen).toHaveBeenCalledWith(false);
+    expect(world.clear).not.toHaveBeenCalled();
+    expect(session.phase).toBe("idle");
+  });
+});
+
 describe("playSession drop / triggerPhysics", () => {
   it("spawns via play() when the board is empty", async () => {
     const state = blankState();

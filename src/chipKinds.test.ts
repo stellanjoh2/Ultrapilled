@@ -79,10 +79,13 @@ describe("textLookFlags", () => {
 });
 
 describe("rasterRing", () => {
-  it("only rings stroked non-svg uploads", () => {
+  it("only rings stroked non-svg, non-GIF uploads", () => {
     expect(rasterRing(defaultImageSlot({ name: "a.png", stroked: true }))).toBe(true);
     expect(rasterRing(defaultImageSlot({ name: "a.svg", stroked: true }))).toBe(false);
     expect(rasterRing(defaultImageSlot({ name: "a.png", stroked: false }))).toBe(false);
+    expect(
+      rasterRing(defaultImageSlot({ name: "cutout.gif", src: "/templates/x.gif", stroked: true })),
+    ).toBe(false);
   });
 });
 

@@ -26,7 +26,7 @@ import { isSvgSource } from "../chipKinds";
 import { gradientEndIndex } from "../pillFill";
 import { playClick, playCreate, playSwitch, playTransition } from "../uiSounds";
 import { placeZoomedFixed } from "../uiScale";
-import { gifIsTransparent } from "../trim";
+import { gifBlocksStroke } from "../trim";
 import type { AppState, ImageSlot, Slot, TextSlot } from "../types";
 import { isTextField, sanitizeTextMotion } from "../types";
 import { canRelinkSlot } from "../remoteImage";
@@ -324,7 +324,7 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
       clearMenuInk(menu);
       const nodes: HTMLElement[] = [];
       if (H.isRasterUpload(slot) || slot.youtube || slot.video) {
-        const allowStroke = !gifIsTransparent(slot.src, slot.name);
+        const allowStroke = !gifBlocksStroke(slot.src, slot.name);
         if (allowStroke && slot.stroked) {
           nodes.push(
             menuColorRow("Stroke Color:", slot.colorIndex ?? 0, paintShapeColor, paintShapeCustom, slot.color),

@@ -17,7 +17,7 @@ describe("textAnimTravel", () => {
   });
 });
 
-describe("applyTextAnim clip width", () => {
+describe("applyTextAnim clip size", () => {
   it("sizes the cycle clip from slot metrics before the chip is mounted", () => {
     // spawnChip paints while detached — offsetWidth/computed font are unusable.
     const host = document.createElement("div");
@@ -36,8 +36,10 @@ describe("applyTextAnim clip width", () => {
     const clip = label.querySelector<HTMLElement>(":scope > .text-anim-clip");
     expect(clip).toBeTruthy();
     const clipW = Number.parseFloat(clip!.style.width);
+    const clipH = Number.parseFloat(clip!.style.height);
     const ink = measureTextInk(slot, 0);
     expect(clipW).toBeGreaterThanOrEqual(ink.width);
+    expect(clipH).toBeGreaterThanOrEqual(ink.height);
     // Must not fall back to the ~14px computed-style default used when detached.
     applyRollingText(label, "rewind", { asPhrase: true, fontSize: 14, fontFamily: "Arial", fontWeight: 400, tracking: 0 });
     const tiny = Number.parseFloat(
@@ -45,6 +47,27 @@ describe("applyTextAnim clip width", () => {
     );
     stopTextAnim(label);
     expect(clipW).toBeGreaterThan(tiny * 2);
+  });
+
+  it("grows the clip taller than 1em when glyph ink exceeds the em square", () => {
+    const host = document.createElement("div");
+    const label = document.createElement("span");
+    host.append(label);
+    // Tall synthetic ink: measureTextInk falls back to fontSize+pad when canvas
+    // metrics are empty; force a large fontSize and assert height >= that floor.
+    const slot = defaultTextSlot({
+      text: "you",
+      fontFamily: "Arial",
+      fontWeight: 400,
+      fontSize: 48,
+      shape: "pill",
+      textAnim: true,
+    });
+    applyTextAnim(label, slot, undefined, 0);
+    const clip = label.querySelector<HTMLElement>(":scope > .text-anim-clip")!;
+    const clipH = Number.parseFloat(clip.style.height);
+    expect(clipH).toBeGreaterThanOrEqual(slot.fontSize);
+    stopTextAnim(label);
   });
 });
 

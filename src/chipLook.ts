@@ -1,6 +1,6 @@
 import { isColorMask, isSvgSource } from "./chipKinds";
 import { fillBlooms } from "./theme";
-import { gifIsTransparent } from "./trim";
+import { gifBlocksStroke } from "./trim";
 import {
   IMAGE_TEMPERATURE_NEUTRAL_K,
   imageContrastOf,
@@ -55,9 +55,9 @@ export function chipContributesBloom(slot: Slot, fill: string, ink: string, grad
 }
 
 
-/** Raster upload inner stroke — SVGs and transparent GIFs skip the ring overlay. */
+/** Raster upload inner stroke — SVGs and GIFs skip the ring overlay. */
 export function rasterRing(slot: ImageSlot): boolean {
-  return Boolean(slot.stroked) && !isSvgSource(slot) && !gifIsTransparent(slot.src, slot.name);
+  return Boolean(slot.stroked) && !isSvgSource(slot) && !gifBlocksStroke(slot.src, slot.name);
 }
 
 export type ImageAdjustSlot = Pick<

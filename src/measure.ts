@@ -398,9 +398,13 @@ export function measureTextSlot(slot: TextSlot, pad = 1, tracking = 0.02): ChipS
   measureCtx.letterSpacing = "0px";
 
   const textW = measureLineWidth(slot.text || " ", slot.fontSize, tracking);
+  // Ornamental faces (Mystery Quest, etc.) paint past the em square — size the
+  // pill from real ink height so descenders aren't clipped by overflow:hidden.
+  const ink = measureTextInk(slot, tracking);
+  const textH = Math.max(slot.fontSize, ink.height);
 
   const padY = Math.max(1, Math.round(slot.fontSize * 0.45 * pad));
-  const height = Math.ceil(slot.fontSize + padY * 2);
+  const height = Math.ceil(textH + padY * 2);
 
   const extraX = Math.max(0, Math.round(slot.fontSize * 0.85 * pad));
   const cap = slot.shape === "pill" ? height / 2 : 0;

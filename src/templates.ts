@@ -21,6 +21,7 @@ export type TemplateId =
   | "new-york"
   | "miami"
   | "berlin"
+  | "halloween"
   | "ultrapilled"
   | typeof MODE_SELECT_THEME_ID
   | typeof NOT_FOUND_THEME_ID;
@@ -30,6 +31,7 @@ export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }
   { id: "new-york", label: "New York", build: newYorkState },
   { id: "miami", label: "Miami", build: miamiState },
   { id: "berlin", label: "Berlin", build: berlinState },
+  { id: "halloween", label: "Halloween", build: halloweenState },
   { id: "ultrapilled", label: "Ultrapilled", build: ultrapilledState },
   { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
   { id: NOT_FOUND_THEME_ID, label: "404", build: notFoundPreviewState },
@@ -114,8 +116,16 @@ function presetIcon(name: string, amount: number, colorIndex: number, extra: Par
 }
 
 /** A bundled photo from public/templates/<template>/. Size is the long edge; the file keeps its aspect. */
-function photo(template: TemplateId, file: string, name: string, size: number, radius: number, scale = 1): ImageSlot {
-  return defaultImageSlot({ src: `/templates/${template}/${file}`, name, size, amount: 1, colorIndex: 0, scale, radius });
+function photo(
+  template: TemplateId,
+  file: string,
+  name: string,
+  size: number,
+  radius: number,
+  scale = 1,
+  extra: Partial<ImageSlot> = {},
+): ImageSlot {
+  return defaultImageSlot({ src: `/templates/${template}/${file}`, name, size, amount: 1, colorIndex: 0, scale, radius, ...extra });
 }
 
 function emoji(char: string, name: string, amount: number, scale: number): ImageSlot {
@@ -499,6 +509,144 @@ export function berlinState(): AppState {
     post: { bloom: 0, bloomOpacity: 77, grain: 99, vignette: 52, saturate: 120, hue: 0, blend: "normal" },
     physics: { ...DEFAULT_PHYSICS },
     template: "berlin",
+    slots,
+  };
+}
+
+/** Spooky night: pumpkin orange, witch purple, slime green on black — horror type, candy emoji, jack-o’-lanterns. */
+export function halloweenState(): AppState {
+  const ORANGE = 0;
+  const PURPLE = 1;
+  const SLIME = 2;
+  const BLACK = 3;
+  const CANDY = 4;
+  const bare = "none" as const;
+  const creep = { fontFamily: "Creepster", fontWeight: 400 as const };
+  const quest = { fontFamily: "Mystery Quest", fontWeight: 400 as const };
+  const heavy = { fontFamily: "Archivo Black", fontWeight: 400 as const };
+  const swiss = (fontWeight: number) => ({ fontFamily: "Inter", fontWeight });
+  const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
+  const slots = [
+    // Short horror words stay large; long lines stay under ~stage width so they
+    // don't fall as one huge horizontal slab (Creepster/Mystery Quest run wide).
+    text({ text: "Trick or treat!", ...creep, shape: bare, colorIndex: SLIME, scale: 2.6, tracking: -20 }),
+    emoji("🎃", "Pumpkin", 3, 0.95),
+    photo("halloween", "hi-fi-spider.gif", "Hi-fi spider", 138, 0, 1, { colorIndex: SLIME, exposure: 45 }),
+    text({ text: "BOO!", ...creep, shape: bare, colorIndex: ORANGE, scale: 4.2, tracking: -40 }),
+    text({
+      text: "Happy Halloween!",
+      ...quest,
+      shape: "pill",
+      colorIndex: BLACK,
+      textColorIndex: ORANGE,
+      scale: 1.35,
+      pillPad: 62,
+      textAnim: true,
+    }),
+    presetIcon("Moons", 2, SLIME, { scale: 0.7 }),
+    text({ text: "Spooky", ...creep, shape: bare, colorIndex: PURPLE, scale: 2.8 }),
+    emoji("👻", "Ghost", 2, 0.85),
+    text({
+      text: "Witch",
+      ...quest,
+      shape: "box",
+      radius: 40,
+      colorIndex: BLACK,
+      textColorIndex: SLIME,
+      scale: 1.05,
+      tracking: -20,
+      pillPad: 42,
+    }),
+    presetIcon("Stars", 3, ORANGE, { scale: 0.4 }),
+    text({ text: "Something wicked this way comes.", ...quest, shape: bare, colorIndex: SLIME, scale: 0.85 }),
+    emoji("🦇", "Bat", 3, 0.7),
+    text({ text: "Haunted", ...creep, shape: bare, colorIndex: ORANGE, scale: 2.4, tracking: -30 }),
+    text({ text: "Beware of the witch’s curse!", ...swiss(700), shape: "pill", colorIndex: PURPLE, textColor: "#ffffff", scale: 0.55, pillPad: 40 }),
+    presetIcon("Spots", 2, PURPLE, { scale: 0.55 }),
+    text({ text: "Death", ...quest, shape: "pill", colorIndex: SLIME, textColorIndex: BLACK, scale: 1.2, pillPad: 48 }),
+    emoji("💀", "Skeleton", 2, 0.75),
+    text({ text: "Don’t go into the basement alone.", ...swiss(600), shape: "pill", stroked: true, stroke: 2, colorIndex: ORANGE, scale: 0.4, pillPad: 72 }),
+    photo("halloween", "friday-the-13th.jpg", "Friday the 13th", 115, 8, 1.05),
+    photo("halloween", "halloween-pumpkins.jpg", "Halloween pumpkins", 110, 20),
+    emoji("🕷️", "Spider", 2, 0.65),
+    text({ text: "Graveyard", ...creep, shape: bare, colorIndex: SLIME, scale: 1.9 }),
+    photo("halloween", "pumpkin-low-poly.gif", "Low-poly pumpkin", 138, 0, 1, {
+      colorIndex: PURPLE,
+      collider: "block",
+      exposure: 25,
+    }),
+    text({
+      text: "The pumpkin grinned in the moonlight.",
+      ...quest,
+      shape: "box",
+      radius: 40,
+      colorIndex: BLACK,
+      textColorIndex: CANDY,
+      scale: 0.4,
+      pillPad: 71,
+    }),
+    emoji("🍬", "Candy", 3, 0.6),
+    text({ text: "Vampire", ...heavy, shape: bare, colorIndex: ORANGE, scale: 1.8, tracking: -80 }),
+    photo("halloween", "carroll-borland.jpg", "Carroll Borland", 115, 12, 1.1),
+    text({ text: "Sweet dreams... if you dare!", ...quest, shape: "pill", colorIndex: ORANGE, textColorIndex: BLACK, scale: 0.75, textAnim: true, pillPad: 36 }),
+    emoji("🧙‍♀️", "Witch", 1, 0.9),
+    text({ text: "Zombie", ...creep, shape: bare, colorIndex: PURPLE, scale: 2.1 }),
+    presetIcon("Blooms", 1, ORANGE, { scale: 0.65 }),
+    text({
+      text: "Who’s that knocking at my door?",
+      ...swiss(700),
+      shape: "pill",
+      stroked: true,
+      stroke: 2,
+      colorIndex: SLIME,
+      scale: 0.38,
+      pillPad: 74,
+    }),
+    emoji("🌕", "Full moon", 1, 0.85),
+    text({ text: "Cauldron", ...quest, shape: bare, colorIndex: CANDY, scale: 1.4 }),
+    text({
+      text: "Stir the cauldron three times.",
+      ...heavy,
+      shape: "box",
+      radius: 40,
+      colorIndex: SLIME,
+      textColorIndex: BLACK,
+      scale: 0.3,
+      tracking: -68,
+      gradient: true,
+      gradientColorIndex: ORANGE,
+      gradientAngle: 120,
+      animatedGradient: true,
+      gradientSpeed: 40,
+      pillPad: 42,
+    }),
+    emoji("🍭", "Lollipop", 2, 0.7),
+    text({ text: "Cobweb", ...creep, shape: bare, colorIndex: ORANGE, scale: 1.6 }),
+  ].filter((slot): slot is Slot => slot != null);
+  return {
+    ...demoState(),
+    stageColor: "#0a0614",
+    background: {
+      ...defaultBackground(),
+      kind: "gradient",
+      shape: "radial",
+      stops: [
+        { id: uid(), color: "#3b1466", at: 0 },
+        { id: uid(), color: "#0a0614", at: 100 },
+      ],
+      grid: false,
+      gridColor: "#c8ff3a",
+      gridOpacity: 12,
+    },
+    theme: ["#ff6a12", "#7b2cff", "#c8ff3a", "#0a0614", "#ffd84a"],
+    post: { bloom: 0, bloomOpacity: 70, grain: 22, vignette: 36, saturate: 118, hue: 0, blend: "normal" },
+    physics: { ...DEFAULT_PHYSICS },
+    masterScale: 2.9,
+    sizeRandom: 100,
+    shapeAmount: 32,
+    pillPad: 24,
+    textTracking: 0,
+    template: "halloween",
     slots,
   };
 }

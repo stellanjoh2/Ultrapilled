@@ -57,6 +57,14 @@ export function gifIsTransparent(src: string, name = ""): boolean {
   return peekTrim(src)?.transparent === true;
 }
 
+/**
+ * GIFs must not use the raster stroke ring — it frames the file bounds, not the
+ * cutout. Hide the control and skip painting for every GIF (opaque or not).
+ */
+export function gifBlocksStroke(src: string, name = ""): boolean {
+  return Boolean(src) && isGifSrc(src, name);
+}
+
 /** Sample the drawn frame for any not-fully-opaque pixel (GIF palette index / alpha). */
 function frameHasTransparency(img: HTMLImageElement, naturalW: number, naturalH: number): boolean {
   const probeScale = Math.min(1, 128 / Math.max(naturalW, naturalH));

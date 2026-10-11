@@ -518,6 +518,8 @@ function refreshAnimClipWidth(label: HTMLElement, opts: RollingTextOpts = {}) {
   const { fontSize, fontFamily, fontWeight, tracking } = clipMetricsFrom(label, opts);
   const font = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
   let maxW = 0;
+  // 1em CSS clip crops faces whose ink exceeds the em square (Mystery Quest "y").
+  let maxH = fontSize;
   for (const row of rows) {
     const prev = {
       position: row.style.position,
@@ -549,6 +551,7 @@ function refreshAnimClipWidth(label: HTMLElement, opts: RollingTextOpts = {}) {
     );
     const layoutTerm = layoutW > 0 ? layoutW + side * 2 + TEXT_INK_PAD * 2 : 0;
     maxW = Math.max(maxW, layoutTerm, ink.width);
+    maxH = Math.max(maxH, ink.height);
     row.style.position = prev.position;
     row.style.inset = prev.inset;
     row.style.left = prev.left;
@@ -558,6 +561,9 @@ function refreshAnimClipWidth(label: HTMLElement, opts: RollingTextOpts = {}) {
   }
   if (maxW > 0) clip.style.width = `${Math.ceil(maxW)}px`;
   else clip.style.removeProperty("width");
+  const h = Math.ceil(maxH);
+  clip.style.height = `${h}px`;
+  for (const row of rows) row.style.lineHeight = `${h}px`;
 }
 
 /** Looping letter motion (same engine as pill text anim). */

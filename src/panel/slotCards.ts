@@ -1,5 +1,6 @@
 import imageIcon from "@phosphor-icons/core/assets/regular/image.svg?raw";
 import fileSvg from "@phosphor-icons/core/assets/regular/file-svg.svg?raw";
+import gifIcon from "@phosphor-icons/core/assets/regular/gif.svg?raw";
 import lockSimple from "@phosphor-icons/core/assets/regular/lock-simple.svg?raw";
 import lockSimpleOpen from "@phosphor-icons/core/assets/regular/lock-simple-open.svg?raw";
 import pencilSimple from "@phosphor-icons/core/assets/regular/pencil-simple.svg?raw";
@@ -15,9 +16,10 @@ import { checkInput } from "../checkBox";
 import { FEATURED_EMOJI, searchEmoji, warmEmojiCatalog, type EmojiItem } from "../emojis";
 import { ICON_PRESETS, IMAGE_COLLIDERS } from "../icons";
 import { isColorMask, isSvgSource } from "../chipKinds";
+import { isGifSrc } from "../trim";
 import { pillPadOf, trackingOf } from "../measure";
 import { imageRemoteOf } from "../remoteImage";
-import { gifIsTransparent } from "../trim";
+import { gifBlocksStroke } from "../trim";
 import {
   gradientAngleOf,
   gradientScaleOf,
@@ -361,7 +363,7 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
       mark.textContent = slot.emoji;
     } else if (H.uploadedShape(slot)) {
       mark.classList.add("slot-mark--image");
-      mark.innerHTML = isSvgSource(slot) ? fileSvg : imageIcon;
+      mark.innerHTML = isSvgSource(slot) ? fileSvg : isGifSrc(slot.src, slot.name) ? gifIcon : imageIcon;
     } else if (slot.src) {
       mark.append(H.shapeSwatch(H.iconSrc(slot), H.iconPreviewFill(slot)));
     }
@@ -1110,7 +1112,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
     ${
       H.isRasterUpload(slot)
         ? `${
-            gifIsTransparent(slot.src, slot.name)
+            gifBlocksStroke(slot.src, slot.name)
               ? ""
               : `<div class="check-row" data-tip="${TIPS.stroked}">
       <label class="check">

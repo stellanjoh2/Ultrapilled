@@ -614,7 +614,10 @@ body:has(.app.is-presenting) .ui-tip {
   --post-hue: 0deg;
 }
 
-/* Hue + grain run on .post-plate (one filtered group) — not stage-wide / backdrop-filter. */
+/* Fill + grid stay on .post-backdrop; pile is .post-plate. Grain only on the
+   static backdrop so chip respawns don't re-raster the stage (Halloween looked
+   like a top-down wipe over black). Hue still hits both layers. */
+.post-backdrop,
 .post-plate {
   position: absolute;
   inset: 0;
@@ -622,15 +625,16 @@ body:has(.app.is-presenting) .ui-tip {
   pointer-events: none;
 }
 
+.stage.has-hue .post-backdrop,
 .stage.has-hue .post-plate {
   filter: hue-rotate(var(--post-hue));
 }
 
-.playfield.has-grain .post-plate {
+.playfield.has-grain .post-backdrop {
   filter: url(#ultrapilled-grain);
 }
 
-.stage.has-hue .playfield.has-grain .post-plate {
+.stage.has-hue .playfield.has-grain .post-backdrop {
   /* Grain during plate paint, then hue — same as old backdrop-grain + stage hue. */
   filter: url(#ultrapilled-grain) hue-rotate(var(--post-hue));
 }
@@ -1765,6 +1769,16 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   overflow: visible;
 }
 
+/*
+ * Shaped pills/boxes: resting glyphs must use the shape’s vertical padding.
+ * A tight overflow:hidden on the label/clip (1em / ink box) crops ornamental
+ * descenders (Mystery Quest “y”) even when the pill itself is tall enough —
+ * letter travel still clips on .is-text-anim-host below.
+ */
+.chip:not(.chip-bare) > .chip-label.is-text-anim {
+  overflow: visible;
+}
+
 /* Clip letters to the pill’s rounded box — not a tight line box mid-air. */
 .chip.is-text-anim-host,
 .smash-btn__label.is-text-anim-host,
@@ -1787,6 +1801,7 @@ html[data-theme="day"] .chip-grad-wheel__hub {
 .loop-chip__text .text-anim-clip {
   position: relative;
   display: block;
+  /* Fallback until JS sizes from ink — ornamental fonts exceed 1em. */
   height: 1em;
   line-height: 1;
   overflow: hidden;
@@ -1795,7 +1810,8 @@ html[data-theme="day"] .chip-grad-wheel__hub {
   margin-right: auto;
 }
 
-.chip.chip-bare .text-anim-clip {
+.chip.chip-bare .text-anim-clip,
+.chip:not(.chip-bare) > .chip-label .text-anim-clip {
   overflow: visible;
 }
 

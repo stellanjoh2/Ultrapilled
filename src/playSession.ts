@@ -44,6 +44,8 @@ export type PlaySession = {
   drop: () => Promise<void>;
   triggerPhysics: () => Promise<void>;
   setRunning: (on: boolean) => void;
+  /** Stop the run without clearing chips — used when a new scene is about to replace them. */
+  halt: () => void;
   finishRun: () => void;
   togglePause: () => void;
   frame: (now: number) => void;
@@ -143,6 +145,18 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     host.world.setFloorOpen(false);
     host.world.clear();
     host.paintWelcome();
+  }
+
+  /** Stop clocks/runner but leave the pile painted until the caller clears/spawns. */
+  function halt() {
+    dropTicket++;
+    host.setRunningFlag(false);
+    host.setPaused(false);
+    host.setPosePinned(false);
+    host.world.setRunning(false);
+    host.world.setFloorOpen(false);
+    phase = "idle";
+    host.paintTransport();
   }
 
   function finishRun() {
@@ -325,6 +339,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     drop,
     triggerPhysics,
     setRunning,
+    halt,
     finishRun,
     togglePause,
     frame,

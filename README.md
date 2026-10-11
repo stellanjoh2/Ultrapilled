@@ -48,9 +48,9 @@ npx shadcn add https://soundcn.xyz/r/<sound-name>.json
 
 **ProRes MOV** — [prores-wasm-encoder](https://github.com/OlivierEstevez/ProRes-WASM-encoder) by [Olivier Estevez](https://github.com/OlivierEstevez). Thank you, Oli — real ProRes (including transparent 4444) in the browser made our editing exports possible. LGPL-2.1-or-later.
 
-## Template photo credits
+## Template asset credits
 
-Bundled under `public/templates/<id>/`. Full per-file notes also live in each folder’s `CREDITS.txt`.
+Bundled under `public/templates/<id>/`. Full per-file notes also live in each folder’s `CREDITS.txt`. Photos and third-party 3D-derived renders (PNG / GIF) keep their original licenses — credit authors where the license requires it (e.g. CC BY).
 
 **Acid** (London night + 1990s rave / club; **CC BY / CC BY-SA / CC0**)
 
@@ -84,6 +84,17 @@ Bundled under `public/templates/<id>/`. Full per-file notes also live in each fo
 | `balloon.jpg` | [Potsdamer Platz Berlin RIMG0463](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0463.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `towers.jpg` | [Potsdamer Platz Berlin RIMG0464](https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0464.JPG) | Jochims | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
+**Halloween** (photos + Sketchfab-derived renders; **CC BY / CC BY-SA / public domain**)
+
+| File | Work | Author | License |
+|------|------|--------|---------|
+| `jack-o-lantern.jpg` | [Jack-o'-Lantern 2003-10-31](https://commons.wikimedia.org/wiki/File:Jack-o%27-Lantern_2003-10-31.jpg) | Toby Ord | [CC BY-SA 2.5](https://creativecommons.org/licenses/by-sa/2.5/) |
+| `halloween-pumpkins.jpg` | [Halloween pumpkins](https://commons.wikimedia.org/wiki/File:Halloween_pumpkins.jpg) | Jiayu Zuo | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| `carroll-borland.jpg` | [Carroll Borland - Mark of Vampire still](https://commons.wikimedia.org/wiki/File:Carroll_Borland_-_Mark_of_Vampire_still.jpg) | Famous Monsters of Filmland #39 (1966) | Public domain |
+| `friday-the-13th.jpg` | [Friday the 13th (1979 Variety advertisement)](https://commons.wikimedia.org/wiki/File:Friday_the_13th_(1979_Variety_advertisement).jpg) | Sean Cunningham Films Ltd. / Paramount Pictures | Public domain |
+| `pumpkin-low-poly.gif` | [Halloween Pumpkin - low poly](https://sketchfab.com/3d-models/halloween-pumpkin-low-poly-b0aef49e4b7e400c91cac3aa252c2dc4) | [Karolina Renkiewicz](https://sketchfab.com/KarolinaRenkiewicz) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `hi-fi-spider.gif` | [hi-fi-spider](https://sketchfab.com/3d-models/hi-fi-spider-ff8a4433a5d449a3a0fc54989185a024) | [jonmariano21](https://sketchfab.com/jonmariano21) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+
 ## License
 
 Original Ultrapilled code and original assets are under the [MIT License](LICENSE).
@@ -99,7 +110,7 @@ Original Ultrapilled code and original assets are under the [MIT License](LICENS
   - [prores-wasm-encoder](https://github.com/OlivierEstevez/ProRes-WASM-encoder) by Olivier Estevez (LGPL-2.1-or-later; see [Video export](#video-export))
   - Mattone (`public/fonts/Mattone-LICENSE.txt`, SIL Open Font License 1.1)
   - [Le Murmure](https://velvetyne.fr/fonts/le-murmure/) (Ultrapilled logotype, SIL Open Font License 1.1)
-  - Template photos (tables above / each folder’s `CREDITS.txt`)
+  - Template photos and attributed template objects (tables above / each folder’s `CREDITS.txt`)
   - Sounds (see [Sounds](#sounds))
   - [Unsplash](https://unsplash.com/license) photos you search in-app
   - [Giphy](https://support.giphy.com/hc/en-us/articles/360032872931-GIPHY-User-Terms-of-Service) GIFs you search in-app

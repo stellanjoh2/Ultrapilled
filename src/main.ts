@@ -121,7 +121,7 @@ import {
   type PillProject,
 } from "./project/pillFormat";
 import { imageRemoteOf, relinkProjectImages, relinkSlotImage } from "./remoteImage";
-import { ensureTrim, ensureTrims, peekTrim } from "./trim";
+import { ensureTrim, ensureTrims, gifBlocksStroke, peekTrim } from "./trim";
 import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
 import {
   attractorReachOf,
@@ -226,9 +226,12 @@ app.innerHTML = `
         <div data-side="left"></div>
       </div>
         <div class="playfield" id="playfield">
-        <!-- Bg + pile share one filtered group (hue/grain). Vignette stays outside. -->
-        <div class="post-plate" id="post-plate">
+        <!-- Backdrop (fill + grid) is filtered apart from the pile so chip respawns
+             don't re-raster the stage (Halloween / Trigger Physics looked like a top wipe). -->
+        <div class="post-backdrop" id="post-backdrop">
         <div class="grid-layer" id="grid-layer" hidden aria-hidden="true"></div>
+        </div>
+        <div class="post-plate" id="post-plate">
         <div class="logo-layer" id="logo-layer" hidden></div>
         <!-- Outside .pile so Create mix (e.g. Difference) can't invert the glow. -->
         <div class="logo-bloom-layer" aria-hidden="true">
@@ -337,6 +340,7 @@ bindUiTypeSounds(app);
 
 const stage = app.querySelector<HTMLElement>("#stage")!;
 const playfield = app.querySelector<HTMLElement>("#playfield")!;
+const postBackdrop = app.querySelector<HTMLElement>("#post-backdrop")!;
 const postPlate = app.querySelector<HTMLElement>("#post-plate")!;
 const stageVeil = app.querySelector<HTMLElement>("#stage-veil")!;
 const physDebugCanvas = app.querySelector<HTMLCanvasElement>("#phys-debug")!;
@@ -1085,12 +1089,18 @@ function openChoiceMenu<T>(
 function applyBackground() {
   const paint = backgroundPaint(state.background, state.canvas, state.stageColor);
   stage.style.background = state.stageColor;
-  // Paint on .post-plate so hue/grain filters include the backdrop (old backdrop-filter grain did).
-  postPlate.style.backgroundColor = paint.color;
-  postPlate.style.backgroundImage = paint.image;
-  postPlate.style.backgroundSize = paint.size;
-  postPlate.style.backgroundPosition = paint.position;
-  postPlate.style.backgroundRepeat = paint.repeat;
+  // Static fill lives on .post-backdrop (not the pile plate) so grain/hue can still
+  // cover it without chip updates forcing a full backdrop re-filter.
+  postBackdrop.style.backgroundColor = paint.color;
+  postBackdrop.style.backgroundImage = paint.image;
+  postBackdrop.style.backgroundSize = paint.size;
+  postBackdrop.style.backgroundPosition = paint.position;
+  postBackdrop.style.backgroundRepeat = paint.repeat;
+  postPlate.style.backgroundColor = "";
+  postPlate.style.backgroundImage = "";
+  postPlate.style.backgroundSize = "";
+  postPlate.style.backgroundPosition = "";
+  postPlate.style.backgroundRepeat = "";
   playfield.style.backgroundColor = "";
   playfield.style.backgroundImage = "";
   playfield.style.backgroundSize = "";
@@ -2396,14 +2406,17 @@ function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Pro
     slot.radius = 0;
     slot.stroked = undefined;
   }
-  if (isGifFile(file)) hintMediaExportOnce();
+  if (isGifFile(file)) {
+    hintMediaExportOnce();
+    // Stroke rings the file bounds — useless on GIF cutouts.
+    slot.stroked = undefined;
+  }
   return ensureTrim(url, file.name)
     .then((trim) => {
       if (slot.src !== url) return null;
       if (trim) {
         slot.size = importSlotSize(trim.nativeW, trim.nativeH, svg ? { minWidth: IMPORT_SVG_MIN_WIDTH_PX } : undefined);
-        // Inner stroke reads as a box around cutout GIFs — drop it when alpha is present.
-        if (trim.transparent) slot.stroked = undefined;
+        if (gifBlocksStroke(url, file.name)) slot.stroked = undefined;
       }
       if (!svg) return null;
       return matchCollider(peekTrim(url)?.displaySrc ?? url);
@@ -5436,8 +5449,19 @@ function live(opts?: { quiet?: boolean; skipFit?: boolean }) {
     paintSectionResets(panel, state);
   };
   bump();
-  void Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]).then(bump);
+  void Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]).then(() => {
+    clearGifStrokes(state.slots);
+    bump();
+  });
   if (state.physics.layoutMode) scheduleLiveThumb();
+}
+
+/** Drop leftover stroke flags on GIFs — the ring only frames the rect, not the cutout. */
+function clearGifStrokes(slots: typeof state.slots) {
+  for (const slot of slots) {
+    if (slot.kind !== "image" || !slot.stroked) continue;
+    if (gifBlocksStroke(slot.src, slot.name)) slot.stroked = undefined;
+  }
 }
 
 /** Ultra meshes need poly-decomp — fetch the chunk, then quiet-remesh when ready. */
@@ -6511,12 +6535,41 @@ async function removeCustomTemplate(id: string) {
   }
 }
 
+/** Bumps when a newer template swap starts — abandon the previous fade/swap. */
+let templateSwapTicket = 0;
+const TEMPLATE_FADE_OUT_S = 0.12;
+const TEMPLATE_FADE_IN_S = 0.18;
+
+function templateSwapReducedMotion(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function tweenPlayfieldAlpha(to: number, duration: number): Promise<void> {
+  return new Promise((resolve) => {
+    gsap.killTweensOf(playfield);
+    if (duration <= 0 || templateSwapReducedMotion()) {
+      gsap.set(playfield, { autoAlpha: to });
+      resolve();
+      return;
+    }
+    gsap.to(playfield, {
+      autoAlpha: to,
+      duration,
+      ease: to > 0 ? "power2.out" : "power2.in",
+      onComplete: () => resolve(),
+    });
+  });
+}
+
 async function loadTemplate(next: AppState) {
+  const ticket = ++templateSwapTicket;
   setPresenting(false);
   clearCanvasNudge();
   closeFontMenu();
   remember();
-  session.setRunning(false);
+  // Keep the old pile painted while fonts/photos for the next scene load —
+  // setRunning(false) would clear immediately and flash an empty stage.
+  session.halt();
   machineFont = "";
   appliedFont = "";
   pickedSlotId = null;
@@ -6524,22 +6577,43 @@ async function loadTemplate(next: AppState) {
   world.setPicked(null);
   openSlots.clear();
   adoptState(keepSelectedCanvas(next, state.canvas));
-  await relinkProjectImages({
-    state,
-    poses: [],
-    frame: { width: 0, height: 0 },
-    images: [],
-    loop: false,
-    pages: [],
-    pageIndex: 0,
-  });
-  for (const slot of state.slots) captureBaseline(slot);
-  resetPages();
+  renderPanel();
+
+  // Prep the next scene off-screen while the current one fades out.
+  const prep = (async () => {
+    await relinkProjectImages({
+      state,
+      poses: [],
+      frame: { width: 0, height: 0 },
+      images: [],
+      loop: false,
+      pages: [],
+      pageIndex: 0,
+    });
+    for (const slot of state.slots) captureBaseline(slot);
+    resetPages();
+    await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
+  })();
+
+  await tweenPlayfieldAlpha(0, TEMPLATE_FADE_OUT_S);
+  if (ticket !== templateSwapTicket) return;
+  // Under the fade, stage peeks through — match the destination solid so a slow
+  // font/photo load doesn't flash the previous scene's stageColor.
+  stage.style.background = state.stageColor;
+
+  await prep;
+  if (ticket !== templateSwapTicket) return;
+
   applyBackground();
   applyPost();
   syncCanvas(false);
-  renderPanel();
+  world.clear();
+  paintWelcome();
   if (state.slots.length) void session.triggerPhysics();
+
+  await tweenPlayfieldAlpha(1, TEMPLATE_FADE_IN_S);
+  if (ticket !== templateSwapTicket) return;
+  gsap.set(playfield, { clearProps: "opacity,visibility" });
 }
 
 copyBtn.addEventListener("click", async () => {
