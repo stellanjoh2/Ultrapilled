@@ -86,11 +86,11 @@ Bundled under `public/templates/<id>/`. Full per-file notes also live in each fo
 
 ## License
 
-Original Ultrapilled code and original assets are under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Full text is in [`LICENSE`](LICENSE).
+Original Ultrapilled code and original assets are under the [MIT License](LICENSE).
 
 **What this means**
 
-- You can use, share, and adapt this project, including commercially, as long as you credit Ultrapilled and link to this project (or the license).
+- You can use, share, and adapt this project, including commercially. Keep the copyright and license notice when you redistribute the source (or a substantial portion of it).
 - GIFs, videos, stills, and other files you export from the app are **yours**. You do not need to credit Ultrapilled on that work.
 - This covers **our** code and original assets only. Dependencies and bundled third-party files keep their own terms:
   - [Matter.js](https://brm.io/matter-js/)
