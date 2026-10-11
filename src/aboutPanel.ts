@@ -31,7 +31,7 @@ const ABOUT_PROJECTS = [
     name: "Showreel",
     cta: "Watch showreel",
     title: "Showreel 2020-2026",
-    lede: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus fermentum, nisl a tincidunt tincidunt, nisi nisl aliquam nisl, eget aliquam nisl nisl sit amet nisl.",
+    lede: "Highlights from those years — a small selection of projects I touched as Creative Director and Principal Designer, from Quixel Megascans and Unreal Engine through to Fortnite.",
     image: "/images/projects/showreel.jpg",
     imageAlt: "Showreel 2020–2026 — Stellan Johansson",
     href: "https://www.youtube.com/watch?v=SXf1NswrDpw",
