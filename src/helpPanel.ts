@@ -59,6 +59,7 @@ function guideBody(): string {
       ${tocLink("help-text", "Text")}
       ${tocLink("help-panel", "Panel")}
       ${tocLink("help-physics", "Physics")}
+      ${tocLink("help-bounce", "Bounce")}
       ${tocLink("help-layout", "Layout")}
       ${tocLink("help-optical", "Optical")}
       ${tocLink("help-menus", "Menus")}
@@ -261,7 +262,7 @@ function guideBody(): string {
       <ol class="help-list help-list--numbered">
         <li>Add a few objects</li>
         <li>Hit Trigger Physics or press ${keycap("P")}</li>
-        <li>${keycap("Space")} plays / pauses the simulation</li>
+        <li>When the pile settles, try ${fun("Bounce")} with ${keycap("Space")}</li>
       </ol>
       <p>While things are live you can grab and throw them.</p>
       <p>
@@ -272,8 +273,24 @@ function guideBody(): string {
       <p class="help-note"><span class="help-fun">Pro move:</span> Loop + a longer Floor pause = settle, then dump, forever — great for looping exports.</p>
     </section>
 
+    <section class="help-section" id="help-bounce">
+      <h3 class="help-section__title">7. Bounce — shake the floor</h3>
+      <p>
+        ${fun("Bounce")} is a quick floor bump while Physics is live.
+        Tap ${keycap("Space")} for a light shake; hold longer to ${pop("charge")} a bigger bounce, then release — like charging a shot.
+      </p>
+      <ul class="help-list">
+        <li>Idle canvas — ${keycap("Space")} still starts the fall</li>
+        <li>Live pile — ${keycap("Space")} bounces the floor (hold = stronger)</li>
+        <li>Layout mode — Bounce is off (no gravity floor)</li>
+      </ul>
+      <p class="help-note">
+        <span class="help-fun">Handy when:</span> the pile settles somewhere you don’t love — bounce it and see what happens.
+      </p>
+    </section>
+
     <section class="help-section" id="help-layout">
-      <h3 class="help-section__title">7. Layout — place freely</h3>
+      <h3 class="help-section__title">8. Layout — place freely</h3>
       <p>Press ${keycap("L")} (or Settings → Design Mode → Layout).</p>
       <ul class="help-list">
         <li>No gravity; objects can overlap</li>
@@ -289,7 +306,7 @@ function guideBody(): string {
     </section>
 
     <section class="help-section" id="help-optical">
-      <h3 class="help-section__title">8. Optical workflows</h3>
+      <h3 class="help-section__title">9. Optical workflows</h3>
       <p>Where Ultrapilled stops feeling like a toy and starts feeling like a ${fun("composition tool")}.</p>
       <ul class="help-list">
         <li><strong>Grid</strong> (${keycap("G")}) — ratio-locked square guides under Background</li>
@@ -305,7 +322,7 @@ function guideBody(): string {
     </section>
 
     <section class="help-section" id="help-menus">
-      <h3 class="help-section__title">9. Right-click is a second toolbar</h3>
+      <h3 class="help-section__title">10. Right-click is a second toolbar</h3>
       <p>Empty canvas: add objects, Hide UI, Clear canvas.</p>
       <p>
         On an object: Duplicate, Edit text, Copy/Paste style, Invert, Flip, Animate,
@@ -314,8 +331,8 @@ function guideBody(): string {
       <h4 class="help-section__sub">Keyboard favorites</h4>
       <div class="help-table" role="table" aria-label="Keyboard shortcuts">
         <div class="help-table__row" role="row">
-          <span class="help-table__key" role="cell">Play / pause</span>
-          <span class="help-table__val" role="cell">${keycap("Space")}</span>
+          <span class="help-table__key" role="cell">${fun("Bounce")}</span>
+          <span class="help-table__val" role="cell">${keycap("Space")} · hold to charge</span>
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">${fun("Trigger physics")}</span>
@@ -358,7 +375,7 @@ function guideBody(): string {
     </section>
 
     <section class="help-section" id="help-media">
-      <h3 class="help-section__title">10. Icons, images, GIFs, and video</h3>
+      <h3 class="help-section__title">11. Icons, images, GIFs, and video</h3>
       <ul class="help-list">
         <li>Drop files on the canvas, or use Icon / Image / Unsplash / Giphy / YouTube</li>
         <li>Icon: search Phosphor (Solid / Outlined) — bundled with the app, no API key</li>
@@ -409,7 +426,7 @@ function guideBody(): string {
     </section>
 
     <section class="help-section" id="help-export">
-      <h3 class="help-section__title">11. Save &amp; export</h3>
+      <h3 class="help-section__title">12. Save &amp; export</h3>
       <div class="help-table" role="table" aria-label="Save and export">
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Keep working</span>
@@ -446,13 +463,14 @@ function guideBody(): string {
     </section>
 
     <section class="help-section" id="help-path">
-      <h3 class="help-section__title">12. A gentle learning path</h3>
+      <h3 class="help-section__title">13. A gentle learning path</h3>
       <ol class="help-list help-list--numbered">
         <li>Pick Physics, aspect 16:9</li>
         <li>Right-click → add a Pill, a few Shapes, and an Icon</li>
         <li>Double-click the pill text; change the words</li>
         <li>Nudge Color theme; turn on Grid (${keycap("G")})</li>
-        <li>Press ${keycap("P")}, then ${keycap("Space")} — watch the fall</li>
+        <li>Press ${keycap("P")} — watch the fall</li>
+        <li>When it settles, tap or hold ${keycap("Space")} to ${fun("Bounce")}</li>
         <li>Tweak Gravity / Bounciness once</li>
         <li>${keycap("H")} to hide UI; admire; ${keycap("H")} again</li>
         <li>Export a PNG, then Save .pill</li>
@@ -477,8 +495,8 @@ function guideBody(): string {
           <span class="help-table__val" role="cell">${keycap("P")}</span>
         </div>
         <div class="help-table__row" role="row">
-          <span class="help-table__key" role="cell">Pause sim</span>
-          <span class="help-table__val" role="cell">${keycap("Space")}</span>
+          <span class="help-table__key" role="cell">${fun("Bounce")}</span>
+          <span class="help-table__val" role="cell">${keycap("Space")} · hold to charge</span>
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Clean view</span>

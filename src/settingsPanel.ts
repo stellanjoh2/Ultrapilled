@@ -71,7 +71,7 @@ function shortcutRow(label: string, keys: string, note?: string): string {
 function shortcutsMarkup(): string {
   const mod = modKeyLabel();
   const rows = [
-    shortcutRow("Play / pause", keycap("Space")),
+    shortcutRow("Bounce", keycap("Space"), "Tap for a light bounce · hold to charge · idle starts the fall"),
     shortcutRow("Trigger physics", keycap("P")),
     shortcutRow("Hide UI", keycap("H")),
     shortcutRow("Toggle grid", keycap("G")),

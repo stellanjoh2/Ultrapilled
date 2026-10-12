@@ -3,6 +3,7 @@ import { ICON_PRESETS } from "./icons";
 import { modeSelectPreviewState, MODE_SELECT_THEME_ID, notFoundPreviewState, NOT_FOUND_THEME_ID } from "./modeSelectTheme";
 import { DEFAULT_THEME } from "./theme";
 import {
+  bouncePhysicsFromUi,
   DEFAULT_PHYSICS,
   defaultBackground,
   defaultImageSlot,
@@ -15,6 +16,9 @@ import {
   type TextSlot,
 } from "./types";
 import ultrapilledLogoRaw from "./assets/ultrapilled-logo.svg?raw";
+
+/** Light spring — UI Bounciness 10 on the 0–100 scale. */
+const TEMPLATE_BOUNCE = bouncePhysicsFromUi(10);
 
 export type TemplateId =
   | "acid"
@@ -332,7 +336,7 @@ export function acidState(): AppState {
     textTracking: 37,
     shapeAmount: 14,
     theme: [...DEFAULT_THEME],
-    physics: { ...DEFAULT_PHYSICS, gravity: 2.05, bounce: 0.65 },
+    physics: { ...DEFAULT_PHYSICS, gravity: 2.05, bounce: TEMPLATE_BOUNCE },
     post: { bloom: 0, bloomOpacity: 100, grain: 0, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
     template: "acid",
     slots,
@@ -469,7 +473,7 @@ export function newYorkState(): AppState {
     shapeAmount: 19,
     theme: ["#111111", "#efece5", "#f0462a", "#1c2bc9", "#f7c6d2"],
     post: { bloom: 0, bloomOpacity: 100, grain: 14, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
-    physics: { ...DEFAULT_PHYSICS },
+    physics: { ...DEFAULT_PHYSICS, bounce: TEMPLATE_BOUNCE },
     template: "new-york",
     slots,
   };
@@ -570,7 +574,7 @@ export function miamiState(): AppState {
     },
     theme: ["#ff3ea5", "#1fe3e3", "#ffe07a", "#7b3cff", "#ff6b2c"],
     post: { bloom: 0, bloomOpacity: 80, grain: 12, vignette: 20, saturate: 115, hue: 0, blend: "normal" },
-    physics: { ...DEFAULT_PHYSICS },
+    physics: { ...DEFAULT_PHYSICS, bounce: TEMPLATE_BOUNCE },
     template: "miami",
     slots,
   };
@@ -707,7 +711,7 @@ export function berlinState(): AppState {
     },
     theme: ["#f23cf5", "#e4ff1a", "#ffffff", "#29ff5a", "#2a8cff"],
     post: { bloom: 0, bloomOpacity: 77, grain: 99, vignette: 52, saturate: 120, hue: 0, blend: "normal" },
-    physics: { ...DEFAULT_PHYSICS },
+    physics: { ...DEFAULT_PHYSICS, bounce: TEMPLATE_BOUNCE },
     template: "berlin",
     slots,
   };
@@ -862,7 +866,7 @@ export function halloweenState(): AppState {
     },
     theme: ["#ff6a12", "#7b2cff", "#c8ff3a", "#0a0614", "#ffd84a"],
     post: { bloom: 0, bloomOpacity: 70, grain: 22, vignette: 36, saturate: 118, hue: 0, blend: "normal" },
-    physics: { ...DEFAULT_PHYSICS },
+    physics: { ...DEFAULT_PHYSICS, bounce: TEMPLATE_BOUNCE },
     masterScale: 2.9,
     sizeRandom: 100,
     shapeAmount: 26,
@@ -1011,7 +1015,7 @@ export function ultrapilledState(): AppState {
     shapeAmount: 18,
     theme: ["#ffffff", "#c4ff00", "#3b00ff", "#00e5ff", "#ff3ec8"],
     post: { bloom: 0, bloomOpacity: 80, grain: 18, vignette: 28, saturate: 110, hue: 0, blend: "difference" },
-    physics: { ...DEFAULT_PHYSICS },
+    physics: { ...DEFAULT_PHYSICS, bounce: TEMPLATE_BOUNCE },
     template: "ultrapilled",
     slots,
   };

@@ -341,6 +341,25 @@ export type PhysicsSettings = {
   layoutMode: boolean;
 };
 
+/** Matter restitution at Bounciness UI 100. Cap below the old 2.0 extreme. */
+export const PHYSICS_BOUNCE_MAX = 1.5;
+
+/** Slider / caption 0–100 ← stored Matter restitution. */
+export function bounceUiFromPhysics(bounce: number): number {
+  return Math.round((clampPhysicsBounce(bounce) / PHYSICS_BOUNCE_MAX) * 100);
+}
+
+/** Stored Matter restitution ← slider / caption 0–100. */
+export function bouncePhysicsFromUi(ui: number): number {
+  const n = Number.isFinite(ui) ? ui : 0;
+  return (Math.min(100, Math.max(0, n)) / 100) * PHYSICS_BOUNCE_MAX;
+}
+
+export function clampPhysicsBounce(bounce: number): number {
+  const n = Number.isFinite(bounce) ? bounce : 0;
+  return Math.min(PHYSICS_BOUNCE_MAX, Math.max(0, n));
+}
+
 export const DEFAULT_PHYSICS: PhysicsSettings = {
   weight: 1,
   gravity: 2,

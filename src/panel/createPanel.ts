@@ -25,6 +25,8 @@ import {
   audioReactAtDefault,
   BLEND_MODES,
   blendMode,
+  bouncePhysicsFromUi,
+  bounceUiFromPhysics,
   compositionAtDefault,
   DEFAULT_AUDIO_REACT,
   DEFAULT_PHYSICS,
@@ -189,7 +191,7 @@ export function syncPhysicsControls(
   const p = state.physics;
   syncRange(panel, "gravity", p.gravity, paintRange, (v) => v.toFixed(2));
   syncRange(panel, "speed", p.speed, paintRange, (v) => v.toFixed(2));
-  syncRange(panel, "bounce", p.bounce, paintRange, (v) => v.toFixed(2));
+  syncRange(panel, "bounce", bounceUiFromPhysics(p.bounce), paintRange, (v) => `${Math.round(v)}`);
   syncRange(panel, "friction", p.friction, paintRange, (v) => v.toFixed(2));
   syncRange(panel, "grip", p.grip, paintRange, (v) => v.toFixed(2));
   syncRange(panel, "spin", p.spin, paintRange, (v) => v.toFixed(2));
@@ -457,8 +459,8 @@ panel.innerHTML = `
       </label>
     </div>
     <div class="row">
-      <label class="field" data-tip="How springy collisions are (above 1 = super-bouncy)">${rangeCaptionHtml("bounce", "Bounciness", H.state.physics.bounce.toFixed(2))}
-        <input type="range" id="bounce" min="0" max="2" step="0.05" value="${H.state.physics.bounce}"${H.state.physics.layoutMode ? " disabled" : ""} />
+      <label class="field" data-tip="How springy collisions are">${rangeCaptionHtml("bounce", "Bounciness", String(bounceUiFromPhysics(H.state.physics.bounce)))}
+        <input type="range" id="bounce" min="0" max="100" step="1" value="${bounceUiFromPhysics(H.state.physics.bounce)}"${H.state.physics.layoutMode ? " disabled" : ""} />
       </label>
     </div>
     <div class="row">
@@ -720,9 +722,9 @@ H.bindRange("speed", "Speed", (v) => {
   H.live();
 });
 H.bindRange("bounce", "Bounciness", (v) => {
-  H.state.physics.bounce = v;
+  H.state.physics.bounce = bouncePhysicsFromUi(v);
   H.live();
-});
+}, (v) => `${Math.round(v)}`);
 H.bindRange("friction", "Friction", (v) => {
   H.state.physics.friction = v;
   H.live();

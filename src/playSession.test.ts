@@ -32,6 +32,7 @@ function stubWorld(overrides: Partial<WorldHandle> = {}): WorldHandle {
     setBloomLive: vi.fn(),
     setAudioScales: vi.fn(),
     impulseAudioJump: vi.fn(),
+    shakeFloor: vi.fn(),
     setFloorOpen: vi.fn(),
     freezePile: vi.fn(),
     redeployFall: vi.fn(),

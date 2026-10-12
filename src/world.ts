@@ -311,6 +311,11 @@ export type WorldHandle = {
   setAudioScales: (scales: ReadonlyMap<string, number> | null) => void;
   /** Upward hop for matching slot ids (sharp / icon hits). */
   impulseAudioJump: (slotIds: Iterable<string>, speed?: number) => void;
+  /**
+   * Quick floor bump (Space). `intensity` is ~100 tap → ~1000 charged hold.
+   * No-op in layout mode, with the floor open, or with no floor.
+   */
+  shakeFloor: (intensity?: number) => void;
   setFloorOpen: (open: boolean) => void;
   freezePile: () => void;
   /** Lift existing chips above the stage and wake them for a fresh fall (keeps transforms). */
@@ -622,6 +627,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   let roof: Matter.Body | null = null;
   let floor: Matter.Body | null = null;
   let floorOpen = false;
+  /** Live Space bump — floor Y rides a short sine then snaps home. */
+  let floorShake: { t0: number; amp: number; restY: number; dur: number } | null = null;
   /** Open side while pieces throw in from left/right; sealed once everyone is inside. */
   let entryGap: "left" | "right" | null = null;
   let bounds = { width: 0, height: 0 };
@@ -949,7 +956,83 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     buildSides(bounds.width, bounds.height);
   }
 
+  function floorRestY() {
+    return bounds.height - EDGE + wallThick() / 2;
+  }
+
+  function cancelFloorShake() {
+    if (!floorShake) return;
+    if (floor && bounds.width > 0) {
+      Body.setPosition(floor, { x: bounds.width / 2, y: floorShake.restY });
+    }
+    floorShake = null;
+  }
+
+  function tickFloorShake() {
+    if (!floorShake || !floor) return;
+    const u = (performance.now() - floorShake.t0) / floorShake.dur;
+    if (u >= 1) {
+      Body.setPosition(floor, { x: bounds.width / 2, y: floorShake.restY });
+      floorShake = null;
+      return;
+    }
+    // Quick up, soft settle — peak at mid-pulse, back to rest.
+    const lift = Math.sin(Math.PI * Math.min(1, Math.max(0, u))) * floorShake.amp;
+    Body.setPosition(floor, {
+      x: bounds.width / 2,
+      y: floorShake.restY - lift,
+    });
+  }
+
+  /**
+   * Nudge the floor up briefly so the pile gets a little shake.
+   * Intensity ~100 (tap) → ~1000 (full charge). Scales linearly from the old 100 feel.
+   */
+  function shakeFloor(intensity = 100) {
+    if (layoutMode || floorOpen || !floor || bounds.width < 8) return;
+    const ui = Math.max(0, Math.min(1000, Number.isFinite(intensity) ? intensity : 100));
+    if (ui < 1) return;
+    // 100 → ~21px (liked tap); 1000 → ~183px (full charge).
+    const amp = 3 + (ui / 100) * 18;
+    cancelFloorShake();
+    const restY = floorRestY();
+    Body.setPosition(floor, { x: bounds.width / 2, y: restY });
+    floorShake = {
+      t0: performance.now(),
+      amp,
+      restY,
+      dur: 140 + Math.min(70, Math.max(0, ui - 100) * 0.2),
+    };
+
+    // Matter static moves don't impart much velocity — wake + a soft kick near the floor.
+    const kick = amp * 0.42;
+    const jostle = amp * 0.05;
+    for (const chip of chips) {
+      if (chip.body.isStatic) continue;
+      Sleeping.set(chip.body, false);
+      const reach = Math.hypot(chip.width, chip.height) * 0.5;
+      const onFloor = chip.body.position.y > bounds.height - reach * 2.4;
+      if (onFloor) {
+        Body.setVelocity(chip.body, {
+          x: chip.body.velocity.x * 0.75 + (Math.random() - 0.5) * jostle * 2.2,
+          y: Math.min(chip.body.velocity.y, 0) - kick * (0.85 + Math.random() * 0.3),
+        });
+        Body.setAngularVelocity(
+          chip.body,
+          chip.body.angularVelocity * 0.55 + (Math.random() - 0.5) * jostle * 0.12,
+        );
+      } else {
+        Body.setVelocity(chip.body, {
+          x: chip.body.velocity.x + (Math.random() - 0.5) * jostle,
+          y: chip.body.velocity.y + (Math.random() - 0.5) * jostle * 0.4,
+        });
+      }
+    }
+    if (!running) setRunning(true);
+  }
+
   function setFloorOpen(open: boolean) {
+    cancelFloorShake();
     floorOpen = open;
     if (floor) {
       Composite.remove(engine.world, floor);
@@ -1454,6 +1537,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   Events.on(engine, "beforeUpdate", () => {
+    tickFloorShake();
     prevVel.clear();
     for (const chip of chips) {
       const { x, y } = chip.body.velocity;
@@ -4840,6 +4924,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     setFreeScaleMax,
     setAudioScales,
     impulseAudioJump,
+    shakeFloor,
     sync,
     draws,
     poses,

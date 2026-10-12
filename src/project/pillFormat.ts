@@ -8,6 +8,7 @@ import {
 } from "../layoutPages";
 import {
   blendMode,
+  clampPhysicsBounce,
   DEFAULT_AUDIO_REACT,
   DEFAULT_PHYSICS,
   fallDirection,
@@ -225,6 +226,9 @@ function parseState(value: unknown): AppState | null {
     physics: {
       ...DEFAULT_PHYSICS,
       ...physicsRaw,
+      bounce: clampPhysicsBounce(
+        typeof physicsRaw.bounce === "number" ? physicsRaw.bounce : DEFAULT_PHYSICS.bounce,
+      ),
       complexity: physicsComplexity(
         typeof physicsRaw.complexity === "string" ? physicsRaw.complexity : undefined,
       ),

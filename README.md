@@ -22,7 +22,7 @@ npm test
 1. Pick **Physics** (things fall) or **Layout** (place freely, like Figma).
 2. Add text, shapes, emoji, Phosphor icons (Solid / Outlined), uploads, Unsplash photos, Giphy GIFs, or a YouTube / MP4 clip from Create.
 3. Tune gravity, speed, and bounciness (Physics), or arrange layers (Layout).
-4. Spacebar triggers a fall. Export GIF / MP4 / MOV / PNG, or save a `.pill` project.
+4. Press **P** to trigger the fall. Tap or hold **Space** to bounce the floor (hold charges a bigger bounce). Export GIF / MP4 / MOV / PNG, or save a `.pill` project.
 
 YouTube and uploaded video do not rasterize — export warns, then draws a play-button stand-in.
 

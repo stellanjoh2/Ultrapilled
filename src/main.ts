@@ -6,6 +6,7 @@ import {
   bundledWeights,
   BLEND_MODES,
   blendMode,
+  clampPhysicsBounce,
   DEFAULT_AUDIO_REACT,
   DEFAULT_PHYSICS,
   dropShadowOpacityOf,
@@ -110,7 +111,7 @@ import {
   type YouTubeClip,
 } from "./youtube";
 import { checkInput } from "./checkBox";
-import { lsGet, lsSet } from "./legacyStorage";
+import { lsGet, lsRemove, lsSet } from "./legacyStorage";
 import { getPrefs, setPrefs } from "./prefs";
 import { askReconnect } from "./reconnectDialog";
 import { askModeSelect, handoffModeSelectPreview, preloadModeSelectMedia, stopModeSelectPreview, warmModeSelectPreview, type AppMode, type ModeSelectChoice } from "./modeSelect";
@@ -285,8 +286,11 @@ app.innerHTML = `
     </header>
     <aside class="dev-panel" id="dev-panel" hidden>
       <h2 class="dev-panel__title">Dev</h2>
-      <p class="dev-panel__hint">Chrome corner radii. Physics outlines on.</p>
+      <p class="dev-panel__hint">Chrome corner radii. Physics outlines on. Hold Space to charge shake.</p>
       <button type="button" class="pill" id="dev-load-404" data-tip="Load the 404 template">404 template</button>
+      <label class="field"><span data-dev-shake-label>Shake max 1000 · tap 100</span>
+        <input type="range" id="dev-shake" min="100" max="1000" step="10" value="1000" />
+      </label>
       <label class="field"><span data-dev-radius-label="panel">Panel 44px</span>
         <input type="range" data-dev-radius="panel" min="0" max="48" step="1" value="44" />
       </label>
@@ -366,8 +370,12 @@ let nudgeFadeTimer = 0;
 let shapeBlinkTimer = 0;
 
 const WELCOME_KEY = "welcomeDismissed";
-/** Separate from welcomeDismissed — that key is set on first add/play, so returning users would never see this tip. */
-const FIRST_OBJECT_NUDGE_KEY = "firstObjectNudgeDismissed";
+/**
+ * Separate from welcomeDismissed — that key is set on first add/play, so returning
+ * users would never see this tip. Bump the suffix when the nudge copy changes
+ * meaningfully so the updated screen can teach once more.
+ */
+const FIRST_OBJECT_NUDGE_KEY = "firstObjectNudgeDismissed.v2";
 let welcomeDismissed = false;
 let firstObjectNudgeDismissed = false;
 /** Auto first-object nudge waits until the boot grid fade finishes. */
@@ -375,6 +383,10 @@ let autoObjectNudgeReady = false;
 try {
   welcomeDismissed = lsGet(WELCOME_KEY) === "1";
   firstObjectNudgeDismissed = lsGet(FIRST_OBJECT_NUDGE_KEY) === "1";
+  // Drop keys from the short-lived settle Bounce tip + pre-Bounce nudge dismiss.
+  lsRemove("firstObjectNudgeDismissed");
+  lsRemove("bounceTipSeen");
+  lsRemove("bounceTipDismissed");
 } catch {
   /* private mode */
 }
@@ -431,7 +443,7 @@ function paintWelcome() {
     return;
   }
 
-  // Physics: loud first-object nudge replaces the quiet spacebar line.
+  // Physics: loud first-object nudge (create + Trigger Physics + Bounce).
   hideCanvasWelcome();
   if (!firstObjectNudgeDismissed) {
     if (!autoObjectNudgeReady) return;
@@ -5766,6 +5778,49 @@ for (const input of devPanel.querySelectorAll<HTMLInputElement>("[data-dev-radiu
   input.addEventListener("input", () => applyDevRadius(key, Number(input.value)));
 }
 
+/** Space shake: tap stays gentle; hold ramps to shakeMax (Dev-tuned). */
+const SHAKE_CHARGE_MS = 700;
+const SHAKE_TAP = 100;
+let shakeMax = 1000;
+const shakeInput = devPanel.querySelector<HTMLInputElement>("#dev-shake");
+const shakeLabel = devPanel.querySelector<HTMLElement>("[data-dev-shake-label]");
+function paintShakeMax(v: number) {
+  shakeMax = Math.max(100, Math.min(1000, Math.round(v / 10) * 10));
+  if (shakeLabel) shakeLabel.textContent = `Shake max ${shakeMax} · tap ${SHAKE_TAP}`;
+  if (shakeInput && Number(shakeInput.value) !== shakeMax) {
+    shakeInput.value = String(shakeMax);
+  }
+}
+shakeInput?.addEventListener("input", () => paintShakeMax(Number(shakeInput.value)));
+
+/** performance.now() when Space went down while live — fire shake on keyup. */
+let spaceChargeAt: number | null = null;
+
+function shakeIntensityFromHold(heldMs: number): number {
+  const tap = Math.min(SHAKE_TAP, shakeMax);
+  const t = Math.min(1, Math.max(0, heldMs / SHAKE_CHARGE_MS));
+  // Ease-in: short taps stay near tap; full charge needs a real hold.
+  const eased = t * t;
+  return Math.round(tap + (shakeMax - tap) * eased);
+}
+
+function cancelSpaceCharge() {
+  spaceChargeAt = null;
+}
+
+function fireSpaceShake() {
+  if (spaceChargeAt == null) return;
+  const held = performance.now() - spaceChargeAt;
+  spaceChargeAt = null;
+  if (!running) return;
+  if (paused) {
+    paused = false;
+    world.setRunning(true);
+  }
+  playClick();
+  world.shakeFloor(shakeIntensityFromHold(held));
+}
+
 let running = false;
 let paused = false;
 let repeat = false;
@@ -6042,7 +6097,29 @@ function showAddShapeNudge(opts?: { auto?: boolean }) {
     " the workspace.",
   );
 
-  canvasNudge.append(title, hint);
+  const playHint = document.createElement("p");
+  playHint.className = "canvas-nudge__hint";
+  playHint.append(
+    "Then press ",
+    nudgeAccent("P"),
+    " to ",
+    nudgeAccent("Trigger Physics"),
+    ". Move the objects around yourself,",
+    document.createElement("br"),
+    "or press or hold ",
+    nudgeAccent("Space"),
+    " to give the canvas a bounce.",
+  );
+
+  const hideHint = document.createElement("p");
+  hideHint.className = "canvas-nudge__hint";
+  hideHint.append(
+    "Press ",
+    nudgeAccent("H"),
+    " to hide the UI and view the canvas full screen.",
+  );
+
+  canvasNudge.append(title, hint, playHint, hideHint);
 
   let dismiss: HTMLButtonElement | null = null;
   if (auto) {
@@ -6061,7 +6138,7 @@ function showAddShapeNudge(opts?: { auto?: boolean }) {
   canvasNudge.hidden = false;
 
   const wordEls = title.querySelectorAll<HTMLElement>(".canvas-nudge__word");
-  const fadeEls = dismiss ? [hint, dismiss] : [hint];
+  const fadeEls = dismiss ? [hint, playHint, hideHint, dismiss] : [hint, playHint, hideHint];
   if (reducedMotion()) {
     gsap.set([wordEls, ...fadeEls], { autoAlpha: 1, y: 0 });
   } else {
@@ -6243,6 +6320,9 @@ function adoptState(next: typeof state) {
   state.physics = {
     ...DEFAULT_PHYSICS,
     ...next.physics,
+    bounce: clampPhysicsBounce(
+      typeof next.physics?.bounce === "number" ? next.physics.bounce : DEFAULT_PHYSICS.bounce,
+    ),
     complexity: physicsComplexity(next.physics?.complexity),
     fallDirection: fallDirection(next.physics?.fallDirection),
     layoutMode: Boolean(next.physics?.layoutMode),
@@ -6818,8 +6898,17 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Space") {
     event.preventDefault();
     if (event.repeat) return;
-    playClick();
-    session.togglePause();
+    // Idle → start the fall. Live → charge shake, fire on keyup.
+    if (!running) {
+      playClick();
+      session.togglePause();
+      return;
+    }
+    if (paused) {
+      paused = false;
+      world.setRunning(true);
+    }
+    spaceChargeAt = performance.now();
     return;
   }
   if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && state.physics.layoutMode) {
@@ -6898,14 +6987,39 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "l" || event.key === "L") {
-    if (event.repeat) return;
-    void setLayoutMode(!state.physics.layoutMode);
+    if (meta || event.altKey || event.repeat) return;
+    event.preventDefault();
+    const next = !state.physics.layoutMode;
+    void (async () => {
+      if (next) {
+        const ok = await askConfirm({
+          title: "Switch to Layout mode?",
+          body: "This turns off gravity so you can place objects freely. Press L again anytime to go back.",
+          confirmLabel: "Switch to Layout",
+          cancelLabel: "Cancel",
+        });
+        if (!ok) return;
+      }
+      await setLayoutMode(next);
+    })();
     return;
   }
   if (event.key === "i" || event.key === "I") {
     if (event.repeat || !pickedSlotId) return;
     invertSlot(pickedSlotId);
   }
+});
+
+window.addEventListener("keyup", (event) => {
+  if (event.code !== "Space") return;
+  if (spaceChargeAt == null) return;
+  event.preventDefault();
+  fireSpaceShake();
+});
+
+window.addEventListener("blur", cancelSpaceCharge);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) cancelSpaceCharge();
 });
 
 let panelScrollFrame = 0;

@@ -24,7 +24,7 @@ const BLANK_FIRST: Hint = {
 };
 
 const HINTS: Hint[] = [
-  { text: "Hit", key: "Space", after: "to play" },
+  { text: "Hit", key: "Space", after: "to Bounce — hold to charge a bigger one" },
   { text: "Hit", key: "P", after: "to re-trigger physics" },
   { text: "Do you hate bouncy stuff? Try Layout Mode — or hit", key: "L" },
   { text: "Need ideas? Explore the templates in the Create tab" },
