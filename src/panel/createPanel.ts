@@ -4,6 +4,7 @@ import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw"
 import gifIcon from "@phosphor-icons/core/assets/regular/gif.svg?raw";
 import gridFourIcon from "@phosphor-icons/core/assets/regular/grid-four.svg?raw";
 import imagesIcon from "@phosphor-icons/core/assets/regular/images.svg?raw";
+import phosphorLogo from "@phosphor-icons/core/assets/regular/phosphor-logo.svg?raw";
 import pillIcon from "@phosphor-icons/core/assets/regular/pill.svg?raw";
 import plus from "@phosphor-icons/core/assets/regular/plus.svg?raw";
 import shapesIcon from "@phosphor-icons/core/assets/regular/shapes.svg?raw";
@@ -82,6 +83,7 @@ export type CreatePanelHost = SlotCardHost & {
   addImagesFromFiles(files: File[]): void;
   openUnsplashAdd(): void;
   openGiphyAdd(): void;
+  openPhosphorAdd(): void;
   openYouTubeAdd(): void;
   bindRange(
     id: string,
@@ -400,6 +402,10 @@ panel.innerHTML = `
         ${slotAddIcon(smileyIcon)}
         Emoji
       </button>
+      <button type="button" class="pill slot-add is-create" id="add-icon" data-tip="Search Phosphor icons — Solid or Outlined">
+        ${slotAddIcon(phosphorLogo)}
+        Icon
+      </button>
       <button type="button" class="pill slot-add is-create" id="add-photo" data-tip="Add an SVG, PNG, JPG, GIF, or MP4">
         ${slotAddIcon(uploadSimple)}
         Image
@@ -630,6 +636,7 @@ panel.querySelector("#add-photo")?.addEventListener("click", () => {
     H.addImagesFromFiles(files);
   });
 });
+panel.querySelector("#add-icon")?.addEventListener("click", () => H.openPhosphorAdd());
 panel.querySelector("#add-unsplash")?.addEventListener("click", () => H.openUnsplashAdd());
 panel.querySelector("#add-giphy")?.addEventListener("click", () => H.openGiphyAdd());
 panel.querySelector("#add-youtube")?.addEventListener("click", () => H.openYouTubeAdd());

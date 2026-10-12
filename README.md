@@ -1,6 +1,6 @@
 # Ultrapilled™
 
-A desktop web physics playground for playful motion graphics. Drop pills, words, longer text, shapes, emoji, uploads, Unsplash photos, Giphy GIFs, and muted YouTube or MP4 clips into **Physics** (fall, bounce, stack) or **Layout** (place freely, multi-page). Theme with palettes, fonts, and look FX—including optional mic-driven Audio react—then export stills, sequences, GIF, MP4, or transparent ProRes, or save a local `.pill` project. Live at [ultrapilled.com](https://ultrapilled.com/). Built on [Matter.js](https://brm.io/matter-js/).
+A desktop web physics playground for playful motion graphics. Drop pills, words, longer text, shapes, emoji, Phosphor icons, uploads, Unsplash photos, Giphy GIFs, and muted YouTube or MP4 clips into **Physics** (fall, bounce, stack) or **Layout** (place freely, multi-page). Theme with palettes, fonts, and look FX—including optional mic-driven Audio react—then export stills, sequences, GIF, MP4, or transparent ProRes, or save a local `.pill` project. Live at [ultrapilled.com](https://ultrapilled.com/). Built on [Matter.js](https://brm.io/matter-js/).
 
 **Desktop browsers only.** Phones and most tablets are gated at the door. Privacy: [ultrapilled.com/privacy.html](https://ultrapilled.com/privacy.html) (also in this repo as [`privacy.html`](privacy.html)).
 
@@ -20,11 +20,15 @@ npm test
 ## Use
 
 1. Pick **Physics** (things fall) or **Layout** (place freely, like Figma).
-2. Add text, icons, uploads, Unsplash photos, Giphy GIFs, or a YouTube / MP4 clip from Create.
+2. Add text, shapes, emoji, Phosphor icons (Solid / Outlined), uploads, Unsplash photos, Giphy GIFs, or a YouTube / MP4 clip from Create.
 3. Tune gravity, speed, and bounciness (Physics), or arrange layers (Layout).
 4. Spacebar triggers a fall. Export GIF / MP4 / MOV / PNG, or save a `.pill` project.
 
 YouTube and uploaded video do not rasterize — export warns, then draws a play-button stand-in.
+
+## Icons
+
+Canvas **Icon** search uses [Phosphor Icons](https://phosphoricons.com/) ([`@phosphor-icons/core`](https://github.com/phosphor-icons/core)) — MIT. Solid and Outlined weights ship with the app (no API key). The same set powers much of the editor chrome.
 
 ## Shapes
 
@@ -109,7 +113,7 @@ Original Ultrapilled code and original assets are under the [MIT License](LICENS
 - This covers **our** code and original assets only. Dependencies and bundled third-party files keep their own terms:
   - [Matter.js](https://brm.io/matter-js/)
   - [GSAP](https://gsap.com/standard-license/)
-  - [Phosphor Icons](https://github.com/phosphor-icons/core)
+  - [Phosphor Icons](https://github.com/phosphor-icons/core) — editor chrome and Create → **Icon** search (MIT; see [Icons](#icons))
   - [prores-wasm-encoder](https://github.com/OlivierEstevez/ProRes-WASM-encoder) by Olivier Estevez (LGPL-2.1-or-later; see [Video export](#video-export))
   - Mattone (`public/fonts/Mattone-LICENSE.txt`, SIL Open Font License 1.1)
   - [Le Murmure](https://velvetyne.fr/fonts/le-murmure/) (Ultrapilled logotype, SIL Open Font License 1.1)

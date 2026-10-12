@@ -7932,6 +7932,10 @@ html[data-theme="day"] .bug-report__message {
   overflow: hidden;
 }
 
+.unsplash-modal__style {
+  flex: none;
+}
+
 .unsplash-modal__search {
   flex: none;
   gap: var(--space-1);
@@ -8022,6 +8026,33 @@ html[data-theme="day"] .bug-report__message {
 
 .unsplash-grid__item:hover img {
   filter: brightness(1.1);
+}
+
+.unsplash-grid--icons {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.unsplash-grid__item--icon {
+  background: color-mix(in srgb, var(--field) 70%, var(--panel));
+}
+
+.unsplash-grid__item--icon img {
+  box-sizing: border-box;
+  padding: calc(18px * var(--ui-scale));
+  object-fit: contain;
+  /* Phosphor SVGs render black via currentColor; invert on dark themes. */
+  filter: invert(1);
+  transition: transform 0.15s ease;
+}
+
+.unsplash-grid__item--icon:hover img {
+  filter: invert(1);
+  transform: scale(1.06);
+}
+
+html[data-theme="day"] .unsplash-grid__item--icon img,
+html[data-theme="day"] .unsplash-grid__item--icon:hover img {
+  filter: none;
 }
 
 .unsplash-grid__item.is-busy {

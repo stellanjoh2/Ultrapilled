@@ -38,6 +38,7 @@ type ExportMode = "image" | "video" | "gif";
 type ImageFormat = "png" | "jpg";
 type ImageOutput = "still" | "sequence";
 type VideoFormat = "mp4" | "mov";
+type LayoutDuration = 5 | 10;
 
 let exportMode: ExportMode = "image";
 let frameRate: FrameRate = 30;
@@ -49,6 +50,8 @@ let imageTransparent = false;
 let imageOutput: ImageOutput = "still";
 let videoFormat: VideoFormat = "mp4";
 let videoTransparent = false;
+/** Layout-mode video length only — physics ignores this. */
+let layoutDuration: LayoutDuration = 5;
 let busy = false;
 let cancelRequested = false;
 let lastStatus = "";
@@ -68,7 +71,7 @@ function setStatus(message: string) {
 function applyBusy() {
   panelEl
     ?.querySelectorAll<HTMLButtonElement>(
-      "[data-export], [data-export-mode], [data-fps], [data-image-format], [data-image-alpha], [data-image-output], [data-video-format], [data-video-alpha]",
+      "[data-export], [data-export-mode], [data-fps], [data-layout-duration], [data-image-format], [data-image-alpha], [data-image-output], [data-video-format], [data-video-alpha]",
     )
     .forEach((button) => {
       button.disabled = busy;
@@ -90,6 +93,11 @@ function paintChoices() {
   });
   panelEl?.querySelectorAll<HTMLButtonElement>("[data-fps]").forEach((button) => {
     const on = Number(button.dataset.fps) === frameRate;
+    button.classList.toggle("is-on", on);
+    button.setAttribute("aria-pressed", String(on));
+  });
+  panelEl?.querySelectorAll<HTMLButtonElement>("[data-layout-duration]").forEach((button) => {
+    const on = Number(button.dataset.layoutDuration) === layoutDuration;
     button.classList.toggle("is-on", on);
     button.setAttribute("aria-pressed", String(on));
   });
@@ -222,9 +230,22 @@ function imagePaneHtml(): string {
       <p class="hint" id="seq-folder-hint"></p>`;
 }
 
-function videoPaneHtml(): string {
+function layoutDurationHtml(): string {
   return `
-      <p class="hint">Renders a full loop of the current scene. Includes bounce sounds when Sound is on.</p>
+      <h2 data-tip="How long the layout clip runs. GIFs and text animations keep playing.">Length</h2>
+      <div class="segment" role="group" aria-label="Export length">
+        <button type="button" class="pill${layoutDuration === 5 ? " is-on" : ""}" data-layout-duration="5" aria-pressed="${layoutDuration === 5}" data-tip="Five seconds of your layout">5s</button>
+        <button type="button" class="pill${layoutDuration === 10 ? " is-on" : ""}" data-layout-duration="10" aria-pressed="${layoutDuration === 10}" data-tip="Ten seconds of your layout">10s</button>
+      </div>`;
+}
+
+function videoPaneHtml(layoutMode: boolean): string {
+  return `
+      <p class="hint">${
+        layoutMode
+          ? "Renders your layout for the length below. Object animations keep playing — no physics entry."
+          : "Renders a full loop of the current scene. Includes bounce sounds when Sound is on."
+      }</p>
       <div class="segment" role="group" aria-label="Video format">
         <button type="button" class="pill" data-video-format="mp4" data-tip="Wide compatibility. Includes bounce sounds when Sound is on.">.MP4</button>
         <button type="button" class="pill" data-video-format="mov" data-tip="ProRes for editing apps. Larger files. Includes bounce sounds when Sound is on.">.MOV</button>
@@ -238,7 +259,8 @@ function videoPaneHtml(): string {
         <select id="video-size">${optionsHtml(VIDEO_SIZE_PRESETS, videoPreset)}</select>
       </label>
       <p class="hint" id="video-size-meta"></p>
-      ${fpsSegmentHtml()}`;
+      ${fpsSegmentHtml()}
+      ${layoutMode ? layoutDurationHtml() : ""}`;
 }
 
 function gifPaneHtml(): string {
@@ -251,8 +273,8 @@ function gifPaneHtml(): string {
       ${fpsSegmentHtml()}`;
 }
 
-function modePaneHtml(): string {
-  if (exportMode === "video") return videoPaneHtml();
+function modePaneHtml(layoutMode: boolean): string {
+  if (exportMode === "video") return videoPaneHtml(layoutMode);
   if (exportMode === "gif") return gifPaneHtml();
   return imagePaneHtml();
 }
@@ -263,7 +285,7 @@ function exportTip(): string {
   return "Export with the image settings above";
 }
 
-function panelHtml(): string {
+function panelHtml(layoutMode: boolean): string {
   return `
     <section class="section">
       <h2 data-tip="Still frames, video, or animated GIF">Export</h2>
@@ -272,7 +294,7 @@ function panelHtml(): string {
         <button type="button" class="pill${exportMode === "video" ? " is-on" : ""}" data-export-mode="video" aria-pressed="${exportMode === "video"}" data-tip="Rendered video of a full loop">Video</button>
         <button type="button" class="pill${exportMode === "gif" ? " is-on" : ""}" data-export-mode="gif" aria-pressed="${exportMode === "gif"}" data-tip="Animated GIF of a loop">GIF</button>
       </div>
-      ${modePaneHtml()}
+      ${modePaneHtml(layoutMode)}
       <div class="export-list">
         <button type="button" class="pill" data-export="${exportMode}" data-tip="${exportTip()}">Export</button>
       </div>
@@ -283,7 +305,8 @@ function panelHtml(): string {
 
 export function mountExportPanel(panel: HTMLElement, controller: ExportController, scroll: number) {
   panelEl = panel;
-  panel.innerHTML = panelHtml();
+  const layoutMode = Boolean(controller.state().physics.layoutMode);
+  panel.innerHTML = panelHtml(layoutMode);
   setStatus(lastStatus);
   const seqHint = panel.querySelector("#seq-folder-hint");
   if (seqHint) {
@@ -319,6 +342,16 @@ export function mountExportPanel(panel: HTMLElement, controller: ExportControlle
       "click",
       () => {
         frameRate = Number(button.dataset.fps) === 60 ? 60 : 30;
+        paintChoices();
+      },
+      { signal },
+    );
+  });
+  panel.querySelectorAll<HTMLButtonElement>("[data-layout-duration]").forEach((button) => {
+    button.addEventListener(
+      "click",
+      () => {
+        layoutDuration = Number(button.dataset.layoutDuration) === 10 ? 10 : 5;
         paintChoices();
       },
       { signal },
@@ -490,6 +523,11 @@ async function runExport(kind: ExportKind, controller: ExportController) {
       shouldStop,
       onProgress: progress,
     };
+    // Layout video: user-picked length. Physics (and GIF/sequences) ignore this.
+    const layoutHoldMs =
+      state.physics.layoutMode && (kind === "mp4" || kind === "mov" || kind === "mov-alpha")
+        ? layoutDuration * 1000
+        : undefined;
     const note =
       kind === "png-seq"
         ? await exportSequence({
@@ -502,10 +540,10 @@ async function runExport(kind: ExportKind, controller: ExportController) {
         : kind === "jpg-seq"
           ? await exportSequence({ ...shared, preset: image, kind: "jpg", transparent: false, folder })
           : kind === "mp4"
-            ? await exportMp4({ ...shared, preset: video })
+            ? await exportMp4({ ...shared, preset: video, layoutHoldMs })
             : kind === "gif"
               ? await exportGif({ ...shared, preset: gif })
-              : await exportMov({ ...shared, preset: video, transparent: kind === "mov-alpha" });
+              : await exportMov({ ...shared, preset: video, transparent: kind === "mov-alpha", layoutHoldMs });
     setStatus(doneMessage(note, fps, Boolean(folder)));
     playCelebrate();
   } catch (error) {

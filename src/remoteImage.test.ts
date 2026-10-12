@@ -3,7 +3,7 @@ import { defaultImageSlot } from "./types";
 import { canRelinkSlot, imageRemoteOf, parseRemoteFromName, srcNeedsRelink } from "./remoteImage";
 
 describe("remoteImage", () => {
-  it("parses Unsplash and Giphy filenames", () => {
+  it("parses Unsplash, Giphy, and Phosphor filenames", () => {
     expect(parseRemoteFromName("unsplash-Jane_Doe-nR5r4U8aYY.jpg")).toEqual({
       kind: "unsplash",
       id: "nR5r4U8aYY",
@@ -11,6 +11,18 @@ describe("remoteImage", () => {
     expect(parseRemoteFromName("giphy-PBS-w-3o7aCTPPm4OHfRLSH6.gif")).toEqual({
       kind: "giphy",
       id: "3o7aCTPPm4OHfRLSH6",
+    });
+    expect(parseRemoteFromName("phosphor-fill-heart.svg")).toEqual({
+      kind: "phosphor",
+      id: "fill:heart",
+    });
+    expect(parseRemoteFromName("phosphor-regular-rocket.svg")).toEqual({
+      kind: "phosphor",
+      id: "regular:rocket",
+    });
+    expect(parseRemoteFromName("phosphor-heart.svg")).toEqual({
+      kind: "phosphor",
+      id: "fill:heart",
     });
     expect(parseRemoteFromName("photo.png")).toBeNull();
   });

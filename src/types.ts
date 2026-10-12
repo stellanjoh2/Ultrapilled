@@ -203,12 +203,12 @@ export type ImageSlot = {
   youtube?: YouTubeClip;
   /** Local muted autoplay video (mp4). When set, `src` / emoji / youtube are unused. */
   video?: LocalVideo;
-  /** Unsplash / Giphy identity so blob URLs can be re-fetched after reconnect. */
+  /** Unsplash / Giphy / Phosphor identity so blob URLs can be re-fetched after reconnect. */
   remote?: ImageRemote;
 };
 
 export type ImageRemote = {
-  kind: "unsplash" | "giphy";
+  kind: "unsplash" | "giphy" | "phosphor";
   id: string;
 };
 

@@ -1,4 +1,11 @@
 import { getGiphyGif, giphyConfigured, giphyGifFile } from "./giphyApi";
+import {
+  getPhosphorIcon,
+  parsePhosphorRemoteId,
+  phosphorConfigured,
+  phosphorIconFile,
+  phosphorRemoteId,
+} from "./phosphorApi";
 import type { PillProject } from "./project/pillFormat";
 import type { ImageRemote, ImageSlot, Slot } from "./types";
 import { getUnsplashPhoto, unsplashConfigured, unsplashPhotoFile } from "./unsplashApi";
@@ -9,12 +16,31 @@ export function parseRemoteFromName(name: string): ImageRemote | null {
   if (unsplash?.[1]) return { kind: "unsplash", id: unsplash[1] };
   const giphy = /^giphy-.+-([A-Za-z0-9]+)\.gif$/i.exec(base);
   if (giphy?.[1]) return { kind: "giphy", id: giphy[1] };
+  const phosphorStyled = /^phosphor-(fill|regular)-([a-z0-9-]+)\.svg$/i.exec(base);
+  if (phosphorStyled?.[1] && phosphorStyled[2]) {
+    return {
+      kind: "phosphor",
+      id: phosphorRemoteId(phosphorStyled[1].toLowerCase() as "fill" | "regular", phosphorStyled[2].toLowerCase()),
+    };
+  }
+  // Legacy bare name from the first ship = solid fill.
+  const phosphor = /^phosphor-([a-z0-9-]+)\.svg$/i.exec(base);
+  if (phosphor?.[1]) return { kind: "phosphor", id: phosphorRemoteId("fill", phosphor[1].toLowerCase()) };
   return null;
 }
 
 export function imageRemoteOf(slot: Pick<ImageSlot, "remote" | "name">): ImageRemote | null {
   const stored = slot.remote;
-  if (stored && (stored.kind === "unsplash" || stored.kind === "giphy") && stored.id) {
+  if (
+    stored &&
+    (stored.kind === "unsplash" || stored.kind === "giphy" || stored.kind === "phosphor") &&
+    stored.id
+  ) {
+    if (stored.kind === "phosphor") {
+      const parsed = parsePhosphorRemoteId(stored.id);
+      if (!parsed) return parseRemoteFromName(slot.name);
+      return { kind: "phosphor", id: phosphorRemoteId(parsed.style, parsed.name) };
+    }
     return { kind: stored.kind, id: stored.id };
   }
   return parseRemoteFromName(slot.name);
@@ -30,14 +56,18 @@ export async function fileForRemote(remote: ImageRemote): Promise<File | null> {
       if (!unsplashConfigured()) return null;
       return unsplashPhotoFile(await getUnsplashPhoto(remote.id), { track: false });
     }
-    if (!giphyConfigured()) return null;
-    return giphyGifFile(await getGiphyGif(remote.id), { track: false });
+    if (remote.kind === "giphy") {
+      if (!giphyConfigured()) return null;
+      return giphyGifFile(await getGiphyGif(remote.id), { track: false });
+    }
+    if (!phosphorConfigured()) return null;
+    return phosphorIconFile(await getPhosphorIcon(remote.id));
   } catch {
     return null;
   }
 }
 
-/** Re-fetch Unsplash / Giphy blobs after a refresh. Data URLs and live files stay put. */
+/** Re-fetch Unsplash / Giphy / Phosphor blobs after a refresh. Data URLs and live files stay put. */
 export async function relinkProjectImages(project: PillProject): Promise<void> {
   const unique: Slot[] = [];
   const seen = new Set<Slot>();
@@ -77,7 +107,7 @@ export function canRelinkSlot(slot: Slot, chipEl?: HTMLElement | null): slot is 
   return slot.kind === "image" && Boolean(imageRemoteOf(slot)) && imageLooksMissing(slot, chipEl);
 }
 
-/** Fetch a new blob for one Unsplash / Giphy chip. Leaves look, size, and pose alone. */
+/** Fetch a new blob for one Unsplash / Giphy / Phosphor chip. Leaves look, size, and pose alone. */
 export async function relinkSlotImage(slot: ImageSlot, cache?: Map<string, string>): Promise<boolean> {
   if (slot.youtube || slot.video) return false;
   const remote = imageRemoteOf(slot);

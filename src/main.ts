@@ -85,6 +85,7 @@ import smileyIcon from "@phosphor-icons/core/assets/regular/smiley.svg?raw";
 import uploadSimple from "@phosphor-icons/core/assets/regular/upload-simple.svg?raw";
 import imagesIcon from "@phosphor-icons/core/assets/regular/images.svg?raw";
 import gifIcon from "@phosphor-icons/core/assets/regular/gif.svg?raw";
+import phosphorLogo from "@phosphor-icons/core/assets/regular/phosphor-logo.svg?raw";
 import youtubeLogo from "@phosphor-icons/core/assets/regular/youtube-logo.svg?raw";
 import eyeIcon from "@phosphor-icons/core/assets/regular/eye.svg?raw";
 import eyeSlash from "@phosphor-icons/core/assets/regular/eye-slash.svg?raw";
@@ -102,6 +103,7 @@ import { closeSettings, openSettings, isSettingsOpen } from "./settingsPanel";
 import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
 import { withUnsplashUtm } from "./unsplashApi";
 import { openGiphyImport, isGiphyOpen } from "./giphyPanel";
+import { openPhosphorImport, isPhosphorOpen } from "./phosphorPanel";
 import { openYouTubeImport, isYouTubeOpen } from "./youtubePanel";
 import {
   DEFAULT_YOUTUBE_SIZE,
@@ -1450,8 +1452,15 @@ const exportController = {
     return { width: frame.width, height: frame.height, scale: layoutScale(frame) };
   },
   draws: () => world.draws(),
-  poses: () => world.fallStartPoses() ?? (world.chipCount() > 0 ? world.poses() : []),
-  replayFall: () => world.fallStartPoses() != null,
+  // Layout: current seats (never fall-start — those are often above the stage).
+  // Physics: prefer the last fall’s spawn so export replays the entry.
+  poses: () => {
+    if (state.physics.layoutMode) {
+      return world.chipCount() > 0 ? world.poses() : [];
+    }
+    return world.fallStartPoses() ?? (world.chipCount() > 0 ? world.poses() : []);
+  },
+  replayFall: () => !state.physics.layoutMode && world.fallStartPoses() != null,
   state: () => state,
   async saveProject() {
     const json = serializePillProject(await embedSlotImages(currentPillProject()));
@@ -2115,6 +2124,11 @@ function createPanelHost(): CreatePanelHost {
         onPick: (file, remote) => addImagesFromFiles([file], undefined, remote),
       });
     },
+    openPhosphorAdd() {
+      openPhosphorImport({
+        onPick: (file, remote) => addImagesFromFiles([file], undefined, remote),
+      });
+    },
     openYouTubeAdd() {
       openYouTubeImport({
         onPick: (clip) => addYouTubeSlot(clip),
@@ -2370,10 +2384,16 @@ function syncImageIconBaseline(slot: ImageSlot) {
   base.src = slot.src;
   base.name = slot.name;
   base.emoji = slot.emoji;
+  // Phosphor apply sets tint / auto-dark after the first baseline snapshot.
+  if (slot.remote?.kind === "phosphor") {
+    base.tint = slot.tint;
+    base.color = slot.color;
+    base.colorIndex = slot.colorIndex;
+  }
 }
 
 /**
- * Swap an image in place. Unsplash / Giphy chips reopen their search modal;
+ * Swap an image in place. Unsplash / Giphy / Phosphor chips reopen their search modal;
  * local uploads keep the file picker.
  */
 function replaceImageSlot(slot: ImageSlot): void {
@@ -2395,6 +2415,10 @@ function replaceImageSlot(slot: ImageSlot): void {
     openGiphyImport({ onPick: (file, next) => apply(file, next) });
     return;
   }
+  if (remote?.kind === "phosphor") {
+    openPhosphorImport({ onPick: (file, next) => apply(file, next) });
+    return;
+  }
   void pickImageFiles(false).then((files) => {
     const file = files[0];
     if (!file) return;
@@ -2413,7 +2437,15 @@ function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Pro
   slot.video = undefined;
   slot.remote = remote;
   slot.collider = undefined;
-  slot.tint = undefined;
+  // Phosphor icons are silhouettes — recolor on by default, like library shapes.
+  // Bright canvases get dark ink so white/lime theme swatches don't vanish.
+  if (remote?.kind === "phosphor") {
+    slot.tint = true;
+    const backdrop = logoBackdropColor(state.background, state.stageColor);
+    if (logotypeInk(backdrop) === "#111111") slot.color = "#111111";
+  } else {
+    slot.tint = undefined;
+  }
   slot.inverted = undefined;
   slot.exposure = undefined;
   slot.contrast = undefined;
@@ -2602,14 +2634,33 @@ function addImagesFromFiles(
   const ids = slots.map((slot) => slot.id);
   void Promise.all(jobs).then(() => {
     resize();
-    // Remount after trim/decode can drop the insert grow; re-reveal the open card.
-    revealSlotId = last.id;
-    renderPanel();
     if (at) {
       const { x, y } = playfieldPoint(at.clientX, at.clientY);
       world.placeSlotsAt(ids, x, y);
     }
     live();
+    // Trim/decode used to full-remount and cancel insert grow / scroll. Refresh the
+    // open card in place and scroll after layout so Icon / Unsplash / Giphy land
+    // on settings like Shape / Emoji.
+    settleRevealSlot(last.id);
+  });
+}
+
+/** After an async import, keep Create → Objects on this card and scroll to its settings. */
+function settleRevealSlot(id: string) {
+  const jumped = panelTab !== "physics";
+  if (jumped) panelTab = "physics";
+  openSections.add("what-falls");
+  openOnly(id);
+  if (jumped || !panel.querySelector(`#slots [data-id="${id}"]`)) {
+    revealSlotId = id;
+    renderPanel();
+    return;
+  }
+  refreshSlotCard(id);
+  requestAnimationFrame(() => {
+    const card = panel.querySelector<HTMLElement>(`[data-id="${id}"]`);
+    if (card) scrollPanelTo(card);
   });
 }
 
@@ -2791,7 +2842,7 @@ function iconSrc(slot: ImageSlot): string {
 
 function uploadedShape(slot: ImageSlot): boolean {
   if (slot.emoji || slot.youtube || slot.video) return false;
-  // Giphy / Unsplash keep photo controls even when the blob src is empty or dead.
+  // Giphy / Unsplash / Phosphor keep photo controls even when the blob src is empty or dead.
   if (imageRemoteOf(slot)) return true;
   return Boolean(slot.src) && !presetIdForSrc(slot.src);
 }
@@ -4068,6 +4119,17 @@ function openCanvasMenu(x: number, y: number) {
     { label: "Longer text", icon: textT, create: true, tip: "A wrapping box you can resize and paste into — sentences and paragraphs", run: () => addTextFieldSlot(at) },
     { label: "Shape", icon: shapesIcon, create: true, tip: "Add a built-in shape from the library", run: () => addShapeSlot(at) },
     { label: "Emoji", icon: smileyIcon, create: true, tip: "Add an emoji", run: () => addEmojiSlot(at) },
+    {
+      label: "Icon",
+      icon: phosphorLogo,
+      create: true,
+      tip: "Search Phosphor icons — Solid or Outlined",
+      run: () => {
+        openPhosphorImport({
+          onPick: (file, remote) => addImagesFromFiles([file], at, remote),
+        });
+      },
+    },
     {
       label: "Image",
       icon: uploadSimple,
@@ -6721,7 +6783,18 @@ window.addEventListener("keydown", (event) => {
   }
   if (typingInField(event.target)) return;
   if (document.body.classList.contains("is-exporting")) return;
-  if (isSettingsOpen() || isHelpOpen() || isAboutOpen() || isBugReportOpen() || isUnsplashOpen() || isGiphyOpen() || isYouTubeOpen()) return;
+  if (
+    isSettingsOpen() ||
+    isHelpOpen() ||
+    isAboutOpen() ||
+    isBugReportOpen() ||
+    isUnsplashOpen() ||
+    isGiphyOpen() ||
+    isPhosphorOpen() ||
+    isYouTubeOpen()
+  ) {
+    return;
+  }
   if (document.querySelector(".reconnect[aria-modal='true']")) return;
   if (presenting) {
     if (event.code === "Space" || event.key === "ArrowRight" || event.key === "PageDown") {

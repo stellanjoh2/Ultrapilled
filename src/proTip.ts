@@ -28,6 +28,7 @@ const HINTS: Hint[] = [
   { text: "Hit", key: "P", after: "to re-trigger physics" },
   { text: "Do you hate bouncy stuff? Try Layout Mode — or hit", key: "L" },
   { text: "Need ideas? Explore the templates in the Create tab" },
+  { text: "Create → Icon searches Phosphor — try Solid and Outlined" },
   { text: "Hide the UI for a clean canvas", key: "H" },
   { text: "Hit", key: "G", after: "to toggle the grid" },
   { text: "Delete a selected object with Backspace" },

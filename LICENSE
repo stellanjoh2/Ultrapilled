@@ -21,5 +21,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 Ultrapilled original code and original assets are licensed under the MIT License
-above. Third-party libraries and bundled assets remain under their own licenses.
-Exports you create with the app are yours; see README.md.
+above. Third-party libraries and bundled assets remain under their own licenses
+(including Phosphor Icons for UI chrome and Create → Icon search). Exports you
+create with the app are yours; see README.md.

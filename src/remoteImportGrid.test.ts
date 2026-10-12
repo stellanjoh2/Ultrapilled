@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { closeGiphy, isGiphyOpen, openGiphyImport } from "./giphyPanel";
+import { closePhosphor, isPhosphorOpen, openPhosphorImport } from "./phosphorPanel";
 import { closeUnsplash, isUnsplashOpen, openUnsplashImport } from "./unsplashPanel";
 
 describe("remote import grid scroll", () => {
@@ -18,12 +19,13 @@ describe("remote import grid scroll", () => {
 
   afterEach(() => {
     closeGiphy();
+    closePhosphor();
     closeUnsplash();
     document.body.innerHTML = "";
     vi.restoreAllMocks();
   });
 
-  it("wraps Giphy and Unsplash thumbnails in a scroller", () => {
+  it("wraps Giphy, Unsplash, and Phosphor thumbnails in a scroller", () => {
     openGiphyImport({ onPick() {} });
     expect(isGiphyOpen()).toBe(true);
     expect(document.querySelector(".unsplash-grid-scroll [data-giphy-grid]")).toBeTruthy();
@@ -32,5 +34,11 @@ describe("remote import grid scroll", () => {
     openUnsplashImport({ onPick() {} });
     expect(isUnsplashOpen()).toBe(true);
     expect(document.querySelector(".unsplash-grid-scroll [data-unsplash-grid]")).toBeTruthy();
+    closeUnsplash();
+
+    openPhosphorImport({ onPick() {} });
+    expect(isPhosphorOpen()).toBe(true);
+    expect(document.querySelector(".unsplash-grid-scroll [data-phosphor-grid]")).toBeTruthy();
+    expect(document.querySelectorAll("[data-phosphor-style]")).toHaveLength(2);
   });
 });

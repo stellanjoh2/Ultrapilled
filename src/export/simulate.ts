@@ -16,6 +16,11 @@ const MAX_FRAMES = 7200;
 const MAX_FALL_MS = 12_000;
 /** Wall-clock escape hatch when each 1080p frame is expensive (grain, GIFs). */
 const MAX_WALL_MS = 90_000;
+/**
+ * Layout export has no fall — hold alone (often 0.8s) is too short for GIF /
+ * text-anim loops. Video UI picks 5s/10s; other formats use this floor.
+ */
+const LAYOUT_EXPORT_MIN_MS = 3000;
 
 export class ExportCancelled extends Error {
   constructor() {
@@ -43,6 +48,8 @@ export async function renderLoop(options: {
   poses?: ChipPose[];
   /** When true with poses, wake in place (replay last fall start). When false, redeployFall. */
   replayFall?: boolean;
+  /** Layout video length override (ms). Physics ignores this. */
+  layoutHoldMs?: number;
   frame?: { width: number; height: number };
   canvas?: HTMLCanvasElement;
   onFrame: (canvas: HTMLCanvasElement, index: number) => Promise<void | false> | void | false;
@@ -65,7 +72,12 @@ export async function renderLoop(options: {
 
   const stepsPerFrame = options.fps === 60 ? 1 : 2;
   const frameMs = stepsPerFrame * STEP_MS;
-  const holdMs = options.state.physics.hold * 1000;
+  const layoutExport = Boolean(options.state.physics.layoutMode);
+  const holdMs = layoutExport
+    ? options.layoutHoldMs != null && options.layoutHoldMs > 0
+      ? options.layoutHoldMs
+      : Math.max(options.state.physics.hold * 1000, LAYOUT_EXPORT_MIN_MS)
+    : options.state.physics.hold * 1000;
 
   let frames = 0;
   let limited = false;
@@ -87,7 +99,7 @@ export async function renderLoop(options: {
       theme: options.state.theme,
       post: options.state.post,
       transparent: options.transparent,
-      layoutMode: Boolean(options.state.physics.layoutMode),
+      layoutMode: layoutExport,
       pillPad: options.state.pillPad,
     };
 
@@ -112,7 +124,7 @@ export async function renderLoop(options: {
           poses,
           frame,
         );
-        if (options.state.physics.layoutMode) sim.freezePile();
+        if (layoutExport) sim.freezePile();
         else if (options.replayFall) sim.wakeAll();
         else sim.redeployFall();
         sim.sync();
@@ -127,6 +139,10 @@ export async function renderLoop(options: {
           options.state.textTracking,
           options.state.sizeRandom,
         );
+        if (layoutExport) {
+          sim.freezePile();
+          sim.sync();
+        }
       }
 
       if (sim.chipCount() === 0) {
@@ -138,7 +154,8 @@ export async function renderLoop(options: {
         continue;
       }
 
-      let phase: "falling" | "holding" = "falling";
+      // Layout: freeze in place — no entry fall; time still advances for GIF/text anims.
+      let phase: "falling" | "holding" = layoutExport ? "holding" : "falling";
       let elapsed = 0;
       let settledFor = 0;
       let holdFor = 0;

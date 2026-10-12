@@ -132,6 +132,25 @@ function emoji(char: string, name: string, amount: number, scale: number): Image
   return defaultImageSlot({ src: "", name, emoji: char, size: 56, amount, colorIndex: 0, scale });
 }
 
+/** Phosphor Create → Icon pick; empty src relinks from `@phosphor-icons/core` on load. */
+function phosphor(
+  remoteId: `${"fill" | "regular"}:${string}`,
+  extra: Partial<ImageSlot> = {},
+): ImageSlot {
+  return defaultImageSlot({
+    src: "",
+    name: `phosphor-${remoteId.replace(":", "-")}.svg`,
+    size: 69.44444444444444,
+    amount: 1,
+    colorIndex: 1,
+    radius: 0,
+    tint: true,
+    collider: "sphere",
+    remote: { kind: "phosphor", id: remoteId },
+    ...extra,
+  });
+}
+
 export function acidState(): AppState {
   const text = (slot: Partial<TextSlot>) => defaultTextSlot({ fontFamily: "Syne", fontWeight: 800, ...slot });
   const slots: Slot[] = [
@@ -185,7 +204,9 @@ export function acidState(): AppState {
       textAnim: true,
     }),
     defaultImageSlot({ src: "", name: "Control Knobs", emoji: "🎛️", size: 56, amount: 1, colorIndex: 1, scale: 1 }),
+    text({ text: "WAREHOUSE", colorIndex: 2, textColorIndex: 4, stroked: true, stroke: 2, pillPad: 24, scale: 0.95 }),
     defaultImageSlot({ src: "", name: "Skull", emoji: "💀", size: 56, amount: 2, colorIndex: 1, scale: 0.65 }),
+    phosphor("regular:smiley"),
     defaultImageSlot({ src: "", name: "Pill", emoji: "💊", size: 56, amount: 2, colorIndex: 2, scale: 0.7 }),
     defaultImageSlot({
       src: "",
@@ -198,7 +219,6 @@ export function acidState(): AppState {
       stroke: 4,
       remote: { kind: "giphy", id: "84BHwBZB4ThDyOHbEI" },
     }),
-    text({ text: "WAREHOUSE", colorIndex: 2, textColorIndex: 4, stroked: true, stroke: 2, pillPad: 24, scale: 0.95 }),
     text({
       text: "MENTAL",
       shape: "none",
@@ -221,6 +241,7 @@ export function acidState(): AppState {
     }),
     presetIcon("Clovers", 2, 2),
     defaultImageSlot({ src: "", name: "Musical Keyboard", emoji: "🎹", size: 72, amount: 1, colorIndex: 2, scale: 0.75 }),
+    phosphor("fill:smiley", { scale: 1.1020408409924023 }),
     photo("acid", "go-ahead-london.jpg", "Go Ahead London", 110, 18),
     text({
       text: "FREE PARTY",
@@ -235,8 +256,8 @@ export function acidState(): AppState {
       gradientSpeed: 14,
       textColor: "#000000",
     }),
-    text({ text: "NUTTER", colorIndex: 4, textColorIndex: 0, stroked: true, stroke: 4, scale: 0.75, pillPad: 64 }),
     presetIcon("Stars", 1, 1, { scale: 1, gradient: false, gradientColorIndex: 0, gradientAngle: 253 }),
+    text({ text: "NUTTER", colorIndex: 4, textColorIndex: 0, stroked: true, stroke: 4, scale: 0.75, pillPad: 64 }),
     text({ text: "BOSH", colorIndex: 2, scale: 0.4, pillPad: 63 }),
     text({
       text: "160–180 BPM",
@@ -309,7 +330,7 @@ export function acidState(): AppState {
     sizeRandom: 100,
     pillPad: 14,
     textTracking: 37,
-    shapeAmount: 15,
+    shapeAmount: 14,
     theme: [...DEFAULT_THEME],
     physics: { ...DEFAULT_PHYSICS, gravity: 2.05, bounce: 0.65 },
     post: { bloom: 0, bloomOpacity: 100, grain: 0, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
@@ -339,14 +360,14 @@ export function newYorkState(): AppState {
     text({ text: "The", ...didone(900), shape: bare, colorIndex: INK, scale: 2, tracking: -60 }),
     presetIcon("Stars", 2, RED, { scale: 0.6 }),
     text({ text: "Culture", ...grotesk, shape: bare, colorIndex: RED, scale: 2.4 }),
+    presetIcon("Checks", 1, INK, { scale: 0.8 }),
     text({ text: "&", ...didone(900), shape: bare, colorIndex: BLUE, scale: 4.31 }),
-    photo("new-york", "template-new-york-pizza-slice.gif", "Pizza", 114, 0, 0.73, {
+    photo("new-york", "template-new-york-pizza-slice.gif", "Pizza", 114, 0, 1.4660714123441718, {
       colorIndex: BLUE,
       exposure: 22,
     }),
     text({ text: "Section A", ...franklin(800), ...box, colorIndex: INK, textColorIndex: PAPER, scale: 0.95 }),
-    presetIcon("Arches", 1, INK, { scale: 0.8 }),
-    text({ text: "Brooklyn", ...franklin(900), shape: bare, colorIndex: INK, scale: 0.8401389766678089, tracking: -80 }),
+    text({ text: "Subway", ...franklin(900), shape: bare, colorIndex: INK, scale: 1.3699413429881004, tracking: -80 }),
     defaultImageSlot({
       src: "",
       name: "giphy-GIPHY-pOeaTGiDBZgYM.gif",
@@ -384,7 +405,7 @@ export function newYorkState(): AppState {
       scale: 0.65,
       pillPad: 55,
     }),
-    photo("new-york", "template-new-york-nyc-taxi.gif", "NYC Taxi", 114, 0, 1.4735658989474556, {
+    photo("new-york", "template-new-york-nyc-taxi.gif", "NYC Taxi", 114, 0, 1.5302974404738625, {
       colorIndex: PINK,
       exposure: 39,
     }),
@@ -399,13 +420,15 @@ export function newYorkState(): AppState {
       remote: { kind: "unsplash", id: "pnmOm0dG1Ng" },
     }),
     presetIcon("Steps", 1, RED, { scale: 0.8 }),
+    phosphor("fill:baseball", { colorIndex: BLUE, size: 75.75757575757576, scale: 0.750344203684905 }),
     text({ text: "“", ...didone(900), shape: bare, colorIndex: RED, scale: 3 }),
     face("🗞️", "Rolled-Up Newspaper", PINK),
     face("🇺🇸", "Flag United States", RED),
     text({ text: "Reimagined", fontFamily: "DM Serif Display", fontWeight: 400, shape: bare, colorIndex: BLUE, scale: 1.3 }),
-    text({ text: "Final Edition", ...franklin(700), shape: "pill", colorIndex: INK, textColorIndex: PAPER, scale: 0.85 }),
+    phosphor("fill:train", { colorIndex: INK, size: 96.80134680134681, scale: 0.9359301197969678, collider: "block" }),
     text({ text: "Vol. XXVI", ...serif(400), shape: bare, colorIndex: BLUE, scale: 1.1 }),
     presetIcon("Rings", 2, BLUE, { scale: 0.55 }),
+    text({ text: "Final Edition", ...franklin(700), shape: "pill", colorIndex: INK, textColorIndex: PAPER, scale: 0.85 }),
     face("🗽", "Statue Of Liberty", BLUE),
     text({ text: "Page 12", ...franklin(600), shape: "pill", stroked: true, stroke: 2, colorIndex: RED, scale: 0.4, pillPad: 50 }),
     text({ text: "$4.95", ...franklin(700), shape: "pill", colorIndex: PINK, scale: 0.85 }),
@@ -443,7 +466,7 @@ export function newYorkState(): AppState {
     sizeRandom: 100,
     pillPad: 22,
     textTracking: 0,
-    shapeAmount: 17,
+    shapeAmount: 19,
     theme: ["#111111", "#efece5", "#f0462a", "#1c2bc9", "#f7c6d2"],
     post: { bloom: 0, bloomOpacity: 100, grain: 14, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
     physics: { ...DEFAULT_PHYSICS },
@@ -478,7 +501,7 @@ export function miamiState(): AppState {
       gradientSpeed: 30,
       gradientScale: 23,
       textColor: "#ffffff",
-      scale: 0.9,
+      scale: 1.2424358914741083,
       tracking: -100,
       pillPad: 37,
     }),
@@ -486,12 +509,14 @@ export function miamiState(): AppState {
     photo("miami", "coast-guard.jpg", "Coast Guard", 115, 3, 1.44),
     text({ text: "Nights", fontFamily: "Fraunces", fontWeight: 800, shape: bare, colorIndex: CYAN, scale: 2.2, tracking: -73 }),
     text({ text: "South Beach", fontFamily: "Bebas Neue", fontWeight: 400, textHeight: 38, shape: "box", radius: 3, colorIndex: CYAN, textColorIndex: PINK, scale: 0.9, pillPad: 24, tracking: -47 }),
+    phosphor("fill:martini", { colorIndex: CYAN, size: 71.42857142857143, scale: 0.514940049175949 }),
     text({ text: "Ocean Drive", fontFamily: "Outfit", fontWeight: 200, shape: bare, colorIndex: CYAN, scale: 1.55, tracking: -174 }),
-    photo("miami", "template-miami-testarossa.gif", "Testarossa", 114, 0, 1.4, { colorIndex: CYAN, collider: "sphere" }),
-    text({ text: "Sunset", fontFamily: "Anton", fontWeight: 400, shape: bare, colorIndex: ORANGE, scale: 2.4, tracking: -73 }),
+    photo("miami", "template-miami-testarossa.gif", "Testarossa", 114, 0, 1.6987092828305308, { colorIndex: CYAN, collider: "sphere" }),
+    text({ text: "Sunset", fontFamily: "Anton", fontWeight: 400, shape: bare, colorIndex: ORANGE, scale: 1.6325085707152776, tracking: -73 }),
     photo("miami", "neron.jpg", "Neron Hotel", 115, 28, 1.27),
     text({ text: "Pool Party", fontFamily: "Syne", fontWeight: 800, shape: "pill", colorIndex: SUN, scale: 0.6, textAnim: true, pillPad: 57 }),
     presetIcon("Stars", 1, SUN, { scale: 0.4 }),
+    phosphor("fill:tree-palm", { colorIndex: CYAN, size: 71.42857142857143, scale: 1.0938284793353892 }),
     text({ text: "1985", fontFamily: "Bebas Neue", fontWeight: 400, shape: bare, colorIndex: PINK, scale: 5.7, tracking: -100 }),
     defaultImageSlot({
       src: "",
@@ -509,7 +534,7 @@ export function miamiState(): AppState {
     text({ text: "8PM–2AM", fontFamily: "Space Grotesk", fontWeight: 700, shape: "pill", colorIndex: PINK, textColor: "#ffffff", scale: 0.5, tracking: -81, pillPad: 54 }),
     text({ text: "Hotel", fontFamily: "Fraunces", fontWeight: 800, shape: "box", radius: 3, colorIndex: CYAN, scale: 0.7, tracking: -63, pillPad: 26 }),
     presetIcon("Arches", 1, VIOLET, { scale: 0.8 }),
-    text({ text: "Side A", fontFamily: "Space Mono", fontWeight: 700, shape: "box", radius: 0, stroked: true, stroke: 2, colorIndex: PINK, scale: 0.4, pillPad: 38 }),
+    text({ text: "Side A", fontFamily: "Space Mono", fontWeight: 700, shape: "box", radius: 6, stroked: true, stroke: 2, colorIndex: PINK, scale: 0.4, pillPad: 54 }),
     photo("miami", "metrorail.jpg", "Metrorail", 110, 14),
     text({
       text: "Open Late",
@@ -529,7 +554,7 @@ export function miamiState(): AppState {
   return {
     ...demoState(),
     stageColor: "#120d2b",
-    shapeAmount: 13,
+    shapeAmount: 15,
     background: {
       ...defaultBackground(),
       kind: "gradient",
@@ -575,6 +600,7 @@ export function berlinState(): AppState {
     text({ text: "Kunst", ...heavy, shape: "box", radius: 10, colorIndex: PINK, textColor: "#000000", scale: 1.6, tracking: -80 }),
     photo("berlin", "template-berlin-moma-queue.jpg", "MoMA Queue", 110, 0),
     text({ text: "24H", ...condensed, shape: bare, colorIndex: GREEN, scale: 3.6 }),
+    phosphor("fill:headphones", { colorIndex: ACID, size: 71.42857142857143, scale: 0.7576293831200989 }),
     text({
       text: "Undisclosed Location",
       ...heavy,
@@ -615,6 +641,11 @@ export function berlinState(): AppState {
       pillPad: 77,
       tracking: -124,
     }),
+    photo("berlin", "template-berlin-skull.gif", "Skull", 104, 0, 1.0643852467628665, {
+      colorIndex: ACID,
+      collider: "block",
+      exposure: 22,
+    }),
     defaultImageSlot({
       src: "",
       name: "giphy-Timmy._ID-3A1rfKbBovWtaNzxNu.gif",
@@ -644,14 +675,10 @@ export function berlinState(): AppState {
       tracking: -60,
       pillPad: 48,
     }),
-    photo("berlin", "template-berlin-skull.gif", "Skull", 104, 0, 1.0643852467628665, {
-      colorIndex: ACID,
-      collider: "block",
-      exposure: 22,
-    }),
     presetIcon("Chevrons", 1, ACID, { scale: 0.7 }),
     emoji("🖤", "Black Heart", 2, 0.6),
     text({ text: "Türsteher", ...swiss(700), shape: bare, colorIndex: WHITE, scale: 1.6, tracking: -181 }),
+    phosphor("regular:bicycle", { colorIndex: GREEN, size: 73.14285714285714, scale: 1.1833021791524172 }),
     text({ text: "B2B", ...mono(700), shape: "box", radius: 6, colorIndex: BLUE, textColor: "#ffffff", scale: 0.9 }),
     text({ text: "Line Up TBA", ...mono(400), shape: "pill", stroked: true, stroke: 2, colorIndex: GREEN, scale: 0.4, pillPad: 65 }),
     text({ text: "Ost", ...heavy, shape: bare, colorIndex: BLUE, scale: 2.6, tracking: -172 }),
@@ -664,7 +691,7 @@ export function berlinState(): AppState {
   return {
     ...demoState(),
     stageColor: "#000000",
-    shapeAmount: 17,
+    shapeAmount: 19,
     background: {
       ...defaultBackground(),
       kind: "solid",
@@ -748,6 +775,7 @@ export function halloweenState(): AppState {
     }),
     emoji("💀", "Skeleton", 1, 0.75),
     text({ text: "Don’t go into the basement alone.", ...jolly, shape: "pill", stroked: true, stroke: 2, colorIndex: ORANGE, scale: 0.4, pillPad: 72 }),
+    phosphor("fill:knife", { colorIndex: PURPLE, size: 86.20689655172414, scale: 1 }),
     photo("halloween", "friday-the-13th.jpg", "Friday the 13th", 115, 8, 1.05),
     emoji("🕷️", "Spider", 2, 0.65),
     text({ text: "Graveyard", ...creep, shape: bare, colorIndex: SLIME, scale: 1.9 }),
@@ -778,6 +806,7 @@ export function halloweenState(): AppState {
       pillPad: 71,
     }),
     emoji("🍬", "Candy", 2, 0.6),
+    phosphor("fill:skull", { colorIndex: SLIME, size: 89.45998698763825, scale: 1, color: "#ffffff" }),
     text({ text: "Vampires", ...consent, shape: bare, colorIndex: ORANGE, color: "#ffffff", scale: 1.8, tracking: -80 }),
     photo("halloween", "carroll-borland.jpg", "Carroll Borland", 115, 12, 1.1),
     text({ text: "Sweet dreams... if you dare!", ...quest, shape: "pill", colorIndex: BLACK, textColorIndex: SLIME, scale: 0.75, pillPad: 36 }),
@@ -836,7 +865,7 @@ export function halloweenState(): AppState {
     physics: { ...DEFAULT_PHYSICS },
     masterScale: 2.9,
     sizeRandom: 100,
-    shapeAmount: 24,
+    shapeAmount: 26,
     pillPad: 24,
     textTracking: 0,
     template: "halloween",

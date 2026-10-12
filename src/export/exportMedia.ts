@@ -30,6 +30,7 @@ type LoopRequest = {
   transparent: boolean;
   poses?: ChipPose[];
   replayFall?: boolean;
+  layoutHoldMs?: number;
   frame?: { width: number; height: number };
   canvas?: HTMLCanvasElement;
   onFrame: (canvas: HTMLCanvasElement, index: number) => Promise<void | false> | void | false;
@@ -211,6 +212,7 @@ async function exportVideo(options: {
   format: "mp4" | "mov";
   poses?: ChipPose[];
   replayFall?: boolean;
+  layoutHoldMs?: number;
   frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
@@ -260,6 +262,7 @@ async function encodeVideoFile(options: {
   withAudio: boolean;
   poses?: ChipPose[];
   replayFall?: boolean;
+  layoutHoldMs?: number;
   frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
@@ -356,6 +359,7 @@ async function encodeVideoFile(options: {
       transparent: options.transparent,
       poses: options.poses,
       replayFall: options.replayFall,
+      layoutHoldMs: options.layoutHoldMs,
       frame: options.frame,
       canvas,
       shouldStop: options.shouldStop,
@@ -418,6 +422,7 @@ export function exportMp4(options: {
   loops: LoopCount;
   poses?: ChipPose[];
   replayFall?: boolean;
+  layoutHoldMs?: number;
   frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;
@@ -435,6 +440,7 @@ export function exportMov(options: {
   transparent: boolean;
   poses?: ChipPose[];
   replayFall?: boolean;
+  layoutHoldMs?: number;
   frame?: { width: number; height: number };
   shouldStop?: () => boolean;
   onProgress?: (message: string) => void;

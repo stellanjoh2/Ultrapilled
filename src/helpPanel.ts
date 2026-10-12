@@ -72,8 +72,8 @@ function guideBody(): string {
     <section class="help-section" id="help-why">
       <h3 class="help-section__title">What’s this for?</h3>
       <p>
-        Ultrapilled is a canvas for type, shapes, and ${fun("motion")} —
-        make something that feels alive without opening a full motion tool.
+        Ultrapilled is a ${fun("design tool")} driven by physics —
+        type, shapes, icons, and motion on a canvas, without opening a full motion suite.
       </p>
       <p>Maybe you’re…</p>
       <ul class="help-list">
@@ -150,7 +150,7 @@ function guideBody(): string {
         <li><strong>Right-click</strong> empty canvas — places at the cursor</li>
         <li><strong>Create → Objects</strong> buttons</li>
         <li><strong>Drag &amp; drop</strong> files (SVG, PNG, JPG, GIF, MP4)</li>
-        <li>Templates, Unsplash, Giphy, YouTube</li>
+        <li>Templates, Icon, Unsplash, Giphy, YouTube</li>
       </ul>
       <h4 class="help-section__sub">Object types</h4>
       <div class="help-table" role="table" aria-label="Object types">
@@ -175,6 +175,10 @@ function guideBody(): string {
           <span class="help-table__val" role="cell">Emoji, with search</span>
         </div>
         <div class="help-table__row" role="row">
+          <span class="help-table__key" role="cell">Icon</span>
+          <span class="help-table__val" role="cell">Search Phosphor — Solid or Outlined</span>
+        </div>
+        <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Image</span>
           <span class="help-table__val" role="cell">Your SVG / PNG / JPG / GIF / MP4</span>
         </div>
@@ -191,6 +195,12 @@ function guideBody(): string {
           <span class="help-table__val" role="cell">Muted looping clip</span>
         </div>
       </div>
+      <p class="help-note">
+        Icons from
+        <a class="help-link" href="https://phosphoricons.com/" target="_blank" rel="noopener noreferrer">Phosphor</a>
+        (MIT). Shapes from
+        <a class="help-link" href="https://www.shapes.gallery/" target="_blank" rel="noopener noreferrer">shapes.gallery</a>.
+      </p>
       <p class="help-note"><span class="help-fun">Try this first:</span> right-click → Pill → type something short.</p>
     </section>
 
@@ -348,17 +358,18 @@ function guideBody(): string {
     </section>
 
     <section class="help-section" id="help-media">
-      <h3 class="help-section__title">10. Images, GIFs, and video</h3>
+      <h3 class="help-section__title">10. Icons, images, GIFs, and video</h3>
       <ul class="help-list">
-        <li>Drop files on the canvas, or use Image / Unsplash / Giphy / YouTube</li>
+        <li>Drop files on the canvas, or use Icon / Image / Unsplash / Giphy / YouTube</li>
+        <li>Icon: search Phosphor (Solid / Outlined) — bundled with the app, no API key</li>
         <li>Raster images: Exposure, Contrast, Saturation, Temperature (Kelvin), Hue</li>
-        <li>SVGs: Recolor vs original</li>
+        <li>SVGs &amp; icons: Recolor vs original</li>
         <li>Collision type Box vs Sphere — ${keycap("C")} shows boxes</li>
         <li>YouTube: paste a URL, set loop length, muted autoplay loop</li>
       </ul>
       <p class="help-note">
         Export note: YouTube embeds and uploaded video don’t rasterize into stills / GIF / video —
-        you’ll get a stand-in. Prefer shapes, text, photos, and GIFs when you need a clean file.
+        you’ll get a stand-in. Prefer shapes, icons, text, photos, and GIFs when you need a clean file.
       </p>
     </section>
 
@@ -438,7 +449,7 @@ function guideBody(): string {
       <h3 class="help-section__title">12. A gentle learning path</h3>
       <ol class="help-list help-list--numbered">
         <li>Pick Physics, aspect 16:9</li>
-        <li>Right-click → add a Pill and a few Shapes</li>
+        <li>Right-click → add a Pill, a few Shapes, and an Icon</li>
         <li>Double-click the pill text; change the words</li>
         <li>Nudge Color theme; turn on Grid (${keycap("G")})</li>
         <li>Press ${keycap("P")}, then ${keycap("Space")} — watch the fall</li>

@@ -72,7 +72,7 @@ export type SlotMenuHost = {
   pickImageFiles(multiple?: boolean): Promise<File[]>;
   assignImageFile(slot: ImageSlot, file: File): Promise<void>;
   assignVideoFile(slot: ImageSlot, file: File): Promise<void>;
-  /** Swap image in place — Unsplash/Giphy reopen search; uploads use the file picker. */
+  /** Swap image in place — Unsplash/Giphy/Phosphor reopen search; uploads use the file picker. */
   replaceImageSlot(slot: ImageSlot): void;
   isVideoFile(file: File): boolean;
   editChipText(id: string, select: "all" | "end", at?: { x: number; y: number }): void;

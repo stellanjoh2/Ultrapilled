@@ -1213,7 +1213,8 @@ function pickPreview(slot: ImageSlot): string {
   }
   const remote = imageRemoteOf(slot);
   if (remote) {
-    const kind = remote.kind === "unsplash" ? "Unsplash" : "Giphy";
+    const kind =
+      remote.kind === "unsplash" ? "Unsplash" : remote.kind === "giphy" ? "Giphy" : "Icon";
     return `<span class="pick-glyph slot-mark--image">${isGifSrc(slot.src, slot.name) ? gifIcon : imageIcon}</span>${label(`Selected <b>${H.escapeAttr(slot.name || kind)}</b>`)}`;
   }
   return `<span class="pick-empty">Nothing selected</span>`;
@@ -1224,7 +1225,13 @@ function photoReplaceControl(slot: ImageSlot): string {
   const remote = imageRemoteOf(slot);
   const reset = H.resetControl("Image", "icon", H.fieldDirty(slot, "icon"));
   const search =
-    remote?.kind === "unsplash" ? "Unsplash" : remote?.kind === "giphy" ? "Giphy" : null;
+    remote?.kind === "unsplash"
+      ? "Unsplash"
+      : remote?.kind === "giphy"
+        ? "Giphy"
+        : remote?.kind === "phosphor"
+          ? "icons"
+          : null;
   const text = search ? `Search ${search}` : "Browse";
   const tip = search ? `Search ${search}` : slot.name;
   // Same path as context-menu Replace — clipped <label>/<input> loses to global file styles.
