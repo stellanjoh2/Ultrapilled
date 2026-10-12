@@ -350,8 +350,15 @@ function guideBody(): string {
       <p>
         Make your own ${fun("looping 3D GIFs")} in
         <a class="help-link help-fun" href="https://orby.studio/" target="_blank" rel="noopener noreferrer">Orby</a>
-        — a free 3D studio that runs in your browser. Drop a GLB or SVG, light it, spin a turntable,
-        and export a GIF (or a transparent PNG still). Then drag the file into Ultrapilled like any other object.
+        — a free 3D studio that runs in your browser, by the same creator as Ultrapilled.
+        Drop a GLB or SVG, light it or apply a shader, spin a turntable, and export a GIF (or a transparent PNG still).
+        Then drag the file into Ultrapilled like any other object.
+      </p>
+      <p class="help-note">
+        <span class="help-fun">Tip:</span> larger GIFs work fine too — a light starting point is
+        ${fun("480p")} · ${fun("15 fps")} · ${fun("2 s")} if you want to keep file sizes down.
+      </p>
+      <p>
         Need a model? There’s a ton of free 3D assets in <code>.glb</code> on
         <a class="help-link" href="https://sketchfab.com/" target="_blank" rel="noopener noreferrer">Sketchfab</a>
         and
