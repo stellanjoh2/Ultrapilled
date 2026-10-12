@@ -45,16 +45,21 @@ export type SlotMenuHost = {
   state: AppState;
   panel: HTMLElement;
   world: {
-    setPicked(id: string | null): void;
+    setPicked(id: string | null, opts?: { ids?: string[] }): void;
     chipEl(id: string): HTMLElement | null | undefined;
   };
+  /** Current canvas/panel multi-select — used to keep menu stroke on the whole group. */
+  pickedSlotIds?: Set<string>;
   remember(key?: string): void;
   live(): void;
   endGesture(): void;
   renderPanel(): void;
   liveChip(id: string, opts?: { quiet?: boolean }): void;
   openSlots: Set<string>;
-  pickSlot(id: string, opts?: { force?: boolean; additive?: boolean; quiet?: boolean }): void;
+  pickSlot(
+    id: string,
+    opts?: { force?: boolean; additive?: boolean; quiet?: boolean; retainMulti?: boolean },
+  ): void;
   get gesture(): string | null;
   get tintPicker(): { anchor: HTMLElement; close: () => void } | null;
   setTintPicker(value: { anchor: HTMLElement; close: () => void } | null): void;
@@ -255,7 +260,9 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
   closeSlotMenu();
   // Select first (panel jump) before the menu listens for scroll-to-close.
   // Quiet: menu plays the shelf-open transition instead of a pick click.
-  H.pickSlot(id, { force: true, quiet: true });
+  // retainMulti: right-click inside an existing multi-select keeps the group
+  // (Paste style / shared actions need every picked object, not only the target).
+  H.pickSlot(id, { force: true, quiet: true, retainMulti: true });
   playTransition(true);
   const slot = H.state.slots.find((item) => item.id === id);
   const abort = new AbortController();
@@ -280,15 +287,20 @@ export function openSlotMenu(x: number, y: number, id: string, host?: SlotMenuHo
 
   // Selection stroke while the menu is open; clear only when the menu dismisses.
   let menuStroke = true;
+  const strokedIds = (() => {
+    const ids = H.pickedSlotIds;
+    if (ids?.has(id) && ids.size > 1) return [...ids];
+    return [id];
+  })();
   const paintMenuStroke = () => {
     if (!menuStroke) return;
-    H.world.setPicked(id);
-    H.world.chipEl(id)?.classList.add("is-menu-picked");
+    H.world.setPicked(id, { ids: strokedIds });
+    for (const pickId of strokedIds) H.world.chipEl(pickId)?.classList.add("is-menu-picked");
   };
   const clearMenuStroke = () => {
     if (!menuStroke) return;
     menuStroke = false;
-    H.world.chipEl(id)?.classList.remove("is-menu-picked");
+    for (const pickId of strokedIds) H.world.chipEl(pickId)?.classList.remove("is-menu-picked");
     H.world.setPicked(null);
   };
   paintMenuStroke();

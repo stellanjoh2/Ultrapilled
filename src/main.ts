@@ -2025,6 +2025,7 @@ function slotMenuHost(): SlotMenuHost {
     canMoveSlotLayer,
     moveSlotLayer,
     relinkSlotContent,
+    pickedSlotIds,
   };
 }
 
@@ -4972,100 +4973,121 @@ function canPasteSlotStyle(slot: Slot): boolean {
   return styleClipboard != null && styleClipboard.kind === slot.kind;
 }
 
+function applyTextStyleClip(slot: TextSlot, style: TextStyleClip) {
+  slot.fontFamily = style.fontFamily;
+  slot.fontWeight = style.fontWeight;
+  slot.fontSize = style.fontSize;
+  slot.textHeight = style.textHeight;
+  slot.pillPad = style.pillPad;
+  slot.tracking = style.tracking;
+  slot.shape = style.shape;
+  slot.radius = style.radius;
+  slot.stroked = style.stroked;
+  slot.stroke = style.stroke;
+  slot.colorIndex = style.colorIndex;
+  slot.color = style.color;
+  slot.gradient = style.gradient;
+  slot.gradientFromIndex = style.gradientFromIndex;
+  slot.gradientFrom = style.gradientFrom;
+  slot.gradientColorIndex = style.gradientColorIndex;
+  slot.gradientColor = style.gradientColor;
+  slot.gradientAngle = style.gradientAngle;
+  slot.gradientScale = style.gradientScale;
+  slot.animatedGradient = style.animatedGradient;
+  slot.gradientSpeed = style.gradientSpeed;
+  slot.textAnim = style.textAnim;
+  slot.textAnimSpeed = style.textAnimSpeed;
+  sanitizeTextMotion(slot);
+  slot.textColorIndex = style.textColorIndex;
+  slot.textColor = style.textColor;
+  slot.blend = style.blend;
+  slot.dropShadow = style.dropShadow;
+  slot.dropShadowRadius = style.dropShadowRadius;
+  slot.dropShadowDistance = style.dropShadowDistance;
+  slot.dropShadowOpacity = style.dropShadowOpacity;
+  slot.dropShadowColor = style.dropShadowColor;
+  slot.scale = style.scale;
+  if (isTextField(slot)) {
+    slot.textField = true;
+    slot.textAnim = undefined;
+    slot.align = style.align;
+    slot.italic = style.italic;
+    slot.lineHeight = style.lineHeight;
+    if (style.boxW != null) slot.boxW = style.boxW;
+    if (style.boxH != null) slot.boxH = style.boxH;
+    slot.boxAuto = style.boxAuto;
+  } else {
+    slot.textField = undefined;
+    slot.boxW = undefined;
+    slot.boxH = undefined;
+    slot.boxAuto = undefined;
+    slot.lineHeight = undefined;
+  }
+}
+
+function applyImageStyleClip(slot: ImageSlot, style: ImageStyleClip) {
+  slot.colorIndex = style.colorIndex;
+  slot.color = style.color;
+  slot.gradient = style.gradient;
+  slot.gradientColorIndex = style.gradientColorIndex;
+  slot.gradientColor = style.gradientColor;
+  slot.gradientAngle = style.gradientAngle;
+  slot.gradientScale = style.gradientScale;
+  slot.animatedGradient = style.animatedGradient;
+  slot.gradientSpeed = style.gradientSpeed;
+  slot.scale = style.scale;
+  slot.radius = style.radius;
+  slot.stroked = style.stroked;
+  slot.stroke = style.stroke;
+  slot.inverted = style.inverted;
+  slot.exposure = style.exposure;
+  slot.contrast = style.contrast;
+  slot.saturation = style.saturation;
+  slot.hue = style.hue;
+  slot.temperature = style.temperature;
+  slot.tint = style.tint;
+  slot.blend = style.blend;
+  slot.dropShadow = style.dropShadow;
+  slot.dropShadowRadius = style.dropShadowRadius;
+  slot.dropShadowDistance = style.dropShadowDistance;
+  slot.dropShadowOpacity = style.dropShadowOpacity;
+  slot.dropShadowColor = style.dropShadowColor;
+}
+
 function pasteSlotStyle(id: string) {
-  const slot = state.slots.find((item) => item.id === id);
-  if (!slot || !canPasteSlotStyle(slot) || !styleClipboard) return;
+  if (!styleClipboard) return;
+  // Whole multi-select + the menu target (in case a fold briefly dropped a pick).
+  const idSet = new Set(pickedSlotIds);
+  idSet.add(id);
+  const ids = [...idSet];
+  const targets = ids
+    .map((targetId) => state.slots.find((item) => item.id === targetId))
+    .filter((slot): slot is Slot => Boolean(slot && canPasteSlotStyle(slot)));
+  if (!targets.length) return;
   remember();
-  if (slot.kind === "text" && styleClipboard.kind === "text") {
+  if (styleClipboard.kind === "text") {
     const style = styleClipboard.style;
-    slot.fontFamily = style.fontFamily;
-    slot.fontWeight = style.fontWeight;
-    slot.fontSize = style.fontSize;
-    slot.textHeight = style.textHeight;
-    slot.pillPad = style.pillPad;
-    slot.tracking = style.tracking;
-    slot.shape = style.shape;
-    slot.radius = style.radius;
-    slot.stroked = style.stroked;
-    slot.stroke = style.stroke;
-    slot.colorIndex = style.colorIndex;
-    slot.color = style.color;
-    slot.gradient = style.gradient;
-    slot.gradientFromIndex = style.gradientFromIndex;
-    slot.gradientFrom = style.gradientFrom;
-    slot.gradientColorIndex = style.gradientColorIndex;
-    slot.gradientColor = style.gradientColor;
-    slot.gradientAngle = style.gradientAngle;
-    slot.gradientScale = style.gradientScale;
-    slot.animatedGradient = style.animatedGradient;
-    slot.gradientSpeed = style.gradientSpeed;
-    slot.textAnim = style.textAnim;
-    slot.textAnimSpeed = style.textAnimSpeed;
-    sanitizeTextMotion(slot);
-    slot.textColorIndex = style.textColorIndex;
-    slot.textColor = style.textColor;
-    slot.blend = style.blend;
-    slot.dropShadow = style.dropShadow;
-    slot.dropShadowRadius = style.dropShadowRadius;
-    slot.dropShadowDistance = style.dropShadowDistance;
-    slot.dropShadowOpacity = style.dropShadowOpacity;
-    slot.dropShadowColor = style.dropShadowColor;
-    slot.scale = style.scale;
-    if (isTextField(slot)) {
-      slot.textField = true;
-      slot.textAnim = undefined;
-      slot.align = style.align;
-      slot.italic = style.italic;
-      slot.lineHeight = style.lineHeight;
-      if (style.boxW != null) slot.boxW = style.boxW;
-      if (style.boxH != null) slot.boxH = style.boxH;
-      slot.boxAuto = style.boxAuto;
-    } else {
-      slot.textField = undefined;
-      slot.boxW = undefined;
-      slot.boxH = undefined;
-      slot.boxAuto = undefined;
-      slot.lineHeight = undefined;
+    for (const slot of targets) {
+      if (slot.kind !== "text") continue;
+      applyTextStyleClip(slot, style);
     }
+    const sample = targets.find((slot): slot is TextSlot => slot.kind === "text");
     playClick();
-    void settleFont(slot.fontFamily, slot.fontWeight).then(() => {
-      renderPanel();
-      live();
-    });
+    void settleFont(sample?.fontFamily ?? style.fontFamily, sample?.fontWeight ?? style.fontWeight).then(
+      () => {
+        renderPanel();
+        live();
+      },
+    );
     return;
   }
-  if (slot.kind === "image" && styleClipboard.kind === "image") {
-    const style = styleClipboard.style;
-    slot.colorIndex = style.colorIndex;
-    slot.color = style.color;
-    slot.gradient = style.gradient;
-    slot.gradientColorIndex = style.gradientColorIndex;
-    slot.gradientColor = style.gradientColor;
-    slot.gradientAngle = style.gradientAngle;
-    slot.gradientScale = style.gradientScale;
-    slot.animatedGradient = style.animatedGradient;
-    slot.gradientSpeed = style.gradientSpeed;
-    slot.scale = style.scale;
-    slot.radius = style.radius;
-    slot.stroked = style.stroked;
-    slot.stroke = style.stroke;
-    slot.inverted = style.inverted;
-    slot.exposure = style.exposure;
-    slot.contrast = style.contrast;
-    slot.saturation = style.saturation;
-    slot.hue = style.hue;
-    slot.temperature = style.temperature;
-    slot.tint = style.tint;
-    slot.blend = style.blend;
-    slot.dropShadow = style.dropShadow;
-    slot.dropShadowRadius = style.dropShadowRadius;
-    slot.dropShadowDistance = style.dropShadowDistance;
-    slot.dropShadowOpacity = style.dropShadowOpacity;
-    slot.dropShadowColor = style.dropShadowColor;
-    playClick();
-    renderPanel();
-    live();
+  for (const slot of targets) {
+    if (slot.kind !== "image") continue;
+    applyImageStyleClip(slot, styleClipboard.style);
   }
+  playClick();
+  renderPanel();
+  live();
 }
 
 const INSERT_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
@@ -7124,7 +7146,10 @@ function dismissPick() {
   }
 }
 
-function pickSlot(id: string | null, opts?: { force?: boolean; additive?: boolean; quiet?: boolean }) {
+function pickSlot(
+  id: string | null,
+  opts?: { force?: boolean; additive?: boolean; quiet?: boolean; retainMulti?: boolean },
+) {
   if (!id) {
     dismissPick();
     return;
@@ -7173,8 +7198,12 @@ function pickSlot(id: string | null, opts?: { force?: boolean; additive?: boolea
     }
   }
 
-  pickedSlotIds.clear();
-  pickedSlotIds.add(id);
+  // Context menu: keep the multi-select when the target is already in the group.
+  const retainMulti = Boolean(opts?.retainMulti && pickedSlotIds.has(id) && pickedSlotIds.size > 1);
+  if (!retainMulti) {
+    pickedSlotIds.clear();
+    pickedSlotIds.add(id);
+  }
   pickedSlotId = id;
   applyWorldPick();
   syncPanelPicks();

@@ -306,13 +306,13 @@ export function closeOtherSlots(id: string) {
   for (const otherId of [...H.openSlots]) {
     if (otherId === id) continue;
     const card = H.panel.querySelector<HTMLElement>(`[data-id="${otherId}"]`);
-    card?.classList.remove("is-picked");
     const other = H.state.slots.find((item) => item.id === otherId);
     const toggle = card?.querySelector<HTMLElement>(".slot-toggle");
     if (other && toggle) setSlotOpen(toggle, other, false, false);
     else {
       H.openSlots.delete(otherId);
-      H.releasePick(otherId);
+      // Folding a card must not dissolve a multi-select.
+      if (H.pickedSlotIds.size <= 1) H.releasePick(otherId);
     }
   }
 }
@@ -324,7 +324,9 @@ export function setSlotOpen(toggle: HTMLElement, slot: Slot, open: boolean, focu
     closeOtherSlots(slot.id);
   } else {
     H.openSlots.delete(slot.id);
-    H.releasePick(slot.id);
+    // Solo pick: collapse clears selection. Multi-select: keep the group
+    // (context menu opens one card and was dropping the first-picked object).
+    if (H.pickedSlotIds.size <= 1) H.releasePick(slot.id);
   }
   const card = toggle.closest(".slot-card");
   card?.classList.toggle("is-open", open);
