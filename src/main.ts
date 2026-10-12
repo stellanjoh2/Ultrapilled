@@ -1152,8 +1152,8 @@ function applyGrid() {
   layer.style.setProperty("--grid-cols", String(cols));
   layer.style.setProperty("--grid-rows", String(rows));
 
-  // Under Mode Select / dump: keep paint ready but invisible so it doesn't pop in.
-  if (shell.classList.contains("ui-hidden") || gridHoldForHandoff) {
+  // Boot / Mode Select dump only — not Hide UI (`h` / ui-hidden), or G can't show the grid.
+  if (introActive || gridHoldForHandoff) {
     layer.classList.remove("is-boot-reveal");
     layer.hidden = !on;
     layer.style.setProperty("--grid-reveal", "0");

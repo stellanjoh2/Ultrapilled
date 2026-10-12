@@ -27,7 +27,7 @@ const HINTS: Hint[] = [
   { text: "Do you hate bouncy stuff? Try Layout Mode — or hit", key: "L" },
   { text: "Need ideas? Explore the templates in the Create tab" },
   { text: "Hide the UI for a clean canvas", key: "H" },
-  { text: "Toggle the guide grid", key: "G" },
+  { text: "Hit", key: "G", after: "to toggle the grid" },
   { text: "Delete a selected object with Backspace" },
   { text: "Duplicate a selection with Shift+D — or ⌘D / Ctrl+D" },
   { text: "Copy and paste objects with ⌘C / ⌘V or Ctrl+C / Ctrl+V" },
