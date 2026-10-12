@@ -54,7 +54,7 @@ function guideBody(): string {
     <nav class="help-toc" aria-label="Guide sections">
       ${tocLink("help-why", "Why")}
       ${tocLink("help-vibe", "Vibe")}
-      ${tocLink("help-stage", "Stage")}
+      ${tocLink("help-canvas", "Canvas")}
       ${tocLink("help-objects", "Objects")}
       ${tocLink("help-text", "Text")}
       ${tocLink("help-panel", "Panel")}
@@ -72,7 +72,7 @@ function guideBody(): string {
     <section class="help-section" id="help-why">
       <h3 class="help-section__title">What’s this for?</h3>
       <p>
-        Ultrapilled is a stage for type, shapes, and ${fun("motion")} —
+        Ultrapilled is a canvas for type, shapes, and ${fun("motion")} —
         make something that feels alive without opening a full motion tool.
       </p>
       <p>Maybe you’re…</p>
@@ -81,7 +81,7 @@ function guideBody(): string {
         <li>doing club-night graphics and need something that actually moves for Stories or Reels</li>
         <li>whipping together a few fun slides for a school presentation in Layout mode</li>
         <li>pulling a quick moodboard together and saving it out before the meeting</li>
-        <li>or you just want to drop things on a stage and watch ${pop("gravity")} do the rest</li>
+        <li>or you just want to drop things on a canvas and watch ${pop("gravity")} do the rest</li>
       </ul>
     </section>
 
@@ -103,11 +103,11 @@ function guideBody(): string {
       <p>If you turned on <strong>Remember last</strong>, you may see Reconnect — restore your last session or start fresh.</p>
     </section>
 
-    <section class="help-section" id="help-stage">
-      <h3 class="help-section__title">2. Meet the stage</h3>
+    <section class="help-section" id="help-canvas">
+      <h3 class="help-section__title">2. Meet the canvas</h3>
       <p>
-        The big rectangle is your canvas. Pick an aspect ratio under Create → Canvas
-        (16:9, 1:1, 3:4, or 9:16). Change <strong>Stage color</strong> anytime.
+        Pick an aspect ratio under Create → Canvas
+        (16:9, 1:1, 3:4, or 9:16). Change <strong>Canvas color</strong> anytime.
       </p>
       <p>There’s no pan or zoom — the frame fits the window. Hide the UI with ${keycap("H")} for a clean look.</p>
       <div class="help-table" role="table" aria-label="Canvas basics">
@@ -144,7 +144,7 @@ function guideBody(): string {
 
     <section class="help-section" id="help-objects">
       <h3 class="help-section__title">3. Your first object</h3>
-      <p>Empty canvas? ${fun("Right-click")} the stage — or use Create → Objects.</p>
+      <p>Empty canvas? ${fun("Right-click")} the canvas — or use Create → Objects.</p>
       <h4 class="help-section__sub">Ways to add</h4>
       <ul class="help-list">
         <li><strong>Right-click</strong> empty canvas — places at the cursor</li>
@@ -227,7 +227,7 @@ function guideBody(): string {
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Background</span>
-          <span class="help-table__val" role="cell">Stage fill, grid, logo</span>
+          <span class="help-table__val" role="cell">Canvas fill, grid, logo</span>
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Export</span>
@@ -350,7 +350,7 @@ function guideBody(): string {
     <section class="help-section" id="help-media">
       <h3 class="help-section__title">10. Images, GIFs, and video</h3>
       <ul class="help-list">
-        <li>Drop files on the stage, or use Image / Unsplash / Giphy / YouTube</li>
+        <li>Drop files on the canvas, or use Image / Unsplash / Giphy / YouTube</li>
         <li>Raster images: Exposure, Contrast, Saturation, Temperature (Kelvin), Hue</li>
         <li>SVGs: Recolor vs original</li>
         <li>Collision type Box vs Sphere — ${keycap("C")} shows boxes</li>
