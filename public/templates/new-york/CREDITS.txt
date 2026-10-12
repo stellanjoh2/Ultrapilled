@@ -15,3 +15,22 @@ white-horse.jpg
   "White Horse Tavern" (1961), New York World-Telegram and the Sun staff photographer
   License: Public domain (Library of Congress, NYWT&S collection)
   https://commons.wikimedia.org/wiki/File:White_Horse_Tavern_NYWTS.jpg
+
+Renders derived from third-party 3D models (author must be credited; CC BY).
+Naming: template-new-york-<kebab asset name>; keep source extension.
+
+template-new-york-nyc-taxi.gif
+  "Ford Crown Victoria NYC Taxi Cab (Low Poly)" by Aeroux (@Aeroux)
+  Turntable GIF (5s / 15fps / 480p)
+  License: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+  Source: https://sketchfab.com/3d-models/ford-crown-victoria-nyc-taxi-cab-low-poly-6dd4b71d39ab470cbc4d7f1fff77eb77
+  Author: https://sketchfab.com/Aeroux
+  Sketchfab NoAI: source model may not be used in generative AI datasets / training
+
+template-new-york-pizza-slice.gif
+  "Plain Pizza Slice" by inciprocal (@inciprocal.com)
+  Turntable GIF (5s / 15fps / 480p)
+  License: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+  Source: https://sketchfab.com/3d-models/plain-pizza-slice-486238438ec64c3cb64d607a30d1a9e6
+  Author: https://sketchfab.com/inciprocal.com
+  Sketchfab NoAI: source model may not be used in generative AI datasets / training
