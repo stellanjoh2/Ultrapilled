@@ -1,26 +1,27 @@
 Berlin template photos: one shoot, 13 September 2004, Ricoh Caplio G3 compact digital camera.
 From Wikimedia Commons, by Jochims. Resized to 960 px wide.
 
-moma-queue.jpg
+template-berlin-moma-queue.jpg
   "MoMa Ausstellung in Berlin 2004 RIMG0457", the queue outside the Neue Nationalgalerie
   License: CC0 1.0 (public domain dedication)
   https://commons.wikimedia.org/wiki/File:MoMa_Ausstellung_in_Berlin_2004_RIMG0457.JPG
 
-balloon.jpg
+template-berlin-balloon.jpg
   "Potsdamer Platz Berlin RIMG0463", the Hi-Flyer balloon
   License: CC0 1.0 (public domain dedication)
   https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0463.JPG
 
-towers.jpg
+template-berlin-towers.jpg
   "Potsdamer Platz Berlin RIMG0464"
   License: CC0 1.0 (public domain dedication)
   https://commons.wikimedia.org/wiki/File:Potsdamer_Platz_Berlin_RIMG0464.JPG
 
 Renders derived from third-party 3D models (author must be credited; CC BY).
-Naming: kebab-case from the Sketchfab slug / short title; keep source extension.
+Naming: template-berlin-<kebab asset name>; keep source extension.
 
-skull-downloadable.gif
+template-berlin-skull.gif
   "Skull downloadable" by martinjario (@martinjario)
+  Turntable GIF (2s / 24fps / 480p)
   License: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
   Source: https://sketchfab.com/3d-models/skull-downloadable-1a9db900738d44298b0bc59f68123393
   Author: https://sketchfab.com/martinjario

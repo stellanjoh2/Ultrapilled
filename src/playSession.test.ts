@@ -147,6 +147,7 @@ describe("playSession drop / triggerPhysics", () => {
 
     expect(world.play).not.toHaveBeenCalled();
     expect(world.refresh).toHaveBeenCalledTimes(1);
+    expect(world.syncLayerOrder).toHaveBeenCalledWith([state.slots[0]!.id]);
     expect(world.redeployFall).toHaveBeenCalledTimes(1);
     expect(world.sync).toHaveBeenCalled();
     expect(session.phase).toBe("falling");

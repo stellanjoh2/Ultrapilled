@@ -377,7 +377,7 @@ panel.innerHTML = `
   ${sectionMarkup(
     "what-falls",
     "Objects",
-    "Everything on the canvas. In Layout mode, list order is layer order — top sits in front",
+    "Everything on the canvas. List order is fall order — top falls in front / last in the stack",
     `<div class="slot-stack" id="slots"></div>
     <div class="slot-adds">
       <button type="button" class="pill slot-add is-create" id="add-text" data-tip="Add a text label inside a rounded pill">

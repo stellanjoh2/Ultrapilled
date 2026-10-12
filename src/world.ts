@@ -339,8 +339,9 @@ export type WorldHandle = {
   /** True when any two chip colliders intersect (used before leaving layout mode). */
   chipsOverlap: () => boolean;
   /**
-   * Match canvas paint order to slot list order (back → front = first → last in `slotIds`).
-   * The panel shows that order reversed so the front layer sits at the top.
+   * Match canvas paint + fall spawn order to slot list order
+   * (back → front = first → last in `slotIds`). The panel shows that order
+   * reversed so the front object sits at the top of the list.
    */
   syncLayerOrder: (slotIds: readonly string[]) => void;
   /** Place chips at saved poses (scaled from `frame` to the current playfield). */
@@ -3574,10 +3575,17 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       if (isPickPainted(item)) syncXformHandleSide(item);
     }
     if (!boxResize) {
-      if (solo) {
-        // Keep slot.scale shared; bake the gesture into this chip only, then remesh.
+      const instances = chips.reduce((n, item) => n + (item.slotId === slotId ? 1 : 0), 0);
+      if (solo && instances > 1) {
+        // Amount copies: keep slot.scale shared; bake into this chip only, then remesh.
         chip.scaleMul = Math.min(freeScaleMax, Math.max(SCALE_MIN, chip.scaleMul * factor));
         onScale?.(slotId, scaleOf?.(slotId) ?? startScale, "end");
+      } else if (solo && instances <= 1) {
+        // Single instance: bake into slot.scale so panel / export match the canvas size.
+        // Fold any prior per-chip scaleMul in, then clear it to avoid double-applying on remesh.
+        const next = clampScale(lastScale * chip.scaleMul);
+        chip.scaleMul = 1;
+        onScale?.(slotId, next, "end");
       } else if (startScales.size > 0) {
         for (const [id, base] of startScales) {
           const max = scaleMaxFor(chips.find((c) => c.slotId === id)?.look?.slot);
@@ -4184,11 +4192,19 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       const angleChanged = Math.abs(nextAngle - xformDrag.lastAngle) >= 0.0005;
       if (!scaleChanged && !angleChanged) return;
       applyLiveXform(nextScale, nextAngle, pivot);
-      if (scaleChanged && (soloBodyId == null || soloBodyId !== xformDrag.chip.body.id)) {
+      // Amount-copy solo keeps scale on scaleMul until release; single-instance updates
+      // slot.scale live so the panel thumb tracks the canvas drag.
+      const soloMulti =
+        soloBodyId != null &&
+        soloBodyId === xformDrag.chip.body.id &&
+        chips.reduce((n, item) => n + (item.slotId === xformDrag!.slotId ? 1 : 0), 0) > 1;
+      if (scaleChanged && !soloMulti) {
         const factor = nextScale / xformDrag.startScale;
+        const scaleMul =
+          soloBodyId != null && soloBodyId === xformDrag.chip.body.id ? xformDrag.chip.scaleMul : 1;
         for (const [id, base] of xformDrag.startScales) {
           const max = scaleMaxFor(chips.find((c) => c.slotId === id)?.look?.slot);
-          onScale?.(id, clampScale(base * factor, max), "move");
+          onScale?.(id, clampScale(base * factor * scaleMul, max), "move");
         }
       }
       if (angleChanged) onRotate?.(xformDrag.slotId, nextAngle, "move");

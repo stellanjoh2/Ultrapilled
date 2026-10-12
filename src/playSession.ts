@@ -98,6 +98,8 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
         state.textTracking,
         state.sizeRandom,
       );
+      // Re-trigger must follow current Objects list order, not a stale chip seqIndex.
+      host.world.syncLayerOrder(state.slots.map((slot) => slot.id));
       host.world.redeployFall();
       host.world.sync();
     } else {

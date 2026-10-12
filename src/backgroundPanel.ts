@@ -27,6 +27,28 @@ export function closeBackgroundUi() {
   pickerClose = null;
 }
 
+/**
+ * Keyboard Delete / Backspace while the Background tab is open.
+ * Returns true when the key was handled (stop removed, or kept because only
+ * MIN_STOPS remain) so the canvas selection is not deleted instead.
+ */
+export function handleBackgroundStopDelete(controller: BackgroundController): boolean {
+  if (!controller.showing()) return false;
+  const background = backgroundOf(controller);
+  if (background.kind !== "gradient") return false;
+  if (!selectedStopId) return false;
+  if (background.stops.length <= MIN_STOPS) return true;
+  const id = selectedStopId;
+  controller.remember();
+  const next = background.stops.filter((stop) => stop.id !== id);
+  background.stops = next;
+  selectedStopId = next[0]?.id ?? null;
+  playRemove();
+  controller.apply();
+  controller.refresh();
+  return true;
+}
+
 function backgroundOf(controller: BackgroundController) {
   return controller.state().background;
 }
@@ -134,7 +156,7 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
             <div class="grad" id="grad" data-tip="Click the bar to add a color. Drag a stop to move it, or drag it away to remove it.">
               <div class="grad__bar" id="grad-bar"></div>
             </div>
-            <p class="hint">Click the bar to add a color. Drag a color away to remove it.</p>
+            <p class="hint">Click the bar to add a color. Drag a color away or press Delete to remove it.</p>
             <div class="field" data-tip="Color of the selected gradient stop">Color
               <button type="button" class="bg-swatch" id="bg-stop" style="background:${stop?.color ?? "#000"}" aria-label="Gradient color" data-tip="Color of the selected gradient stop"></button>
             </div>`
@@ -653,20 +675,21 @@ function mountStops(panel: HTMLElement, controller: BackgroundController) {
     }
   };
 
-  const select = (id: string) => {
+  const select = (id: string, knob?: HTMLElement) => {
     selectedStopId = id;
-    for (const knob of bar.querySelectorAll<HTMLElement>(".grad__stop")) {
-      knob.classList.toggle("is-on", knob.dataset.stop === id);
+    for (const node of bar.querySelectorAll<HTMLElement>(".grad__stop")) {
+      node.classList.toggle("is-on", node.dataset.stop === id);
     }
     const current = stops().find((stop) => stop.id === id);
     const swatch = panel.querySelector<HTMLElement>("#bg-stop");
     if (current && swatch) swatch.style.background = current.color;
+    knob?.focus({ preventScroll: true });
   };
 
   const onStopDown = (event: PointerEvent, knob: HTMLElement, id: string) => {
     event.preventDefault();
     event.stopPropagation();
-    select(id);
+    select(id, knob);
     const pointer = event.pointerId;
     const startY = event.clientY;
     let moved = false;

@@ -369,7 +369,7 @@ function slotHead(slot: Slot, open: boolean): HTMLElement {
     }
     const title = document.createElement("span");
     title.className = "slot-title";
-    const named = Boolean(slot.youtube || slot.video || slot.emoji || slot.src);
+    const named = Boolean(slot.youtube || slot.video || slot.emoji || slot.src || imageRemoteOf(slot));
     title.textContent = named ? slot.name : "Empty";
     if (!named) title.classList.add("is-empty");
     else title.dataset.tip = slot.name;
@@ -1217,6 +1217,11 @@ function pickPreview(slot: ImageSlot): string {
   }
   if (slot.src) {
     return `<img class="pick-glyph" src="${H.iconSrc(slot)}" alt="" />${label(`Selected <b>${H.escapeAttr(slot.name)}</b>`)}`;
+  }
+  const remote = imageRemoteOf(slot);
+  if (remote) {
+    const kind = remote.kind === "unsplash" ? "Unsplash" : "Giphy";
+    return `<span class="pick-glyph slot-mark--image">${isGifSrc(slot.src, slot.name) ? gifIcon : imageIcon}</span>${label(`Selected <b>${H.escapeAttr(slot.name || kind)}</b>`)}`;
   }
   return `<span class="pick-empty">Nothing selected</span>`;
 }

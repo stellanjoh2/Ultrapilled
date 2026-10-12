@@ -48,7 +48,7 @@ import {
 import { clampTextFieldWords } from "./textField";
 import { isMicActive, sampleOnset, startMic, stopMic } from "./audioReact";
 import { activateFamily, listedFamilies, localWeights, maybeQueryLocalCatalog, queryLocalCatalog } from "./localFonts";
-import { closeBackgroundUi, mountBackgroundPanel } from "./backgroundPanel";
+import { closeBackgroundUi, handleBackgroundStopDelete, mountBackgroundPanel } from "./backgroundPanel";
 import { backgroundImage, backgroundPaint, gridDivisions, logoBackdropColor, logoFill, logoSize, isSvgLogo } from "./background";
 import { mountColorPicker } from "./colorPicker";
 import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
@@ -2157,6 +2157,17 @@ function createPanelHost(): CreatePanelHost {
   };
 }
 
+function backgroundController() {
+  return {
+    state: () => state,
+    remember,
+    endGesture,
+    apply: applyBackground,
+    refresh: renderPanel,
+    showing: () => panelTab === "background",
+  };
+}
+
 function renderPanel() {
   const inserted = insertMotion;
   insertMotion = null;
@@ -2173,14 +2184,7 @@ function renderPanel() {
     return;
   }
   if (panelTab === "background") {
-    mountBackgroundPanel(panel, {
-      state: () => state,
-      remember,
-      endGesture,
-      apply: applyBackground,
-      refresh: renderPanel,
-      showing: () => panelTab === "background",
-    }, scroll);
+    mountBackgroundPanel(panel, backgroundController(), scroll);
     return;
   }
   mountCreatePanel(panel, createPanelHost(), scroll, inserted);
@@ -2776,7 +2780,10 @@ function iconSrc(slot: ImageSlot): string {
 }
 
 function uploadedShape(slot: ImageSlot): boolean {
-  return Boolean(slot.src) && !slot.emoji && !slot.youtube && !slot.video && !presetIdForSrc(slot.src);
+  if (slot.emoji || slot.youtube || slot.video) return false;
+  // Giphy / Unsplash keep photo controls even when the blob src is empty or dead.
+  if (imageRemoteOf(slot)) return true;
+  return Boolean(slot.src) && !presetIdForSrc(slot.src);
 }
 
 
@@ -3915,7 +3922,8 @@ function applySlotOrder(visualIds: string[]) {
   }
   remember();
   state.slots = ordered;
-  if (state.physics.layoutMode) world.syncLayerOrder(ids);
+  // List order is fall spawn order (and paint order) — sync chips even outside Layout.
+  world.syncLayerOrder(ids);
   playClick();
 }
 
@@ -3937,9 +3945,7 @@ function moveSlotLayer(id: string, where: LayerMove): boolean {
   remember();
   const [slot] = state.slots.splice(index, 1);
   state.slots.splice(next, 0, slot!);
-  if (state.physics.layoutMode) {
-    world.syncLayerOrder(state.slots.map((item) => item.id));
-  }
+  world.syncLayerOrder(state.slots.map((item) => item.id));
   syncSlotCardOrder();
   playClick();
   return true;
@@ -5458,9 +5464,7 @@ function live(opts?: { quiet?: boolean; skipFit?: boolean }) {
       }
       paintWelcome();
     }
-    if (state.physics.layoutMode) {
-      world.syncLayerOrder(state.slots.map((slot) => slot.id));
-    }
+    world.syncLayerOrder(state.slots.map((slot) => slot.id));
     paintSectionResets(panel, state);
   };
   bump();
@@ -6755,6 +6759,10 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "Backspace" || event.key === "Delete") {
+    if (handleBackgroundStopDelete(backgroundController())) {
+      event.preventDefault();
+      return;
+    }
     if (pickedSlotIds.size === 0) return;
     event.preventDefault();
     if (event.repeat) return;

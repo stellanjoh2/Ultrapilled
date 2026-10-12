@@ -17,3 +17,14 @@ metrorail.jpg
   "Passengers aboard the Metrorail in Miami" (1980s), Florida Department of Commerce, Florida Film Bureau
   License: CC0 1.0 (public domain dedication)
   https://commons.wikimedia.org/wiki/File:Passengers_aboard_the_Metrorail_in_Miami.jpg
+
+Renders derived from third-party 3D models (author must be credited; CC BY).
+Naming: template-miami-<kebab asset name>; keep source extension.
+
+template-miami-testarossa.gif
+  "1988 Ferrari Testarossa" by Ddiaz Design (@ddiaz-design)
+  Turntable GIF (5s / 15fps / 480p)
+  License: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+  Source: https://sketchfab.com/3d-models/1988-ferrari-testarossa-8968ceebb4ae445091f02d2344d367ea
+  Author: https://sketchfab.com/ddiaz-design
+  Sketchfab NoAI: source model may not be used in generative AI datasets / training

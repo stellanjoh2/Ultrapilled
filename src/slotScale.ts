@@ -1,15 +1,16 @@
 /**
  * Slot scale limits.
  *
- * Panel range inputs stay on a tight soft max so everyday tweaks stay controllable.
- * Corner free-transform is intentionally much freer (and grows when Composition
- * Scale is low) so tiny chips can be recovered after heavy masterScale downs.
+ * Panel range inputs use a soft max (large enough for hero type) so everyday
+ * tweaks stay controllable. Corner free-transform is intentionally much freer
+ * (and grows when Composition Scale is low) so tiny chips can be recovered
+ * after heavy masterScale downs.
  */
 
 export const SCALE_MIN = 0.1;
 
 /** Soft ceiling for the panel scale range (text / shape / SVG). */
-export const SCALE_SLIDER_MAX = 3;
+export const SCALE_SLIDER_MAX = 8;
 
 /** Soft ceiling for raster-upload panel scale range. */
 export const SCALE_UPLOAD_SLIDER_MAX = 4;
