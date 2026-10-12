@@ -2632,7 +2632,7 @@ button.pill.smash-btn.is-on::after {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
 }
 
-.bg-file {
+input[type="file"].bg-file {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2642,6 +2642,10 @@ button.pill.smash-btn.is-on::after {
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+input[type="file"].bg-file::file-selector-button {
+  display: none;
 }
 
 .grad {
@@ -3956,7 +3960,8 @@ html[data-theme="day"] input[type="file"]::file-selector-button:hover {
   pointer-events: none;
 }
 
-.file-replace__input {
+/* Beat input[type="file"] / ::file-selector-button so this stay visually hidden. */
+input[type="file"].file-replace__input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -3968,7 +3973,7 @@ html[data-theme="day"] input[type="file"]::file-selector-button:hover {
   white-space: nowrap;
 }
 
-.file-replace__input::file-selector-button {
+input[type="file"].file-replace__input::file-selector-button {
   display: none;
 }
 
@@ -6017,7 +6022,7 @@ html[data-theme="day"] .shape-swatch {
   overflow: hidden;
   box-shadow: var(--shadow-2);
   color: var(--ink);
-  /* Tip must never steal canvas picks — only Stop is interactive. */
+  /* Tip must never steal canvas picks — only Stop / links are interactive. */
   pointer-events: none;
   opacity: 0;
   transform: translateX(calc(-100% - max(var(--panel-inset), env(safe-area-inset-left, 0px))));
@@ -6159,15 +6164,23 @@ html[data-theme="day"] .shape-swatch {
   cursor: pointer;
 }
 
-/* Beat `.pro-tip *` so only this control stays clickable. */
-.pro-tip .pro-tip__stop {
+/* Beat `.pro-tip *` so Stop and outbound links stay clickable. */
+.pro-tip .pro-tip__stop,
+.pro-tip .pro-tip__link {
   pointer-events: auto;
 }
 
 @media (hover: hover) {
-  .pro-tip__stop:hover {
+  .pro-tip__stop:hover,
+  .pro-tip__link:hover {
     color: var(--pill-fun-face);
   }
+}
+
+.pro-tip__link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
 }
 
 .pro-tip__body kbd {

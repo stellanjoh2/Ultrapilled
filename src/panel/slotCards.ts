@@ -1021,7 +1021,11 @@ function videoFields(slot: ImageSlot, open: boolean): HTMLElement {
   placeFold(wrap, editor, open);
 
   if (slot.stroked) H.bindTint(editor, slot);
-  editor.querySelector<HTMLInputElement>("[data-file]")?.addEventListener("change", (e) => {
+  const videoFile = editor.querySelector<HTMLInputElement>("[data-file]");
+  editor.querySelector<HTMLButtonElement>("[data-replace-file]")?.addEventListener("click", () => {
+    videoFile?.click();
+  });
+  videoFile?.addEventListener("change", (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file || !H.isMediaFile(file)) return;
     H.remember();
@@ -1172,19 +1176,8 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
   placeFold(wrap, editor, open);
 
   if (canTint || (H.isRasterUpload(slot) && slot.stroked)) H.bindTint(editor, slot);
-  editor.querySelector<HTMLButtonElement>("[data-replace-remote]")?.addEventListener("click", () => {
+  editor.querySelector<HTMLButtonElement>("[data-replace-image]")?.addEventListener("click", () => {
     H.replaceImageSlot(slot);
-  });
-  editor.querySelector<HTMLInputElement>("[data-file]")?.addEventListener("change", (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file || !H.isMediaFile(file)) return;
-    H.remember();
-    playCreate();
-    const job = H.isVideoFile(file) ? H.assignVideoFile(slot, file) : H.assignImageFile(slot, file);
-    void job.then(() => {
-      H.refreshSlotCard(slot.id);
-      H.live();
-    });
   });
   H.bindSlotInputs(editor, slot);
   return wrap;
@@ -1230,22 +1223,17 @@ function photoReplaceControl(slot: ImageSlot): string {
   const src = H.iconSrc(slot);
   const remote = imageRemoteOf(slot);
   const reset = H.resetControl("Image", "icon", H.fieldDirty(slot, "icon"));
-  if (remote?.kind === "unsplash" || remote?.kind === "giphy") {
-    const label = remote.kind === "unsplash" ? "Unsplash" : "Giphy";
-    return `<div class="field file-replace" data-tip="${TIPS.replaceImage}">
+  const search =
+    remote?.kind === "unsplash" ? "Unsplash" : remote?.kind === "giphy" ? "Giphy" : null;
+  const text = search ? `Search ${search}` : "Browse";
+  const tip = search ? `Search ${search}` : slot.name;
+  // Same path as context-menu Replace — clipped <label>/<input> loses to global file styles.
+  return `<div class="field file-replace" data-tip="${TIPS.replaceImage}">
     <span class="field-label"><span>Replace image</span>${reset}</span>
-    <button type="button" class="file-replace__btn" style="background-image:url(&quot;${H.escapeAttr(src)}&quot;)" data-replace-remote data-tip="${H.escapeAttr(`Search ${label}`)}">
-      <span class="file-replace__text">Search ${label}</span>
+    <button type="button" class="file-replace__btn" style="background-image:url(&quot;${H.escapeAttr(src)}&quot;)" data-replace-image data-tip="${H.escapeAttr(tip)}">
+      <span class="file-replace__text">${text}</span>
     </button>
   </div>`;
-  }
-  return `<label class="field file-replace" data-tip="${TIPS.replaceImage}">
-    <span class="field-label"><span>Replace image</span>${reset}</span>
-    <span class="file-replace__btn" style="background-image:url(&quot;${H.escapeAttr(src)}&quot;)" data-tip="${H.escapeAttr(slot.name)}">
-      <span class="file-replace__text">Browse</span>
-    </span>
-    <input type="file" class="file-replace__input" accept="${H.IMAGE_FILE_ACCEPT}" data-file />
-  </label>`;
 }
 
 function videoReplaceControl(slot: ImageSlot): string {
@@ -1253,11 +1241,11 @@ function videoReplaceControl(slot: ImageSlot): string {
   const thumb = poster
     ? ` style="background-image:url(&quot;${H.escapeAttr(poster)}&quot;)"`
     : "";
-  return `<label class="field file-replace" data-tip="${TIPS.replaceVideo}">
+  return `<div class="field file-replace" data-tip="${TIPS.replaceVideo}">
     <span class="field-label"><span>Replace video</span></span>
-    <span class="file-replace__btn${poster ? "" : " file-replace__btn--video"}"${thumb} data-tip="${H.escapeAttr(slot.name)}">
+    <button type="button" class="file-replace__btn${poster ? "" : " file-replace__btn--video"}"${thumb} data-replace-file data-tip="${H.escapeAttr(slot.name)}">
       <span class="file-replace__text">Browse</span>
-    </span>
-    <input type="file" class="file-replace__input" accept="${H.IMAGE_FILE_ACCEPT}" data-file />
-  </label>`;
+    </button>
+    <input type="file" class="file-replace__input" accept="${H.IMAGE_FILE_ACCEPT}" data-file hidden tabindex="-1" aria-hidden="true" />
+  </div>`;
 }

@@ -166,13 +166,13 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
         background.kind === "image"
           ? `${
               file
-                ? `<label class="field file-replace" data-tip="Use a JPG or PNG as the stage">
+                ? `<div class="field file-replace" data-tip="Use a JPG or PNG as the stage">
                     <span class="field-label"><span>Replace image</span></span>
-                    <span class="file-replace__btn" id="bg-photo">
+                    <button type="button" class="file-replace__btn" id="bg-photo">
                       <span class="file-replace__text">Browse</span>
-                    </span>
-                    <input type="file" class="file-replace__input" id="bg-file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" />
-                  </label>
+                    </button>
+                    <input type="file" class="file-replace__input" id="bg-file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" hidden tabindex="-1" aria-hidden="true" />
+                  </div>
                   <p class="hint" id="bg-name"></p>
                   <label class="field" data-tip="Fade the photo over black to darken the stage"><span id="bg-image-opacity-label">Opacity ${Math.round(background.imageOpacity ?? 100)}</span>
                     <input type="range" id="bg-image-opacity" min="0" max="100" step="1" value="${background.imageOpacity ?? 100}" />
@@ -278,6 +278,7 @@ export function mountBackgroundPanel(panel: HTMLElement, controller: BackgroundC
 
   const input = panel.querySelector<HTMLInputElement>("#bg-file");
   panel.querySelector("#bg-upload")?.addEventListener("click", () => input?.click());
+  panel.querySelector("#bg-photo")?.addEventListener("click", () => input?.click());
   input?.addEventListener("change", () => {
     const picked = input.files?.[0];
     input.value = "";

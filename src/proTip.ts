@@ -15,6 +15,8 @@ type Hint = {
   text: string;
   key?: string;
   after?: string;
+  /** Linked label after `text` (and optional key/after), before the trailing period. */
+  link?: { href: string; label: string };
 };
 
 const BLANK_FIRST: Hint = {
@@ -40,6 +42,10 @@ const HINTS: Hint[] = [
   { text: "Want to use bloom but it feels laggy? Try Performance mode in Settings" },
   { text: "Do you hate sound? You can turn that off in the Settings" },
   { text: "Save your scene as a .pill file from the Export tab" },
+  {
+    text: "Want 3D GIFs like the ones in the templates? Try",
+    link: { href: "https://orby.studio/", label: "orby.studio" },
+  },
 ];
 
 let isBlank: () => boolean = () => false;
@@ -158,6 +164,20 @@ function paintCard(opts: { title: string; hint: Hint; index?: number; oneOff?: b
     body.append(key);
   }
   if (hint.after) body.append(` ${hint.after}`);
+  if (hint.link) {
+    body.append(" ");
+    const a = document.createElement("a");
+    a.className = "pro-tip__link";
+    a.href = hint.link.href;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = hint.link.label;
+    a.addEventListener("click", (event) => {
+      event.preventDefault();
+      window.open(hint.link!.href, "_blank", "noopener,noreferrer");
+    });
+    body.append(a);
+  }
   body.append(".");
 
   node.append(head, body);
