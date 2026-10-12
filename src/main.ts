@@ -67,6 +67,7 @@ import { hintMediaExportOnce, mountProTip, releaseProTips, setProTipsEnabled } f
 import { mountTooltips, setTooltipsEnabled } from "./tooltip";
 import { createThemeShelf } from "./themeShelf";
 import { blankPrefabText, blankState, preloadUltrapilledLogo, ultrapilledLogoAsset, templateLabel } from "./templates";
+import { notFoundPreviewState } from "./modeSelectTheme";
 import {
   customTemplateLabel,
   deleteCustomTemplate,
@@ -283,6 +284,7 @@ app.innerHTML = `
     <aside class="dev-panel" id="dev-panel" hidden>
       <h2 class="dev-panel__title">Dev</h2>
       <p class="dev-panel__hint">Chrome corner radii. Physics outlines on.</p>
+      <button type="button" class="pill" id="dev-load-404" data-tip="Load the 404 template">404 template</button>
       <label class="field"><span data-dev-radius-label="panel">Panel 44px</span>
         <input type="range" data-dev-radius="panel" min="0" max="48" step="1" value="44" />
       </label>
@@ -319,7 +321,7 @@ app.innerHTML = `
           </span>
         </button>
         <div class="panel-actions__bar">
-          <button type="button" class="pill panel-util" id="loop" aria-pressed="false" data-tip="Keep the floor opening so the fall never ends">
+          <button type="button" class="pill panel-util" id="loop" aria-pressed="false" data-tip="Repeat the fall on a timer — after Floor pause the floor opens and the cycle restarts">
             <span class="loop-chip__text">Loop</span>
           </button>
           <button type="button" class="pill panel-util" id="reset-defaults" data-tip="Restore default sliders and options">Reset</button>
@@ -6674,6 +6676,10 @@ copyBtn.addEventListener("click", async () => {
   window.setTimeout(() => {
     copyBtn.textContent = "Copy settings";
   }, 1500);
+});
+
+devPanel.querySelector("#dev-load-404")?.addEventListener("click", () => {
+  void loadTemplate(notFoundPreviewState());
 });
 
 window.addEventListener("keydown", (event) => {

@@ -203,7 +203,7 @@ export function mobileLandingPreviewState(): AppState {
   };
 }
 
-/** 404 page scene id — used by `404.html` and the CREATE template picker. */
+/** 404 page scene id — used by `404.html` and the Dev panel template load. */
 export const NOT_FOUND_THEME_ID = "404";
 
 const NOT_FOUND_THEME = ["#050505", "#141414", "#282828", "#404040", "#FF1133"] as const;
@@ -300,7 +300,7 @@ export function notFoundPreviewState(): AppState {
       gridOpacity: 10,
     }),
     canvas: "16:9",
-    masterScale: 8.3,
+    masterScale: 7,
     sizeRandom: 100,
     pillPad: 30,
     textTracking: 37,

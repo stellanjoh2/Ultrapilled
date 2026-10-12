@@ -592,7 +592,10 @@ templatePick?.addEventListener("click", () => {
     return;
   }
   const choices: { value: string; label: string; onRemove?: () => void }[] = [
-    ...TEMPLATES.map((template) => ({ value: template.id as string, label: template.label })),
+    ...TEMPLATES.filter((template) => !template.devOnly).map((template) => ({
+      value: template.id as string,
+      label: template.label,
+    })),
     ...listCustomTemplates().map((template) => ({
       value: template.id,
       label: template.label,

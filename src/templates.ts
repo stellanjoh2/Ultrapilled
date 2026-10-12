@@ -26,7 +26,7 @@ export type TemplateId =
   | typeof MODE_SELECT_THEME_ID
   | typeof NOT_FOUND_THEME_ID;
 
-export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }[] = [
+export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState; devOnly?: boolean }[] = [
   { id: "acid", label: "London", build: acidState },
   { id: "new-york", label: "New York", build: newYorkState },
   { id: "miami", label: "Miami", build: miamiState },
@@ -34,7 +34,7 @@ export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState }
   { id: "halloween", label: "Halloween", build: halloweenState },
   { id: "ultrapilled", label: "Ultrapilled", build: ultrapilledState },
   { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
-  { id: NOT_FOUND_THEME_ID, label: "404", build: notFoundPreviewState },
+  { id: NOT_FOUND_THEME_ID, label: "404", build: notFoundPreviewState, devOnly: true },
 ];
 
 export function templateLabel(id: string | undefined): string | undefined {

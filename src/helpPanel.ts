@@ -78,7 +78,7 @@ function guideBody(): string {
       <p>Maybe you’re…</p>
       <ul class="help-list">
         <li>running a restaurant and need looping price boards for the TVs — drop your logotype on the background and you’re branded</li>
-        <li>doing club-night graphics and need something that actually moves for Stories or Reels</li>
+        <li>making club-night or VJ graphics that actually move — for Stories, Reels, or the screens</li>
         <li>whipping together a few fun slides for a school presentation in Layout mode</li>
         <li>pulling a quick moodboard together and saving it out before the meeting</li>
         <li>or you just want to drop things on a canvas and watch ${pop("gravity")} do the rest</li>
@@ -236,7 +236,7 @@ function guideBody(): string {
       </div>
       <ul class="help-list">
         <li><strong>${fun("Trigger Physics")}</strong> (${keycap("P")}) — run / restart the fall</li>
-        <li><strong>Loop</strong> — floor keeps opening so the fall never ends</li>
+        <li><strong>Loop</strong> — after Floor pause, the floor opens on a timer and the cycle repeats</li>
         <li><strong>Settings</strong> — sound, theme, shortcuts</li>
         <li>Floppy icon — Save / Load <code>.pill</code></li>
       </ul>
