@@ -526,7 +526,7 @@ export function berlinState(): AppState {
     text({ text: "030", ...condensed, shape: bare, colorIndex: ACID, scale: 3.6, tracking: -46 }),
     text({ text: "SCHRANZ", ...heavy, shape: bare, colorIndex: WHITE, scale: 2.75, tracking: -256 }),
     photo("berlin", "template-berlin-balloon.jpg", "Hi-Flyer", 110, 28),
-    presetIcon("Xs", 2, ACID, { scale: 0.5 }),
+    presetIcon("Xs", 2, BLUE, { scale: 0.5 }),
     text({ text: "Kunst", ...heavy, shape: "box", radius: 10, colorIndex: PINK, textColor: "#000000", scale: 1.6, tracking: -80 }),
     photo("berlin", "template-berlin-moma-queue.jpg", "MoMA Queue", 110, 0),
     text({ text: "24H", ...condensed, shape: bare, colorIndex: GREEN, scale: 3.6 }),
@@ -599,9 +599,9 @@ export function berlinState(): AppState {
       tracking: -60,
       pillPad: 48,
     }),
-    photo("berlin", "template-berlin-skull.gif", "Skull", 104, 0, 1, {
+    photo("berlin", "template-berlin-skull.gif", "Skull", 104, 0, 1.0643852467628665, {
       colorIndex: ACID,
-      collider: "sphere",
+      collider: "block",
       exposure: 22,
     }),
     presetIcon("Chevrons", 1, ACID, { scale: 0.7 }),
@@ -613,13 +613,13 @@ export function berlinState(): AppState {
     presetIcon("Boxes", 1, GREEN, { scale: 0.8 }),
     emoji("🚇", "U-Bahn", 1, 0.75),
     text({ text: "Sign Up Now", ...swiss(700), shape: "pill", stroked: true, stroke: 2, colorIndex: PINK, scale: 0.3, pillPad: 55 }),
-    text({ text: "Kater", ...swiss(600), shape: bare, colorIndex: WHITE, scale: 1.1, tracking: -60 }),
+    text({ text: "Kater", ...swiss(600), shape: bare, colorIndex: WHITE, scale: 1.1, tracking: -212 }),
     emoji("🏢", "Office Building", 1, 1),
   ].filter((slot): slot is Slot => slot != null);
   return {
     ...demoState(),
     stageColor: "#000000",
-    shapeAmount: 16,
+    shapeAmount: 17,
     background: {
       ...defaultBackground(),
       kind: "solid",
