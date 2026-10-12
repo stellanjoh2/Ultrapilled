@@ -6721,12 +6721,15 @@ html[data-theme="day"] .settings-modal__body .keycap {
   width: calc(22px * var(--ui-scale));
   height: calc(22px * var(--ui-scale));
   line-height: 0;
+  transition: transform 0.15s ease;
+  backface-visibility: hidden;
 }
 
 .help-trigger svg {
   display: block;
   width: 100%;
   height: 100%;
+  backface-visibility: hidden;
 }
 
 .help-trigger.is-on {
@@ -6736,6 +6739,13 @@ html[data-theme="day"] .settings-modal__body .keycap {
 }
 
 @media (hover: hover) and (pointer: fine) {
+  /* Over dark stage chrome — lime glyph hover like other icon-hover marks.
+     Beat the day-theme icon-hover ink override (help sits on the playfield). */
+  .help-trigger.icon-hover:hover:not(:disabled):not(.is-on),
+  html[data-theme="day"] .help-trigger.icon-hover:hover:not(:disabled):not(.is-on) {
+    color: var(--pill-fun-face);
+  }
+
   .help-trigger.is-on:hover:not(:disabled),
   html[data-theme="day"] .help-trigger.is-on:hover:not(:disabled) {
     color: var(--on-primary);
