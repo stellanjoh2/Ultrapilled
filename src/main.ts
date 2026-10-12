@@ -91,10 +91,12 @@ import trashSimple from "@phosphor-icons/core/assets/regular/trash-simple.svg?ra
 import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import folderOpen from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
+import questionIcon from "@phosphor-icons/core/assets/regular/question.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
 import { warmGifTracks } from "./export/gifFrames";
 import { isAboutOpen } from "./aboutPanel";
 import { isBugReportOpen } from "./bugReport";
+import { isHelpOpen, toggleHelp } from "./helpPanel";
 import { openSettings, isSettingsOpen } from "./settingsPanel";
 import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
 import { withUnsplashUtm } from "./unsplashApi";
@@ -142,7 +144,7 @@ import { cancelSlotDrag } from "./slotDrag";
 import { bindUiClickSounds, bindUiHoverSounds, bindUiTypeSounds, playButton, playCaution, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
 import gsap from "gsap";
 import "./style.css";
-import { compositionScale, placeZoomedFixed, syncUiScale, uiScale } from "./uiScale";
+import { compositionScale, placeZoomedFixed, syncUiScale, UI_REF_H, uiScale } from "./uiScale";
 import { beginScrub, endScrub } from "./scrub";
 import {
   bindRangeValueEdit,
@@ -269,6 +271,9 @@ app.innerHTML = `
       </div>
     </div>
     <nav class="page-strip" id="page-strip" hidden aria-label="Pages"></nav>
+    <button type="button" class="help-trigger icon-hover" id="open-help" data-open-help aria-label="Help guide" aria-expanded="false" aria-haspopup="dialog" data-tip="Help guide">
+      <span aria-hidden="true">${questionIcon}</span>
+    </button>
     <header class="topbar">
       <button type="button" class="logotype" aria-label="Ultrapilled — start over" data-tip="Start over">
         <span class="logotype__label">Ultrapilled</span>
@@ -799,9 +804,12 @@ function openFontMenu(
     const maxLeft = shellRect.left - gap;
     const available = maxLeft - 8;
     const width = available >= preferred ? preferred : Math.max(minWidth, available);
+    // Match 2560×1440 panel height (inset = --space-2); don't grow on taller viewports.
+    const inset = 24 * s;
+    const designH = UI_REF_H * s - 2 * inset;
     menu.style.width = `${width}px`;
     menu.style.maxHeight = "none";
-    menu.style.height = `${shellRect.height}px`;
+    menu.style.height = `${Math.min(shellRect.height, designH)}px`;
     menu.style.left = `${Math.max(8, maxLeft - width)}px`;
     menu.style.bottom = "auto";
     menu.style.top = `${shellRect.top}px`;
@@ -6341,6 +6349,9 @@ for (const id of ["physics", "background", "export"] as const) {
 app.querySelector("#open-settings")?.addEventListener("click", () => {
   openSettings(settingsController);
 });
+app.querySelector("#open-help")?.addEventListener("click", () => {
+  toggleHelp();
+});
 
 const projectBtn = app.querySelector<HTMLButtonElement>("#open-project")!;
 let closeProjectMenu: (() => void) | null = null;
@@ -6702,7 +6713,7 @@ window.addEventListener("keydown", (event) => {
   }
   if (typingInField(event.target)) return;
   if (document.body.classList.contains("is-exporting")) return;
-  if (isSettingsOpen() || isAboutOpen() || isBugReportOpen() || isUnsplashOpen() || isGiphyOpen() || isYouTubeOpen()) return;
+  if (isSettingsOpen() || isHelpOpen() || isAboutOpen() || isBugReportOpen() || isUnsplashOpen() || isGiphyOpen() || isYouTubeOpen()) return;
   if (document.querySelector(".reconnect[aria-modal='true']")) return;
   if (presenting) {
     if (event.code === "Space" || event.key === "ArrowRight" || event.key === "PageDown") {

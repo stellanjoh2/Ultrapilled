@@ -255,14 +255,17 @@ body:has(.app.ui-hidden) .ui-tip {
   display: none;
 }
 
-.app.ui-hidden .topbar {
+.app.ui-hidden .topbar,
+body:has(.help-modal) .topbar {
   opacity: 0;
   transform: translateY(-4px) scale(0.97);
   pointer-events: none;
   visibility: hidden;
 }
 
-.app.ui-hidden .page-strip {
+.app.ui-hidden .page-strip,
+.app.ui-hidden .help-trigger,
+body:has(.help-modal) .help-trigger {
   opacity: 0;
   transform: translateY(4px) scale(0.97);
   pointer-events: none;
@@ -277,6 +280,7 @@ body:has(.app.ui-hidden) .ui-tip {
 }
 
 .app.is-presenting .pro-tip,
+.app.is-presenting .help-trigger,
 body:has(.app.is-presenting) .ui-tip {
   display: none;
 }
@@ -304,6 +308,9 @@ body:has(.app.is-presenting) .ui-tip {
 @media (prefers-reduced-motion: no-preference) {
   .app.ui-hidden .topbar,
   .app.ui-hidden .page-strip,
+  .app.ui-hidden .help-trigger,
+  body:has(.help-modal) .topbar,
+  body:has(.help-modal) .help-trigger,
   .app.is-presenting .topbar {
     transition:
       opacity 0.14s ease,
@@ -3669,10 +3676,10 @@ select:focus {
 }
 
 .font-menu--fonts .font-menu-item {
-  min-height: max(44px, calc(48px * var(--ui-scale)));
-  padding: max(8px, calc(10px * var(--ui-scale))) var(--space-1);
+  min-height: calc(48px * var(--ui-scale));
+  padding: calc(10px * var(--ui-scale)) var(--space-1);
   overflow: visible;
-  font-size: max(18px, calc(24px * var(--ui-scale)));
+  font-size: calc(24px * var(--ui-scale));
   font-weight: 400;
   line-height: 1.2;
 }
@@ -4066,19 +4073,22 @@ button.pill.is-on:active {
   transition: 100ms;
 }
 
-button.pill.pill--commit {
+button.pill.pill--commit,
+a.pill.pill--commit {
   background: var(--primary);
   color: var(--on-primary);
   border: 1px solid transparent;
   box-shadow: none;
 }
 
-button.pill.pill--commit:hover:not(:disabled) {
+button.pill.pill--commit:hover:not(:disabled),
+a.pill.pill--commit:hover {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
 }
 
-button.pill.pill--commit:active:not(:disabled) {
+button.pill.pill--commit:active:not(:disabled),
+a.pill.pill--commit:active {
   background: var(--pill-fun-face);
   color: var(--pill-fun-ink);
   transform: translateY(calc(8px * var(--ui-scale)));
@@ -6013,7 +6023,11 @@ html[data-theme="day"] .shape-swatch {
   position: fixed;
   z-index: 60;
   left: max(var(--panel-inset), env(safe-area-inset-left, 0px));
-  bottom: max(var(--panel-inset), env(safe-area-inset-bottom, 0px));
+  /* Sit above the help FAB so tips don’t cover the trigger. */
+  bottom: calc(
+    max(var(--panel-inset), env(safe-area-inset-bottom, 0px)) + calc(48px * var(--ui-scale)) +
+      var(--space-1)
+  );
   width: fit-content;
   max-width: min(calc(380px * var(--ui-scale)), calc(var(--ui-vw) - (var(--space-2) * 2)));
   margin: 0;
@@ -6668,6 +6682,531 @@ html[data-theme="day"] .settings-modal__body .keycap {
 
 .settings-modal__done {
   width: 100%;
+}
+
+/* —— Help guide (half-width left sheet, frosted — canvas stays visible) —— */
+
+.help-trigger {
+  position: absolute;
+  left: var(--panel-inset);
+  bottom: var(--panel-inset);
+  z-index: 41;
+  display: grid;
+  place-items: center;
+  width: calc(48px * var(--ui-scale));
+  height: calc(48px * var(--ui-scale));
+  margin: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: calc(9999px * var(--ui-scale));
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
+  backdrop-filter: blur(16px) saturate(1.12);
+  line-height: 0;
+  cursor: pointer;
+  transform-origin: bottom left;
+  pointer-events: auto;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.help-trigger > span {
+  display: grid;
+  place-items: center;
+  width: calc(22px * var(--ui-scale));
+  height: calc(22px * var(--ui-scale));
+  line-height: 0;
+}
+
+.help-trigger svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.help-trigger.is-on {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .help-trigger.is-on:hover:not(:disabled),
+  html[data-theme="day"] .help-trigger.is-on:hover:not(:disabled) {
+    color: var(--on-primary);
+  }
+}
+
+.app:has(#page-strip:not([hidden])) .help-trigger {
+  bottom: calc(var(--panel-inset) + calc(54px * var(--ui-scale)) + var(--space-1));
+}
+
+.app:has(#page-strip:not([hidden])) .pro-tip {
+  bottom: calc(
+    var(--panel-inset) + calc(54px * var(--ui-scale)) + var(--space-1) + calc(48px * var(--ui-scale)) +
+      var(--space-1)
+  );
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .help-trigger {
+    background: color-mix(in srgb, var(--canvas) 88%, transparent);
+  }
+}
+
+.help-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  pointer-events: auto;
+}
+
+.help-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+
+.help-modal__sheet {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  bottom: var(--space-2);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(33.333vw, calc(100% - (var(--space-2) * 2)));
+  border-radius: var(--radius-settings);
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--canvas) 58%, transparent);
+  box-shadow: var(--shadow-2);
+  -webkit-backdrop-filter: blur(28px) saturate(1.18);
+  backdrop-filter: blur(28px) saturate(1.18);
+  overflow: hidden;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .help-modal__sheet {
+    background: color-mix(in srgb, var(--canvas) 92%, transparent);
+  }
+}
+
+html[data-theme="day"] .help-modal__sheet {
+  background: color-mix(in srgb, var(--canvas) 70%, transparent);
+}
+
+.help-modal__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(16px * var(--ui-scale));
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--panel-rule);
+}
+
+.help-fun {
+  color: var(--pill-fun-face);
+}
+
+.help-pop {
+  color: var(--loop-stroke-b);
+}
+
+html[data-theme="day"] .help-fun {
+  /* Lime on light chrome — keep the mark; day panels already use it for hover smash. */
+  color: var(--pill-fun-face);
+}
+
+html[data-theme="day"] .help-pop {
+  color: #6b4fd8;
+}
+
+.help-modal__titles {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--ui-scale));
+  min-width: 0;
+}
+
+.help-modal__title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: calc(44px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.help-modal__updated {
+  margin: 0;
+  color: var(--ink-mute);
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.help-modal__back {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: calc(32px * var(--ui-scale));
+  height: calc(32px * var(--ui-scale));
+  margin-left: calc(-5px * var(--ui-scale));
+  padding: 0;
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
+  background: transparent;
+  color: var(--ink-mute);
+  transition: color 0.15s ease;
+}
+
+.help-modal__back-icon {
+  display: grid;
+  place-items: center;
+  width: calc(22.5px * var(--ui-scale));
+  height: calc(22.5px * var(--ui-scale));
+  transition: transform 0.15s ease;
+}
+
+.help-modal__back-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .help-modal__back:hover {
+    color: var(--pill-fun-face);
+  }
+}
+
+.help-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3);
+  scroll-behavior: smooth;
+}
+
+.help-lede {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-secondary);
+  font-size: calc(20px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: -0.015em;
+}
+
+.help-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(8px * var(--ui-scale));
+  margin: 0 0 var(--space-3);
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--panel-rule);
+}
+
+.help-toc__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(36px * var(--ui-scale));
+  padding: 0 calc(14px * var(--ui-scale));
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: calc(9999px * var(--ui-scale));
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink-secondary);
+  font-size: calc(16px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .help-toc__link:hover {
+    background: var(--pill-fun-face);
+    color: var(--pill-fun-ink);
+    border-color: transparent;
+  }
+}
+
+.help-section {
+  margin: 0 0 var(--space-3);
+  scroll-margin-top: var(--space-2);
+}
+
+.help-section:last-child {
+  margin-bottom: 0;
+}
+
+.help-section__title {
+  margin: 0 0 var(--space-1);
+  color: var(--ink);
+  font-family: var(--font-section);
+  /* Match Settings .section h2. */
+  font-size: calc(20px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.help-section__sub {
+  margin: var(--space-2) 0 var(--space-1);
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: calc(18px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.help-section p,
+.help-list {
+  margin: 0 0 var(--space-1);
+  color: var(--ink-secondary);
+  font-size: calc(16px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+}
+
+.help-section p:last-child,
+.help-list:last-child {
+  margin-bottom: 0;
+}
+
+.help-section strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.help-section code {
+  font-size: 0.92em;
+  color: var(--ink);
+}
+
+.help-note {
+  /* Same size as running text; mute only. Lime rule = tip callout. */
+  margin-top: var(--space-1);
+  padding-left: var(--space-1);
+  border-left: 2px solid var(--pill-fun-face);
+  color: var(--ink-mute) !important;
+  font-size: calc(16px * var(--ui-scale)) !important;
+  line-height: 1.45 !important;
+}
+
+.help-note .help-fun {
+  color: var(--pill-fun-face) !important;
+}
+
+.help-list {
+  padding-left: 1.15em;
+}
+
+.help-list--numbered {
+  padding-left: 1.35em;
+}
+
+.help-list li + li {
+  margin-top: calc(10px * var(--ui-scale));
+}
+
+.help-table {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 var(--space-1);
+  border-top: 1px solid var(--panel-rule);
+}
+
+.help-table__row {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 0.36fr) minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  min-height: calc(52px * var(--ui-scale));
+  padding: calc(12px * var(--ui-scale)) 0;
+  border-bottom: 1px solid var(--panel-rule);
+}
+
+.help-table__key {
+  color: var(--ink);
+  font-size: calc(16px * var(--ui-scale));
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.help-table__val {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(6px * var(--ui-scale));
+  color: var(--ink-secondary);
+  font-size: calc(16px * var(--ui-scale));
+  line-height: 1.45;
+}
+
+.help-modal__body .keycap {
+  display: inline-grid;
+  place-items: center;
+  min-width: calc(32px * var(--ui-scale));
+  height: calc(32px * var(--ui-scale));
+  padding: 0 calc(9px * var(--ui-scale));
+  border: 1px solid var(--panel-rule);
+  border-radius: calc(8px * var(--ui-scale));
+  background: color-mix(in srgb, var(--field) 78%, transparent);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.35);
+}
+
+html[data-theme="day"] .help-modal__body .keycap {
+  box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.08);
+}
+
+.help-link {
+  color: var(--ink);
+  text-underline-offset: 0.15em;
+  transition: color 0.15s ease;
+}
+
+.help-link.help-fun {
+  color: var(--pill-fun-face);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .help-link:hover {
+    color: var(--pill-fun-face);
+  }
+
+  .help-link.help-fun:hover {
+    color: var(--ink);
+  }
+}
+
+.help-toc__link[href="#help-orby"] {
+  border-color: color-mix(in srgb, var(--pill-fun-face) 45%, transparent);
+  color: var(--pill-fun-face);
+}
+
+.help-orby-gifs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+
+.help-orby-gifs__item {
+  margin: 0;
+  aspect-ratio: 1;
+  border-radius: var(--radius-pop);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  overflow: hidden;
+}
+
+.help-orby-gifs__item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Lime smash CTA — same family as Trigger Physics, sized for the guide column. */
+.help-orby-cta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(52px * var(--ui-scale));
+  margin: 0 0 calc(8px * var(--ui-scale));
+  padding: calc(12px * var(--ui-scale)) calc(24px * var(--ui-scale));
+  border: none;
+  border-radius: calc(9999px * var(--ui-scale));
+  background: var(--play-face);
+  color: var(--play-ink);
+  font-size: calc(14px * var(--ui-scale));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: 0 calc(8px * var(--ui-scale)) 0 var(--play-edge);
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease,
+    filter 0.15s ease;
+}
+
+.help-orby-cta__label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .help-orby-cta:hover {
+    background: var(--play-face);
+    color: var(--play-ink);
+    filter: brightness(1.04);
+  }
+}
+
+.help-orby-cta:active {
+  background: var(--play-face);
+  color: var(--play-ink);
+  transform: translateY(calc(8px * var(--ui-scale)));
+  box-shadow: 0 0 0 var(--play-edge);
+  filter: none;
+}
+
+.help-orby-cta:focus-visible {
+  outline: 2px solid var(--play-ink);
+  outline-offset: calc(3px * var(--ui-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-orby-cta {
+    transition: filter 0.15s ease;
+  }
+
+  .help-orby-cta:active {
+    transform: none;
+    box-shadow: 0 calc(8px * var(--ui-scale)) 0 var(--play-edge);
+  }
+}
+
+.help-modal__foot {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--panel-rule);
+}
+
+.help-modal__done {
+  width: 100%;
+}
+
+.help-modal__body :is(button, a).pill,
+.help-modal__foot button.pill {
+  min-height: calc(54px * var(--ui-scale));
+  font-size: calc(15px * var(--ui-scale));
 }
 
 /*
