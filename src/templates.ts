@@ -392,7 +392,7 @@ export function newYorkState(): AppState {
         { id: uid(), color: "#02006c", at: 0 },
         { id: uid(), color: "#080808", at: 100 },
       ],
-      grid: false,
+      grid: true,
       gridDensity: "base",
       gridColor: "#1c2bc9",
       gridOpacity: 20,
