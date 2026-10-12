@@ -7109,11 +7109,6 @@ html[data-theme="day"] .help-modal__body .keycap {
   }
 }
 
-.help-toc__link[href="#help-orby"] {
-  border-color: color-mix(in srgb, var(--pill-fun-face) 45%, transparent);
-  color: var(--pill-fun-face);
-}
-
 .help-orby-gifs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
