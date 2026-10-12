@@ -96,8 +96,8 @@ import { mountExportPanel } from "./export/exportPanel";
 import { warmGifTracks } from "./export/gifFrames";
 import { isAboutOpen } from "./aboutPanel";
 import { isBugReportOpen } from "./bugReport";
-import { isHelpOpen, toggleHelp } from "./helpPanel";
-import { openSettings, isSettingsOpen } from "./settingsPanel";
+import { closeHelp, isHelpOpen, toggleHelp } from "./helpPanel";
+import { closeSettings, openSettings, isSettingsOpen } from "./settingsPanel";
 import { openUnsplashImport, isUnsplashOpen } from "./unsplashPanel";
 import { withUnsplashUtm } from "./unsplashApi";
 import { openGiphyImport, isGiphyOpen } from "./giphyPanel";
@@ -6347,9 +6347,11 @@ for (const id of ["physics", "background", "export"] as const) {
   });
 }
 app.querySelector("#open-settings")?.addEventListener("click", () => {
+  if (isHelpOpen()) closeHelp();
   openSettings(settingsController);
 });
 app.querySelector("#open-help")?.addEventListener("click", () => {
+  if (isSettingsOpen()) closeSettings();
   toggleHelp();
 });
 

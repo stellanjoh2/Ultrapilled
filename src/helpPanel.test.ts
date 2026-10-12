@@ -30,11 +30,13 @@ describe("help panel", () => {
     const title = document.querySelector("#help-modal-title");
     expect(sheet).toBeTruthy();
     expect(title?.textContent).toBe("How to Guide");
+    expect(document.querySelector("#help-why")).toBeTruthy();
     expect(document.querySelector("#help-objects")).toBeTruthy();
     expect(document.querySelector("#help-orby")).toBeTruthy();
+    expect(document.body.textContent).toContain("What’s this for?");
     expect(document.body.textContent).toContain("Double-click");
     expect(document.querySelector('.help-orby-cta[href="https://orby.studio/"]')?.textContent?.trim()).toBe(
-      "Visit Orby",
+      "Visit Orby.studio",
     );
     const gifs = [...document.querySelectorAll<HTMLImageElement>(".help-orby-gifs__item img")];
     expect(gifs).toHaveLength(3);

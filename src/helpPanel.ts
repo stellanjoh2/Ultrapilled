@@ -52,6 +52,7 @@ function guideBody(): string {
     </p>
 
     <nav class="help-toc" aria-label="Guide sections">
+      ${tocLink("help-why", "Why")}
       ${tocLink("help-vibe", "Vibe")}
       ${tocLink("help-stage", "Stage")}
       ${tocLink("help-objects", "Objects")}
@@ -67,6 +68,22 @@ function guideBody(): string {
       ${tocLink("help-path", "Path")}
       ${tocLink("help-index", "Index")}
     </nav>
+
+    <section class="help-section" id="help-why">
+      <h3 class="help-section__title">What’s this for?</h3>
+      <p>
+        Ultrapilled is a stage for type, shapes, and ${fun("motion")} —
+        make something that feels alive without opening a full motion tool.
+      </p>
+      <p>Maybe you’re…</p>
+      <ul class="help-list">
+        <li>running a restaurant and need looping price boards for the TVs</li>
+        <li>doing club-night graphics and need something that actually moves for Stories or Reels</li>
+        <li>pulling a quick moodboard together and saving it out before the meeting</li>
+        <li>or you just want to drop things on a stage and watch ${pop("gravity")} do the rest</li>
+      </ul>
+      <p>${fun("Design first. Fall second. Export when it hits.")}</p>
+    </section>
 
     <section class="help-section" id="help-vibe">
       <h3 class="help-section__title">1. Choose your vibe</h3>
@@ -266,10 +283,10 @@ function guideBody(): string {
       <p>Where Ultrapilled stops feeling like a toy and starts feeling like a ${fun("composition tool")}.</p>
       <ul class="help-list">
         <li><strong>Grid</strong> (${keycap("G")}) — ratio-locked square guides under Background</li>
-        <li><strong>Text height</strong> — vertical seating in a Pill or Box</li>
+        <li><strong>Text height</strong> — nudge Y when a font sits off-center</li>
         <li><strong>Color theme</strong> — pick a system, or View Themes (Common / Retro / Feral)</li>
         <li><strong>Copy style / Paste style</strong> — match look without copying the object</li>
-        <li><strong>Invert</strong> (${keycap("I")}) — quick contrast flips</li>
+        <li><strong>Invert</strong> (${keycap("I")}) — straight color invert</li>
         <li><strong>Gradients</strong> — drag on-canvas stops to rotate and scale; click to pick</li>
         <li><strong>Look</strong> — bloom, grain, vignette, saturate on the whole frame</li>
         <li><strong>Background</strong> — solid, gradient, or image; optional logotype behind/in front</li>
@@ -376,7 +393,7 @@ function guideBody(): string {
         </figure>
       </div>
       <a class="help-orby-cta" href="https://orby.studio/" target="_blank" rel="noopener noreferrer">
-        <span class="help-orby-cta__label">Visit Orby</span>
+        <span class="help-orby-cta__label">Visit Orby.studio</span>
       </a>
     </section>
 
@@ -408,7 +425,13 @@ function guideBody(): string {
           <span class="help-table__val" role="cell">Export → GIF</span>
         </div>
       </div>
-      <p>Your exports are yours — no Ultrapilled credit required on the output.</p>
+      <p>
+        Your exports are yours — no Ultrapilled credit required on the output.
+        But if you enjoy the tool, have feedback, or want to show me what you’ve made,
+        reach out on
+        <a class="help-link" href="https://x.com/johstell" target="_blank" rel="noopener noreferrer">X</a>
+        — I’d be happy to hear from you.
+      </p>
     </section>
 
     <section class="help-section" id="help-path">
@@ -533,7 +556,7 @@ export function openHelp(): void {
       </header>
       <div class="help-modal__body" id="help-modal-body">${guideBody()}</div>
       <footer class="help-modal__foot">
-        <button type="button" class="pill pill--commit help-modal__done" data-help-close data-tip="Close help">Done</button>
+        <button type="button" class="pill pill--commit help-modal__done" data-help-close data-tip="Close help">Ok, I think I get it</button>
       </footer>
     </div>
   `;
