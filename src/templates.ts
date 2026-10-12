@@ -154,7 +154,7 @@ export function acidState(): AppState {
       textColorIndex: 2,
     }),
     photo("acid", "piccadilly.jpg", "Piccadilly", 115, 5, 1.77),
-    photo("acid", "template-acid-big-ben.gif", "Big Ben", 110, 0, 1.25, {
+    photo("acid", "template-acid-big-ben.gif", "Big Ben", 110, 0, 2.4033368155205364, {
       colorIndex: 1,
       collider: "block",
     }),
