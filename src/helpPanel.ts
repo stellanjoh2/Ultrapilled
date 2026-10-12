@@ -77,12 +77,12 @@ function guideBody(): string {
       </p>
       <p>Maybe you’re…</p>
       <ul class="help-list">
-        <li>running a restaurant and need looping price boards for the TVs</li>
+        <li>running a restaurant and need looping price boards for the TVs — drop your logotype on the background and you’re branded</li>
         <li>doing club-night graphics and need something that actually moves for Stories or Reels</li>
+        <li>whipping together a few fun slides for a school presentation in Layout mode</li>
         <li>pulling a quick moodboard together and saving it out before the meeting</li>
         <li>or you just want to drop things on a stage and watch ${pop("gravity")} do the rest</li>
       </ul>
-      <p>${fun("Design first. Fall second. Export when it hits.")}</p>
     </section>
 
     <section class="help-section" id="help-vibe">
