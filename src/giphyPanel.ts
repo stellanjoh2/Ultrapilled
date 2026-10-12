@@ -104,6 +104,7 @@ export function openGiphyImport(opts: { onPick: (file: File, remote?: ImageRemot
   const input = root.querySelector<HTMLInputElement>("[data-giphy-query]")!;
   const status = root.querySelector<HTMLElement>("[data-giphy-status]")!;
   const grid = root.querySelector<HTMLElement>("[data-giphy-grid]")!;
+  const gridScroll = root.querySelector<HTMLElement>(".unsplash-grid-scroll")!;
   const moreWrap = root.querySelector<HTMLElement>("[data-giphy-more]")!;
   const moreBtn = root.querySelector<HTMLButtonElement>("[data-giphy-load-more]")!;
 
@@ -239,6 +240,15 @@ export function openGiphyImport(opts: { onPick: (file: File, remote?: ImageRemot
       });
   };
 
+  const scrollToNewResults = (fromIndex: number) => {
+    const firstNew = grid.children[fromIndex];
+    if (!(firstNew instanceof HTMLElement)) return;
+    const top =
+      gridScroll.scrollTop +
+      (firstNew.getBoundingClientRect().top - gridScroll.getBoundingClientRect().top);
+    gridScroll.scrollTo({ top, behavior: reducedMotion() ? "auto" : "smooth" });
+  };
+
   const loadMore = () => {
     if (loadingMore || page >= totalPages) return;
     const gen = searchGen;
@@ -248,8 +258,9 @@ export function openGiphyImport(opts: { onPick: (file: File, remote?: ImageRemot
       .then((next) => {
         if (gen !== searchGen) return;
         loadingMore = false;
+        const fromIndex = grid.children.length;
         applyPage(next, false);
-        moreBtn.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+        scrollToNewResults(fromIndex);
       })
       .catch((err: unknown) => {
         if (gen !== searchGen) return;

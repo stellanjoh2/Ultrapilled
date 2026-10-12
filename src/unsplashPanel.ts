@@ -113,6 +113,7 @@ export function openUnsplashImport(opts: {
   const input = root.querySelector<HTMLInputElement>("[data-unsplash-query]")!;
   const status = root.querySelector<HTMLElement>("[data-unsplash-status]")!;
   const grid = root.querySelector<HTMLElement>("[data-unsplash-grid]")!;
+  const gridScroll = root.querySelector<HTMLElement>(".unsplash-grid-scroll")!;
   const moreWrap = root.querySelector<HTMLElement>("[data-unsplash-more]")!;
   const moreBtn = root.querySelector<HTMLButtonElement>("[data-unsplash-load-more]")!;
 
@@ -255,6 +256,15 @@ export function openUnsplashImport(opts: {
       });
   };
 
+  const scrollToNewResults = (fromIndex: number) => {
+    const firstNew = grid.children[fromIndex];
+    if (!(firstNew instanceof HTMLElement)) return;
+    const top =
+      gridScroll.scrollTop +
+      (firstNew.getBoundingClientRect().top - gridScroll.getBoundingClientRect().top);
+    gridScroll.scrollTo({ top, behavior: reducedMotion() ? "auto" : "smooth" });
+  };
+
   const loadMore = () => {
     if (!activeQuery || loadingMore || page >= totalPages) return;
     const gen = searchGen;
@@ -264,8 +274,9 @@ export function openUnsplashImport(opts: {
       .then((next) => {
         if (gen !== searchGen) return;
         loadingMore = false;
+        const fromIndex = grid.children.length;
         applyPage(next, false);
-        moreBtn.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+        scrollToNewResults(fromIndex);
       })
       .catch((err: unknown) => {
         if (gen !== searchGen) return;
