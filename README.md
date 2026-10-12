@@ -52,13 +52,14 @@ npx shadcn add https://soundcn.xyz/r/<sound-name>.json
 
 Bundled under `public/templates/<id>/`. Full per-file notes also live in each folder’s `CREDITS.txt`. Photos and third-party 3D-derived renders (PNG / GIF) keep their original licenses — credit authors where the license requires it (e.g. CC BY).
 
-**Acid** (London night + 1990s rave / club; **CC BY / CC BY-SA / CC0**)
+**Acid** (London night + 1990s rave / club + Sketchfab-derived render; **CC BY / CC BY-SA / CC0**)
 
 | File | Work | Author | License |
 |------|------|--------|---------|
 | `piccadilly.jpg` | [Piccadilly Circus at night in 1988](https://commons.wikimedia.org/wiki/File:Piccadilly_Circus_at_night_in_1988_-_geograph.org.uk_-_2687917.jpg) | Peter Shimmon | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) |
 | `go-ahead-london.jpg` | [Go Ahead London's 171](https://commons.wikimedia.org/wiki/File:20200914_Go_Ahead_London_171.jpg) | Alex Noble | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `fish-chips.jpg` | [Anstruther Fish Supper](https://commons.wikimedia.org/wiki/File:Anstruther_Fish_Supper.jpg) | Edinburgh Blog | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| `template-acid-big-ben.gif` | [Clock Tower (Big Ben)](https://sketchfab.com/3d-models/clock-tower-big-ben-9a1c691fac774bcca4e2ba565c4c9d9b) | [ManySince910](https://sketchfab.com/noears6) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
 **New York** (1960s B&W; public domain)
 

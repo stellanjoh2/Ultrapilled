@@ -15,3 +15,14 @@ fish-chips.jpg
   "Anstruther Fish Supper" by Edinburgh Blog
   License: CC BY 2.0
   https://commons.wikimedia.org/wiki/File:Anstruther_Fish_Supper.jpg
+
+Renders derived from third-party 3D models (author must be credited; CC BY).
+Naming: template-acid-<kebab asset name>; keep source extension.
+
+template-acid-big-ben.gif
+  "Clock Tower (Big Ben)" by ManySince910 (@noears6)
+  Turntable GIF (5s / 15fps / 720p)
+  License: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+  Source: https://sketchfab.com/3d-models/clock-tower-big-ben-9a1c691fac774bcca4e2ba565c4c9d9b
+  Author: https://sketchfab.com/noears6
+  Sketchfab NoAI: source model may not be used in generative AI datasets / training

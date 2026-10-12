@@ -18,6 +18,7 @@ template-<template-id>-<asset-name>.<ext>
 
 | Template   | Example file                         |
 | ---------- | ------------------------------------ |
+| Acid       | `template-acid-big-ben.gif`          |
 | Berlin     | `template-berlin-skull.gif`          |
 | Halloween  | `template-halloween-hi-fi-spider.gif`|
 | Miami      | `template-miami-coast-guard.jpg`     |
