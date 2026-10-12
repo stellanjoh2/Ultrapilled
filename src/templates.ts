@@ -156,7 +156,7 @@ export function acidState(): AppState {
     photo("acid", "piccadilly.jpg", "Piccadilly", 115, 5, 1.77),
     photo("acid", "template-acid-big-ben.gif", "Big Ben", 110, 0, 1.25, {
       colorIndex: 1,
-      collider: "sphere",
+      collider: "block",
     }),
     text({
       text: "BUZZING",
