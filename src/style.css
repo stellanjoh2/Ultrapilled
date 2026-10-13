@@ -7389,6 +7389,7 @@ html[data-theme="day"] .help-modal__body .keycap {
   line-height: 1.45;
 }
 
+/* About is always a dark surface; day chrome --ink / light stage must not win. */
 a.pill.about-project__launch {
   display: inline-flex;
   align-items: center;
@@ -7399,6 +7400,25 @@ a.pill.about-project__launch {
   margin: calc(36px * var(--ui-scale)) 0 0;
   padding: var(--space-0) var(--space-2);
   font-size: calc(15px * var(--ui-scale));
+  /* Opaque chip — day stage can be light behind the scrim; frost washes out. */
+  background: #141414;
+  color: #f5f5f5;
+  border: 1px solid color-mix(in srgb, #f5f5f5 45%, transparent);
+  box-shadow: none;
+  transition:
+    background 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease;
+}
+
+a.pill.about-project__launch:hover,
+a.pill.about-project__launch:focus-visible,
+a.pill.about-project__launch:active {
+  background: #c4ff00;
+  color: #111111;
+  border-color: #c4ff00;
+  box-shadow: none;
+  transform: none;
 }
 
 .about-overlay__ok {
