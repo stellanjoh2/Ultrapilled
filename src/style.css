@@ -7389,6 +7389,8 @@ html[data-theme="day"] .help-modal__body .keycap {
   line-height: 1.45;
 }
 
+/* About is always a dark fullscreen surface (white type over media/scrim).
+   Day chrome --ink is near-black, so plain outline pills disappear — pin light rest colors. */
 a.pill.about-project__launch {
   display: inline-flex;
   align-items: center;
@@ -7399,6 +7401,16 @@ a.pill.about-project__launch {
   margin: calc(36px * var(--ui-scale)) 0 0;
   padding: var(--space-0) var(--space-2);
   font-size: calc(15px * var(--ui-scale));
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid rgb(255 255 255 / 0.4);
+}
+
+a.pill.about-project__launch:hover,
+a.pill.about-project__launch:active {
+  background: var(--pill-fun-face);
+  color: var(--pill-fun-ink);
+  border-color: transparent;
 }
 
 .about-overlay__ok {
