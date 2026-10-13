@@ -590,7 +590,7 @@ export function berlinState(): AppState {
   const bare = "none" as const;
   const condensed = { fontFamily: "Anton", fontWeight: 400, tracking: -70 };
   const heavy = { fontFamily: "Archivo Black", fontWeight: 400 };
-  const mono = (fontWeight: number) => ({ fontFamily: "Space Mono", fontWeight });
+  const pixel = (fontWeight: number) => ({ fontFamily: "Pixelify Sans", fontWeight });
   const swiss = (fontWeight: number) => ({ fontFamily: "Inter", fontWeight });
   const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
   const slots = [
@@ -617,7 +617,7 @@ export function berlinState(): AppState {
       tracking: -127,
       pillPad: 68,
     }),
-    text({ text: "Eintritt Frei", ...mono(700), shape: "box", radius: 8, stroked: true, stroke: 4, colorIndex: WHITE, scale: 0.35, pillPad: 57 }),
+    text({ text: "Eintritt Frei", ...pixel(700), shape: "box", radius: 8, stroked: true, stroke: 4, colorIndex: WHITE, scale: 0.35, pillPad: 57 }),
     presetIcon("Xs", 1, PINK, { scale: 0.9 }),
     text({ text: "Döner", ...heavy, shape: "box", radius: 40, colorIndex: ACID, textColor: "#000000", scale: 0.85, tracking: -127, pillPad: 37 }),
     text({
@@ -635,7 +635,7 @@ export function berlinState(): AppState {
     photo("berlin", "template-berlin-towers.jpg", "Potsdamer Platz", 110, 12),
     text({
       text: "Kartenzahlung möglich?",
-      ...mono(700),
+      ...pixel(700),
       shape: "pill",
       colorIndex: GREEN,
       color: "#282828",
@@ -683,8 +683,8 @@ export function berlinState(): AppState {
     emoji("🖤", "Black Heart", 2, 0.6),
     text({ text: "Türsteher", ...swiss(700), shape: bare, colorIndex: WHITE, scale: 1.6, tracking: -181 }),
     phosphor("regular:bicycle", { colorIndex: GREEN, size: 73.14285714285714, scale: 1.1833021791524172 }),
-    text({ text: "B2B", ...mono(700), shape: "box", radius: 6, colorIndex: BLUE, textColor: "#ffffff", scale: 0.9 }),
-    text({ text: "Line Up TBA", ...mono(400), shape: "pill", stroked: true, stroke: 2, colorIndex: GREEN, scale: 0.4, pillPad: 65 }),
+    text({ text: "B2B", ...pixel(700), shape: "box", radius: 6, colorIndex: BLUE, textColor: "#ffffff", scale: 0.9 }),
+    text({ text: "Line Up TBA", ...pixel(400), shape: "pill", stroked: true, stroke: 2, colorIndex: GREEN, scale: 0.4, pillPad: 65 }),
     text({ text: "Ost", ...heavy, shape: bare, colorIndex: BLUE, scale: 2.6, tracking: -172 }),
     presetIcon("Boxes", 1, GREEN, { scale: 0.8 }),
     emoji("🚇", "U-Bahn", 1, 0.75),
