@@ -34,7 +34,8 @@ export async function unlockAudio(): Promise<void> {
     try {
       await ctx.resume();
     } catch {
-      unlocked = ctx.state === "running";
+      // resume() failed — keep playSound gated until a later gesture succeeds
+      unlocked = false;
       return;
     }
   }
