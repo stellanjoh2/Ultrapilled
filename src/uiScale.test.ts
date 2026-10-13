@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compositionScale, UI_REF_H, UI_REF_W, viewportScale } from "./uiScale";
+import { chromeScale, compositionScale, UI_REF_H, UI_REF_W, viewportScale } from "./uiScale";
 
 describe("viewportScale", () => {
   it("is 1 at the 2560×1440 authoring size", () => {
@@ -21,6 +21,27 @@ describe("viewportScale", () => {
   });
 });
 
+describe("chromeScale", () => {
+  it("matches viewport at and above the authoring size", () => {
+    expect(chromeScale(UI_REF_W, UI_REF_H)).toBe(1);
+    expect(chromeScale(3840, 2160)).toBeCloseTo(1.5, 10);
+  });
+
+  it("softens laptop shrink so 1710×1107 stays readable", () => {
+    const view = viewportScale(1710, 1107);
+    expect(view).toBeCloseTo(1710 / 2560, 10);
+    expect(chromeScale(1710, 1107)).toBeCloseTo(Math.sqrt(view), 10);
+    // ~327px panel / ~12.3px body vs ~267 / ~10 on linear scale
+    expect(400 * chromeScale(1710, 1107)).toBeGreaterThan(320);
+    expect(15 * chromeScale(1710, 1107)).toBeGreaterThan(12);
+  });
+
+  it("is gentler than linear at 1080p", () => {
+    expect(chromeScale(1920, 1080)).toBeCloseTo(Math.sqrt(0.75), 10);
+    expect(chromeScale(1920, 1080)).toBeGreaterThan(viewportScale(1920, 1080));
+  });
+});
+
 describe("compositionScale", () => {
   it("keeps a chip the same fraction of a 16:9 stage", () => {
     const authored = 200;
@@ -37,5 +58,10 @@ describe("compositionScale", () => {
   it("still applies the framed-canvas factor", () => {
     expect(compositionScale(0.5, 2560, 1440)).toBeCloseTo(0.5, 10);
     expect(compositionScale(0.5, 1920, 1080)).toBeCloseTo(0.375, 10);
+  });
+
+  it("stays on linear viewport fit, not the soft chrome curve", () => {
+    expect(compositionScale(1, 1710, 1107)).toBeCloseTo(viewportScale(1710, 1107), 10);
+    expect(compositionScale(1, 1710, 1107)).toBeLessThan(chromeScale(1710, 1107));
   });
 });

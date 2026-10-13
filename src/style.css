@@ -8,7 +8,7 @@
 
 :root {
   color-scheme: dark;
-  /* Authored for 2560×1440; scales via --ui-scale down to ~14"/980p. */
+  /* Authored for 2560×1440; --ui-scale set by syncUiScale (soft √ below 1). */
   --ui-ref-w: 2560;
   --ui-ref-h: 1440;
   --ui-scale: min(100vw / 2560px, 100dvh / 1440px);

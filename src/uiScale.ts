@@ -2,14 +2,26 @@
 export const UI_REF_W = 2560;
 export const UI_REF_H = 1440;
 
-/** Fit of a viewport against 2560×1440. Same factor as CSS `--ui-scale`. */
+/** Fit of a viewport against 2560×1440. Used for chips / physics (linear). */
 export function viewportScale(viewW: number, viewH: number): number {
   if (viewW < 2 || viewH < 2) return 1;
   return Math.min(viewW / UI_REF_W, viewH / UI_REF_H);
 }
 
+/**
+ * Soften chrome shrink below the authoring size so laptops stay readable.
+ * √ of the linear fit: 1710×1107 → ~0.82 (panel ~327px, body ~12px) instead of ~0.67.
+ * At/above 2560, stay linear so 4K chrome still grows with the display.
+ */
+export function chromeScale(viewW: number, viewH: number): number {
+  const view = viewportScale(viewW, viewH);
+  if (view >= 1) return view;
+  return Math.sqrt(view);
+}
+
+/** UI chrome scale (panel, type, spacing). Softer than viewportScale on laptops. */
 export function uiScale(): number {
-  return viewportScale(window.innerWidth, window.innerHeight);
+  return chromeScale(window.innerWidth, window.innerHeight);
 }
 
 /**
@@ -18,7 +30,9 @@ export function uiScale(): number {
  */
 export function compositionScale(frameScale: number, viewW?: number, viewH?: number): number {
   const view =
-    viewW != null && viewH != null ? viewportScale(viewW, viewH) : uiScale();
+    viewW != null && viewH != null
+      ? viewportScale(viewW, viewH)
+      : viewportScale(window.innerWidth, window.innerHeight);
   const scale = frameScale * view;
   return Number.isFinite(scale) && scale > 0 ? Math.max(0.001, scale) : 0.001;
 }
