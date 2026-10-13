@@ -20,6 +20,7 @@ import { isAboutOpen, openAbout } from "./aboutPanel";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { mountHeaderLogotype } from "./logotypeLive";
 import { isPillFile } from "./project/pillFormat";
+import { unlockAudio } from "./lib/sound-engine";
 import { playCaution, playClick, playNotify } from "./uiSounds";
 import { MODE_SELECT_MOBILE_ASSET_SCALE, modeSelectAssetScale } from "./mobileGate";
 import { compositionScale } from "./uiScale";
@@ -396,6 +397,9 @@ export function mountMobileAccessOverlay() {
   const xMark = overlay.querySelector<HTMLElement>(".mobile-overlay__x")!;
 
   const dismiss = () => {
+    // Gesture unlock + restore speaker impacts (preview starts silent for Mode Select).
+    void unlockAudio();
+    previewWorld?.setImpactListener(null);
     host.classList.add("is-playing");
     overlay.remove();
   };

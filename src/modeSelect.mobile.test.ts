@@ -60,7 +60,7 @@ describe("mobile access overlay", () => {
     expect(document.querySelector(".reconnect")).toBeNull();
   });
 
-  it("hides the overlay when I WANT TO TOUCH is pressed so the pile can be touched", () => {
+  it("hides the overlay when I WANT TO TOUCH is pressed so the pile can be touched", async () => {
     vi.stubGlobal(
       "matchMedia",
       vi.fn().mockReturnValue({
@@ -71,12 +71,17 @@ describe("mobile access overlay", () => {
       }),
     );
 
+    const soundEngine = await import("./lib/sound-engine");
+    const unlockSpy = vi.spyOn(soundEngine, "unlockAudio").mockResolvedValue();
+
     mountMobileAccessOverlay();
     const host = document.querySelector(".mode-select-host");
     host?.querySelector<HTMLButtonElement>(".mobile-overlay__ok")?.click();
 
     expect(host?.classList.contains("is-playing")).toBe(true);
     expect(host?.querySelector(".mobile-overlay")).toBeNull();
+    expect(unlockSpy).toHaveBeenCalled();
+    unlockSpy.mockRestore();
   });
 });
 
