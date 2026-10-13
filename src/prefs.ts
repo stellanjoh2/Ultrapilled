@@ -93,7 +93,7 @@ export function setPrefs(patch: Partial<AppPrefs>) {
   notify();
 }
 
-const THEME_ANIM_MS = 320;
+const THEME_ANIM_MS = 160;
 let themeAnimTimer = 0;
 
 /** Applies night/day chrome before first paint and after changes. */

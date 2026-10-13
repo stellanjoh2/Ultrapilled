@@ -14,6 +14,7 @@ import {
   type VideoSizePreset,
 } from "./size";
 import { askConfirm } from "../confirmDialog";
+import { getPrefs, onPrefsChange } from "../prefs";
 import { playCaution, playCelebrate, playNotify, startProgress, stopProgress } from "../uiSounds";
 import {
   closeExportProgress,
@@ -50,6 +51,8 @@ let imageTransparent = false;
 let imageOutput: ImageOutput = "still";
 let videoFormat: VideoFormat = "mp4";
 let videoTransparent = false;
+/** Export-local: mux bounce hits when Sound is on. Does not change Settings. */
+let includeSounds = true;
 /** Layout-mode video length only — physics ignores this. */
 let layoutDuration: LayoutDuration = 5;
 let busy = false;
@@ -57,7 +60,12 @@ let cancelRequested = false;
 let lastStatus = "";
 let panelEl: HTMLElement | null = null;
 let mountAbort = new AbortController();
+let unsubPrefs: (() => void) | null = null;
 const FRAME_PROGRESS = /^Rendering frame (\d+)$/;
+
+function soundIsOn(): boolean {
+  return getPrefs().soundOn;
+}
 
 function setStatus(message: string) {
   lastStatus = message;
@@ -71,7 +79,7 @@ function setStatus(message: string) {
 function applyBusy() {
   panelEl
     ?.querySelectorAll<HTMLButtonElement>(
-      "[data-export], [data-export-mode], [data-fps], [data-layout-duration], [data-image-format], [data-image-alpha], [data-image-output], [data-video-format], [data-video-alpha]",
+      "[data-export], [data-export-mode], [data-fps], [data-layout-duration], [data-image-format], [data-image-alpha], [data-image-output], [data-video-format], [data-video-alpha], [data-include-sounds]",
     )
     .forEach((button) => {
       button.disabled = busy;
@@ -128,6 +136,13 @@ function paintChoices() {
     button.setAttribute("aria-pressed", String(on));
     button.disabled = busy || videoFormat === "mp4";
   });
+  panelEl?.querySelectorAll<HTMLButtonElement>("[data-include-sounds]").forEach((button) => {
+    const on = (button.dataset.includeSounds === "1") === includeSounds;
+    button.classList.toggle("is-on", on);
+    button.setAttribute("aria-pressed", String(on));
+  });
+  const soundsSection = panelEl?.querySelector<HTMLElement>("[data-export-include-sounds]");
+  if (soundsSection) soundsSection.hidden = !soundIsOn();
 
   const seqHint = panelEl?.querySelector("#seq-folder-hint");
   if (seqHint instanceof HTMLElement) {
@@ -198,16 +213,75 @@ function videoKind(): ExportKind {
   return videoTransparent ? "mov-alpha" : "mov";
 }
 
-function fpsSegmentHtml(): string {
+function fpsSectionHtml(): string {
   return `
+    <section class="section">
       <h2 data-tip="Frames per second for this export">Frame rate</h2>
       <div class="segment" role="group" aria-label="Frame rate">
         <button type="button" class="pill${frameRate === 30 ? " is-on" : ""}" data-fps="30" aria-pressed="${frameRate === 30}" data-tip="Smaller files, fine for most uses">30 fps</button>
         <button type="button" class="pill${frameRate === 60 ? " is-on" : ""}" data-fps="60" aria-pressed="${frameRate === 60}" data-tip="Smoother motion, much larger files">60 fps</button>
-      </div>`;
+      </div>
+    </section>`;
 }
 
-function imagePaneHtml(): string {
+function layoutDurationSectionHtml(): string {
+  return `
+    <section class="section">
+      <h2 data-tip="How long the layout clip runs. GIFs and text animations keep playing.">Length</h2>
+      <div class="segment" role="group" aria-label="Export length">
+        <button type="button" class="pill${layoutDuration === 5 ? " is-on" : ""}" data-layout-duration="5" aria-pressed="${layoutDuration === 5}" data-tip="Five seconds of your layout">5s</button>
+        <button type="button" class="pill${layoutDuration === 10 ? " is-on" : ""}" data-layout-duration="10" aria-pressed="${layoutDuration === 10}" data-tip="Ten seconds of your layout">10s</button>
+      </div>
+    </section>`;
+}
+
+function includeSoundsSectionHtml(): string {
+  const hide = soundIsOn() ? "" : " hidden";
+  return `
+    <section class="section" data-export-include-sounds${hide}>
+      <h2 data-tip="Mux bounce hits into this file. Leaves Sound in Settings alone.">Include Sounds</h2>
+      <div class="segment" role="group" aria-label="Include Sounds">
+        <button type="button" class="pill" data-include-sounds="0" data-tip="Silent video — Sound stays on in the app">No</button>
+        <button type="button" class="pill" data-include-sounds="1" data-tip="Mix bounce hits into the file">Yes</button>
+      </div>
+    </section>`;
+}
+
+function resolutionSectionHtml(
+  tip: string,
+  selectId: string,
+  metaId: string,
+  options: string,
+  after = "",
+): string {
+  return `
+    <section class="section">
+      <h2 data-tip="${tip}">Resolution</h2>
+      <div class="field">
+        <select id="${selectId}" aria-label="Resolution">${options}</select>
+        <p class="hint" id="${metaId}"></p>
+      </div>
+      ${after}
+    </section>`;
+}
+
+/** Hint + format controls that stay inside the top Export section. */
+function exportHeadExtrasHtml(layoutMode: boolean): string {
+  if (exportMode === "video") {
+    return `
+      <p class="hint">${
+        layoutMode
+          ? "Renders your layout for the length below. Object animations keep playing — no physics entry."
+          : "Renders a full loop of the current scene."
+      }</p>
+      <div class="segment" role="group" aria-label="Video format">
+        <button type="button" class="pill" data-video-format="mp4" data-tip="Wide compatibility">.MP4</button>
+        <button type="button" class="pill" data-video-format="mov" data-tip="ProRes for editing apps. Larger files.">.MOV</button>
+      </div>`;
+  }
+  if (exportMode === "gif") {
+    return `<p class="hint">If the loop is long, the GIF stops before it gets too large.</p>`;
+  }
   return `
       <p class="hint">Stills are the canvas right now. Sequences fall the current scene.</p>
       <div class="segment" role="group" aria-label="Image output">
@@ -217,66 +291,45 @@ function imagePaneHtml(): string {
       <div class="segment" role="group" aria-label="Image format">
         <button type="button" class="pill" data-image-format="png" data-tip="Lossless image">.PNG</button>
         <button type="button" class="pill" data-image-format="jpg" data-tip="Smaller photo-style image">.JPG</button>
-      </div>
-      <h2 data-tip="Keep the background clear in the file">Transparent</h2>
-      <div class="segment" role="group" aria-label="Image transparency">
-        <button type="button" class="pill" data-image-alpha="0" data-tip="Keep the composition background">No</button>
-        <button type="button" class="pill" data-image-alpha="1" data-tip="Clear background. PNG only.">Yes</button>
-      </div>
-      <label class="field" data-tip="Pixel size for PNG and JPG exports. Up to 8K for stills and sequences.">Resolution
-        <select id="image-size">${optionsHtml(IMAGE_SIZE_PRESETS, imagePreset)}</select>
-      </label>
-      <p class="hint" id="image-size-meta"></p>
-      <p class="hint" id="seq-folder-hint"></p>`;
-}
-
-function layoutDurationHtml(): string {
-  return `
-      <h2 data-tip="How long the layout clip runs. GIFs and text animations keep playing.">Length</h2>
-      <div class="segment" role="group" aria-label="Export length">
-        <button type="button" class="pill${layoutDuration === 5 ? " is-on" : ""}" data-layout-duration="5" aria-pressed="${layoutDuration === 5}" data-tip="Five seconds of your layout">5s</button>
-        <button type="button" class="pill${layoutDuration === 10 ? " is-on" : ""}" data-layout-duration="10" aria-pressed="${layoutDuration === 10}" data-tip="Ten seconds of your layout">10s</button>
       </div>`;
 }
 
-function videoPaneHtml(layoutMode: boolean): string {
-  return `
-      <p class="hint">${
-        layoutMode
-          ? "Renders your layout for the length below. Object animations keep playing — no physics entry."
-          : "Renders a full loop of the current scene. Includes bounce sounds when Sound is on."
-      }</p>
-      <div class="segment" role="group" aria-label="Video format">
-        <button type="button" class="pill" data-video-format="mp4" data-tip="Wide compatibility. Includes bounce sounds when Sound is on.">.MP4</button>
-        <button type="button" class="pill" data-video-format="mov" data-tip="ProRes for editing apps. Larger files. Includes bounce sounds when Sound is on.">.MOV</button>
-      </div>
+/** Option groups as their own sections — same space-3 rhythm as Create/Background. */
+function modeOptionSectionsHtml(layoutMode: boolean): string {
+  if (exportMode === "video") {
+    return `
+    <section class="section">
       <h2 data-tip="Keep the background clear in the file">Transparent</h2>
       <div class="segment" role="group" aria-label="Video transparency">
         <button type="button" class="pill" data-video-alpha="0" data-tip="Keep the composition background">No</button>
         <button type="button" class="pill" data-video-alpha="1" data-tip="Clear background. ProRes 4444 MOV.">Yes</button>
       </div>
-      <label class="field" data-tip="Pixel size for MP4 and MOV. Up to 4K.">Resolution
-        <select id="video-size">${optionsHtml(VIDEO_SIZE_PRESETS, videoPreset)}</select>
-      </label>
-      <p class="hint" id="video-size-meta"></p>
-      ${fpsSegmentHtml()}
-      ${layoutMode ? layoutDurationHtml() : ""}`;
-}
-
-function gifPaneHtml(): string {
+    </section>
+    ${includeSoundsSectionHtml()}
+    ${resolutionSectionHtml("Pixel size for MP4 and MOV. Up to 4K.", "video-size", "video-size-meta", optionsHtml(VIDEO_SIZE_PRESETS, videoPreset))}
+    ${fpsSectionHtml()}
+    ${layoutMode ? layoutDurationSectionHtml() : ""}`;
+  }
+  if (exportMode === "gif") {
+    return `
+    ${resolutionSectionHtml("GIF pixel size. Long loops may stop early to stay small.", "gif-size", "gif-size-meta", optionsHtml(GIF_PRESETS, gifPreset))}
+    ${fpsSectionHtml()}`;
+  }
   return `
-      <p class="hint">If the loop is long, the GIF stops before it gets too large.</p>
-      <label class="field" data-tip="GIF pixel size. Long loops may stop early to stay small.">Resolution
-        <select id="gif-size">${optionsHtml(GIF_PRESETS, gifPreset)}</select>
-      </label>
-      <p class="hint" id="gif-size-meta"></p>
-      ${fpsSegmentHtml()}`;
-}
-
-function modePaneHtml(layoutMode: boolean): string {
-  if (exportMode === "video") return videoPaneHtml(layoutMode);
-  if (exportMode === "gif") return gifPaneHtml();
-  return imagePaneHtml();
+    <section class="section">
+      <h2 data-tip="Keep the background clear in the file">Transparent</h2>
+      <div class="segment" role="group" aria-label="Image transparency">
+        <button type="button" class="pill" data-image-alpha="0" data-tip="Keep the composition background">No</button>
+        <button type="button" class="pill" data-image-alpha="1" data-tip="Clear background. PNG only.">Yes</button>
+      </div>
+    </section>
+    ${resolutionSectionHtml(
+      "Pixel size for PNG and JPG exports. Up to 8K for stills and sequences.",
+      "image-size",
+      "image-size-meta",
+      optionsHtml(IMAGE_SIZE_PRESETS, imagePreset),
+      `<p class="hint" id="seq-folder-hint"></p>`,
+    )}`;
 }
 
 function exportTip(): string {
@@ -294,7 +347,10 @@ function panelHtml(layoutMode: boolean): string {
         <button type="button" class="pill${exportMode === "video" ? " is-on" : ""}" data-export-mode="video" aria-pressed="${exportMode === "video"}" data-tip="Rendered video of a full loop">Video</button>
         <button type="button" class="pill${exportMode === "gif" ? " is-on" : ""}" data-export-mode="gif" aria-pressed="${exportMode === "gif"}" data-tip="Animated GIF of a loop">GIF</button>
       </div>
-      ${modePaneHtml(layoutMode)}
+      ${exportHeadExtrasHtml(layoutMode)}
+    </section>
+    ${modeOptionSectionsHtml(layoutMode)}
+    <section class="section">
       <div class="export-list">
         <button type="button" class="pill" data-export="${exportMode}" data-tip="${exportTip()}">Export</button>
       </div>
@@ -321,8 +377,13 @@ export function mountExportPanel(panel: HTMLElement, controller: ExportControlle
 
   mountAbort.abort();
   mountAbort = new AbortController();
+  unsubPrefs?.();
   const signal = mountAbort.signal;
   window.addEventListener("resize", () => paintSizes(controller), { signal });
+  unsubPrefs = onPrefsChange(() => {
+    if (panelEl !== panel) return;
+    paintChoices();
+  });
 
   panel.querySelectorAll<HTMLButtonElement>("[data-export-mode]").forEach((button) => {
     button.addEventListener(
@@ -404,6 +465,16 @@ export function mountExportPanel(panel: HTMLElement, controller: ExportControlle
       () => {
         if (videoFormat === "mp4") return;
         videoTransparent = button.dataset.videoAlpha === "1";
+        paintChoices();
+      },
+      { signal },
+    );
+  });
+  panel.querySelectorAll<HTMLButtonElement>("[data-include-sounds]").forEach((button) => {
+    button.addEventListener(
+      "click",
+      () => {
+        includeSounds = button.dataset.includeSounds === "1";
         paintChoices();
       },
       { signal },
@@ -540,10 +611,21 @@ async function runExport(kind: ExportKind, controller: ExportController) {
         : kind === "jpg-seq"
           ? await exportSequence({ ...shared, preset: image, kind: "jpg", transparent: false, folder })
           : kind === "mp4"
-            ? await exportMp4({ ...shared, preset: video, layoutHoldMs })
+            ? await exportMp4({
+                ...shared,
+                preset: video,
+                layoutHoldMs,
+                includeSounds: includeSounds && soundIsOn(),
+              })
             : kind === "gif"
               ? await exportGif({ ...shared, preset: gif })
-              : await exportMov({ ...shared, preset: video, transparent: kind === "mov-alpha", layoutHoldMs });
+              : await exportMov({
+                  ...shared,
+                  preset: video,
+                  transparent: kind === "mov-alpha",
+                  layoutHoldMs,
+                  includeSounds: includeSounds && soundIsOn(),
+                });
     setStatus(doneMessage(note, fps, Boolean(folder)));
     playCelebrate();
   } catch (error) {

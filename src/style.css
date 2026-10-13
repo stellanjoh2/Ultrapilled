@@ -40,8 +40,8 @@
   --canvas-soft: #1c1c1c;
   --field: #2a2a2a;
   --field-hover: #333333;
-  --shadow-1: rgba(0, 0, 0, 0.4) 0 1px 3px;
-  --shadow-2: rgba(0, 0, 0, 0.55) 0 16px 40px;
+  --shadow-1: rgba(0, 0, 0, 0.1) 0 1px 3px;
+  --shadow-2: rgba(0, 0, 0, 0.16) 0 16px 40px;
   /* Fun pills — lime hover smash; rest is outline (solid fill = selected/commit) */
   --pill-fun-face: #c4ff00;
   --pill-fun-ink: #080808;
@@ -87,19 +87,25 @@ html[data-theme="day"] {
   --ink-secondary: #2e2e2e;
   --ink-mute: #555555;
   --on-primary: #ffffff;
-  /* Black sphere, Orby Lime mark */
-  --check-on: #080808;
-  --check-mark: #c4ff00;
+  /* Full invert of night lime accents → Orby Purple (#c4ff00 ↔ #3b00ff) */
+  --check-on: #3b00ff;
+  --check-mark: #ffffff;
+  --play-face: #3b00ff;
+  /* Darker purple shelf (same role as night --play-edge under lime) */
+  --play-edge: #2a00b8;
+  --play-ink: #ffffff;
   --loop-face: #ffffff;
   --loop-edge: #c8c8c8;
   --loop-ink: #111111;
+  --loop-stroke-a: #3b00ff;
+  --loop-stroke-b: #627f00;
+  --pill-fun-face: #3b00ff;
+  --pill-fun-ink: #ffffff;
   /* Soft chrome so solid-white fields / icon tiles read clearly */
   --canvas: #f0f0f0;
   --canvas-soft: #e2e2e2;
   --field: #ffffff;
   --field-hover: #f7f7f7;
-  --shadow-1: rgba(0, 0, 0, 0.1) 0 1px 3px;
-  --shadow-2: rgba(0, 0, 0, 0.16) 0 16px 40px;
   --panel-rule: rgba(0, 0, 0, 0.14);
 }
 
@@ -110,14 +116,14 @@ html[data-theme="day"] {
   html.theme-animating *::before,
   html.theme-animating *::after {
     transition:
-      background-color 0.32s ease,
-      background 0.32s ease,
-      color 0.32s ease,
-      border-color 0.32s ease,
-      box-shadow 0.32s ease,
-      fill 0.32s ease,
-      stroke 0.32s ease,
-      outline-color 0.32s ease !important;
+      background-color 0.16s ease,
+      background 0.16s ease,
+      color 0.16s ease,
+      border-color 0.16s ease,
+      box-shadow 0.16s ease,
+      fill 0.16s ease,
+      stroke 0.16s ease,
+      outline-color 0.16s ease !important;
   }
 }
 
@@ -2398,17 +2404,6 @@ button.pill.smash-btn.is-on:focus-visible {
   --loop-stroke-b: #ff3b00;
 }
 
-/* Day: lime label fails on light face — keep magic stroke, use dark ink for text/icon */
-html[data-theme="day"] button.pill.smash-btn.is-on,
-html[data-theme="day"] button.pill.smash-btn.is-on:hover,
-html[data-theme="day"] button.pill.smash-btn.is-on:active {
-  color: var(--loop-ink);
-}
-
-html[data-theme="day"] button.pill.smash-btn.is-on:focus-visible {
-  outline-color: var(--loop-ink);
-}
-
 .smash-btn__label {
   position: relative;
   z-index: 1;
@@ -3046,11 +3041,6 @@ input[type="file"].bg-file::file-selector-button {
   [data-collision-boxes].icon-hover.is-on:hover:not(:disabled) {
     color: var(--pill-fun-face);
   }
-
-  html[data-theme="day"] [data-collision-boxes].icon-hover:hover:not(:disabled),
-  html[data-theme="day"] [data-collision-boxes].icon-hover.is-on:hover:not(:disabled) {
-    color: var(--ink);
-  }
 }
 .field-caption {
   display: inline-flex;
@@ -3303,7 +3293,7 @@ html[data-theme="day"] input[type="text"].field-caption-input:focus {
 }
 
 .check__box input[type="checkbox"]:checked {
-  border-color: #c4ff00;
+  border-color: var(--check-on);
 }
 
 .check__box input[type="checkbox"]:checked + .check__splash {
@@ -3318,12 +3308,12 @@ html[data-theme="day"] input[type="text"].field-caption-input:focus {
   40% {
     background: var(--check-on);
     box-shadow:
-      0 calc(-15px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
-      calc(13px * var(--ui-scale)) calc(-7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
-      calc(13px * var(--ui-scale)) calc(7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
-      0 calc(15px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
-      calc(-13px * var(--ui-scale)) calc(7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00,
-      calc(-13px * var(--ui-scale)) calc(-7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) #c4ff00;
+      0 calc(-15px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) var(--check-on),
+      calc(13px * var(--ui-scale)) calc(-7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) var(--check-on),
+      calc(13px * var(--ui-scale)) calc(7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) var(--check-on),
+      0 calc(15px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) var(--check-on),
+      calc(-13px * var(--ui-scale)) calc(7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) var(--check-on),
+      calc(-13px * var(--ui-scale)) calc(-7px * var(--ui-scale)) 0 calc(-7px * var(--ui-scale)) var(--check-on);
   }
 
   100% {
@@ -3752,6 +3742,12 @@ input[type="range"] {
     --fill: #fff;
     --thumb: #fff;
     --thumb-scale: 1.1;
+  }
+
+  /* Day primary is near-black — full white hover is a flash; lift toward white instead. */
+  html[data-theme="day"] input[type="range"]:hover:not(:disabled):not(:active) {
+    --fill: color-mix(in srgb, var(--primary) 68%, #fff);
+    --thumb: color-mix(in srgb, var(--primary) 68%, #fff);
   }
 }
 
@@ -4227,11 +4223,6 @@ button.icon-btn.panel-project:active:not(:disabled) {
   .icon-hover.is-on:hover:not(:disabled) {
     color: var(--on-primary);
   }
-
-  /* Day: solo glyphs can't be lime on light surfaces — scale still reads as hover */
-  html[data-theme="day"] .icon-hover:hover:not(:disabled) {
-    color: var(--ink);
-  }
 }
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
@@ -4330,11 +4321,6 @@ button.pill.slot-add:hover {
   color: var(--pill-fun-face);
 }
 
-/* Day: lime labels fail on light chrome — keep the create smash, ink for text */
-html[data-theme="day"] button.pill.slot-add:hover {
-  color: var(--ink);
-}
-
 .slot-add__icon {
   position: absolute;
   top: 50%;
@@ -4361,10 +4347,6 @@ html[data-theme="day"] button.pill.slot-add:hover {
 .slot-add:hover:not(.is-create):not(.is-clear) .slot-add__icon {
   background: color-mix(in srgb, var(--ink) 22%, var(--field));
   color: var(--pill-fun-face);
-}
-
-html[data-theme="day"] .slot-add:hover:not(.is-create):not(.is-clear) .slot-add__icon {
-  color: var(--ink);
 }
 
 .slot-add__icon > svg,
@@ -4399,13 +4381,10 @@ button.pill.slot-add.is-clear .slot-add__icon {
 }
 
 @media (hover: hover) {
-  /* Side panel: fill the dashed pill (incl. stroke). Context menu stays subtler. */
-  .slot-adds button.pill.slot-add:hover:not(:disabled) .slot-add__icon {
-    transform: translateY(-50%) scale(1.25);
-  }
-
+  /* 32 → 40 fills the pill height (side panel + context menu). */
+  .slot-adds button.pill.slot-add:hover:not(:disabled) .slot-add__icon,
   .canvas-add-menu > button.pill.slot-add:hover:not(:disabled) .slot-add__icon {
-    transform: translateY(-50%) scale(1.1875);
+    transform: translateY(-50%) scale(1.25);
   }
 
   /* One paint flip: lime disc + dark +, same smash as other pills. */
@@ -4503,10 +4482,6 @@ button.pill.slot-add.is-clear .slot-add__icon {
   background: var(--field-hover);
   color: var(--pill-fun-face);
   transform: translateX(var(--menu-hover-shift));
-}
-
-html[data-theme="day"] .canvas-add-menu > button.pill.slot-add:hover {
-  color: var(--ink);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5237,7 +5212,7 @@ html[data-theme="day"] .shape-swatch {
 @media (hover: hover) and (pointer: fine) {
   html[data-theme="day"] .icon-grid button:hover:not(.is-on),
   html[data-theme="day"] .emoji-grid button:hover:not(.is-on) {
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ink) 28%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pill-fun-face) 40%, transparent);
   }
 }
 
@@ -5459,12 +5434,6 @@ html[data-theme="day"] .shape-swatch {
   .panel-credit__social button:hover {
     color: var(--pill-fun-face);
     opacity: 1;
-  }
-
-  html[data-theme="day"] .panel-credit__s.icon-hover:hover:not(:disabled),
-  html[data-theme="day"] .panel-credit__social a:hover,
-  html[data-theme="day"] .panel-credit__social button:hover {
-    color: var(--ink);
   }
 }
 
@@ -6451,7 +6420,7 @@ body.is-exporting .app {
 
 .export-progress__n {
   margin: var(--space-2) 0 var(--space-3);
-  color: #c4ff00;
+  color: var(--pill-fun-face);
   font-family: var(--font-section);
   font-size: 54px;
   font-weight: 400;
@@ -6761,18 +6730,15 @@ html[data-theme="day"] .help-modal__body .keycap {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  /* Solid lime smash + black glyph — same tokens as pill / panel-project hover.
-     Beat the day-theme icon-hover ink override (help sits on the playfield). */
-  .help-trigger.icon-hover:hover:not(:disabled):not(.is-on),
-  html[data-theme="day"] .help-trigger.icon-hover:hover:not(:disabled):not(.is-on) {
+  /* Solid accent smash — same tokens as pill / panel-project hover. */
+  .help-trigger.icon-hover:hover:not(:disabled):not(.is-on) {
     background: var(--pill-fun-face);
     color: var(--pill-fun-ink);
     border-color: transparent;
     box-shadow: none;
   }
 
-  .help-trigger.is-on:hover:not(:disabled),
-  html[data-theme="day"] .help-trigger.is-on:hover:not(:disabled) {
+  .help-trigger.is-on:hover:not(:disabled) {
     color: var(--on-primary);
   }
 }
@@ -6839,15 +6805,6 @@ html[data-theme="day"] .help-modal__body .keycap {
 
 .help-pop {
   color: var(--loop-stroke-b);
-}
-
-html[data-theme="day"] .help-fun {
-  /* Lime on light chrome — keep the mark; day panels already use it for hover smash. */
-  color: var(--pill-fun-face);
-}
-
-html[data-theme="day"] .help-pop {
-  color: #6b4fd8;
 }
 
 .help-modal__titles {
@@ -7488,11 +7445,6 @@ a.pill.about-project__launch {
   color: var(--play-face);
 }
 
-/* Day: solo glyphs can't be lime on light surfaces */
-html[data-theme="day"] .report-card__icon {
-  color: var(--ink);
-}
-
 .report-card__icon svg {
   width: 100%;
   height: 100%;
@@ -7608,13 +7560,6 @@ html[data-theme="day"] .report-card__icon {
 
 @media (hover: hover) and (pointer: fine) {
   .bug-report__x:hover {
-    color: var(--pill-fun-face);
-  }
-
-  /* Day: lime-on-black smash — not lime on the white field disc */
-  html[data-theme="day"] .bug-report__x.icon-hover:hover:not(:disabled),
-  html[data-theme="day"] .unsplash-modal__x.icon-hover:hover:not(:disabled) {
-    background: var(--ink);
     color: var(--pill-fun-face);
   }
 }
@@ -7854,7 +7799,8 @@ html[data-theme="day"] .bug-report__message {
   z-index: 210;
   display: grid;
   place-items: center;
-  padding: var(--space-2);
+  /* Vertical gap = 4× main panel inset (--panel-inset / --space-2, 24px → 96px). */
+  padding: calc(var(--panel-inset) * 4) var(--space-2);
   pointer-events: auto;
 }
 
@@ -7870,7 +7816,7 @@ html[data-theme="day"] .bug-report__message {
   display: flex;
   flex-direction: column;
   width: min(700px, calc(100% - (var(--space-2) * 2)));
-  max-height: calc(100% - (var(--space-2) * 2));
+  max-height: 100%;
   border-radius: var(--radius-settings);
   background: var(--canvas);
   box-shadow: var(--shadow-2);
@@ -7879,7 +7825,7 @@ html[data-theme="day"] .bug-report__message {
 }
 
 .unsplash-modal__card.has-results {
-  min-height: min(720px, calc(100% - (var(--space-2) * 2)));
+  min-height: min(720px, 100%);
 }
 
 .unsplash-modal__head {
@@ -8506,10 +8452,6 @@ input[type="file"].mode-select__file {
     color: var(--pill-fun-face);
     opacity: 1;
   }
-
-  html[data-theme="day"] .mode-select__social a:hover {
-    color: var(--ink);
-  }
 }
 
 .mode-select__social svg,
@@ -8562,10 +8504,6 @@ button.mode-select__s::before {
   button.mode-select__s.icon-hover:hover {
     color: var(--pill-fun-face);
     opacity: 1;
-  }
-
-  html[data-theme="day"] button.mode-select__s.icon-hover:hover {
-    color: var(--ink);
   }
 }
 

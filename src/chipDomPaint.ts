@@ -223,9 +223,11 @@ export function blitBareTextCanvas(fromEl: HTMLElement, toEl: HTMLElement): bool
 }
 
 /**
- * Animated GIF + bloom: browsers won't feed live GIF frames through canvas
- * `drawImage(img)`, and a second `<img src=gif>` runs its own clock (drift).
- * When ImageDecoder exists we drive face + glow canvases from one decode loop.
+ * Animated GIF playback via ImageDecoder → canvas.
+ * Native `<img>` GIF clocks restart whenever CSS `filter` changes on the image
+ * or an ancestor (post hue on `.post-plate`, per-object hue/exposure, etc.).
+ * Bloom also needs one shared clock for face + glow (dual `<img>` drifts;
+ * `drawImage(img)` is static).
  */
 type GifBloomTarget = { width: number; height: number };
 
@@ -426,12 +428,11 @@ async function ensureGifBloomPlayer(src: string): Promise<GifBloomPlayer | null>
 }
 
 /**
- * Drive face + glow from one ImageDecoder clock.
- * Returns false when ImageDecoder is unavailable — caller should keep dual `<img>`.
+ * Drive a GIF face from one ImageDecoder clock (survives CSS filter / hue tweaks).
+ * Returns false when ImageDecoder is unavailable — caller should keep `<img>`.
  */
-export function bindGifBloomPair(
+export function bindGifFace(
   faceEl: HTMLElement,
-  glowEl: HTMLElement,
   src: string,
   width: number,
   height: number,
@@ -441,12 +442,9 @@ export function bindGifBloomPair(
   if (!src || !gifImageDecoderAvailable() || gifBloomFailedSrc.has(src)) return false;
 
   const faceCanvas = ensureGifBloomCanvas(faceEl, radius, filterCss);
-  const glowCanvas = ensureGifBloomCanvas(glowEl, radius, filterCss);
   gifBloomFaces.add(faceEl);
 
-  // Drop prior src links if this pair moved.
   if (gifBloomCanvasSrc.get(faceCanvas) !== src) unregisterGifBloomCanvas(faceCanvas);
-  if (gifBloomCanvasSrc.get(glowCanvas) !== src) unregisterGifBloomCanvas(glowCanvas);
 
   let player = gifBloomPlayers.get(src);
   if (!player) {
@@ -465,9 +463,7 @@ export function bindGifBloomPair(
   }
   player.faces.add(faceEl);
   player.targets.set(faceCanvas, { width, height });
-  player.targets.set(glowCanvas, { width, height });
   gifBloomCanvasSrc.set(faceCanvas, src);
-  gifBloomCanvasSrc.set(glowCanvas, src);
 
   if (player.decoder) {
     void pumpGifBloomPlayer(player);
@@ -477,14 +473,50 @@ export function bindGifBloomPair(
   return true;
 }
 
-/** Tear down shared GIF canvases for a face/glow pair (bloom off / chip gone). */
-export function unbindGifBloomPair(faceEl: HTMLElement, glowEl: HTMLElement) {
+/**
+ * Drive face + glow from one ImageDecoder clock.
+ * Returns false when ImageDecoder is unavailable — caller should keep dual `<img>`.
+ */
+export function bindGifBloomPair(
+  faceEl: HTMLElement,
+  glowEl: HTMLElement,
+  src: string,
+  width: number,
+  height: number,
+  radius: number,
+  filterCss: string,
+): boolean {
+  if (!bindGifFace(faceEl, src, width, height, radius, filterCss)) return false;
+
+  const glowCanvas = ensureGifBloomCanvas(glowEl, radius, filterCss);
+  if (gifBloomCanvasSrc.get(glowCanvas) !== src) unregisterGifBloomCanvas(glowCanvas);
+
+  const player = gifBloomPlayers.get(src);
+  if (!player) return false;
+  player.targets.set(glowCanvas, { width, height });
+  gifBloomCanvasSrc.set(glowCanvas, src);
+  void pumpGifBloomPlayer(player);
+  return true;
+}
+
+/** Drop glow canvas only — face keeps looping when bloom turns off. */
+export function unbindGifGlow(glowEl: HTMLElement) {
+  const glowCanvas = glowEl.querySelector(":scope > canvas");
+  if (glowCanvas instanceof HTMLCanvasElement) unregisterGifBloomCanvas(glowCanvas);
+}
+
+/** Tear down GIF face playback (no longer a GIF raster / falling back to `<img>`). */
+export function unbindGifFace(faceEl: HTMLElement) {
   gifBloomFaces.delete(faceEl);
   const faceCanvas = faceEl.querySelector(":scope > canvas");
-  const glowCanvas = glowEl.querySelector(":scope > canvas");
   if (faceCanvas instanceof HTMLCanvasElement) unregisterGifBloomCanvas(faceCanvas);
-  if (glowCanvas instanceof HTMLCanvasElement) unregisterGifBloomCanvas(glowCanvas);
   for (const player of gifBloomPlayers.values()) player.faces.delete(faceEl);
+}
+
+/** Tear down shared GIF canvases for a face/glow pair (slot no longer a GIF raster). */
+export function unbindGifBloomPair(faceEl: HTMLElement, glowEl: HTMLElement) {
+  unbindGifFace(faceEl);
+  unbindGifGlow(glowEl);
 }
 
 function clearBareGradientSeat(label: HTMLElement) {
@@ -1293,37 +1325,9 @@ export function applyVisual(
   }
 
   if (!isColorMask(slot)) {
-    // Face/glow canvases owned by the shared GIF decoder — don't remount a competing <img>.
-    if (!bloom && gifBloomOwnsFace(el) && isGifSrc(slot.src, slot.name)) {
-      const canvas = el.querySelector(":scope > canvas");
-      if (canvas instanceof HTMLCanvasElement) {
-        styleGifBloomCanvas(canvas, radius, imageRasterFilter(slot));
-        const playerSrc = gifBloomCanvasSrc.get(canvas);
-        const player = playerSrc ? gifBloomPlayers.get(playerSrc) : undefined;
-        const size = player?.targets.get(canvas);
-        if (size) {
-          size.width = width;
-          size.height = height;
-        }
-        if (rasterRing(slot)) {
-          const foundRing = el.querySelector(":scope > .chip-ring");
-          const ringEl = foundRing instanceof HTMLElement ? foundRing : document.createElement("div");
-          if (ringEl.parentElement !== el) {
-            ringEl.className = "chip-ring";
-            ringEl.setAttribute("aria-hidden", "true");
-          }
-          ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, slot.stroke ?? 4)}px ${fill}`;
-          mountLookChild(el, ringEl);
-        } else {
-          el.querySelector(":scope > .chip-ring")?.remove();
-        }
-        return;
-      }
-    }
-    // Bloom pass must not mount a second GIF <img> — independent decoders drift.
-    // syncChipGlow owns the shared decoder canvases; leave a sized shell if called directly.
-    if (bloom && isGifSrc(slot.src, slot.name)) {
-      ensureGifBloomCanvas(el, radius, imageRasterFilter(slot));
+    const filterCss = imageRasterFilter(slot);
+    // ImageDecoder→canvas so post/per-object hue (CSS filter) doesn't rewind the loop.
+    if (!bloom && isGifSrc(slot.src, slot.name) && bindGifFace(el, src, width, height, radius, filterCss)) {
       if (rasterRing(slot)) {
         const foundRing = el.querySelector(":scope > .chip-ring");
         const ringEl = foundRing instanceof HTMLElement ? foundRing : document.createElement("div");
@@ -1338,6 +1342,26 @@ export function applyVisual(
       }
       return;
     }
+    // Bloom pass must not mount a second GIF <img> — independent decoders drift.
+    // syncChipGlow owns the shared decoder canvases; leave a sized shell if called directly.
+    if (bloom && isGifSrc(slot.src, slot.name)) {
+      ensureGifBloomCanvas(el, radius, filterCss);
+      if (rasterRing(slot)) {
+        const foundRing = el.querySelector(":scope > .chip-ring");
+        const ringEl = foundRing instanceof HTMLElement ? foundRing : document.createElement("div");
+        if (ringEl.parentElement !== el) {
+          ringEl.className = "chip-ring";
+          ringEl.setAttribute("aria-hidden", "true");
+        }
+        ringEl.style.boxShadow = `inset 0 0 0 ${Math.max(1, slot.stroke ?? 4)}px ${fill}`;
+        mountLookChild(el, ringEl);
+      } else {
+        el.querySelector(":scope > .chip-ring")?.remove();
+      }
+      return;
+    }
+    // Static raster or ImageDecoder unavailable — browser <img> (GIF loops may reset on filter).
+    if (gifBloomOwnsFace(el)) unbindGifFace(el);
     const foundImg = el.querySelector(":scope > img");
     const img = foundImg instanceof HTMLImageElement ? foundImg : document.createElement("img");
     stripLookChildren(el, img);
@@ -1347,7 +1371,7 @@ export function applyVisual(
     // Keep radius on the img so xform handles outside the chip stay visible.
     img.style.borderRadius = `${radius}px`;
     // Invert always explicit; color adjusts compose when non-default.
-    img.style.filter = imageRasterFilter(slot);
+    img.style.filter = filterCss;
     mountLookChild(el, img);
     // Raster inner stroke sits in a ring overlay so the img doesn't cover it.
     if (rasterRing(slot)) {
@@ -1363,6 +1387,7 @@ export function applyVisual(
     return;
   }
 
+  if (gifBloomOwnsFace(el)) unbindGifFace(el);
   const foundFace = el.querySelector(":scope > .chip-face");
   const face = foundFace instanceof HTMLElement ? foundFace : document.createElement("div");
   stripLookChildren(el, face);

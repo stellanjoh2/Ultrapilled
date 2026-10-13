@@ -15,6 +15,7 @@ import {
   paintFill,
   paintSweepBand,
   unbindGifBloomPair,
+  unbindGifGlow,
 } from "./chipDomPaint";
 import { chipContributesBloom, imageRasterFilter, rasterRing } from "./chipLook";
 import { peekTrim } from "./trim";
@@ -1647,29 +1648,12 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     if (!chip.glow.isConnected) return;
     const look = chip.look;
     const wasGifBloom = Boolean(look && isGifBloomSlot(look.slot));
-    if (wasGifBloom) unbindGifBloomPair(chip.el, chip.glow);
+    // Keep the face decoder looping — only drop the bloom twin (CSS filter restarts <img> GIFs).
+    if (wasGifBloom) unbindGifGlow(chip.glow);
     const glowCanvas = chip.glow.querySelector(":scope > canvas");
     if (glowCanvas instanceof HTMLCanvasElement) unmirrorBareCanvas(glowCanvas);
     stopTextAnimIn(chip.glow);
     chip.glow.remove();
-    // Shared GIF decoder replaced the face <img> with a canvas — restore browser playback.
-    if (wasGifBloom && look) {
-      applyVisual(
-        chip.el,
-        look.slot,
-        chip.width,
-        chip.height,
-        look.radius,
-        look.fill,
-        look.ink,
-        look.tracking,
-        false,
-        look.shiftEm,
-        look.gradientTo,
-        chip.slotId === editingId,
-        lookPad,
-      );
-    }
   }
 
   function attachGlow(chip: DroppedChip) {

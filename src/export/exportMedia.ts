@@ -210,6 +210,8 @@ async function exportVideo(options: {
   loops: LoopCount;
   transparent: boolean;
   format: "mp4" | "mov";
+  /** When false, skip bounce audio even if Sound is on in Settings. */
+  includeSounds?: boolean;
   poses?: ChipPose[];
   replayFall?: boolean;
   layoutHoldMs?: number;
@@ -224,6 +226,7 @@ async function exportVideo(options: {
   } = await import("mediabunny");
   const audioQuality = new Quality("high");
   const canAudio =
+    options.includeSounds !== false &&
     prefs.soundOn &&
     prefs.bounceSounds &&
     prefs.soundVolume > 0 &&
@@ -420,6 +423,7 @@ export function exportMp4(options: {
   preset: VideoSizePreset;
   fps: FrameRate;
   loops: LoopCount;
+  includeSounds?: boolean;
   poses?: ChipPose[];
   replayFall?: boolean;
   layoutHoldMs?: number;
@@ -438,6 +442,7 @@ export function exportMov(options: {
   fps: FrameRate;
   loops: LoopCount;
   transparent: boolean;
+  includeSounds?: boolean;
   poses?: ChipPose[];
   replayFall?: boolean;
   layoutHoldMs?: number;
