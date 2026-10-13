@@ -604,7 +604,12 @@ export function berlinState(): AppState {
     text({ text: "Kunst", ...heavy, shape: "box", radius: 10, colorIndex: PINK, textColor: "#000000", scale: 1.6, tracking: -80 }),
     photo("berlin", "template-berlin-moma-queue.jpg", "MoMA Queue", 110, 0),
     text({ text: "24H", ...pixel, shape: bare, colorIndex: GREEN, scale: 4.688479933455517, tracking: -217 }),
-    phosphor("fill:headphones", { colorIndex: ACID, size: 71.42857142857143, scale: 0.7576293831200989 }),
+    phosphor("fill:headphones", {
+      colorIndex: ACID,
+      size: 71.42857142857143,
+      scale: 0.7576293831200989,
+      collider: "block",
+    }),
     text({
       text: "Undisclosed Location",
       ...pixel,
@@ -682,7 +687,12 @@ export function berlinState(): AppState {
     presetIcon("Chevrons", 1, ACID, { scale: 0.7 }),
     emoji("🖤", "Black Heart", 2, 0.6),
     text({ text: "Türsteher", ...swiss(700), shape: bare, colorIndex: WHITE, scale: 1.6, tracking: -181 }),
-    phosphor("regular:bicycle", { colorIndex: GREEN, size: 73.14285714285714, scale: 1.1833021791524172 }),
+    phosphor("regular:bicycle", {
+      colorIndex: GREEN,
+      size: 73.14285714285714,
+      scale: 1.1833021791524172,
+      collider: "block",
+    }),
     text({ text: "B2B", ...pixel, shape: "box", radius: 6, colorIndex: BLUE, textColor: "#ffffff", scale: 0.9 }),
     text({ text: "Line Up TBA", ...pixel, shape: "pill", stroked: true, stroke: 2, colorIndex: GREEN, scale: 0.4, pillPad: 65 }),
     text({ text: "Ost", ...heavy, shape: bare, colorIndex: BLUE, scale: 2.6, tracking: -172 }),
