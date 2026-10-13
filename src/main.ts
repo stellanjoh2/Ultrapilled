@@ -1186,6 +1186,10 @@ function applyGrid() {
     return;
   }
 
+  // Drop any boot/handoff opacity tween so CSS --grid-reveal owns visibility again.
+  gsap.killTweensOf(layer);
+  gsap.set(layer, { clearProps: "opacity" });
+
   layer.classList.remove("is-boot-reveal");
   if (on) {
     layer.hidden = false;
@@ -1244,7 +1248,9 @@ function bootRevealGrid() {
       ease: "power1.out",
       onComplete: () => {
         gsap.set(layer, { clearProps: "opacity" });
-        layer.style.setProperty("--grid-reveal", "1");
+        // Template swap may have toggled grid off while we were fading in.
+        if (state.background.grid) layer.style.setProperty("--grid-reveal", "1");
+        else layer.style.setProperty("--grid-reveal", "0");
         releaseProTips();
         releaseAutoObjectNudge();
       },
@@ -6802,6 +6808,9 @@ async function loadTemplate(next: AppState) {
   await prep;
   if (ticket !== templateSwapTicket) return;
 
+  // Template owns the stage now — don't keep Mode Select's grid hold suppressing
+  // --grid-reveal (Berlin etc. ship grid: true but stayed invisible under the hold).
+  gridHoldForHandoff = false;
   applyBackground();
   applyPost();
   syncCanvas(false);

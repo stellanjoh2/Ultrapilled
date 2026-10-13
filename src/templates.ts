@@ -590,7 +590,7 @@ export function berlinState(): AppState {
   const bare = "none" as const;
   const condensed = { fontFamily: "Anton", fontWeight: 400, tracking: -70 };
   const heavy = { fontFamily: "Archivo Black", fontWeight: 400 };
-  const pixel = (fontWeight: number) => ({ fontFamily: "Pixelify Sans", fontWeight });
+  const pixel = { fontFamily: "Geist Pixel", fontWeight: 400 as const };
   const swiss = (fontWeight: number) => ({ fontFamily: "Inter", fontWeight });
   const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
   const slots = [
@@ -603,21 +603,21 @@ export function berlinState(): AppState {
     presetIcon("Xs", 2, BLUE, { scale: 0.5 }),
     text({ text: "Kunst", ...heavy, shape: "box", radius: 10, colorIndex: PINK, textColor: "#000000", scale: 1.6, tracking: -80 }),
     photo("berlin", "template-berlin-moma-queue.jpg", "MoMA Queue", 110, 0),
-    text({ text: "24H", ...condensed, shape: bare, colorIndex: GREEN, scale: 3.6 }),
+    text({ text: "24H", ...pixel, shape: bare, colorIndex: GREEN, scale: 4.688479933455517, tracking: -217 }),
     phosphor("fill:headphones", { colorIndex: ACID, size: 71.42857142857143, scale: 0.7576293831200989 }),
     text({
       text: "Undisclosed Location",
-      ...heavy,
+      ...pixel,
       shape: "box",
       radius: 4,
       colorIndex: ACID,
       textColor: "#000000",
       textColorIndex: PINK,
       scale: 0.55,
-      tracking: -127,
+      tracking: 30,
       pillPad: 68,
     }),
-    text({ text: "Eintritt Frei", ...pixel(700), shape: "box", radius: 8, stroked: true, stroke: 4, colorIndex: WHITE, scale: 0.35, pillPad: 57 }),
+    text({ text: "Eintritt Frei", ...pixel, shape: "box", radius: 8, stroked: true, stroke: 4, colorIndex: WHITE, scale: 0.35, pillPad: 57 }),
     presetIcon("Xs", 1, PINK, { scale: 0.9 }),
     text({ text: "Döner", ...heavy, shape: "box", radius: 40, colorIndex: ACID, textColor: "#000000", scale: 0.85, tracking: -127, pillPad: 37 }),
     text({
@@ -635,7 +635,7 @@ export function berlinState(): AppState {
     photo("berlin", "template-berlin-towers.jpg", "Potsdamer Platz", 110, 12),
     text({
       text: "Kartenzahlung möglich?",
-      ...pixel(700),
+      ...pixel,
       shape: "pill",
       colorIndex: GREEN,
       color: "#282828",
@@ -643,7 +643,7 @@ export function berlinState(): AppState {
       scale: 0.4,
       textAnim: true,
       pillPad: 77,
-      tracking: -124,
+      tracking: -20,
     }),
     photo("berlin", "template-berlin-skull.gif", "Skull", 104, 0, 1.0643852467628665, {
       colorIndex: ACID,
@@ -661,7 +661,7 @@ export function berlinState(): AppState {
       stroke: 4,
       remote: { kind: "giphy", id: "3A1rfKbBovWtaNzxNu" },
     }),
-    text({ text: "12AM–10AM", ...heavy, shape: bare, colorIndex: PINK, scale: 1.4, tracking: -80 }),
+    text({ text: "12AM–10AM", ...pixel, shape: bare, colorIndex: PINK, scale: 1.4, tracking: -80 }),
     text({
       text: "Afterhour",
       ...heavy,
@@ -683,8 +683,8 @@ export function berlinState(): AppState {
     emoji("🖤", "Black Heart", 2, 0.6),
     text({ text: "Türsteher", ...swiss(700), shape: bare, colorIndex: WHITE, scale: 1.6, tracking: -181 }),
     phosphor("regular:bicycle", { colorIndex: GREEN, size: 73.14285714285714, scale: 1.1833021791524172 }),
-    text({ text: "B2B", ...pixel(700), shape: "box", radius: 6, colorIndex: BLUE, textColor: "#ffffff", scale: 0.9 }),
-    text({ text: "Line Up TBA", ...pixel(400), shape: "pill", stroked: true, stroke: 2, colorIndex: GREEN, scale: 0.4, pillPad: 65 }),
+    text({ text: "B2B", ...pixel, shape: "box", radius: 6, colorIndex: BLUE, textColor: "#ffffff", scale: 0.9 }),
+    text({ text: "Line Up TBA", ...pixel, shape: "pill", stroked: true, stroke: 2, colorIndex: GREEN, scale: 0.4, pillPad: 65 }),
     text({ text: "Ost", ...heavy, shape: bare, colorIndex: BLUE, scale: 2.6, tracking: -172 }),
     presetIcon("Boxes", 1, GREEN, { scale: 0.8 }),
     emoji("🚇", "U-Bahn", 1, 0.75),
@@ -698,10 +698,10 @@ export function berlinState(): AppState {
     shapeAmount: 19,
     background: {
       ...defaultBackground(),
-      kind: "solid",
+      kind: "gradient",
       shape: "radial",
       stops: [
-        { id: uid(), color: "#02006c", at: 0 },
+        { id: uid(), color: "#2e0044", at: 0 },
         { id: uid(), color: "#080808", at: 100 },
       ],
       grid: true,
