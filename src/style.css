@@ -7165,9 +7165,10 @@ html[data-theme="day"] .help-modal__body .keycap {
 }
 
 /*
- * Stage blur under About is applied in aboutPanel on #app + .mode-select-host
- * via filter / -webkit-filter (numeric tween — works Safari/Chrome/Firefox, and
- * clears fully on close so Mode Select frost isn’t left in a filter containing block).
+ * About underlay blur is backdrop-filter on .about-overlay__scrim (aboutPanel),
+ * not filter:blur on #app / Mode Select — full-bleed filter fringes a bright
+ * edge light-leak. Clears fully on close so Mode Select frost isn’t left in a
+ * filter containing block.
  */
 
 .about-overlay {

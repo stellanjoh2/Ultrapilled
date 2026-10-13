@@ -116,40 +116,32 @@ function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Stage + Mode Select host (sibling of #app) — whichever is behind About. */
-function aboutBlurTargets(): HTMLElement[] {
-  const targets: HTMLElement[] = [];
-  const app = document.querySelector<HTMLElement>("#app");
-  if (app) targets.push(app);
-  const gate = document.querySelector<HTMLElement>(".mode-select-host");
-  if (gate) targets.push(gate);
-  return targets;
+/** Scrim for the open About overlay — blur lives here, not on #app / Mode Select. */
+function aboutBlurScrim(): HTMLElement | null {
+  return modalRoot?.querySelector<HTMLElement>(".about-overlay__scrim") ?? null;
 }
 
 /**
- * Apply underlay blur. Uses filter + -webkit-filter (Safari), numeric tween (not
- * GSAP’s filter string), and clears entirely when off so Mode Select frost /
- * mix-blend aren’t stuck under a permanent filter containing block.
+ * Soften whatever sits under About via backdrop-filter on the scrim.
+ * Avoids full-bleed filter:blur on #app / Mode Select, which fringes a bright
+ * light-leak at the viewport edges. Clears fully when off (same as before so
+ * Mode Select frost / mix-blend aren’t left in a filter containing block).
  */
-function setAboutBlurPx(targets: HTMLElement[], px: number): void {
+function setAboutBlurPx(scrim: HTMLElement, px: number): void {
   if (px <= 0.05) {
-    for (const el of targets) {
-      el.style.removeProperty("filter");
-      el.style.removeProperty("-webkit-filter");
-    }
+    scrim.style.removeProperty("backdrop-filter");
+    scrim.style.removeProperty("-webkit-backdrop-filter");
     return;
   }
   const value = `blur(${px}px)`;
-  for (const el of targets) {
-    el.style.filter = value;
-    el.style.setProperty("-webkit-filter", value);
-  }
+  scrim.style.setProperty("-webkit-backdrop-filter", value);
+  scrim.style.backdropFilter = value;
 }
 
-/** Soften whatever sits under About — tween blur so open/close isn’t a hard cut. */
+/** Tween scrim blur so open/close isn’t a hard cut. */
 function tweenAboutBlur(on: boolean, duration: number): void {
-  const targets = aboutBlurTargets();
-  if (!targets.length) return;
+  const scrim = aboutBlurScrim();
+  if (!scrim) return;
   blurTween?.kill();
   blurTween = null;
 
@@ -157,19 +149,19 @@ function tweenAboutBlur(on: boolean, duration: number): void {
   const to = on ? ABOUT_BLUR_PX : 0;
 
   if (reducedMotion() || duration <= 0) {
-    setAboutBlurPx(targets, to);
+    setAboutBlurPx(scrim, to);
     return;
   }
 
   const state = { px: from };
-  setAboutBlurPx(targets, from);
+  setAboutBlurPx(scrim, from);
   blurTween = gsap.to(state, {
     px: to,
     duration,
     ease: on ? "power2.out" : "power1.in",
-    onUpdate: () => setAboutBlurPx(targets, state.px),
+    onUpdate: () => setAboutBlurPx(scrim, state.px),
     onComplete: () => {
-      setAboutBlurPx(targets, to);
+      setAboutBlurPx(scrim, to);
       blurTween = null;
     },
   });
