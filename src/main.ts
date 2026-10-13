@@ -1,7 +1,7 @@
 import { canvasFrame, keepSelectedCanvas, parseCanvasRatio, type CanvasFrame, type CanvasRatio } from "./canvas";
 import { FEATURED_EMOJI } from "./emojis";
 import { ICON_PRESETS, imageColliderId } from "./icons";
-import { matchCollider, preloadIconDecomp, presetIdForSrc, simpleColliderKind } from "./iconMesh";
+import { matchImageCollider, preloadIconDecomp, presetIdForSrc } from "./iconMesh";
 import {
   bundledWeights,
   BLEND_MODES,
@@ -213,6 +213,8 @@ let lastDraftJson = "";
 let draftReady = false;
 
 let insertMotion: InsertMotion | null = null;
+/** Cancels an in-flight append grow so async Icon/Unsplash settle can scroll without fighting the pin. */
+let abortInsertGrow: (() => void) | null = null;
 
 let tintPicker: { anchor: HTMLElement; close: () => void } | null = null;
 
@@ -365,6 +367,9 @@ const bgCredit = playfield.querySelector<HTMLElement>("#bg-credit")!;
 bgCredit.addEventListener("pointerdown", (event) => event.stopPropagation());
 bgCredit.addEventListener("click", (event) => event.stopPropagation());
 let collisionBoxesOn = false;
+/** Brief wireframe peek after changing collision type while the eye toggle is off. */
+let collisionPeekIds: Set<string> | null = null;
+let collisionPeekTimer = 0;
 let devModeOn = false;
 let nudgeFadeTimer = 0;
 let shapeBlinkTimer = 0;
@@ -2488,14 +2493,14 @@ function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Pro
         if (gifBlocksStroke(url, file.name)) slot.stroked = undefined;
       }
       if (!svg) return null;
-      return matchCollider(peekTrim(url)?.displaySrc ?? url);
+      // Same circle-vs-box silhouette check Shapes use — prefers box unless clearly round.
+      return matchImageCollider(peekTrim(url)?.displaySrc ?? url);
     })
-    .then((id: string | null) => {
-      if (slot.src !== url) return;
-      // Uploads only offer box/sphere; map round silhouette matches to sphere.
-      if (id === "sphere" || (id && simpleColliderKind(id) === "circle")) {
-        slot.collider = "sphere";
-      }
+    .then((id: "block" | "sphere" | null) => {
+      if (slot.src !== url || !id) return;
+      slot.collider = id === "sphere" ? "sphere" : undefined;
+      const base = imageBaselines.get(slot.id);
+      if (base) base.collider = slot.collider;
     })
     .catch(() => {
       /* keep block collider */
@@ -2671,6 +2676,9 @@ function settleRevealSlot(id: string) {
   if (jumped) panelTab = "physics";
   openSections.add("what-falls");
   openOnly(id);
+  // Fast local icons (Phosphor) finish while append-grow still pins .slot-adds — abort that
+  // pin or settle’s scroll is undone and the panel stays on the Create row.
+  abortInsertGrow?.();
   if (jumped || !panel.querySelector(`#slots [data-id="${id}"]`)) {
     revealSlotId = id;
     renderPanel();
@@ -3539,7 +3547,8 @@ function fieldDirty(slot: Slot, key: string): boolean {
     case "gradientSpeed":
       return gradientSpeedOf(slot.gradientSpeed) !== gradientSpeedOf(base.gradientSpeed);
     case "collider":
-      return colliderOf(slot) !== imageColliderId(base.collider);
+      // Raw value: unset keeps the silhouette mesh; explicit "block"/"sphere" overrides it.
+      return (slot.collider ?? "") !== (base.collider ?? "");
     case "blend":
       return blendMode(slot.blend) !== blendMode(base.blend);
     case "dropShadow":
@@ -3737,6 +3746,7 @@ function applyFieldReset(slot: Slot, key: string) {
   else if (key === "attractorIdle") slot.attractorIdle = undefined;
   if (slot.kind === "image" && key === "amount") live();
   else liveChip(slot.id);
+  if (key === "collider") peekCollisionBoxes(slot.id);
   renderPanel();
 }
 
@@ -3974,6 +3984,7 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
       if (slot.kind === "image" && key === "amount") live();
       else if (key === "pillPad") liveChip(slot.id, { quiet: true });
       else liveChip(slot.id);
+      if (key === "collider") peekCollisionBoxes(slot.id);
     });
     if (continuous) {
       const finish = () => {
@@ -5110,6 +5121,7 @@ function flushOpenSlotFold(card: HTMLElement) {
 }
 
 function growInsertedSlot(motion: InsertMotion) {
+  abortInsertGrow?.();
   const card = panel.querySelector<HTMLElement>(`[data-id="${motion.id}"]`);
   if (!card) return;
   flushOpenSlotFold(card);
@@ -5165,30 +5177,54 @@ function growInsertedSlot(motion: InsertMotion) {
     { duration: INSERT_MS, easing: INSERT_EASE, fill: "forwards" },
   );
   let pinFrame = 0;
+  let settled = false;
+  const clearCollapse = () => {
+    if (!card.isConnected) return;
+    card.style.height = "";
+    card.style.minHeight = "";
+    card.style.paddingTop = "";
+    card.style.paddingBottom = "";
+    card.style.marginBottom = "";
+    card.style.overflow = "";
+  };
+  const finishPin = () => {
+    cancelAnimationFrame(pinFrame);
+    pinFrame = 0;
+    panel.style.overflowAnchor = "";
+  };
+  abortInsertGrow = () => {
+    if (settled) return;
+    settled = true;
+    abortInsertGrow = null;
+    finishPin();
+    anim.cancel();
+    clearCollapse();
+  };
   const pinLoop = () => {
+    if (settled) return;
     pinAnchor();
     if (anim.playState === "running") pinFrame = requestAnimationFrame(pinLoop);
   };
   pinFrame = requestAnimationFrame(pinLoop);
   anim.finished
     .then(() => {
-      cancelAnimationFrame(pinFrame);
+      if (settled) return;
+      settled = true;
+      abortInsertGrow = null;
+      finishPin();
       pinAnchor();
-      card.style.height = "";
-      card.style.minHeight = "";
-      card.style.paddingTop = "";
-      card.style.paddingBottom = "";
-      card.style.marginBottom = "";
-      card.style.overflow = "";
+      clearCollapse();
       anim.cancel();
       pinAnchor();
-      panel.style.overflowAnchor = "";
       scrollPanelTo(card);
       pinPageScroll();
     })
     .catch(() => {
-      cancelAnimationFrame(pinFrame);
-      panel.style.overflowAnchor = "";
+      if (settled) return;
+      settled = true;
+      abortInsertGrow = null;
+      finishPin();
+      clearCollapse();
     });
 }
 
@@ -6003,7 +6039,8 @@ function paintCollisionBoxesButtons() {
 }
 
 function paintPhysDebug() {
-  if (!collisionBoxesOn) return;
+  const peekOnly = Boolean(collisionPeekIds) && !collisionBoxesOn;
+  if (!collisionBoxesOn && !peekOnly) return;
   const width = playfield.clientWidth;
   const height = playfield.clientHeight;
   if (width < 2 || height < 2) return;
@@ -6014,10 +6051,13 @@ function paintPhysDebug() {
   const ctx = physDebugCanvas.getContext("2d");
   if (!ctx) return;
   ctx.clearRect(0, 0, width, height);
-  ctx.lineWidth = 1.5;
+  // Peek is a glance from the panel — slightly louder than the steady eye-toggle overlay.
+  ctx.lineWidth = peekOnly ? 2.5 : 1.5;
   ctx.strokeStyle = "#39ff14";
-  ctx.fillStyle = "rgb(57 255 20 / 0.08)";
-  for (const poly of world.wireframes()) {
+  ctx.fillStyle = peekOnly ? "rgb(57 255 20 / 0.18)" : "rgb(57 255 20 / 0.08)";
+  // Peek shows only the object whose type just changed; the eye toggle shows everything.
+  const polys = collisionBoxesOn ? world.wireframes() : world.wireframes(collisionPeekIds ?? undefined);
+  for (const poly of polys) {
     if (poly.length < 2) continue;
     ctx.beginPath();
     ctx.moveTo(poly[0].x, poly[0].y);
@@ -6028,11 +6068,79 @@ function paintPhysDebug() {
   }
 }
 
+function clearCollisionPeek() {
+  window.clearTimeout(collisionPeekTimer);
+  collisionPeekTimer = 0;
+  gsap.killTweensOf(physDebugCanvas);
+  collisionPeekIds = null;
+  gsap.set(physDebugCanvas, { clearProps: "opacity" });
+  if (!collisionBoxesOn) {
+    physDebugCanvas.hidden = true;
+    const ctx = physDebugCanvas.getContext("2d");
+    ctx?.clearRect(0, 0, physDebugCanvas.width, physDebugCanvas.height);
+  }
+}
+
+/** Flash this object's hit shape, then fade — even when collision visibility is off. */
+function peekCollisionBoxes(slotId: string) {
+  if (collisionBoxesOn) {
+    paintPhysDebug();
+    return;
+  }
+  window.clearTimeout(collisionPeekTimer);
+  collisionPeekTimer = 0;
+  collisionPeekIds = new Set([slotId]);
+  physDebugCanvas.hidden = false;
+  gsap.killTweensOf(physDebugCanvas);
+  // liveChip only remeshes existing bodies — if the stage is empty, spawn quietly so we have geometry.
+  if (world.wireframes(collisionPeekIds).length === 0) {
+    live({ quiet: true });
+  }
+  if (reducedMotion()) {
+    gsap.set(physDebugCanvas, { opacity: 1 });
+    paintPhysDebug();
+    collisionPeekTimer = window.setTimeout(() => {
+      collisionPeekTimer = 0;
+      if (!collisionPeekIds?.has(slotId) || collisionBoxesOn) return;
+      clearCollisionPeek();
+    }, 700);
+    return;
+  }
+  // Hold long enough to look up from the panel, then ease out.
+  gsap.set(physDebugCanvas, { opacity: 1 });
+  paintPhysDebug();
+  gsap.to(physDebugCanvas, {
+    opacity: 0,
+    duration: 0.55,
+    delay: 0.55,
+    ease: "power1.in",
+    onComplete: () => {
+      if (collisionBoxesOn) {
+        collisionPeekIds = null;
+        gsap.set(physDebugCanvas, { clearProps: "opacity" });
+        paintPhysDebug();
+        return;
+      }
+      clearCollisionPeek();
+    },
+  });
+}
+
 function setCollisionBoxes(on: boolean) {
   collisionBoxesOn = on;
-  physDebugCanvas.hidden = !on;
-  if (on) paintPhysDebug();
-  else {
+  if (on) {
+    window.clearTimeout(collisionPeekTimer);
+    collisionPeekTimer = 0;
+    gsap.killTweensOf(physDebugCanvas);
+    collisionPeekIds = null;
+    gsap.set(physDebugCanvas, { clearProps: "opacity" });
+    physDebugCanvas.hidden = false;
+    paintPhysDebug();
+  } else if (collisionPeekIds) {
+    // Keep an in-flight peek visible; don't hard-clear mid-fade.
+    physDebugCanvas.hidden = false;
+  } else {
+    physDebugCanvas.hidden = true;
     const ctx = physDebugCanvas.getContext("2d");
     ctx?.clearRect(0, 0, physDebugCanvas.width, physDebugCanvas.height);
   }

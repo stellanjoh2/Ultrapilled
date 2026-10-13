@@ -63,31 +63,39 @@ const simpleKindCache = new Map<string, "circle" | "box">();
 function pickSimpleKind(id: string): "circle" | "box" {
   if (id === "sphere" || id === "ring") return "circle";
   if (id === "block" || id === "triangle") return "box";
-
   const paths = galleryPaths(id);
+  return colliderKindFromInk((u, v) => filled(id, paths, u, v));
+}
+
+/**
+ * Circle only when the silhouette is clearly radial — otherwise box.
+ * Same heuristic Shapes use for Normal complexity; Phosphor / SVG import shares it.
+ */
+export function colliderKindFromInk(ink: (u: number, v: number) => boolean): "circle" | "box" {
   let minX = 1;
   let minY = 1;
   let maxX = 0;
   let maxY = 0;
-  let ink = 0;
+  let marks = 0;
   const boundStep = 48;
   for (let y = 0; y < boundStep; y++) {
     for (let x = 0; x < boundStep; x++) {
       const u = (x + 0.5) / boundStep;
       const v = (y + 0.5) / boundStep;
-      if (!filled(id, paths, u, v)) continue;
-      ink++;
+      if (!ink(u, v)) continue;
+      marks++;
       if (u < minX) minX = u;
       if (v < minY) minY = v;
       if (u > maxX) maxX = u;
       if (v > maxY) maxY = v;
     }
   }
-  if (!ink) return "box";
+  if (!marks) return "box";
 
   const bw = maxX - minX;
   const bh = maxY - minY;
   if (!(bw > 0) || !(bh > 0)) return "box";
+  // Elongated icons stack better as boxes even when the tips look round.
   if (Math.abs(bw - bh) / Math.max(bw, bh) > 0.12) return "box";
 
   const cx = (minX + maxX) / 2;
@@ -101,7 +109,7 @@ function pickSimpleKind(id: string): "circle" | "box" {
     for (let x = 0; x < step; x++) {
       const u = minX + ((x + 0.5) / step) * bw;
       const v = minY + ((y + 0.5) / step) * bh;
-      const on = filled(id, paths, u, v);
+      const on = ink(u, v);
       if (on !== Math.hypot(u - cx, v - cy) <= radius) circleMiss++;
       if (!on) boxMiss++;
       samples++;
@@ -109,7 +117,7 @@ function pickSimpleKind(id: string): "circle" | "box" {
   }
   const circleRatio = circleMiss / samples;
   const boxRatio = boxMiss / samples;
-  // Circle must beat the AABB by a clear margin so sparse grids stay boxed.
+  // Circle must beat the AABB by a clear margin so sparse / square icons stay boxed.
   if (circleRatio <= boxRatio * 0.75) return "circle";
 
   let maxR = 0;
@@ -123,7 +131,7 @@ function pickSimpleKind(id: string): "circle" | "box" {
       const mid = (lo + hi) / 2;
       const u = cx + Math.cos(a) * mid;
       const v = cy + Math.sin(a) * mid;
-      if (u < minX || u > maxX || v < minY || v > maxY || !filled(id, paths, u, v)) hi = mid;
+      if (u < minX || u > maxX || v < minY || v > maxY || !ink(u, v)) hi = mid;
       else lo = mid;
     }
     if (lo > maxR) maxR = lo;
@@ -134,39 +142,29 @@ function pickSimpleKind(id: string): "circle" | "box" {
   return "box";
 }
 
-const presetMasks = new Map<string, Uint8Array>();
+/** Classify a tight-cropped binary mask the same way gallery shapes are classified. */
+export function colliderKindFromMask(mask: Uint8Array, size: number): "circle" | "box" {
+  const inkAt = (u: number, v: number) => {
+    const x = Math.min(size - 1, Math.max(0, Math.floor(u * size)));
+    const y = Math.min(size - 1, Math.max(0, Math.floor(v * size)));
+    return mask[y * size + x] === 1;
+  };
+  const kind = colliderKindFromInk(inkAt);
+  if (kind === "box") return "box";
+  // Sparse glyphs (most Phosphor icons) can look "round enough" on tips alone — keep those boxed.
+  let ink = 0;
+  for (let i = 0; i < mask.length; i++) if (mask[i]) ink++;
+  if (ink / mask.length < 0.45) return "box";
+  return "circle";
+}
 
-/** Pick the gallery collider whose silhouette overlaps the image the most. */
-export function matchCollider(src: string): Promise<string> {
+/** Box vs sphere for imported SVGs / Phosphor — prefers box unless the cutout is clearly round. */
+export function matchImageCollider(src: string): Promise<"block" | "sphere"> {
   return imageMask(src).then((mask) => {
     if (!mask) return "block";
     const fitted = cropMask(mask, GRID);
-    let best = "block";
-    let bestScore = -1;
-    for (const icon of ICON_PRESETS) {
-      const score = maskOverlap(fitted, presetMask(icon.id));
-      if (score > bestScore) {
-        best = icon.id;
-        bestScore = score;
-      }
-    }
-    return best;
+    return colliderKindFromMask(fitted, GRID) === "circle" ? "sphere" : "block";
   });
-}
-
-function presetMask(id: string): Uint8Array {
-  const cached = presetMasks.get(id);
-  if (cached) return cached;
-  const mask = new Uint8Array(GRID * GRID);
-  const paths = galleryPaths(id);
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
-      if (filled(id, paths, (x + 0.5) / GRID, (y + 0.5) / GRID)) mask[y * GRID + x] = 1;
-    }
-  }
-  const cropped = cropMask(mask, GRID);
-  presetMasks.set(id, cropped);
-  return cropped;
 }
 
 function cropMask(mask: Uint8Array, size: number): Uint8Array {
@@ -196,18 +194,6 @@ function cropMask(mask: Uint8Array, size: number): Uint8Array {
     }
   }
   return out;
-}
-
-function maskOverlap(a: Uint8Array, b: Uint8Array): number {
-  let shared = 0;
-  let either = 0;
-  for (let i = 0; i < a.length; i++) {
-    const onA = a[i] === 1;
-    const onB = b[i] === 1;
-    if (onA || onB) either++;
-    if (onA && onB) shared++;
-  }
-  return either ? shared / either : 0;
 }
 
 function imageMask(src: string): Promise<Uint8Array | null> {

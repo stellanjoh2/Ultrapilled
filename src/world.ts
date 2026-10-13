@@ -368,8 +368,8 @@ export type WorldHandle = {
   alignChipsStraight: (slotId: string) => void;
   /** Offline export: record bounce hits (skips live speaker playback while set). */
   setImpactListener: (fn: ((hit: ImpactHit) => void) | null) => void;
-  /** Convex hulls of each solid collider part, in stage pixels. */
-  wireframes: () => { x: number; y: number }[][];
+  /** Convex hulls of each solid collider part, in stage pixels. Optional slot filter. */
+  wireframes: (slotIds?: Iterable<string>) => { x: number; y: number }[][];
   step: (delta?: number) => void;
   destroy: () => void;
 };
@@ -418,6 +418,10 @@ function applyWeight(body: Matter.Body, weight: number) {
 
 function colliderId(slot: Slot): string {
   if (slot.kind !== "image" || slot.emoji || !slot.src) return "";
+  // Collision type Box / Sphere is an explicit override of the silhouette mesh.
+  if (slot.collider === "sphere" || slot.collider === "block") {
+    return slot.collider;
+  }
   const own = presetIdForSrc(slot.src);
   if (own) return own;
   return imageColliderId(slot.collider);
@@ -4693,9 +4697,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return out;
   }
 
-  function wireframes(): { x: number; y: number }[][] {
+  function wireframes(slotIds?: Iterable<string>): { x: number; y: number }[][] {
+    const filter = slotIds ? new Set(slotIds) : null;
     const out: { x: number; y: number }[][] = [];
     for (const chip of chips) {
+      if (filter && !filter.has(chip.slotId)) continue;
       for (const part of solidParts(chip.body)) {
         const verts = part.vertices;
         const poly: { x: number; y: number }[] = [];

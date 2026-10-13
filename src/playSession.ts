@@ -211,6 +211,8 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     if (heldByOverlay) {
       overlayHeld = true;
       host.world.setRunning(false);
+      // Keep collision peeks / eye-toggle wireframes painting while overlays hold physics.
+      host.paintPhysDebug();
       if (host.shouldContinue?.() === false) return;
       requestAnimationFrame(frame);
       return;
@@ -224,6 +226,7 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
       host.world.setRunning(false);
       holdSequenceClock(dt);
       if (lastInteractAt) lastInteractAt += dt;
+      host.paintPhysDebug();
       if (host.shouldContinue?.() === false) return;
       requestAnimationFrame(frame);
       return;
