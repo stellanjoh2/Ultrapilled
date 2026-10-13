@@ -21,7 +21,7 @@ import { isBugReportOpen, openBugReport } from "./bugReport";
 import { mountHeaderLogotype } from "./logotypeLive";
 import { isPillFile } from "./project/pillFormat";
 import { unlockAudio } from "./lib/sound-engine";
-import { playCaution, playClick, playNotify } from "./uiSounds";
+import { bindAudioUnlockGestures, playCaution, playClick, playNotify } from "./uiSounds";
 import { MODE_SELECT_MOBILE_ASSET_SCALE, modeSelectAssetScale } from "./mobileGate";
 import { compositionScale } from "./uiScale";
 import { createWorld } from "./world";
@@ -371,6 +371,8 @@ export function mountMobileAccessOverlay() {
   const host = ensureHost();
   host.classList.add("is-mobile-gate");
   warmModeSelectPreview();
+  // Mobile boot skips main.ts — bind unlock so button + pile touches open Web Audio (iOS).
+  bindAudioUnlockGestures();
   if (host.querySelector(".mobile-overlay")) return;
   const overlay = document.createElement("div");
   overlay.className = "mobile-overlay";
@@ -396,10 +398,15 @@ export function mountMobileAccessOverlay() {
   const github = overlay.querySelector<HTMLElement>(".mobile-overlay__github")!;
   const xMark = overlay.querySelector<HTMLElement>(".mobile-overlay__x")!;
 
-  const dismiss = () => {
-    // Gesture unlock + restore speaker impacts (preview starts silent for Mode Select).
+  // Unlock + enable impacts on pointerdown (iOS needs audio routed inside the gesture).
+  ok.addEventListener("pointerdown", () => {
     void unlockAudio();
     previewWorld?.setImpactListener(null);
+  });
+  const dismiss = () => {
+    void unlockAudio();
+    previewWorld?.setImpactListener(null);
+    playClick();
     host.classList.add("is-playing");
     overlay.remove();
   };

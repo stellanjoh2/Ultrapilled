@@ -76,7 +76,9 @@ describe("mobile access overlay", () => {
 
     mountMobileAccessOverlay();
     const host = document.querySelector(".mode-select-host");
-    host?.querySelector<HTMLButtonElement>(".mobile-overlay__ok")?.click();
+    const ok = host?.querySelector<HTMLButtonElement>(".mobile-overlay__ok");
+    ok?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    ok?.click();
 
     expect(host?.classList.contains("is-playing")).toBe(true);
     expect(host?.querySelector(".mobile-overlay")).toBeNull();

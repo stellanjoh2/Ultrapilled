@@ -297,6 +297,11 @@ function bindAudioUnlock() {
   window.addEventListener("keydown", unlock, true);
 }
 
+/** Bind gesture unlock early (e.g. mobile gate) so pile touches can re-open Web Audio. */
+export function bindAudioUnlockGestures() {
+  bindAudioUnlock();
+}
+
 /** Sine taps / button on interactive UI presses. */
 export function bindUiClickSounds(root: ParentNode = document) {
   bindAudioUnlock();

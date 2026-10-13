@@ -9,13 +9,32 @@ function ensureContext(): AudioContext {
   return audioContext;
 }
 
-/** Call from a user gesture so Chrome allows playback. */
+/** Play a one-sample buffer — iOS Safari stays muted after resume() alone. */
+function kickSilentBuffer(ctx: AudioContext) {
+  try {
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+  } catch {
+    // Ignore — resume below may still succeed.
+  }
+}
+
+/** Call from a user gesture so Chrome / iOS Safari allow playback. */
 export async function unlockAudio(): Promise<void> {
   const ctx = ensureContext();
-  if (ctx.state === "suspended") {
+  // Must run synchronously inside the gesture (before any await).
+  kickSilentBuffer(ctx);
+  // Let playSound proceed while resume settles from this same gesture.
+  unlocked = true;
+
+  if (ctx.state !== "running") {
     try {
       await ctx.resume();
     } catch {
+      unlocked = ctx.state === "running";
       return;
     }
   }
@@ -83,7 +102,7 @@ export async function playSound(
 
   const { volume = 1, playbackRate = 1, loop = false, onEnd } = options;
   const ctx = ensureContext();
-  if (ctx.state === "suspended") {
+  if (ctx.state !== "running") {
     try {
       await ctx.resume();
     } catch {
