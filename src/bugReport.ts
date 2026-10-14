@@ -1,6 +1,6 @@
 import gsap from "gsap";
+import arrowLeftIcon from "@phosphor-icons/core/assets/regular/arrow-left.svg?raw";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
-import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
 import { PRIVACY_HREF } from "./privacy";
 import { ensureTurnstileScript, turnstileSiteKey } from "./turnstile";
@@ -47,6 +47,7 @@ let sending = false;
 let thanksMode = false;
 let overlayPhysicsHeld = false;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
+let returnFocus: HTMLElement | null = null;
 let turnstileHost: HTMLElement | null = null;
 let turnstileWidgetId: string | number | null = null;
 let turnstileFadeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -269,14 +270,14 @@ function revealThankYou() {
     tl.fromTo(ok, { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.28, ease: "power3.out" }, "-=0.14");
   };
 
-  const card = root.querySelector<HTMLElement>(".bug-report__card");
-  if (reducedMotion() || !card) {
+  const sheet = root.querySelector<HTMLElement>(".bug-report__sheet");
+  if (reducedMotion() || !sheet) {
     swap();
     return;
   }
 
-  gsap.to(card, {
-    y: 24,
+  gsap.to(sheet, {
+    x: 48,
     autoAlpha: 0,
     duration: 0.22,
     ease: "power2.in",
@@ -289,7 +290,7 @@ export function closeBugReport(): void {
   closing = true;
   const root = modalRoot;
   const scrim = root.querySelector<HTMLElement>(".bug-report__scrim");
-  const card = root.querySelector<HTMLElement>(".bug-report__card");
+  const sheet = root.querySelector<HTMLElement>(".bug-report__sheet");
   const thanks = root.querySelector<HTMLElement>(".bug-report-thanks");
   if (onKey) window.removeEventListener("keydown", onKey, true);
   onKey = null;
@@ -307,6 +308,8 @@ export function closeBugReport(): void {
       releasePhysicsForOverlay();
       overlayPhysicsHeld = false;
     }
+    if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+    returnFocus = null;
   };
 
   if (reducedMotion() || !scrim) {
@@ -320,8 +323,8 @@ export function closeBugReport(): void {
     tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
     return;
   }
-  if (card) tl.to(card, { y: 24, autoAlpha: 0, duration: 0.24, ease: "power2.in" }, 0);
-  tl.to(scrim, { autoAlpha: 0, duration: 0.24, ease: "power1.in" }, 0);
+  if (sheet) tl.to(sheet, { x: 48, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
+  tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
 }
 
 function optionsHtml(
@@ -452,6 +455,7 @@ async function submitForm(form: HTMLFormElement) {
 
 export function openBugReport(): void {
   if (modalRoot || closing) return;
+  returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   const root = document.createElement("div");
   root.className = "bug-report";
@@ -460,62 +464,68 @@ export function openBugReport(): void {
   root.setAttribute("aria-labelledby", "bug-report-title");
   root.innerHTML = `
     <div class="bug-report__scrim" data-bug-close></div>
-    <div class="bug-report__card">
+    <div class="bug-report__sheet">
       <header class="bug-report__head">
-        <h2 class="bug-report__title" id="bug-report-title">Report an issue</h2>
-        <button type="button" class="bug-report__x icon-hover" data-bug-close aria-label="Close" data-tip="Close">
-          <span aria-hidden="true">${xIcon}</span>
+        <button type="button" class="bug-report__back icon-hover" data-bug-close aria-label="Back" data-tip="Close issue form">
+          <span class="bug-report__back-icon" aria-hidden="true">${arrowLeftIcon}</span>
         </button>
+        <div class="bug-report__titles">
+          <h2 class="bug-report__title" id="bug-report-title">Report an issue</h2>
+          <p class="bug-report__sub">Spotted something wrong? Tell me what happened</p>
+        </div>
       </header>
-      <p class="bug-report__lede">
-        Tell me what’s happening. I read every report and appreciate the detail.
-        I don’t collect contact details, so I can’t reply, but every submission is read.
-      </p>
-      <form class="bug-report__form" id="bug-report-form" novalidate>
-        <label class="bug-report__label" for="bug-report-category" data-tip="What kind of problem this is">Category</label>
-        <select class="bug-report__select" id="bug-report-category" name="category">
-          ${optionsHtml(CATEGORIES, "rendering")}
-        </select>
-        <label class="bug-report__label" for="bug-report-severity" data-tip="How badly it gets in the way">Severity</label>
-        <div class="bug-report__severity">
-          <select class="bug-report__select" id="bug-report-severity" name="severity">
-            ${optionsHtml(SEVERITIES, "moderate")}
+      <div class="bug-report__body">
+        <p class="bug-report__lede">
+          Tell me what’s happening — steps, browser, and what you expected all help.
+          <span class="bug-report__accent">I can’t reply, but every report is read.</span>
+        </p>
+        <form class="bug-report__form" id="bug-report-form" novalidate>
+          <label class="bug-report__label" for="bug-report-category" data-tip="What kind of problem this is">Category</label>
+          <select class="bug-report__field" id="bug-report-category" name="category">
+            ${optionsHtml(CATEGORIES, "rendering")}
           </select>
-        </div>
-        <label class="bug-report__label" for="bug-report-message" data-tip="Steps, browser, and what you expected">Details</label>
-        <textarea
-          class="bug-report__message"
-          id="bug-report-message"
-          name="message"
-          maxlength="8000"
-          rows="6"
-          placeholder="About 5+ words: steps to reproduce, browser/OS, what you expected…"
-        ></textarea>
-        <div
-          class="bug-report__meter"
-          data-bug-word-meter
-          role="progressbar"
-          aria-valuemin="0"
-          aria-valuemax="${MIN_BUG_MESSAGE_WORDS}"
-          aria-valuenow="0"
-          aria-label="Words of detail"
-        >
-          <div class="bug-report__meter-fill" data-bug-word-meter-fill></div>
-        </div>
-        <input type="text" name="honeypot" class="bug-report__hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
-        <p class="bug-report__status" aria-live="polite"></p>
-        <div class="bug-report__actions">
-          <button type="button" class="pill" data-bug-close>Cancel</button>
+          <label class="bug-report__label" for="bug-report-severity" data-tip="How badly it gets in the way">Severity</label>
+          <div class="bug-report__severity">
+            <select class="bug-report__field" id="bug-report-severity" name="severity">
+              ${optionsHtml(SEVERITIES, "moderate")}
+            </select>
+          </div>
+          <label class="bug-report__label" for="bug-report-message" data-tip="Steps, browser, and what you expected">Details</label>
+          <textarea
+            class="bug-report__field bug-report__message"
+            id="bug-report-message"
+            name="message"
+            maxlength="8000"
+            rows="6"
+            placeholder="About 5+ words: steps to reproduce, browser/OS, what you expected…"
+          ></textarea>
+          <div
+            class="bug-report__meter"
+            data-bug-word-meter
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="${MIN_BUG_MESSAGE_WORDS}"
+            aria-valuenow="0"
+            aria-label="Words of detail"
+          >
+            <div class="bug-report__meter-fill" data-bug-word-meter-fill></div>
+          </div>
+          <input type="text" name="honeypot" class="bug-report__hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <p class="bug-report__status" aria-live="polite"></p>
           <span class="bug-report__send-wrap" data-bug-send-wrap>
-            <button type="submit" class="pill pill--commit" data-bug-send disabled>Send</button>
+            <button type="submit" class="pill pill--commit bug-report__send" data-bug-send disabled>Send report</button>
           </span>
-        </div>
-      </form>
+          <p class="bug-report__fine">No contact details are collected with your report. <a href="${PRIVACY_HREF}">How we handle it</a>.</p>
+        </form>
+      </div>
+      <footer class="bug-report__foot">
+        <button type="button" class="bug-report__done" data-bug-close>Ok, take me back</button>
+      </footer>
     </div>
   `;
 
   const scrim = root.querySelector<HTMLElement>(".bug-report__scrim")!;
-  const card = root.querySelector<HTMLElement>(".bug-report__card")!;
+  const sheet = root.querySelector<HTMLElement>(".bug-report__sheet")!;
   const form = root.querySelector<HTMLFormElement>("#bug-report-form")!;
   const message = form.querySelector<HTMLTextAreaElement>("#bug-report-message")!;
   const severity = form.querySelector<HTMLSelectElement>("#bug-report-severity")!;
@@ -561,14 +571,14 @@ export function openBugReport(): void {
   void prepareTurnstile();
 
   gsap.set(scrim, { autoAlpha: 0 });
-  gsap.set(card, { autoAlpha: 0, y: 28 });
+  gsap.set(sheet, { autoAlpha: 0, x: 56 });
 
   if (reducedMotion()) {
-    gsap.set([scrim, card], { clearProps: "all", autoAlpha: 1, y: 0 });
+    gsap.set([scrim, sheet], { clearProps: "all", autoAlpha: 1, x: 0 });
     return;
   }
 
   const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-  tl.to(scrim, { autoAlpha: 1, duration: 0.28 }, 0);
-  tl.to(card, { autoAlpha: 1, y: 0, duration: 0.38 }, 0.04);
+  tl.to(scrim, { autoAlpha: 1, duration: 0.32 }, 0);
+  tl.to(sheet, { autoAlpha: 1, x: 0, duration: 0.42 }, 0.04);
 }

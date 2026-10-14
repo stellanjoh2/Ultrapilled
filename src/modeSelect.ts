@@ -20,7 +20,7 @@ import { PRIVACY_HREF } from "./privacy";
 import { isAboutOpen, openAbout } from "./aboutPanel";
 import { clearGuestbookDeepLink, shouldOpenGuestbookFromUrl } from "./guestbook";
 import { GUESTBOOK_TOGGLE_EVENT, closeGuestbook, isGuestbookOpen, openGuestbook } from "./guestbookPanel";
-import { isBugReportOpen, openBugReport } from "./bugReport";
+import { closeBugReport, isBugReportOpen, openBugReport } from "./bugReport";
 import { mountHeaderLogotype } from "./logotypeLive";
 import { isPillFile } from "./project/pillFormat";
 import { unlockAudio } from "./lib/sound-engine";
@@ -652,6 +652,10 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
       if (!(target instanceof Element)) return;
       if (target.closest("[data-open-bug-report]")) {
         event.preventDefault();
+        if (isBugReportOpen()) {
+          closeBugReport();
+          return;
+        }
         closeGuestbook();
         openBugReport();
         return;
@@ -664,7 +668,10 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
       if (target.closest("[data-open-guestbook]")) {
         event.preventDefault();
         if (isGuestbookOpen()) closeGuestbook();
-        else openGuestbook();
+        else {
+          closeBugReport();
+          openGuestbook();
+        }
         return;
       }
       if (target.closest("[data-load-project]")) {

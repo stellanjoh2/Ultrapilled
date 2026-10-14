@@ -83,11 +83,11 @@ describe("bug report", () => {
     expect(meter?.getAttribute("aria-valuenow")).toBe("5");
   });
 
-  it("closes when clicking the SVG inside the Close button", () => {
+  it("closes when clicking the SVG inside the Back button", () => {
     openBugReport();
     expect(isBugReportOpen()).toBe(true);
 
-    const path = document.querySelector(".bug-report__x svg path, .bug-report__x svg");
+    const path = document.querySelector(".bug-report__back svg path, .bug-report__back svg");
     expect(path).toBeTruthy();
     expect(path instanceof HTMLElement).toBe(false);
     path!.dispatchEvent(new MouseEvent("click", { bubbles: true }));

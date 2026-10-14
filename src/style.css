@@ -54,6 +54,9 @@
   --panel-pad: var(--space-2);
   --panel-width: calc(400px * var(--ui-scale));
   --panel-width-layout: var(--panel-width);
+  /* Right-side sheets — Settings, and the wider Guestbook / Report an issue. */
+  --sheet-width: calc(520px * var(--ui-scale));
+  --sheet-width-wide: calc(740px * var(--ui-scale));
   --shelf-slide: 0.45s cubic-bezier(0.83, 0, 0.17, 1);
   /* Chrome corner radii — live-tuned in Dev mode (K) */
   --radius-panel: calc(44px * var(--ui-scale));
@@ -6469,7 +6472,7 @@ body.is-exporting .app {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  width: min(calc(520px * var(--ui-scale)), calc(100% - (var(--space-2) * 2)));
+  width: min(var(--sheet-width), calc(100% - (var(--space-2) * 2)));
   border-radius: var(--radius-settings);
   background: var(--canvas);
   box-shadow: var(--shadow-2);
@@ -7513,192 +7516,21 @@ a.pill.about-project__launch:active {
   text-underline-offset: 0.12em;
 }
 
-.bug-report {
-  position: fixed;
-  inset: 0;
-  z-index: 220;
-  display: grid;
-  place-items: center;
-  padding: var(--space-2);
-  pointer-events: auto;
-}
-
-.bug-report__scrim {
-  position: absolute;
-  inset: 0;
-  background: transparent;
-}
-
-.bug-report__card {
+.bug-report__severity {
   position: relative;
-  z-index: 1;
-  width: min(calc(483px * var(--ui-scale)), 100%);
-  max-height: calc(100% - (var(--space-2) * 2));
-  overflow: auto;
-  padding: var(--space-2);
-  border-radius: var(--radius-reconnect);
-  background: var(--canvas);
-  box-shadow: var(--shadow-2);
-}
-
-.bug-report__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1);
-}
-
-.bug-report__title {
-  margin: 0;
-  color: var(--ink);
-  font-family: var(--font-section);
-  font-size: calc(24px * var(--ui-scale));
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.bug-report__x {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: calc(32px * var(--ui-scale));
-  height: calc(32px * var(--ui-scale));
-  margin: 0 calc(-4px * var(--ui-scale)) 0 0;
-  padding: 0;
-  border: none;
-  border-radius: calc(9999px * var(--ui-scale));
-  background: var(--field);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.bug-report__x svg {
-  width: calc(16px * var(--ui-scale));
-  height: calc(16px * var(--ui-scale));
-  display: block;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .bug-report__x:hover {
-    color: var(--pill-fun-face);
-  }
-}
-
-.bug-report__lede {
-  margin: var(--space-1) 0 var(--space-2);
-  color: var(--ink-secondary);
-  font-size: calc(16px * var(--ui-scale));
-  font-weight: 300;
-  line-height: 1.45;
-  letter-spacing: -0.01em;
-}
-
-.bug-report__form {
-  display: flex;
-  flex-direction: column;
-}
-
-.bug-report__label {
-  margin: 0 0 calc(6px * var(--ui-scale));
-  color: var(--ink-mute);
-  font-size: calc(15px * var(--ui-scale));
-  font-weight: 400;
-}
-
-.bug-report__select,
-.bug-report__message {
-  width: 100%;
   margin: 0 0 var(--space-1);
 }
 
-.bug-report__message {
-  min-height: calc(160px * var(--ui-scale));
-  margin-bottom: 0;
-  padding: var(--space-1);
-  border: none;
-  border-radius: calc(8px * var(--ui-scale));
-  background: var(--field);
-  color: var(--ink);
-  font: inherit;
-  font-size: calc(15px * var(--ui-scale));
-  font-weight: 300;
-  line-height: 1.45;
-  letter-spacing: 0;
-  resize: vertical;
-  box-sizing: border-box;
-}
-
-.bug-report__meter {
-  width: 100%;
-  height: calc(4px * var(--ui-scale));
-  margin: calc(8px * var(--ui-scale)) 0 var(--space-1);
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-  box-sizing: border-box;
-}
-
-.bug-report__meter-fill {
-  position: relative;
-  display: block;
-  width: 0%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #ff4d4d 0%, #f5a524 100%);
-  transition: width 0.22s ease;
-}
-
-.bug-report__meter-fill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--play-face);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.22s ease;
-}
-
-.bug-report__meter-fill.is-ready::after {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bug-report__meter-fill,
-  .bug-report__meter-fill::after {
-    transition: none;
-  }
-}
-
-.bug-report__message::placeholder {
-  color: var(--ink-mute);
-  opacity: 1;
-}
-
-.bug-report__message:focus {
-  background-color: var(--field-hover);
-  outline: 2px solid color-mix(in srgb, var(--ink) 28%, transparent);
-  outline-offset: calc(2px * var(--ui-scale));
-}
-
-html[data-theme="day"] .bug-report__message {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
-}
-
-.bug-report__severity {
-  position: relative;
-}
-
-.bug-report__severity .bug-report__select {
-  padding-left: calc(28px * var(--ui-scale));
+.bug-report__severity .bug-report__field {
+  margin: 0;
+  padding-left: calc(36px * var(--ui-scale));
 }
 
 .bug-report__severity::before {
   content: "";
   position: absolute;
-  top: calc(20px * var(--ui-scale));
-  left: calc(12px * var(--ui-scale));
+  top: 50%;
+  left: calc(16px * var(--ui-scale));
   width: calc(8px * var(--ui-scale));
   height: calc(8px * var(--ui-scale));
   border-radius: 50%;
@@ -7727,44 +7559,10 @@ html[data-theme="day"] .bug-report__message {
   background: #ff4d4d;
 }
 
-.bug-report__hp {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
-.bug-report__status {
-  min-height: calc(18px * var(--ui-scale));
-  margin: 0 0 var(--space-1);
-  color: var(--ink-mute);
-  font-size: calc(13px * var(--ui-scale));
-}
-
-.bug-report__status.is-error {
-  color: #ff6b6b;
-}
-
-.bug-report__actions {
+.bug-report.is-thanks {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1);
-}
-
-.bug-report__send-wrap {
-  display: block;
-  min-width: 0;
-}
-
-.bug-report__actions .pill {
-  width: 100%;
-  min-width: 0;
-  min-height: calc(54px * var(--ui-scale));
-}
-
-.bug-report__send-wrap:has(.pill:disabled) {
-  cursor: not-allowed;
+  place-items: center;
+  padding: var(--space-2);
 }
 
 .bug-report.is-thanks .bug-report__scrim {
@@ -7928,55 +7726,44 @@ html[data-theme="day"] .bug-report__message {
   }
 }
 
-/* Cloudflare Turnstile — fixed top-right, same placement as Orby. */
-.bug-report-turnstile {
-  position: fixed;
-  top: max(env(safe-area-inset-top, 0px), calc(16px * var(--ui-scale)));
-  right: max(env(safe-area-inset-right, 0px), calc(16px * var(--ui-scale)));
-  left: auto;
-  z-index: 260;
-  margin: 0;
-  pointer-events: auto;
-  transform-origin: top right;
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  transition:
-    opacity 0.28s ease,
-    transform 0.28s ease;
-}
-
-.bug-report-turnstile[hidden] {
-  display: none !important;
-}
-
-.bug-report-turnstile:not([hidden]) {
-  display: block;
-  min-height: 4rem;
-}
-
-.bug-report-turnstile.is-faded {
-  opacity: 0;
-  transform: translateY(-8px) scale(0.97);
-  pointer-events: none;
-}
-
-/* Guestbook — right-side sheet, slides in like Settings. Starts below the
-   Mode Select header pills so Load Project / Report issue stay clickable. */
-.guestbook-modal {
+/* Guestbook + Report an issue — one right-side sheet template, slides in like
+   Settings. Width and type both ride --ui-scale (740 / 520 at 2560×1440, √-soft
+   on laptops, linear on 4K), then clamp to the viewport minus its inset. */
+.guestbook-modal,
+.bug-report {
   position: fixed;
   inset: 0;
-  top: calc(var(--panel-inset) + 52px * var(--ui-scale));
   z-index: 220;
   pointer-events: auto;
 }
 
-.guestbook-modal__scrim {
+/* On Mode Select, start below the header pills so Load Project / Report issue /
+   Guestbook stay clickable. */
+.guestbook-modal,
+.mode-select-host.is-gate ~ .bug-report:not(.is-thanks) {
+  top: calc(var(--panel-inset) + 52px * var(--ui-scale));
+}
+
+.guestbook-modal__scrim,
+.bug-report__scrim {
   position: absolute;
   inset: 0;
   background: transparent;
 }
 
-.guestbook-modal__sheet {
+/* Full-viewport dim (also over the Mode Select header, which stays clickable).
+   Fades with the scrim's autoAlpha. */
+.guestbook-modal__scrim::before,
+.bug-report:not(.is-thanks) .bug-report__scrim::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.1);
+  pointer-events: none;
+}
+
+.guestbook-modal__sheet,
+.bug-report__sheet {
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
@@ -7984,14 +7771,15 @@ html[data-theme="day"] .bug-report__message {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  width: min(33.333vw, calc(100% - (var(--space-2) * 2)));
+  width: min(var(--sheet-width-wide), calc(100% - (var(--space-2) * 2)));
   border-radius: var(--radius-settings);
   background: var(--canvas);
   box-shadow: var(--shadow-2);
   overflow: hidden;
 }
 
-.guestbook-modal__head {
+.guestbook-modal__head,
+.bug-report__head {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -8001,14 +7789,16 @@ html[data-theme="day"] .bug-report__message {
   border-bottom: 1px solid var(--panel-rule);
 }
 
-.guestbook-modal__titles {
+.guestbook-modal__titles,
+.bug-report__titles {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
 }
 
-.guestbook-modal__title {
+.guestbook-modal__title,
+.bug-report__title {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-section);
@@ -8018,7 +7808,8 @@ html[data-theme="day"] .bug-report__message {
   letter-spacing: -0.03em;
 }
 
-.guestbook-modal__updated {
+.guestbook-modal__updated,
+.bug-report__sub {
   margin: 0;
   color: var(--ink-mute);
   font-size: calc(13px * var(--ui-scale));
@@ -8027,7 +7818,8 @@ html[data-theme="day"] .bug-report__message {
   line-height: 1.2;
 }
 
-.guestbook-modal__back {
+.guestbook-modal__back,
+.bug-report__back {
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -8044,7 +7836,8 @@ html[data-theme="day"] .bug-report__message {
   transition: color 0.15s ease;
 }
 
-.guestbook-modal__back-icon {
+.guestbook-modal__back-icon,
+.bug-report__back-icon {
   display: grid;
   place-items: center;
   width: calc(22.5px * var(--ui-scale));
@@ -8052,19 +7845,22 @@ html[data-theme="day"] .bug-report__message {
   transition: transform 0.15s ease;
 }
 
-.guestbook-modal__back-icon svg {
+.guestbook-modal__back-icon svg,
+.bug-report__back-icon svg {
   display: block;
   width: 100%;
   height: 100%;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .guestbook-modal__back:hover {
+  .guestbook-modal__back:hover,
+  .bug-report__back:hover {
     color: var(--pill-fun-face);
   }
 }
 
-.guestbook-modal__body {
+.guestbook-modal__body,
+.bug-report__body {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -8073,7 +7869,8 @@ html[data-theme="day"] .bug-report__message {
   overscroll-behavior: contain;
 }
 
-.guestbook-modal__foot {
+.guestbook-modal__foot,
+.bug-report__foot {
   flex-shrink: 0;
   display: flex;
   justify-content: flex-start;
@@ -8081,7 +7878,8 @@ html[data-theme="day"] .bug-report__message {
   border-top: 1px solid var(--panel-rule);
 }
 
-.guestbook-modal__done {
+.guestbook-modal__done,
+.bug-report__done {
   margin: 0;
   padding: 0;
   border: none;
@@ -8102,18 +7900,21 @@ html[data-theme="day"] .bug-report__message {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .guestbook-modal__done:hover {
+  .guestbook-modal__done:hover,
+  .bug-report__done:hover {
     color: var(--pill-fun-face);
     text-decoration-color: currentColor;
   }
 }
 
-.guestbook-modal__body :is(button).pill {
+.guestbook-modal__body :is(button).pill,
+.bug-report__body :is(button).pill {
   min-height: calc(54px * var(--ui-scale));
   font-size: calc(15px * var(--ui-scale));
 }
 
-.guestbook__lede {
+.guestbook__lede,
+.bug-report__lede {
   margin: 0 0 var(--space-2);
   color: var(--ink-secondary);
   font-size: calc(20px * var(--ui-scale));
@@ -8122,30 +7923,40 @@ html[data-theme="day"] .bug-report__message {
   letter-spacing: -0.015em;
 }
 
-.guestbook__accent {
+.guestbook__accent,
+.bug-report__accent {
   color: var(--pill-fun-face);
 }
 
-.guestbook__form {
+.guestbook__form,
+.bug-report__form {
   display: flex;
   flex-direction: column;
   margin: 0 0 calc(var(--space-3) + var(--space-2));
 }
 
-.guestbook__label {
+.bug-report__form {
+  margin-bottom: 0;
+}
+
+.guestbook__label,
+.bug-report__label {
   margin: 0 0 calc(6px * var(--ui-scale));
   color: var(--ink-mute);
   font-size: calc(16px * var(--ui-scale));
   font-weight: 400;
 }
 
-.guestbook__field {
+.guestbook__field,
+.bug-report__field {
   width: 100%;
+  min-height: 0;
   margin: 0 0 var(--space-1);
   padding: calc(14px * var(--ui-scale)) var(--space-1);
   border: none;
   border-radius: calc(8px * var(--ui-scale));
-  background: var(--field);
+  /* background-color only — keeps the global select chevron image. */
+  background-color: var(--field);
   color: var(--ink);
   font: inherit;
   font-size: calc(16px * var(--ui-scale));
@@ -8155,28 +7966,38 @@ html[data-theme="day"] .bug-report__message {
   box-sizing: border-box;
 }
 
-.guestbook__message {
+select.bug-report__field {
+  padding-right: calc(var(--space-1) * 2 + 8px);
+  cursor: pointer;
+}
+
+.guestbook__message,
+.bug-report__message {
   min-height: calc(140px * var(--ui-scale));
   margin-bottom: 0;
   resize: vertical;
 }
 
-html[data-theme="day"] .guestbook__field {
+html[data-theme="day"] .guestbook__field,
+html[data-theme="day"] .bug-report__field {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
-.guestbook__field::placeholder {
+.guestbook__field::placeholder,
+.bug-report__field::placeholder {
   color: var(--ink-mute);
   opacity: 1;
 }
 
-.guestbook__field:focus {
+.guestbook__field:focus,
+.bug-report__field:focus {
   background-color: var(--field-hover);
   outline: 2px solid color-mix(in srgb, var(--ink) 28%, transparent);
   outline-offset: calc(2px * var(--ui-scale));
 }
 
-.guestbook__meter {
+.guestbook__meter,
+.bug-report__meter {
   width: 100%;
   height: calc(4px * var(--ui-scale));
   margin: calc(8px * var(--ui-scale)) 0 var(--space-1);
@@ -8186,7 +8007,8 @@ html[data-theme="day"] .guestbook__field {
   box-sizing: border-box;
 }
 
-.guestbook__meter-fill {
+.guestbook__meter-fill,
+.bug-report__meter-fill {
   position: relative;
   display: block;
   width: 0%;
@@ -8196,7 +8018,8 @@ html[data-theme="day"] .guestbook__field {
   transition: width 0.22s ease;
 }
 
-.guestbook__meter-fill::after {
+.guestbook__meter-fill::after,
+.bug-report__meter-fill::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -8207,18 +8030,22 @@ html[data-theme="day"] .guestbook__field {
   transition: opacity 0.22s ease;
 }
 
-.guestbook__meter-fill.is-ready::after {
+.guestbook__meter-fill.is-ready::after,
+.bug-report__meter-fill.is-ready::after {
   opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .guestbook__meter-fill,
-  .guestbook__meter-fill::after {
+  .guestbook__meter-fill::after,
+  .bug-report__meter-fill,
+  .bug-report__meter-fill::after {
     transition: none;
   }
 }
 
-.guestbook__hp {
+.guestbook__hp,
+.bug-report__hp {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -8226,14 +8053,16 @@ html[data-theme="day"] .guestbook__field {
   clip: rect(0 0 0 0);
 }
 
-.guestbook__status {
+.guestbook__status,
+.bug-report__status {
   min-height: calc(20px * var(--ui-scale));
   margin: 0 0 var(--space-1);
   color: var(--ink-mute);
   font-size: calc(15px * var(--ui-scale));
 }
 
-.guestbook__status.is-error {
+.guestbook__status.is-error,
+.bug-report__status.is-error {
   color: #ff6b6b;
 }
 
@@ -8241,28 +8070,33 @@ html[data-theme="day"] .guestbook__field {
   color: var(--pill-fun-face);
 }
 
-.guestbook__send-wrap {
+.guestbook__send-wrap,
+.bug-report__send-wrap {
   display: block;
   width: 100%;
   min-width: 0;
 }
 
-.guestbook__send {
+.guestbook__send,
+.bug-report__send {
   width: 100%;
 }
 
-.guestbook__send-wrap:has(.pill:disabled) {
+.guestbook__send-wrap:has(.pill:disabled),
+.bug-report__send-wrap:has(.pill:disabled) {
   cursor: not-allowed;
 }
 
-.guestbook__fine {
+.guestbook__fine,
+.bug-report__fine {
   margin: var(--space-1) 0 0;
   color: var(--ink-mute);
   font-size: calc(13px * var(--ui-scale));
   line-height: 1.45;
 }
 
-.guestbook__fine a {
+.guestbook__fine a,
+.bug-report__fine a {
   color: inherit;
   font-weight: 700;
   text-decoration: none;
@@ -8270,7 +8104,8 @@ html[data-theme="day"] .guestbook__field {
 }
 
 @media (hover: hover) {
-  .guestbook__fine a:hover {
+  .guestbook__fine a:hover,
+  .bug-report__fine a:hover {
     color: var(--pill-fun-face);
   }
 }
@@ -8358,7 +8193,8 @@ html[data-theme="day"] .guestbook__field {
 }
 
 /* Cloudflare Turnstile — fixed top-left, clear of the right-side sheet. */
-.guestbook-turnstile {
+.guestbook-turnstile,
+.bug-report-turnstile {
   position: fixed;
   top: max(env(safe-area-inset-top, 0px), calc(16px * var(--ui-scale)));
   left: max(env(safe-area-inset-left, 0px), calc(16px * var(--ui-scale)));
@@ -8374,16 +8210,19 @@ html[data-theme="day"] .guestbook__field {
     transform 0.28s ease;
 }
 
-.guestbook-turnstile[hidden] {
+.guestbook-turnstile[hidden],
+.bug-report-turnstile[hidden] {
   display: none !important;
 }
 
-.guestbook-turnstile:not([hidden]) {
+.guestbook-turnstile:not([hidden]),
+.bug-report-turnstile:not([hidden]) {
   display: block;
   min-height: 4rem;
 }
 
-.guestbook-turnstile.is-faded {
+.guestbook-turnstile.is-faded,
+.bug-report-turnstile.is-faded {
   opacity: 0;
   transform: translateY(-8px) scale(0.97);
   pointer-events: none;
@@ -8974,7 +8813,7 @@ html[data-theme="day"] .unsplash-grid__item--icon:hover img {
   right: var(--panel-inset);
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   margin: 0;
   z-index: 2;
   pointer-events: auto;
