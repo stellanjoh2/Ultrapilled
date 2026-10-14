@@ -32,6 +32,13 @@ function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** Fired on `window` with `detail: boolean` (open) when the guestbook opens or starts closing. */
+export const GUESTBOOK_TOGGLE_EVENT = "guestbook:toggle";
+
+function announce(open: boolean): void {
+  window.dispatchEvent(new CustomEvent<boolean>(GUESTBOOK_TOGGLE_EVENT, { detail: open }));
+}
+
 export function isGuestbookOpen(): boolean {
   return Boolean(modalRoot);
 }
@@ -274,6 +281,7 @@ export function closeGuestbook(): void {
   if (onKey) window.removeEventListener("keydown", onKey, true);
   onKey = null;
   playRemove();
+  announce(false);
 
   const done = () => {
     removeTurnstileHost();
@@ -291,7 +299,7 @@ export function closeGuestbook(): void {
     return;
   }
   const tl = gsap.timeline({ onComplete: done });
-  tl.to(sheet, { x: -48, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
+  tl.to(sheet, { x: 48, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
   tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
 }
 
@@ -302,7 +310,6 @@ export function openGuestbook(): void {
   const root = document.createElement("div");
   root.className = "guestbook-modal";
   root.setAttribute("role", "dialog");
-  root.setAttribute("aria-modal", "true");
   root.setAttribute("aria-labelledby", "guestbook-title");
   root.innerHTML = `
     <div class="guestbook-modal__scrim" data-guestbook-close></div>
@@ -406,6 +413,7 @@ export function openGuestbook(): void {
 
   document.body.append(root);
   modalRoot = root;
+  announce(true);
   holdPhysicsForOverlay();
   playTransition(true);
   name.focus({ preventScroll: true });
@@ -414,7 +422,7 @@ export function openGuestbook(): void {
   void loadEntries(root, true);
 
   gsap.set(scrim, { autoAlpha: 0 });
-  gsap.set(sheet, { autoAlpha: 0, x: -56 });
+  gsap.set(sheet, { autoAlpha: 0, x: 56 });
 
   if (reducedMotion()) {
     gsap.set([scrim, sheet], { clearProps: "all", autoAlpha: 1, x: 0 });

@@ -101,6 +101,7 @@ export function modeSelectPreviewState(): AppState {
       tracking: 500,
       pillPad: 22,
     }),
+    icon("Stars", 1, { scale: 0.6 })!,
     text({
       text: "frr",
       shape: "box",
@@ -128,7 +129,6 @@ export function modeSelectPreviewState(): AppState {
       color: "#191919",
       textColor: "#191919",
     }),
-    icon("Stars", 1, { scale: 0.6 })!,
   ].filter(Boolean) as Slot[];
 
   return {

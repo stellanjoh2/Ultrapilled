@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { closeAbout, isAboutOpen } from "./aboutPanel";
 import { closeBugReport, isBugReportOpen } from "./bugReport";
+import { closeGuestbook, isGuestbookOpen } from "./guestbookPanel";
 import { askModeSelect, stopModeSelectPreview } from "./modeSelect";
 
 describe("mode select header actions", () => {
   afterEach(() => {
     closeAbout();
     closeBugReport();
+    closeGuestbook();
     stopModeSelectPreview();
     document.body.innerHTML = "";
     vi.restoreAllMocks();
@@ -44,6 +46,10 @@ describe("mode select header actions", () => {
     expect(report?.classList.contains("mode-select__action")).toBe(true);
     expect(report?.classList.contains("pill")).toBe(true);
     expect(report?.getAttribute("data-tip")).toBe("Send a bug report");
+    const guestbook = actions?.querySelector("[data-open-guestbook]");
+    expect(guestbook?.textContent).toContain("Guestbook");
+    expect(guestbook?.classList.contains("mode-select__action")).toBe(true);
+    expect(report?.nextElementSibling).toBe(guestbook);
 
     root.querySelector<HTMLButtonElement>("[data-mode=physics]")?.click();
     await expect(pending).resolves.toEqual({ kind: "mode", mode: "physics" });
@@ -60,6 +66,32 @@ describe("mode select header actions", () => {
 
     root.querySelector<HTMLButtonElement>("[data-mode=layout]")?.click();
     await expect(pending).resolves.toEqual({ kind: "mode", mode: "layout" });
+  });
+
+  it("toggles the guestbook from the header and closes it on mode pick", async () => {
+    stubReducedMotion();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ entries: [], remaining: 0 }))));
+    const pending = askModeSelect();
+    const root = document.querySelector(".mode-select")!;
+    const pill = root.querySelector<HTMLButtonElement>(".mode-select__actions [data-open-guestbook]")!;
+
+    pill.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(isGuestbookOpen()).toBe(true);
+    expect(pill.classList.contains("is-open")).toBe(true);
+    expect(pill.getAttribute("aria-pressed")).toBe("true");
+    pill.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(isGuestbookOpen()).toBe(false);
+    expect(pill.classList.contains("is-open")).toBe(false);
+
+    pill.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    document.querySelector<HTMLButtonElement>(".guestbook-modal__back")!.click();
+    expect(pill.classList.contains("is-open")).toBe(false);
+
+    pill.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(isGuestbookOpen()).toBe(true);
+    root.querySelector<HTMLButtonElement>("[data-mode=layout]")?.click();
+    await expect(pending).resolves.toEqual({ kind: "mode", mode: "layout" });
+    expect(isGuestbookOpen()).toBe(false);
   });
 
   it("opens About from the S logo without leaving Mode Select", async () => {

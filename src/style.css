@@ -7960,10 +7960,12 @@ html[data-theme="day"] .bug-report__message {
   pointer-events: none;
 }
 
-/* Guestbook — same left half-width sheet as How to Guide. */
+/* Guestbook — right-side sheet, slides in like Settings. Starts below the
+   Mode Select header pills so Load Project / Report issue stay clickable. */
 .guestbook-modal {
   position: fixed;
   inset: 0;
+  top: calc(var(--panel-inset) + 52px * var(--ui-scale));
   z-index: 220;
   pointer-events: auto;
 }
@@ -7977,7 +7979,7 @@ html[data-theme="day"] .bug-report__message {
 .guestbook-modal__sheet {
   position: absolute;
   top: var(--space-2);
-  left: var(--space-2);
+  right: var(--space-2);
   bottom: var(--space-2);
   z-index: 1;
   display: flex;
@@ -8355,16 +8357,16 @@ html[data-theme="day"] .guestbook__field {
   width: 100%;
 }
 
-/* Cloudflare Turnstile — fixed top-right, same placement as bug report. */
+/* Cloudflare Turnstile — fixed top-left, clear of the right-side sheet. */
 .guestbook-turnstile {
   position: fixed;
   top: max(env(safe-area-inset-top, 0px), calc(16px * var(--ui-scale)));
-  right: max(env(safe-area-inset-right, 0px), calc(16px * var(--ui-scale)));
-  left: auto;
+  left: max(env(safe-area-inset-left, 0px), calc(16px * var(--ui-scale)));
+  right: auto;
   z-index: 260;
   margin: 0;
   pointer-events: auto;
-  transform-origin: top right;
+  transform-origin: top left;
   opacity: 1;
   transform: translateY(0) scale(1);
   transition:
@@ -9181,6 +9183,14 @@ button.pill.mode-select__action:not(.pill--commit):active:not(:disabled):not(.is
   border-color: color-mix(in srgb, var(--pill-fun-face) 70%, transparent);
   box-shadow: none;
   transform: none;
+}
+
+button.pill.mode-select__action.is-open:not(.pill--commit):not(.is-on),
+button.pill.mode-select__action.is-open:not(.pill--commit):hover:not(:disabled):not(.is-on),
+button.pill.mode-select__action.is-open:not(.pill--commit):active:not(:disabled):not(.is-on) {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
 }
 
 .mode-select__action-icon {
