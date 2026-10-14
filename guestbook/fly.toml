@@ -1,0 +1,33 @@
+app = "ultrapilled-guestbook"
+primary_region = "arn"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ALLOWED_ORIGINS = "https://ultrapilled.com"
+  TURNSTILE_HOSTNAMES = "ultrapilled.com"
+  ISSO_PUBLIC_ENDPOINT = "https://guestbook.ultrapilled.com"
+  ISSO_DBPATH = "/data/guestbook.db"
+
+[[mounts]]
+  source = "guestbook_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

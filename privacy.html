@@ -17,7 +17,7 @@
       </a>
       <h1>Privacy</h1>
       <p class="lede">
-        Last updated 11 October 2026. A free desktop web app.
+        Last updated 14 October 2026. A free desktop web app.
         <span class="privacy-warn">We don’t upload your files or use them to train AI.</span>
       </p>
 
@@ -44,6 +44,22 @@
           <li><strong class="privacy-nice">Local fonts</strong> — listing fonts on your computer uses the browser’s font access prompt. Font files stay local.</li>
         </ul>
         <p><span class="privacy-nice">There is no advertising SDK and no analytics tracker in the app.</span></p>
+      </section>
+
+      <section id="guestbook">
+        <h2>Guestbook</h2>
+        <p>
+          Signing the guestbook is optional. It sends the name and message you type to
+          <code>guestbook.ultrapilled.com</code>, a small <a href="https://isso-comments.de/" target="_blank" rel="noopener noreferrer">Isso</a>
+          server we run on Fly.io in Stockholm. <span class="privacy-nice">We don’t ask for an email address or website.</span>
+          Each entry is stored with its date and a shortened IP address (the last part removed) to stop spam and rate-limit abuse.
+          A <strong class="privacy-nice">Cloudflare Turnstile</strong> security check runs before you sign; Cloudflare may process technical data under its own policy.
+        </p>
+        <p>
+          New entries go to a moderation inbox and stay hidden until approved.
+          <span class="privacy-warn">Once approved, your name, message, and date are public.</span>
+          Entries that are never approved are deleted after 30 days. To remove an approved entry, use the issue report form and tell us the name and date.
+        </p>
       </section>
 
       <section>

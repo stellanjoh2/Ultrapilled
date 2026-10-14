@@ -7960,6 +7960,297 @@ html[data-theme="day"] .bug-report__message {
   pointer-events: none;
 }
 
+.guestbook {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: grid;
+  place-items: center;
+  padding: var(--space-2);
+  pointer-events: auto;
+}
+
+.guestbook__scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, #080808 45%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+html[data-theme="day"] .guestbook__scrim {
+  background: color-mix(in srgb, #ffffff 40%, transparent);
+}
+
+.guestbook__card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(calc(560px * var(--ui-scale)), 100%);
+  max-height: calc(100% - (var(--space-2) * 2));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-2);
+  border-radius: var(--radius-reconnect);
+  background: var(--canvas);
+  box-shadow: var(--shadow-2);
+  box-sizing: border-box;
+}
+
+.guestbook__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.guestbook__title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: calc(24px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.guestbook__x {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: calc(32px * var(--ui-scale));
+  height: calc(32px * var(--ui-scale));
+  margin: 0 calc(-4px * var(--ui-scale)) 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: var(--field);
+  color: var(--ink);
+  line-height: 0;
+  cursor: pointer;
+}
+
+.guestbook__x svg {
+  display: block;
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .guestbook__x:hover {
+    color: var(--pill-fun-face);
+  }
+}
+
+.guestbook__lede {
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--ink-secondary);
+  font-size: calc(16px * var(--ui-scale));
+  font-weight: 300;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.guestbook__accent {
+  color: var(--pill-fun-face);
+}
+
+.guestbook__form {
+  display: flex;
+  flex-direction: column;
+}
+
+.guestbook__label {
+  margin: 0 0 calc(6px * var(--ui-scale));
+  color: var(--ink-mute);
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 400;
+}
+
+.guestbook__field {
+  width: 100%;
+  margin: 0 0 var(--space-1);
+  padding: calc(12px * var(--ui-scale)) var(--space-1);
+  border: none;
+  border-radius: calc(8px * var(--ui-scale));
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 300;
+  line-height: 1.45;
+  letter-spacing: 0;
+  box-sizing: border-box;
+}
+
+.guestbook__message {
+  min-height: calc(112px * var(--ui-scale));
+  margin-bottom: 0;
+  resize: vertical;
+}
+
+html[data-theme="day"] .guestbook__field {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.guestbook__field::placeholder {
+  color: var(--ink-mute);
+  opacity: 1;
+}
+
+.guestbook__field:focus {
+  background-color: var(--field-hover);
+  outline: 2px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  outline-offset: calc(2px * var(--ui-scale));
+}
+
+.guestbook__count {
+  margin: calc(6px * var(--ui-scale)) 0 var(--space-1);
+  color: var(--ink-mute);
+  font-size: calc(12px * var(--ui-scale));
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.guestbook__count.is-over {
+  color: #ff6b6b;
+}
+
+.guestbook__hp {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.guestbook__turnstile:not([hidden]) {
+  display: block;
+  min-height: calc(65px * var(--ui-scale));
+  margin: 0 0 var(--space-1);
+}
+
+.guestbook__status {
+  min-height: calc(18px * var(--ui-scale));
+  margin: 0 0 var(--space-1);
+  color: var(--ink-mute);
+  font-size: calc(13px * var(--ui-scale));
+}
+
+.guestbook__status.is-error {
+  color: #ff6b6b;
+}
+
+.guestbook__status.is-ok {
+  color: var(--pill-fun-face);
+}
+
+.guestbook__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: var(--space-1);
+}
+
+.guestbook__actions .pill {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(54px * var(--ui-scale));
+}
+
+.guestbook__actions .pill:disabled {
+  cursor: not-allowed;
+}
+
+.guestbook__fine {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-mute);
+  font-size: calc(12px * var(--ui-scale));
+  line-height: 1.45;
+}
+
+.guestbook__fine a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .guestbook__fine a:hover {
+    color: var(--pill-fun-face);
+  }
+}
+
+.guestbook__entries {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.guestbook__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guestbook__entry {
+  padding: var(--space-1);
+  border-radius: calc(12px * var(--ui-scale));
+  background: var(--field);
+}
+
+.guestbook__text {
+  margin: 0;
+  color: var(--ink);
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 300;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.guestbook__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+  margin: calc(8px * var(--ui-scale)) 0 0;
+  font-size: calc(13px * var(--ui-scale));
+}
+
+.guestbook__author {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pill-fun-face);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guestbook__time {
+  flex: none;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.guestbook__empty {
+  margin: 0;
+  color: var(--ink-mute);
+  font-size: calc(14px * var(--ui-scale));
+  text-align: center;
+}
+
+.guestbook__more {
+  align-self: center;
+  margin-top: var(--space-1);
+}
+
 .unsplash-modal {
   position: fixed;
   inset: 0;

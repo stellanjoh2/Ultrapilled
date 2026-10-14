@@ -3,6 +3,7 @@ import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circl
 import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
 import { PRIVACY_HREF } from "./privacy";
+import { ensureTurnstileScript, turnstileSiteKey } from "./turnstile";
 import { playNotify, playRemove, playTransition } from "./uiSounds";
 
 export const BUG_REPORT_APP = "ultrapilled";
@@ -40,27 +41,6 @@ const THANK_YOU_OK = "Keep pilling";
 /** Same arrow glyph as Orby’s big-message magic CTA. */
 const THANKS_OK_ARROW = `<svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3.5 8h9M9 4.5L12.5 8 9 11.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-type TurnstileApi = {
-  render: (
-    el: HTMLElement,
-    opts: {
-      sitekey: string;
-      theme?: string;
-      callback?: () => void;
-      "expired-callback"?: () => void;
-    },
-  ) => string | number;
-  remove: (id: string | number) => void;
-  reset: (id: string | number) => void;
-  getResponse: (id: string | number) => string;
-};
-
-declare global {
-  interface Window {
-    turnstile?: TurnstileApi;
-  }
-}
-
 let modalRoot: HTMLElement | null = null;
 let closing = false;
 let sending = false;
@@ -69,29 +49,10 @@ let overlayPhysicsHeld = false;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
 let turnstileHost: HTMLElement | null = null;
 let turnstileWidgetId: string | number | null = null;
-let turnstileScriptPromise: Promise<void> | null = null;
 let turnstileFadeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-function turnstileSiteKey(): string {
-  return import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
-}
-
-function ensureTurnstileScript(): Promise<void> {
-  if (typeof window.turnstile !== "undefined") return Promise.resolve();
-  if (turnstileScriptPromise) return turnstileScriptPromise;
-  turnstileScriptPromise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("turnstile script"));
-    document.head.append(script);
-  });
-  return turnstileScriptPromise;
 }
 
 function clearTurnstileFadeTimer() {

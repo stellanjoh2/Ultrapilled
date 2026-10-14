@@ -1,0 +1,273 @@
+"""WSGI gate in front of Isso.
+
+Isso only ships a per-minute IP limit and a moderation queue. Everything else
+lives here: Turnstile, honeypot, origin allowlist, content rules, extra rate
+limits, and a route allowlist so only the guestbook thread and moderation
+links are reachable.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import re
+import threading
+import time
+import urllib.parse
+import urllib.request
+from collections import deque
+from dataclasses import dataclass
+from typing import Callable, Iterable
+
+THREAD_URI = "/guestbook"
+THREAD_TITLE = "Guestbook"
+TURNSTILE_ACTION = "guestbook"
+TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+MAX_BODY_BYTES = 8 * 1024
+MIN_NAME = 1
+MAX_NAME = 40
+MIN_TEXT = 3
+MAX_TEXT = 500
+
+_MODERATE_PATH = re.compile(r"^/id/\d+/(?:activate|delete|edit)/[^/]+$")
+
+# No links of any kind — the guestbook has no use for them and they are the spam payload.
+_LINK = re.compile(
+    r"(?:https?:|ftp:|mailto:|www\.|\]\(|<a\s|\[url"
+    r"|\b[\w-]+\.(?:com|net|org|info|biz|ru|cn|xyz|top|io|co|me|ly|link|click|site|online|shop|app|dev|gg|tk|ml|ga|cf|bit)\b"
+    r"|[\w.+-]+@[\w-]+\.[\w.-]+)",
+    re.IGNORECASE,
+)
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
+
+Verifier = Callable[[str, str], dict]
+
+
+@dataclass
+class Window:
+    limit: int
+    seconds: float
+
+
+@dataclass
+class GateSettings:
+    allowed_origins: tuple[str, ...]
+    turnstile_hostnames: tuple[str, ...]
+    turnstile_secret: str = ""
+    allow_missing_turnstile: bool = False
+    trust_fly_client_ip: bool = False
+    per_ip: tuple[Window, ...] = (Window(3, 600), Window(6, 86400))
+    global_windows: tuple[Window, ...] = (Window(30, 3600), Window(150, 86400))
+
+
+class RateLimiter:
+    """In-memory sliding windows — fine for the single Fly machine this runs on."""
+
+    def __init__(self, per_key: Iterable[Window], global_windows: Iterable[Window], clock=time.monotonic):
+        self.per_key = tuple(per_key)
+        self.global_windows = tuple(global_windows)
+        self.clock = clock
+        self.hits: dict[str, deque[float]] = {}
+        self.global_hits: deque[float] = deque()
+        self.lock = threading.Lock()
+
+    @staticmethod
+    def _retry(hits: deque[float], windows: tuple[Window, ...], now: float) -> float:
+        wait = 0.0
+        for window in windows:
+            recent = [t for t in hits if now - t < window.seconds]
+            if len(recent) >= window.limit:
+                wait = max(wait, window.seconds - (now - recent[-window.limit]))
+        return wait
+
+    def check(self, key: str) -> float:
+        """Return seconds to wait (0 = allowed) and record the hit when allowed."""
+        with self.lock:
+            now = self.clock()
+            horizon = max([w.seconds for w in self.per_key + self.global_windows] or [0])
+            hits = self.hits.setdefault(key, deque())
+            for bucket in (hits, self.global_hits):
+                while bucket and now - bucket[0] >= horizon:
+                    bucket.popleft()
+            wait = max(self._retry(hits, self.per_key, now), self._retry(self.global_hits, self.global_windows, now))
+            if wait > 0:
+                return wait
+            hits.append(now)
+            self.global_hits.append(now)
+            if len(self.hits) > 10000:
+                self.hits = {k: v for k, v in self.hits.items() if v}
+            return 0.0
+
+
+def verify_turnstile(secret: str, token: str, remote_ip: str) -> dict:
+    data = urllib.parse.urlencode({"secret": secret, "response": token, "remoteip": remote_ip}).encode()
+    req = urllib.request.Request(TURNSTILE_VERIFY_URL, data=data, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return {"success": False, "error-codes": ["verify-unreachable"]}
+
+
+def clean_text(value: str) -> str:
+    value = _CONTROL.sub("", value.replace("\r\n", "\n").replace("\r", "\n"))
+    value = re.sub(r"\n{3,}", "\n\n", value)
+    return value.strip()
+
+
+def entry_problem(author: str, text: str) -> tuple[str, str] | None:
+    """Return (code, message) when the entry breaks a content rule."""
+    if not (MIN_NAME <= len(author) <= MAX_NAME):
+        return "name_length", f"Name must be 1–{MAX_NAME} characters."
+    if "\n" in author:
+        return "name_length", "Name must be a single line."
+    if not (MIN_TEXT <= len(text) <= MAX_TEXT):
+        return "text_length", f"Message must be {MIN_TEXT}–{MAX_TEXT} characters."
+    if _LINK.search(author) or _LINK.search(text):
+        return "links_not_allowed", "Links and email addresses aren’t allowed in the guestbook."
+    if re.search(r"(.)\1{14,}", text):
+        return "repeated", "That message looks like keyboard mashing."
+    return None
+
+
+class GuestbookGate:
+    def __init__(self, app, settings: GateSettings, verifier: Verifier | None = None, limiter: RateLimiter | None = None):
+        self.app = app
+        self.settings = settings
+        self.verifier = verifier or (lambda token, ip: verify_turnstile(settings.turnstile_secret, token, ip))
+        self.limiter = limiter or RateLimiter(settings.per_ip, settings.global_windows)
+
+    def __call__(self, environ, start_response):
+        if self.settings.trust_fly_client_ip:
+            fly_ip = environ.get("HTTP_FLY_CLIENT_IP", "").strip()
+            if fly_ip:
+                environ["REMOTE_ADDR"] = fly_ip
+        # Isso must only see the client IP we decided on, not a spoofable chain.
+        environ.pop("HTTP_X_FORWARDED_FOR", None)
+        environ.pop("HTTP_X_SCRIPT_NAME", None)
+
+        method = environ.get("REQUEST_METHOD", "GET")
+        path = environ.get("PATH_INFO", "") or "/"
+        query = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
+        uri = (query.get("uri") or [""])[0]
+
+        if path == "/healthz" and method in ("GET", "HEAD"):
+            return self._json(environ, start_response, 200, {"ok": True})
+
+        if _MODERATE_PATH.match(path) and method in ("GET", "POST"):
+            return self.app(environ, start_response)
+
+        if path not in ("/", "/new"):
+            return self._json(environ, start_response, 404, {"error": "Not found", "code": "not_found"})
+
+        if uri != THREAD_URI:
+            return self._json(environ, start_response, 404, {"error": "Not found", "code": "not_found"})
+
+        if method == "OPTIONS":
+            if not self._origin_ok(environ):
+                return self._json(environ, start_response, 403, {"error": "Origin not allowed", "code": "origin_denied"})
+            return self.app(environ, start_response)
+
+        if path == "/" and method in ("GET", "HEAD"):
+            return self.app(environ, start_response)
+
+        if path == "/new" and method == "POST":
+            return self._new(environ, start_response)
+
+        return self._json(environ, start_response, 405, {"error": "Method not allowed", "code": "method"})
+
+    def _origin_ok(self, environ) -> bool:
+        return environ.get("HTTP_ORIGIN", "") in self.settings.allowed_origins
+
+    def _new(self, environ, start_response):
+        if not self._origin_ok(environ):
+            return self._json(environ, start_response, 403, {"error": "Origin not allowed", "code": "origin_denied"})
+
+        if not environ.get("CONTENT_TYPE", "").startswith("application/json"):
+            return self._json(environ, start_response, 415, {"error": "JSON only", "code": "content_type"})
+
+        try:
+            length = int(environ.get("CONTENT_LENGTH") or 0)
+        except ValueError:
+            length = 0
+        if length <= 0 or length > MAX_BODY_BYTES:
+            return self._json(environ, start_response, 413, {"error": "Entry is too large", "code": "too_large"})
+
+        try:
+            body = json.loads(environ["wsgi.input"].read(length).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return self._json(environ, start_response, 400, {"error": "Invalid JSON", "code": "bad_json"})
+        if not isinstance(body, dict):
+            return self._json(environ, start_response, 400, {"error": "Invalid JSON", "code": "bad_json"})
+
+        # Bots that fill the hidden field get a convincing "pending" reply and nothing is stored.
+        if str(body.get("honeypot") or "").strip():
+            return self._json(environ, start_response, 202, {"mode": 2})
+
+        author = body.get("author")
+        text = body.get("text")
+        if not isinstance(author, str) or not isinstance(text, str):
+            return self._json(environ, start_response, 400, {"error": "Name and message are required", "code": "missing"})
+        author = clean_text(author)
+        text = clean_text(text)
+        problem = entry_problem(author, text)
+        if problem:
+            code, message = problem
+            return self._json(environ, start_response, 400, {"error": message, "code": code})
+
+        ip = environ.get("REMOTE_ADDR", "") or "unknown"
+        rejected = self._turnstile_rejection(body, ip)
+        if rejected:
+            status, payload = rejected
+            return self._json(environ, start_response, status, payload)
+
+        wait = self.limiter.check(ip)
+        if wait > 0:
+            return self._json(
+                environ,
+                start_response,
+                429,
+                {"error": "Too many entries", "code": "rate_limited", "retryAfter": int(wait) + 1},
+                extra=[("Retry-After", str(int(wait) + 1))],
+            )
+
+        clean = json.dumps(
+            {"author": author, "text": text, "title": THREAD_TITLE, "email": None, "website": None, "parent": None},
+            ensure_ascii=False,
+        ).encode("utf-8")
+        environ["wsgi.input"] = io.BytesIO(clean)
+        environ["CONTENT_LENGTH"] = str(len(clean))
+        environ["CONTENT_TYPE"] = "application/json"
+        return self.app(environ, start_response)
+
+    def _turnstile_rejection(self, body: dict, ip: str) -> tuple[int, dict] | None:
+        if not self.settings.turnstile_secret:
+            if self.settings.allow_missing_turnstile:
+                return None
+            return 503, {"error": "Guestbook is not configured", "code": "turnstile_unconfigured"}
+
+        token = body.get("turnstileToken")
+        if not isinstance(token, str) or not token or len(token) > 2048:
+            return 400, {"error": "Complete the security check", "code": "turnstile_required"}
+
+        result = self.verifier(token, ip)
+        hostname_ok = result.get("hostname") in self.settings.turnstile_hostnames
+        action_ok = result.get("action") == TURNSTILE_ACTION
+        if not (result.get("success") and hostname_ok and action_ok):
+            return 403, {"error": "Security check failed", "code": "turnstile_failed"}
+        return None
+
+    def _json(self, environ, start_response, status: int, payload: dict, extra=None):
+        reason = {200: "OK", 202: "Accepted", 400: "Bad Request", 403: "Forbidden", 404: "Not Found",
+                  405: "Method Not Allowed", 413: "Payload Too Large", 415: "Unsupported Media Type",
+                  429: "Too Many Requests", 503: "Service Unavailable"}.get(status, "")
+        data = json.dumps(payload).encode("utf-8")
+        headers = [("Content-Type", "application/json"), ("Content-Length", str(len(data))),
+                   ("Cache-Control", "no-store")]
+        origin = environ.get("HTTP_ORIGIN", "")
+        if origin in self.settings.allowed_origins:
+            headers += [("Access-Control-Allow-Origin", origin), ("Vary", "Origin")]
+        headers += list(extra or [])
+        start_response(f"{status} {reason}", headers)
+        return [data]

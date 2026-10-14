@@ -23,6 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Guestbook server (Python)
+guestbook/.venv
+__pycache__/
+*.db
+
 # PartyKit local runtime (unused)
 .partykit
 

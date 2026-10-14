@@ -17,6 +17,7 @@ import bugIcon from "@phosphor-icons/core/assets/regular/bug.svg?raw";
 import folderOpenIcon from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
 import { PRIVACY_HREF } from "./privacy";
 import { isAboutOpen, openAbout } from "./aboutPanel";
+import { isGuestbookOpen, openGuestbook } from "./guestbookPanel";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { mountHeaderLogotype } from "./logotypeLive";
 import { isPillFile } from "./project/pillFormat";
@@ -525,7 +526,7 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
         </p>
         <p class="mode-select__foot">
           Ultrapilled™ is a <span class="mode-select__playground" style="color: ${VIBE_ACCENT}">free physics playground</span> for dropping text, shapes, Phosphor icons, and images into motion.<br />
-          Everything stays in your browser — <span class="mode-select__privacy" style="color: ${PRIVACY_ACCENT}">we don’t upload your files or use them to train AI</span>. <a href="${PRIVACY_HREF}">How we handle data</a>.
+          Everything stays in your browser — <span class="mode-select__privacy" style="color: ${PRIVACY_ACCENT}">we don’t upload your files or use them to train AI</span>. <a href="${PRIVACY_HREF}">How we handle data</a> · <a href="#guestbook" role="button" data-open-guestbook>Sign the guestbook</a>.
         </p>
         <button type="button" class="mode-select__s icon-hover" data-open-about aria-label="About the creator" data-tip="About the creator">
           <span class="mode-select__s-mark" aria-hidden="true"></span>
@@ -604,7 +605,7 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
     };
 
     const onKey = (event: KeyboardEvent) => {
-      if (isBugReportOpen() || isAboutOpen()) return;
+      if (isBugReportOpen() || isAboutOpen() || isGuestbookOpen()) return;
       // Programmatic land-focus mustn’t look “preselected” — only show the ring after real key nav.
       if (
         event.key === "Tab" ||
@@ -642,6 +643,11 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
       if (target.closest("[data-open-about]")) {
         event.preventDefault();
         openAbout();
+        return;
+      }
+      if (target.closest("[data-open-guestbook]")) {
+        event.preventDefault();
+        openGuestbook();
         return;
       }
       if (target.closest("[data-load-project]")) {
