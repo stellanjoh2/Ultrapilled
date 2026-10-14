@@ -37,15 +37,160 @@ const THANK_YOU_PREFIX =
 const THANK_YOU_ACCENT = "We’ll look into it shortly.";
 const THANK_YOU_OK = "Keep pilling";
 
+/** Same arrow glyph as Orby’s big-message magic CTA. */
+const THANKS_OK_ARROW = `<svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3.5 8h9M9 4.5L12.5 8 9 11.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+type TurnstileApi = {
+  render: (
+    el: HTMLElement,
+    opts: {
+      sitekey: string;
+      theme?: string;
+      callback?: () => void;
+      "expired-callback"?: () => void;
+    },
+  ) => string | number;
+  remove: (id: string | number) => void;
+  reset: (id: string | number) => void;
+  getResponse: (id: string | number) => string;
+};
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileApi;
+  }
+}
+
 let modalRoot: HTMLElement | null = null;
 let closing = false;
 let sending = false;
 let thanksMode = false;
 let overlayPhysicsHeld = false;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
+let turnstileHost: HTMLElement | null = null;
+let turnstileWidgetId: string | number | null = null;
+let turnstileScriptPromise: Promise<void> | null = null;
+let turnstileFadeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function turnstileSiteKey(): string {
+  return import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
+}
+
+function ensureTurnstileScript(): Promise<void> {
+  if (typeof window.turnstile !== "undefined") return Promise.resolve();
+  if (turnstileScriptPromise) return turnstileScriptPromise;
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("turnstile script"));
+    document.head.append(script);
+  });
+  return turnstileScriptPromise;
+}
+
+function clearTurnstileFadeTimer() {
+  if (turnstileFadeTimer != null) {
+    clearTimeout(turnstileFadeTimer);
+    turnstileFadeTimer = null;
+  }
+}
+
+function revealTurnstileHost() {
+  if (!turnstileHost) return;
+  clearTurnstileFadeTimer();
+  turnstileHost.classList.remove("is-faded");
+  turnstileHost.hidden = false;
+  turnstileHost.setAttribute("aria-hidden", "false");
+}
+
+function fadeTurnstileHostOut() {
+  if (!turnstileHost) return;
+  clearTurnstileFadeTimer();
+  const delay = reducedMotion() ? 0 : 2450;
+  turnstileFadeTimer = setTimeout(() => {
+    turnstileFadeTimer = null;
+    turnstileHost?.classList.add("is-faded");
+  }, delay);
+}
+
+function clearTurnstileWidget() {
+  clearTurnstileFadeTimer();
+  if (turnstileWidgetId != null && window.turnstile) {
+    try {
+      window.turnstile.remove(turnstileWidgetId);
+    } catch {
+      /* ignore */
+    }
+  }
+  turnstileWidgetId = null;
+}
+
+function removeTurnstileHost() {
+  clearTurnstileWidget();
+  turnstileHost?.remove();
+  turnstileHost = null;
+}
+
+async function prepareTurnstile() {
+  const siteKey = turnstileSiteKey();
+  if (!siteKey) return;
+  if (!turnstileHost) {
+    turnstileHost = document.createElement("div");
+    turnstileHost.id = "bug-report-turnstile";
+    turnstileHost.className = "bug-report-turnstile";
+    turnstileHost.setAttribute("aria-label", "Security check");
+    turnstileHost.hidden = true;
+    turnstileHost.setAttribute("aria-hidden", "true");
+    document.body.append(turnstileHost);
+  }
+  revealTurnstileHost();
+  try {
+    await ensureTurnstileScript();
+  } catch {
+    return;
+  }
+  if (!turnstileHost || !window.turnstile) return;
+  clearTurnstileWidget();
+  try {
+    turnstileWidgetId = window.turnstile.render(turnstileHost, {
+      sitekey: siteKey,
+      theme: "dark",
+      callback: () => fadeTurnstileHostOut(),
+      "expired-callback": () => revealTurnstileHost(),
+    });
+    revealTurnstileHost();
+  } catch {
+    /* widget failed to start — submit will surface the error */
+  }
+}
+
+function resetTurnstile() {
+  if (turnstileWidgetId != null && window.turnstile) {
+    try {
+      window.turnstile.reset(turnstileWidgetId);
+    } catch {
+      /* ignore */
+    }
+  }
+  revealTurnstileHost();
+}
+
+function thanksOkButtonHtml(): string {
+  return `
+    <button type="button" class="bug-report-thanks__ok" data-bug-thanks-dismiss>
+      <span class="bug-report-thanks__ok-ring" aria-hidden="true"></span>
+      <span class="bug-report-thanks__ok-inner">
+        <span class="bug-report-thanks__ok-label">${THANK_YOU_OK}</span>
+        <span class="bug-report-thanks__ok-arrow" aria-hidden="true">${THANKS_OK_ARROW}</span>
+      </span>
+    </button>
+  `;
 }
 
 export function bugReportApiUrl(): string {
@@ -131,11 +276,10 @@ function revealThankYou() {
         <p class="bug-report-thanks__message" id="bug-report-thanks-message">
           ${THANK_YOU_PREFIX}<span class="bug-report-thanks__accent">${THANK_YOU_ACCENT}</span>
         </p>
-        <button type="button" class="pill pill--commit bug-report-thanks__ok" data-bug-thanks-dismiss>
-          ${THANK_YOU_OK}
-        </button>
+        ${thanksOkButtonHtml()}
       </div>
     `;
+    removeTurnstileHost();
     if (!overlayPhysicsHeld) {
       holdPhysicsForOverlay();
       overlayPhysicsHeld = true;
@@ -192,6 +336,7 @@ export function closeBugReport(): void {
 
   const done = () => {
     gsap.killTweensOf(root.querySelectorAll(".bug-report-thanks__word, .bug-report-thanks__ok"));
+    removeTurnstileHost();
     root.remove();
     modalRoot = null;
     closing = false;
@@ -279,6 +424,22 @@ async function submitForm(form: HTMLFormElement) {
     return;
   }
 
+  const siteKey = turnstileSiteKey();
+  let turnstileToken = "";
+  if (siteKey) {
+    if (!window.turnstile || turnstileWidgetId == null) {
+      setStatus(form, "Security check isn’t ready yet. Wait a moment and try again.", true);
+      void prepareTurnstile();
+      return;
+    }
+    turnstileToken = window.turnstile.getResponse(turnstileWidgetId) || "";
+    if (!turnstileToken) {
+      setStatus(form, "Complete the security check, then send.", true);
+      revealTurnstileHost();
+      return;
+    }
+  }
+
   sending = true;
   syncSend(form);
   setStatus(form, "Sending…");
@@ -293,13 +454,14 @@ async function submitForm(form: HTMLFormElement) {
         severity,
         message,
         honeypot,
+        turnstileToken,
         source: "ultrapilled-app",
       }),
     });
 
     if (!res.ok) {
       const raw = await res.text();
-      let err: { error?: string; detail?: string; retryAfter?: number } = {};
+      let err: { error?: string; detail?: string; code?: string; retryAfter?: number } = {};
       try {
         err = raw ? JSON.parse(raw) : {};
       } catch {
@@ -308,6 +470,10 @@ async function submitForm(form: HTMLFormElement) {
       let msg = err.detail || err.error || "Could not send report. Try again later.";
       if (res.status === 429) msg = "You’re submitting a little too often. Wait a bit and try again.";
       if (res.status === 503) msg = "Issue reporting isn’t available right now.";
+      if (err.code === "turnstile_failed" || err.code === "turnstile_required") {
+        msg = "Security check failed. Try again.";
+        resetTurnstile();
+      }
       setStatus(form, msg, true);
       sending = false;
       syncSend(form);
@@ -431,6 +597,7 @@ export function openBugReport(): void {
   modalRoot = root;
   playTransition(true);
   message.focus({ preventScroll: true });
+  void prepareTurnstile();
 
   gsap.set(scrim, { autoAlpha: 0 });
   gsap.set(card, { autoAlpha: 0, y: 28 });

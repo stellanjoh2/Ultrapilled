@@ -121,15 +121,39 @@ describe("bug report", () => {
     expect(document.querySelector(".bug-report-thanks__accent")?.textContent).toBe(
       "We’ll look into it shortly.",
     );
-    expect(document.querySelector(".bug-report-thanks__ok")?.textContent?.trim()).toBe(
+    const ok = document.querySelector(".bug-report-thanks__ok");
+    expect(ok?.querySelector(".bug-report-thanks__ok-label")?.textContent?.trim()).toBe(
       "Keep pilling",
     );
+    expect(ok?.querySelector(".bug-report-thanks__ok-arrow")).toBeTruthy();
+    expect(ok?.classList.contains("pill")).toBe(false);
     expect(document.querySelector("#bug-report-form")).toBeNull();
     expect(isBugReportOpen()).toBe(true);
 
-    document.querySelector(".bug-report-thanks__ok")!.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
+    ok!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(isBugReportOpen()).toBe(false);
+  });
+
+  it("mounts a Turnstile host when a site key is configured", async () => {
+    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "0xtest-site-key");
+    const render = vi.fn().mockReturnValue("widget-1");
+    vi.stubGlobal("turnstile", {
+      render,
+      remove: vi.fn(),
+      reset: vi.fn(),
+      getResponse: vi.fn().mockReturnValue(""),
+    });
+
+    openBugReport();
+    await vi.waitFor(() => {
+      expect(document.querySelector("#bug-report-turnstile")).toBeTruthy();
+    });
+    expect(render).toHaveBeenCalled();
+    expect(document.querySelector("#bug-report-turnstile")?.getAttribute("aria-label")).toBe(
+      "Security check",
+    );
+
+    closeBugReport();
+    expect(document.querySelector("#bug-report-turnstile")).toBeNull();
   });
 });
