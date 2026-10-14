@@ -7960,96 +7960,140 @@ html[data-theme="day"] .bug-report__message {
   pointer-events: none;
 }
 
-.guestbook {
+/* Guestbook — same left half-width sheet as How to Guide. */
+.guestbook-modal {
   position: fixed;
   inset: 0;
   z-index: 220;
-  display: grid;
-  place-items: center;
-  padding: var(--space-2);
   pointer-events: auto;
 }
 
-.guestbook__scrim {
+.guestbook-modal__scrim {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, #080808 45%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: transparent;
 }
 
-html[data-theme="day"] .guestbook__scrim {
-  background: color-mix(in srgb, #ffffff 40%, transparent);
-}
-
-.guestbook__card {
-  position: relative;
+.guestbook-modal__sheet {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  bottom: var(--space-2);
   z-index: 1;
   display: flex;
   flex-direction: column;
-  width: min(calc(560px * var(--ui-scale)), 100%);
-  max-height: calc(100% - (var(--space-2) * 2));
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: var(--space-2);
-  border-radius: var(--radius-reconnect);
+  width: min(33.333vw, calc(100% - (var(--space-2) * 2)));
+  border-radius: var(--radius-settings);
   background: var(--canvas);
   box-shadow: var(--shadow-2);
-  box-sizing: border-box;
+  overflow: hidden;
 }
 
-.guestbook__head {
+.guestbook-modal__head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--panel-rule);
 }
 
-.guestbook__title {
+.guestbook-modal__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.guestbook-modal__title {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-section);
-  font-size: calc(24px * var(--ui-scale));
+  font-size: calc(44px * var(--ui-scale));
   font-weight: 400;
-  letter-spacing: -0.02em;
   line-height: 1;
+  letter-spacing: -0.03em;
 }
 
-.guestbook__x {
+.guestbook-modal__updated {
+  margin: 0;
+  color: var(--ink-mute);
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.guestbook-modal__back {
   display: grid;
   place-items: center;
-  flex: none;
+  flex-shrink: 0;
   width: calc(32px * var(--ui-scale));
   height: calc(32px * var(--ui-scale));
-  margin: 0 calc(-4px * var(--ui-scale)) 0 0;
+  margin-left: calc(-5px * var(--ui-scale));
   padding: 0;
   border: none;
-  border-radius: 9999px;
-  background: var(--field);
-  color: var(--ink);
+  border-radius: calc(9999px * var(--ui-scale));
+  background: transparent;
+  color: var(--ink-mute);
   line-height: 0;
   cursor: pointer;
+  transition: color 0.15s ease;
 }
 
-.guestbook__x svg {
+.guestbook-modal__back-icon {
+  display: grid;
+  place-items: center;
+  width: calc(22.5px * var(--ui-scale));
+  height: calc(22.5px * var(--ui-scale));
+  transition: transform 0.15s ease;
+}
+
+.guestbook-modal__back-icon svg {
   display: block;
-  width: calc(16px * var(--ui-scale));
-  height: calc(16px * var(--ui-scale));
+  width: 100%;
+  height: 100%;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .guestbook__x:hover {
+  .guestbook-modal__back:hover {
     color: var(--pill-fun-face);
   }
 }
 
+.guestbook-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3);
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+.guestbook-modal__foot {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--panel-rule);
+}
+
+.guestbook-modal__done {
+  width: 100%;
+}
+
+.guestbook-modal__body :is(button).pill,
+.guestbook-modal__foot button.pill {
+  min-height: calc(54px * var(--ui-scale));
+  font-size: calc(15px * var(--ui-scale));
+}
+
 .guestbook__lede {
-  margin: var(--space-1) 0 var(--space-2);
+  margin: 0 0 var(--space-2);
   color: var(--ink-secondary);
-  font-size: calc(16px * var(--ui-scale));
-  font-weight: 300;
+  font-size: calc(20px * var(--ui-scale));
+  font-weight: 400;
   line-height: 1.45;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .guestbook__accent {
@@ -8059,33 +8103,34 @@ html[data-theme="day"] .guestbook__scrim {
 .guestbook__form {
   display: flex;
   flex-direction: column;
+  margin: 0 0 calc(var(--space-3) + var(--space-2));
 }
 
 .guestbook__label {
   margin: 0 0 calc(6px * var(--ui-scale));
   color: var(--ink-mute);
-  font-size: calc(15px * var(--ui-scale));
+  font-size: calc(16px * var(--ui-scale));
   font-weight: 400;
 }
 
 .guestbook__field {
   width: 100%;
   margin: 0 0 var(--space-1);
-  padding: calc(12px * var(--ui-scale)) var(--space-1);
+  padding: calc(14px * var(--ui-scale)) var(--space-1);
   border: none;
   border-radius: calc(8px * var(--ui-scale));
   background: var(--field);
   color: var(--ink);
   font: inherit;
-  font-size: calc(15px * var(--ui-scale));
-  font-weight: 300;
+  font-size: calc(16px * var(--ui-scale));
+  font-weight: 400;
   line-height: 1.45;
-  letter-spacing: 0;
+  letter-spacing: -0.01em;
   box-sizing: border-box;
 }
 
 .guestbook__message {
-  min-height: calc(112px * var(--ui-scale));
+  min-height: calc(140px * var(--ui-scale));
   margin-bottom: 0;
   resize: vertical;
 }
@@ -8156,10 +8201,10 @@ html[data-theme="day"] .guestbook__field {
 }
 
 .guestbook__status {
-  min-height: calc(18px * var(--ui-scale));
+  min-height: calc(20px * var(--ui-scale));
   margin: 0 0 var(--space-1);
   color: var(--ink-mute);
-  font-size: calc(13px * var(--ui-scale));
+  font-size: calc(15px * var(--ui-scale));
 }
 
 .guestbook__status.is-error {
@@ -8170,21 +8215,14 @@ html[data-theme="day"] .guestbook__field {
   color: var(--pill-fun-face);
 }
 
-.guestbook__actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1);
-}
-
 .guestbook__send-wrap {
   display: block;
+  width: 100%;
   min-width: 0;
 }
 
-.guestbook__actions .pill {
+.guestbook__send {
   width: 100%;
-  min-width: 0;
-  min-height: calc(54px * var(--ui-scale));
 }
 
 .guestbook__send-wrap:has(.pill:disabled) {
@@ -8194,7 +8232,7 @@ html[data-theme="day"] .guestbook__field {
 .guestbook__fine {
   margin: var(--space-1) 0 0;
   color: var(--ink-mute);
-  font-size: calc(12px * var(--ui-scale));
+  font-size: calc(13px * var(--ui-scale));
   line-height: 1.45;
 }
 
@@ -8214,9 +8252,21 @@ html[data-theme="day"] .guestbook__field {
 .guestbook__entries {
   display: flex;
   flex-direction: column;
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--panel-rule);
+  padding-top: var(--space-3);
+}
+
+.guestbook__entries-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-section);
+  font-size: calc(22px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .guestbook__list {
@@ -8229,7 +8279,7 @@ html[data-theme="day"] .guestbook__field {
 }
 
 .guestbook__entry {
-  padding: var(--space-1);
+  padding: var(--space-2) var(--space-1);
   border-radius: calc(12px * var(--ui-scale));
   background: var(--field);
 }
@@ -8237,9 +8287,10 @@ html[data-theme="day"] .guestbook__field {
 .guestbook__text {
   margin: 0;
   color: var(--ink);
-  font-size: calc(15px * var(--ui-scale));
-  font-weight: 300;
+  font-size: calc(18px * var(--ui-scale));
+  font-weight: 400;
   line-height: 1.45;
+  letter-spacing: -0.012em;
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
@@ -8249,8 +8300,8 @@ html[data-theme="day"] .guestbook__field {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-1);
-  margin: calc(8px * var(--ui-scale)) 0 0;
-  font-size: calc(13px * var(--ui-scale));
+  margin: calc(10px * var(--ui-scale)) 0 0;
+  font-size: calc(14px * var(--ui-scale));
 }
 
 .guestbook__author {
@@ -8271,13 +8322,13 @@ html[data-theme="day"] .guestbook__field {
 .guestbook__empty {
   margin: 0;
   color: var(--ink-mute);
-  font-size: calc(14px * var(--ui-scale));
+  font-size: calc(16px * var(--ui-scale));
   text-align: center;
 }
 
 .guestbook__more {
-  align-self: center;
-  margin-top: var(--space-1);
+  align-self: stretch;
+  width: 100%;
 }
 
 /* Cloudflare Turnstile — fixed top-right, same placement as bug report. */

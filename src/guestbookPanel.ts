@@ -1,5 +1,5 @@
 import gsap from "gsap";
-import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
+import arrowLeftIcon from "@phosphor-icons/core/assets/regular/arrow-left.svg?raw";
 import {
   GUESTBOOK_TURNSTILE_ACTION,
   MAX_GUESTBOOK_NAME,
@@ -247,7 +247,7 @@ async function submit(form: HTMLFormElement): Promise<void> {
       setStatus(
         form,
         result.pending
-          ? `Thanks, ${name.value.trim()}! Your entry will show up once it’s approved.`
+          ? `Thanks, ${name.value.trim()}! Your entry will show up once it's approved.`
           : `Thanks, ${name.value.trim()}!`,
         "ok",
       );
@@ -269,8 +269,8 @@ export function closeGuestbook(): void {
   if (!modalRoot || closing) return;
   closing = true;
   const root = modalRoot;
-  const scrim = root.querySelector<HTMLElement>(".guestbook__scrim");
-  const card = root.querySelector<HTMLElement>(".guestbook__card");
+  const scrim = root.querySelector<HTMLElement>(".guestbook-modal__scrim");
+  const sheet = root.querySelector<HTMLElement>(".guestbook-modal__sheet");
   if (onKey) window.removeEventListener("keydown", onKey, true);
   onKey = null;
   playRemove();
@@ -286,13 +286,13 @@ export function closeGuestbook(): void {
     returnFocus = null;
   };
 
-  if (reducedMotion() || !scrim || !card) {
+  if (reducedMotion() || !scrim || !sheet) {
     done();
     return;
   }
   const tl = gsap.timeline({ onComplete: done });
-  tl.to(card, { y: 24, autoAlpha: 0, duration: 0.24, ease: "power2.in" }, 0);
-  tl.to(scrim, { autoAlpha: 0, duration: 0.24, ease: "power1.in" }, 0);
+  tl.to(sheet, { x: -48, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
+  tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
 }
 
 export function openGuestbook(): void {
@@ -300,75 +300,81 @@ export function openGuestbook(): void {
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   const root = document.createElement("div");
-  root.className = "guestbook";
+  root.className = "guestbook-modal";
   root.setAttribute("role", "dialog");
   root.setAttribute("aria-modal", "true");
   root.setAttribute("aria-labelledby", "guestbook-title");
   root.innerHTML = `
-    <div class="guestbook__scrim" data-guestbook-close></div>
-    <div class="guestbook__card">
-      <header class="guestbook__head">
-        <h2 class="guestbook__title" id="guestbook-title">Guestbook</h2>
-        <button type="button" class="guestbook__x icon-hover" data-guestbook-close aria-label="Close" data-tip="Close">
-          <span aria-hidden="true">${xIcon}</span>
+    <div class="guestbook-modal__scrim" data-guestbook-close></div>
+    <div class="guestbook-modal__sheet">
+      <header class="guestbook-modal__head">
+        <button type="button" class="guestbook-modal__back icon-hover" data-guestbook-close aria-label="Back" data-tip="Close guestbook">
+          <span class="guestbook-modal__back-icon" aria-hidden="true">${arrowLeftIcon}</span>
         </button>
+        <div class="guestbook-modal__titles">
+          <h2 class="guestbook-modal__title" id="guestbook-title">Guestbook</h2>
+          <p class="guestbook-modal__updated">Leave a note for the next visitor</p>
+        </div>
       </header>
-      <p class="guestbook__lede">
-        Say hi, share what you made, or leave a note for the next visitor.
-        <span class="guestbook__accent">Every entry is read by a human before it shows up.</span>
-      </p>
-      <form class="guestbook__form" id="guestbook-form" novalidate>
-        <label class="guestbook__label" for="guestbook-name">Name</label>
-        <input
-          class="guestbook__field"
-          id="guestbook-name"
-          name="author"
-          type="text"
-          maxlength="${MAX_GUESTBOOK_NAME}"
-          autocomplete="nickname"
-          spellcheck="false"
-          placeholder="What should we call you?"
-        />
-        <label class="guestbook__label" for="guestbook-message">Message</label>
-        <textarea
-          class="guestbook__field guestbook__message"
-          id="guestbook-message"
-          name="text"
-          maxlength="${MAX_GUESTBOOK_TEXT}"
-          rows="4"
-          placeholder="About 5+ words. No links, be kind."
-        ></textarea>
-        <div
-          class="guestbook__meter"
-          data-guestbook-word-meter
-          role="progressbar"
-          aria-valuemin="0"
-          aria-valuemax="${MIN_GUESTBOOK_WORDS}"
-          aria-valuenow="0"
-          aria-label="Words of the message"
-        >
-          <div class="guestbook__meter-fill" data-guestbook-word-meter-fill></div>
-        </div>
-        <input type="text" name="honeypot" class="guestbook__hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
-        <p class="guestbook__status" aria-live="polite"></p>
-        <div class="guestbook__actions">
-          <button type="button" class="pill" data-guestbook-close>Close</button>
+      <div class="guestbook-modal__body">
+        <p class="guestbook__lede">
+          Say hi, share what you made, or leave a note.
+          <span class="guestbook__accent">Every entry is read by a human before it shows up.</span>
+        </p>
+        <form class="guestbook__form" id="guestbook-form" novalidate>
+          <label class="guestbook__label" for="guestbook-name">Name</label>
+          <input
+            class="guestbook__field"
+            id="guestbook-name"
+            name="author"
+            type="text"
+            maxlength="${MAX_GUESTBOOK_NAME}"
+            autocomplete="nickname"
+            spellcheck="false"
+            placeholder="What should we call you?"
+          />
+          <label class="guestbook__label" for="guestbook-message">Message</label>
+          <textarea
+            class="guestbook__field guestbook__message"
+            id="guestbook-message"
+            name="text"
+            maxlength="${MAX_GUESTBOOK_TEXT}"
+            rows="5"
+            placeholder="About 5+ words. No links, be kind."
+          ></textarea>
+          <div
+            class="guestbook__meter"
+            data-guestbook-word-meter
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="${MIN_GUESTBOOK_WORDS}"
+            aria-valuenow="0"
+            aria-label="Words of the message"
+          >
+            <div class="guestbook__meter-fill" data-guestbook-word-meter-fill></div>
+          </div>
+          <input type="text" name="honeypot" class="guestbook__hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <p class="guestbook__status" aria-live="polite"></p>
           <span class="guestbook__send-wrap" data-guestbook-send-wrap>
-            <button type="submit" class="pill pill--commit" data-guestbook-send disabled>Sign the guestbook</button>
+            <button type="submit" class="pill pill--commit guestbook__send" data-guestbook-send disabled>Sign the guestbook</button>
           </span>
-        </div>
-        <p class="guestbook__fine">Your name, message, and date are public once approved. <a href="${PRIVACY_HREF}#guestbook">How we handle it</a>.</p>
-      </form>
-      <section class="guestbook__entries" aria-label="Entries">
-        <ol class="guestbook__list"></ol>
-        <p class="guestbook__empty">Loading entries…</p>
-        <button type="button" class="pill guestbook__more" data-guestbook-more hidden>Show more</button>
-      </section>
+          <p class="guestbook__fine">Your name, message, and date are public once approved. <a href="${PRIVACY_HREF}#guestbook">How we handle it</a>.</p>
+        </form>
+        <section class="guestbook__entries" aria-label="Entries">
+          <h3 class="guestbook__entries-title">Entries</h3>
+          <ol class="guestbook__list"></ol>
+          <p class="guestbook__empty">Loading entries…</p>
+          <button type="button" class="pill guestbook__more" data-guestbook-more hidden>Show more</button>
+        </section>
+      </div>
+      <footer class="guestbook-modal__foot">
+        <button type="button" class="pill pill--commit guestbook-modal__done" data-guestbook-close data-tip="Close guestbook">Ok, take me back</button>
+      </footer>
     </div>
   `;
 
-  const scrim = root.querySelector<HTMLElement>(".guestbook__scrim")!;
-  const card = root.querySelector<HTMLElement>(".guestbook__card")!;
+  const scrim = root.querySelector<HTMLElement>(".guestbook-modal__scrim")!;
+  const sheet = root.querySelector<HTMLElement>(".guestbook-modal__sheet")!;
   const form = root.querySelector<HTMLFormElement>("#guestbook-form")!;
   const name = form.querySelector<HTMLInputElement>("#guestbook-name")!;
 
@@ -407,10 +413,15 @@ export function openGuestbook(): void {
   void prepareTurnstile();
   void loadEntries(root, true);
 
-  if (reducedMotion()) return;
   gsap.set(scrim, { autoAlpha: 0 });
-  gsap.set(card, { autoAlpha: 0, y: 28 });
+  gsap.set(sheet, { autoAlpha: 0, x: -56 });
+
+  if (reducedMotion()) {
+    gsap.set([scrim, sheet], { clearProps: "all", autoAlpha: 1, x: 0 });
+    return;
+  }
+
   const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-  tl.to(scrim, { autoAlpha: 1, duration: 0.28 }, 0);
-  tl.to(card, { autoAlpha: 1, y: 0, duration: 0.38, clearProps: "transform" }, 0.04);
+  tl.to(scrim, { autoAlpha: 1, duration: 0.32 }, 0);
+  tl.to(sheet, { autoAlpha: 1, x: 0, duration: 0.42 }, 0.04);
 }

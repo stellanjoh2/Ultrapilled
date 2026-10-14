@@ -123,9 +123,13 @@ describe("guestbook panel", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders entries as text, never HTML", async () => {
+  it("opens a left sheet like the How to Guide", async () => {
     openGuestbook();
     expect(isGuestbookOpen()).toBe(true);
+    expect(document.querySelector(".guestbook-modal__sheet")).toBeTruthy();
+    expect(document.querySelector("#guestbook-title")?.textContent).toBe("Guestbook");
+    expect(document.querySelector(".guestbook-modal__back")).toBeTruthy();
+    expect(document.querySelector(".guestbook-modal__done")?.textContent).toBe("Ok, take me back");
     await vi.waitFor(() => expect(document.querySelector(".guestbook__entry")).toBeTruthy());
     const text = document.querySelector(".guestbook__text")!;
     expect(text.textContent).toBe("<img src=x onerror=alert(1)>");
@@ -166,7 +170,7 @@ describe("guestbook panel", () => {
     vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "test-site-key");
     openGuestbook();
     await vi.waitFor(() => expect(document.querySelector("#guestbook-turnstile")).toBeTruthy());
-    expect(document.querySelector(".guestbook__card #guestbook-turnstile")).toBeNull();
+    expect(document.querySelector(".guestbook-modal__sheet #guestbook-turnstile")).toBeNull();
     expect(document.querySelector("#guestbook-turnstile")?.parentElement).toBe(document.body);
     closeGuestbook();
     expect(document.querySelector("#guestbook-turnstile")).toBeNull();
