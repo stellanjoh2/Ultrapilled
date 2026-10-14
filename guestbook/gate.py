@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import sqlite3
 import threading
 import time
 import urllib.parse
@@ -18,6 +19,8 @@ import urllib.request
 from collections import deque
 from dataclasses import dataclass
 from typing import Callable, Iterable
+
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 THREAD_URI = "/guestbook"
 THREAD_TITLE = "Guestbook"
@@ -29,8 +32,11 @@ MIN_NAME = 1
 MAX_NAME = 40
 MIN_WORDS = 5
 MAX_TEXT = 500
+# Match Isso purge-after for pending entries — Activate stays usable until purge.
+MODERATION_MAX_AGE = 30 * 24 * 60 * 60
 
-_MODERATE_PATH = re.compile(r"^/id/\d+/(?:activate|delete|edit)/[^/]+$")
+# No edit — same signed email key must not rewrite approved entries.
+_MODERATE_PATH = re.compile(r"^/id/(?P<id>\d+)/(?P<action>activate|delete)/(?P<key>[^/]+)$")
 
 # No links of any kind — the guestbook has no use for them and they are the spam payload.
 _LINK = re.compile(
@@ -57,8 +63,25 @@ class GateSettings:
     turnstile_secret: str = ""
     allow_missing_turnstile: bool = False
     trust_fly_client_ip: bool = False
+    isso_dbpath: str = ""
+    moderation_max_age: int = MODERATION_MAX_AGE
     per_ip: tuple[Window, ...] = (Window(3, 600), Window(6, 86400))
     global_windows: tuple[Window, ...] = (Window(30, 3600), Window(150, 86400))
+
+
+def moderation_key_valid(dbpath: str, comment_id: int, key: str, max_age: int) -> bool:
+    """Re-check Isso's signed moderation key with a finite lifetime (Isso itself uses ~forever)."""
+    if not dbpath or not key:
+        return False
+    try:
+        with sqlite3.connect(dbpath) as db:
+            row = db.execute("SELECT value FROM preferences WHERE key = ?", ("session-key",)).fetchone()
+        if not row or not row[0]:
+            return False
+        payload = URLSafeTimedSerializer(row[0]).loads(key, max_age=max_age)
+        return payload == comment_id
+    except (BadSignature, SignatureExpired, TypeError, ValueError, sqlite3.Error, OSError):
+        return False
 
 
 class RateLimiter:
@@ -158,7 +181,21 @@ class GuestbookGate:
         if path == "/healthz" and method in ("GET", "HEAD"):
             return self._json(environ, start_response, 200, {"ok": True})
 
-        if _MODERATE_PATH.match(path) and method in ("GET", "POST"):
+        moderate = _MODERATE_PATH.match(path)
+        if moderate and method in ("GET", "POST"):
+            comment_id = int(moderate.group("id"))
+            if not moderation_key_valid(
+                self.settings.isso_dbpath,
+                comment_id,
+                moderate.group("key"),
+                self.settings.moderation_max_age,
+            ):
+                return self._json(
+                    environ,
+                    start_response,
+                    403,
+                    {"error": "Moderation link expired or invalid", "code": "moderation_expired"},
+                )
             return self.app(environ, start_response)
 
         if path not in ("/", "/new"):

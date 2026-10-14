@@ -54,3 +54,5 @@ Later deploys: `cd guestbook && fly deploy`.
 ## Moderating
 
 Each new entry emails `SMTP_TO` with **Activate** and **Delete** links. To remove an approved entry later, use its Delete link from that email.
+
+Links expire after **30 days** (same window as the pending-entry purge). There is no edit URL — only activate and delete.

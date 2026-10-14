@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
+from itsdangerous import URLSafeTimedSerializer
 from werkzeug.test import Client
 
 from gate import GateSettings, GuestbookGate, RateLimiter, Window
 
 ORIGIN = "https://ultrapilled.com"
 GOOD_TOKEN = {"success": True, "hostname": "ultrapilled.com", "action": "guestbook"}
+SESSION_KEY = "test-session-key-for-moderation"
 
 
 class FakeIsso:
@@ -25,6 +28,18 @@ class FakeIsso:
         self.calls.append((environ["REQUEST_METHOD"], environ["PATH_INFO"], environ.get("REMOTE_ADDR"), body))
         start_response("202 Accepted", [("Content-Type", "application/json")])
         return [b'{"mode": 2}']
+
+
+def make_mod_db(directory: str) -> tuple[str, URLSafeTimedSerializer]:
+    path = str(Path(directory) / "prefs.db")
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE preferences (key VARCHAR PRIMARY KEY, value VARCHAR)")
+        db.execute("INSERT INTO preferences (key, value) VALUES (?, ?)", ("session-key", SESSION_KEY))
+    return path, URLSafeTimedSerializer(SESSION_KEY)
+
+
+def mod_path(signer: URLSafeTimedSerializer, comment_id: int, action: str) -> str:
+    return f"/id/{comment_id}/{action}/{signer.dumps(comment_id)}"
 
 
 def make(verify=None, per_ip=(Window(3, 600),), global_windows=(Window(30, 3600),), **kw):
@@ -72,10 +87,33 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(isso.calls, [])
 
     def test_moderation_links_pass_through(self):
-        client, isso = make()
-        self.assertEqual(client.get("/id/4/activate/abc.def").status_code, 202)
-        self.assertEqual(client.post("/id/4/delete/abc.def").status_code, 202)
-        self.assertEqual(len(isso.calls), 2)
+        with tempfile.TemporaryDirectory() as tmp:
+            dbpath, signer = make_mod_db(tmp)
+            client, isso = make(isso_dbpath=dbpath)
+            self.assertEqual(client.get(mod_path(signer, 4, "activate")).status_code, 202)
+            self.assertEqual(client.post(mod_path(signer, 4, "delete")).status_code, 202)
+            self.assertEqual(len(isso.calls), 2)
+
+    def test_edit_moderation_path_is_blocked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dbpath, signer = make_mod_db(tmp)
+            client, isso = make(isso_dbpath=dbpath)
+            res = client.post(mod_path(signer, 4, "edit"), data="{}", content_type="application/json")
+            self.assertEqual(res.status_code, 404)
+            self.assertEqual(isso.calls, [])
+
+    def test_expired_moderation_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dbpath, signer = make_mod_db(tmp)
+            client, isso = make(isso_dbpath=dbpath, moderation_max_age=1)
+            key = signer.dumps(4)
+            import time
+
+            time.sleep(2)
+            res = client.get(f"/id/4/activate/{key}")
+            self.assertEqual(res.status_code, 403)
+            self.assertEqual(res.json["code"], "moderation_expired")
+            self.assertEqual(isso.calls, [])
 
     def test_healthz(self):
         client, _ = make()

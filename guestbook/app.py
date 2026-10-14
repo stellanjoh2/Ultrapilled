@@ -70,6 +70,7 @@ def build_app():
         turnstile_secret=os.environ.get("TURNSTILE_SECRET_KEY", ""),
         allow_missing_turnstile=dev,
         trust_fly_client_ip=bool(os.environ.get("FLY_APP_NAME")),
+        isso_dbpath=conf.get("general", "dbpath"),
     )
     return GuestbookGate(make_app(conf), settings)
 
