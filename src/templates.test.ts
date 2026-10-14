@@ -15,11 +15,11 @@ describe("ultrapilledState logo store", () => {
 });
 
 describe("berlinState background", () => {
-  it("ships with the acid grid on", () => {
+  it("ships with the magenta grid on", () => {
     const background = berlinState().background;
     expect(background.grid).toBe(true);
-    expect(background.gridColor).toBe("#e1ff00");
-    expect(background.gridOpacity).toBe(25);
+    expect(background.gridColor).toBe("#ed20ec");
+    expect(background.gridOpacity).toBe(50);
     expect(background.kind).toBe("gradient");
   });
 });
