@@ -5,6 +5,25 @@ export const DEFAULT_GUESTBOOK_API = "https://guestbook.ultrapilled.com";
 export const LOCAL_GUESTBOOK_API = "http://localhost:8080";
 export const GUESTBOOK_TURNSTILE_ACTION = "guestbook";
 export const GUESTBOOK_PAGE_SIZE = 20;
+/** Query/hash Isso emails and /guestbook redirect use to open the overlay. */
+export const GUESTBOOK_DEEP_LINK = "guestbook";
+
+export function shouldOpenGuestbookFromUrl(url: URL | Location = window.location): boolean {
+  const params = new URLSearchParams(url.search);
+  if (params.has(GUESTBOOK_DEEP_LINK)) return true;
+  return url.hash === `#${GUESTBOOK_DEEP_LINK}` || url.hash.startsWith(`#${GUESTBOOK_DEEP_LINK}`);
+}
+
+/** Drop ?guestbook / #guestbook after opening so refresh doesn’t re-open it. */
+export function clearGuestbookDeepLink(): void {
+  const url = new URL(window.location.href);
+  const hadQuery = url.searchParams.has(GUESTBOOK_DEEP_LINK);
+  const hadHash = url.hash === `#${GUESTBOOK_DEEP_LINK}` || url.hash.startsWith(`#${GUESTBOOK_DEEP_LINK}`);
+  if (!hadQuery && !hadHash) return;
+  url.searchParams.delete(GUESTBOOK_DEEP_LINK);
+  if (hadHash) url.hash = "";
+  history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
 
 export const MAX_GUESTBOOK_NAME = 40;
 export const MIN_GUESTBOOK_WORDS = 5;

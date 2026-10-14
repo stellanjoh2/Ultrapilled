@@ -17,6 +17,7 @@ import bugIcon from "@phosphor-icons/core/assets/regular/bug.svg?raw";
 import folderOpenIcon from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
 import { PRIVACY_HREF } from "./privacy";
 import { isAboutOpen, openAbout } from "./aboutPanel";
+import { clearGuestbookDeepLink, shouldOpenGuestbookFromUrl } from "./guestbook";
 import { isGuestbookOpen, openGuestbook } from "./guestbookPanel";
 import { isBugReportOpen, openBugReport } from "./bugReport";
 import { mountHeaderLogotype } from "./logotypeLive";
@@ -675,6 +676,12 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
     host.append(root);
     window.addEventListener("keydown", onKey);
     cards[0]?.focus({ preventScroll: true });
+
+    // Isso emails link to /guestbook → redirect to ?guestbook=1; open the sheet here.
+    if (shouldOpenGuestbookFromUrl()) {
+      clearGuestbookDeepLink();
+      openGuestbook();
+    }
 
     void video?.play().catch(() => {});
 

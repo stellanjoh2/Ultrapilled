@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LOCAL_GUESTBOOK_API,
+  clearGuestbookDeepLink,
   fetchGuestbook,
   guestbookApiUrl,
   guestbookProblem,
   postGuestbook,
+  shouldOpenGuestbookFromUrl,
 } from "./guestbook";
 import { closeGuestbook, isGuestbookOpen, openGuestbook } from "./guestbookPanel";
 
@@ -15,6 +17,15 @@ function jsonResponse(status: number, body: unknown): Response {
 describe("guestbook rules", () => {
   it("uses the local Isso in dev", () => {
     expect(guestbookApiUrl()).toBe(LOCAL_GUESTBOOK_API);
+  });
+
+  it("detects guestbook deep links from the moderation email redirect", () => {
+    expect(shouldOpenGuestbookFromUrl(new URL("https://ultrapilled.com/?guestbook=1"))).toBe(true);
+    expect(shouldOpenGuestbookFromUrl(new URL("https://ultrapilled.com/#guestbook"))).toBe(true);
+    expect(shouldOpenGuestbookFromUrl(new URL("https://ultrapilled.com/"))).toBe(false);
+    history.replaceState(null, "", "/?guestbook=1");
+    clearGuestbookDeepLink();
+    expect(window.location.search).toBe("");
   });
 
   it("mirrors the server content rules", () => {
