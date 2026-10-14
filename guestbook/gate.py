@@ -18,6 +18,7 @@ import urllib.parse
 import urllib.request
 from collections import deque
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Iterable
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -64,9 +65,13 @@ class GateSettings:
     allow_missing_turnstile: bool = False
     trust_fly_client_ip: bool = False
     isso_dbpath: str = ""
+    rate_dbpath: str = ""
     moderation_max_age: int = MODERATION_MAX_AGE
     per_ip: tuple[Window, ...] = (Window(3, 600), Window(6, 86400))
     global_windows: tuple[Window, ...] = (Window(30, 3600), Window(150, 86400))
+    # Generous vs posts — still caps scrapers / bandwidth burn after Fly wake.
+    read_per_ip: tuple[Window, ...] = (Window(60, 60), Window(600, 3600))
+    read_global: tuple[Window, ...] = (Window(300, 60), Window(5000, 3600))
 
 
 def moderation_key_valid(dbpath: str, comment_id: int, key: str, max_age: int) -> bool:
@@ -85,18 +90,40 @@ def moderation_key_valid(dbpath: str, comment_id: int, key: str, max_age: int) -
 
 
 class RateLimiter:
-    """In-memory sliding windows — fine for the single Fly machine this runs on."""
+    """Sliding windows. With dbpath, persists to SQLite so Fly auto-stop doesn't reset budgets."""
 
-    def __init__(self, per_key: Iterable[Window], global_windows: Iterable[Window], clock=time.monotonic):
+    GLOBAL = "__global__"
+
+    def __init__(
+        self,
+        per_key: Iterable[Window],
+        global_windows: Iterable[Window],
+        clock=None,
+        dbpath: str | None = None,
+        namespace: str = "",
+    ):
         self.per_key = tuple(per_key)
         self.global_windows = tuple(global_windows)
-        self.clock = clock
+        # Wall clock when persisting — monotonic resets / isn't comparable across process restarts.
+        self.clock = clock or (time.monotonic if not dbpath else time.time)
+        self.dbpath = dbpath
+        self.namespace = namespace
+        self.lock = threading.Lock()
         self.hits: dict[str, deque[float]] = {}
         self.global_hits: deque[float] = deque()
-        self.lock = threading.Lock()
+        if dbpath:
+            parent = Path(dbpath).parent
+            if str(parent) not in ("", "."):
+                parent.mkdir(parents=True, exist_ok=True)
+            with sqlite3.connect(dbpath) as db:
+                db.execute("CREATE TABLE IF NOT EXISTS hits (bucket TEXT NOT NULL, ts REAL NOT NULL)")
+                db.execute("CREATE INDEX IF NOT EXISTS idx_hits_bucket_ts ON hits (bucket, ts)")
+
+    def _bucket(self, key: str) -> str:
+        return f"{self.namespace}:{key}" if self.namespace else key
 
     @staticmethod
-    def _retry(hits: deque[float], windows: tuple[Window, ...], now: float) -> float:
+    def _retry(hits: list[float] | deque[float], windows: tuple[Window, ...], now: float) -> float:
         wait = 0.0
         for window in windows:
             recent = [t for t in hits if now - t < window.seconds]
@@ -107,20 +134,45 @@ class RateLimiter:
     def check(self, key: str) -> float:
         """Return seconds to wait (0 = allowed) and record the hit when allowed."""
         with self.lock:
-            now = self.clock()
-            horizon = max([w.seconds for w in self.per_key + self.global_windows] or [0])
-            hits = self.hits.setdefault(key, deque())
-            for bucket in (hits, self.global_hits):
-                while bucket and now - bucket[0] >= horizon:
-                    bucket.popleft()
-            wait = max(self._retry(hits, self.per_key, now), self._retry(self.global_hits, self.global_windows, now))
+            if self.dbpath:
+                return self._check_db(key)
+            return self._check_memory(key)
+
+    def _check_memory(self, key: str) -> float:
+        now = self.clock()
+        horizon = max([w.seconds for w in self.per_key + self.global_windows] or [0])
+        hits = self.hits.setdefault(self._bucket(key), deque())
+        for bucket in (hits, self.global_hits):
+            while bucket and now - bucket[0] >= horizon:
+                bucket.popleft()
+        wait = max(self._retry(hits, self.per_key, now), self._retry(self.global_hits, self.global_windows, now))
+        if wait > 0:
+            return wait
+        hits.append(now)
+        self.global_hits.append(now)
+        if len(self.hits) > 10000:
+            self.hits = {k: v for k, v in self.hits.items() if v}
+        return 0.0
+
+    def _check_db(self, key: str) -> float:
+        now = float(self.clock())
+        horizon = max([w.seconds for w in self.per_key + self.global_windows] or [0])
+        cutoff = now - horizon
+        ip_bucket = self._bucket(key)
+        global_bucket = self._bucket(self.GLOBAL)
+        with sqlite3.connect(self.dbpath) as db:
+            db.execute("DELETE FROM hits WHERE ts < ?", (cutoff,))
+            ip_hits = [row[0] for row in db.execute(
+                "SELECT ts FROM hits WHERE bucket = ? AND ts >= ? ORDER BY ts", (ip_bucket, cutoff)
+            )]
+            global_hits = [row[0] for row in db.execute(
+                "SELECT ts FROM hits WHERE bucket = ? AND ts >= ? ORDER BY ts", (global_bucket, cutoff)
+            )]
+            wait = max(self._retry(ip_hits, self.per_key, now), self._retry(global_hits, self.global_windows, now))
             if wait > 0:
                 return wait
-            hits.append(now)
-            self.global_hits.append(now)
-            if len(self.hits) > 10000:
-                self.hits = {k: v for k, v in self.hits.items() if v}
-            return 0.0
+            db.executemany("INSERT INTO hits (bucket, ts) VALUES (?, ?)", ((ip_bucket, now), (global_bucket, now)))
+        return 0.0
 
 
 def verify_turnstile(secret: str, token: str, remote_ip: str) -> dict:
@@ -158,11 +210,24 @@ def entry_problem(author: str, text: str) -> tuple[str, str] | None:
 
 
 class GuestbookGate:
-    def __init__(self, app, settings: GateSettings, verifier: Verifier | None = None, limiter: RateLimiter | None = None):
+    def __init__(
+        self,
+        app,
+        settings: GateSettings,
+        verifier: Verifier | None = None,
+        limiter: RateLimiter | None = None,
+        read_limiter: RateLimiter | None = None,
+    ):
         self.app = app
         self.settings = settings
         self.verifier = verifier or (lambda token, ip: verify_turnstile(settings.turnstile_secret, token, ip))
-        self.limiter = limiter or RateLimiter(settings.per_ip, settings.global_windows)
+        rate_db = settings.rate_dbpath or None
+        self.write_limiter = limiter or RateLimiter(
+            settings.per_ip, settings.global_windows, dbpath=rate_db, namespace="write"
+        )
+        self.read_limiter = read_limiter or RateLimiter(
+            settings.read_per_ip, settings.read_global, dbpath=rate_db, namespace="read"
+        )
 
     def __call__(self, environ, start_response):
         if self.settings.trust_fly_client_ip:
@@ -177,6 +242,7 @@ class GuestbookGate:
         path = environ.get("PATH_INFO", "") or "/"
         query = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
         uri = (query.get("uri") or [""])[0]
+        ip = environ.get("REMOTE_ADDR", "") or "unknown"
 
         if path == "/healthz" and method in ("GET", "HEAD"):
             return self._json(environ, start_response, 200, {"ok": True})
@@ -210,7 +276,7 @@ class GuestbookGate:
             return self.app(environ, start_response)
 
         if path == "/" and method in ("GET", "HEAD"):
-            return self.app(environ, start_response)
+            return self._read(environ, start_response, ip)
 
         if path == "/new" and method == "POST":
             return self._new(environ, start_response)
@@ -219,6 +285,25 @@ class GuestbookGate:
 
     def _origin_ok(self, environ) -> bool:
         return environ.get("HTTP_ORIGIN", "") in self.settings.allowed_origins
+
+    def _rate_limited(self, environ, start_response, wait: float):
+        return self._json(
+            environ,
+            start_response,
+            429,
+            {"error": "Too many requests", "code": "rate_limited", "retryAfter": int(wait) + 1},
+            extra=[("Retry-After", str(int(wait) + 1))],
+        )
+
+    def _read(self, environ, start_response, ip: str):
+        # Foreign browser origins can't read the list; missing Origin (curl) is still rate-limited.
+        origin = environ.get("HTTP_ORIGIN", "")
+        if origin and origin not in self.settings.allowed_origins:
+            return self._json(environ, start_response, 403, {"error": "Origin not allowed", "code": "origin_denied"})
+        wait = self.read_limiter.check(ip)
+        if wait > 0:
+            return self._rate_limited(environ, start_response, wait)
+        return self.app(environ, start_response)
 
     def _new(self, environ, start_response):
         if not self._origin_ok(environ):
@@ -262,15 +347,9 @@ class GuestbookGate:
             status, payload = rejected
             return self._json(environ, start_response, status, payload)
 
-        wait = self.limiter.check(ip)
+        wait = self.write_limiter.check(ip)
         if wait > 0:
-            return self._json(
-                environ,
-                start_response,
-                429,
-                {"error": "Too many entries", "code": "rate_limited", "retryAfter": int(wait) + 1},
-                extra=[("Retry-After", str(int(wait) + 1))],
-            )
+            return self._rate_limited(environ, start_response, wait)
 
         clean = json.dumps(
             {"author": author, "text": text, "title": THREAD_TITLE, "email": None, "website": None, "parent": None},

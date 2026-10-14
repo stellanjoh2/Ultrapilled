@@ -11,6 +11,7 @@ Env (Fly secrets in production):
   ALLOWED_ORIGINS        Space-separated, default https://ultrapilled.com
   TURNSTILE_HOSTNAMES    Space-separated, default ultrapilled.com
   ISSO_DBPATH            Default /data/guestbook.db
+  RATE_DBPATH            Default sibling rate.db next to ISSO_DBPATH (survives Fly sleep)
   ISSO_PUBLIC_ENDPOINT   Default https://guestbook.ultrapilled.com
   GUESTBOOK_DEV=1        Local only: skip Turnstile, log moderation links to stdout
 """
@@ -64,13 +65,22 @@ def build_conf():
 def build_app():
     logging.basicConfig(level=logging.INFO)
     conf, origins, dev = build_conf()
+    dbpath = conf.get("general", "dbpath")
+    rate_dbpath = os.environ.get("RATE_DBPATH") or str(Path(dbpath).with_name("rate.db"))
+    smtp_host = conf.get("smtp", "host")
+    if not dev and "gmail" in smtp_host.lower():
+        logging.warning(
+            "SMTP host is %s — a leaked app password can send as that mailbox. Prefer Resend when available.",
+            smtp_host,
+        )
     settings = GateSettings(
         allowed_origins=origins,
         turnstile_hostnames=_env_list("TURNSTILE_HOSTNAMES", "ultrapilled.com"),
         turnstile_secret=os.environ.get("TURNSTILE_SECRET_KEY", ""),
         allow_missing_turnstile=dev,
         trust_fly_client_ip=bool(os.environ.get("FLY_APP_NAME")),
-        isso_dbpath=conf.get("general", "dbpath"),
+        isso_dbpath=dbpath,
+        rate_dbpath=rate_dbpath,
     )
     return GuestbookGate(make_app(conf), settings)
 

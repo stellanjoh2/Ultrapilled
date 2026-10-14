@@ -253,6 +253,29 @@ class RateLimitTests(unittest.TestCase):
         now[0] = 11
         self.assertEqual(limiter.check("a"), 0)
 
+    def test_persists_across_process_restarts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dbpath = str(Path(tmp) / "rate.db")
+            now = [1000.0]
+            first = RateLimiter((Window(1, 600),), (), clock=lambda: now[0], dbpath=dbpath, namespace="write")
+            self.assertEqual(first.check("1.2.3.4"), 0)
+            second = RateLimiter((Window(1, 600),), (), clock=lambda: now[0], dbpath=dbpath, namespace="write")
+            self.assertGreater(second.check("1.2.3.4"), 0)
+
+    def test_read_rate_limit_and_foreign_origin(self):
+        client, isso = make(
+            read_per_ip=(Window(1, 60),),
+            read_global=(Window(10, 60),),
+        )
+        self.assertEqual(client.get("/?uri=/guestbook", headers={"Origin": ORIGIN}).status_code, 202)
+        limited = client.get("/?uri=/guestbook", headers={"Origin": ORIGIN})
+        self.assertEqual(limited.status_code, 429)
+        self.assertEqual(
+            client.get("/?uri=/guestbook", headers={"Origin": "https://evil.example"}).status_code,
+            403,
+        )
+        self.assertEqual(len(isso.calls), 1)
+
 
 class IssoIntegrationTests(unittest.TestCase):
     """Real Isso + gate: entries land in moderation and stay hidden until approved."""

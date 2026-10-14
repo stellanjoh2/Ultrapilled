@@ -9,6 +9,7 @@ primary_region = "arn"
   TURNSTILE_HOSTNAMES = "ultrapilled.com"
   ISSO_PUBLIC_ENDPOINT = "https://guestbook.ultrapilled.com"
   ISSO_DBPATH = "/data/guestbook.db"
+  RATE_DBPATH = "/data/rate.db"
 
 [[mounts]]
   source = "guestbook_data"

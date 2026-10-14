@@ -10,7 +10,8 @@
 | Cloudflare Turnstile, verified server-side incl. hostname + `guestbook` action; fails closed if the secret is missing | gate |
 | Honeypot field — bots get a fake "pending" reply, nothing stored | gate |
 | No links / emails, 1–40 char name, ≥5 words / ≤500 chars, control + bidi chars stripped | gate (+ mirrored in the client) |
-| 3 entries / 10 min and 6 / day per IP; 30 / hour and 150 / day site-wide | gate |
+| 3 entries / 10 min and 6 / day per IP; 30 / hour and 150 / day site-wide (SQLite on the volume — survives Fly sleep) | gate |
+| Reads: 60 / min and 600 / hour per IP; 300 / min and 5000 / hour site-wide; foreign `Origin` rejected | gate |
 | 1 entry / minute and 3 entries total per /24 network | Isso guard |
 | Every entry held for approval by email; unapproved entries purged after 30 days | Isso moderation |
 | Only `GET /`, `POST /new` for `/guestbook` and moderation links reachable; admin, edit, delete, votes, feeds, embed JS all 404 | gate |
@@ -47,7 +48,7 @@ fly certs add guestbook.ultrapilled.com
 Then add the DNS record `fly certs add` prints (a `CNAME guestbook → ultrapilled-guestbook.fly.dev`) at the ultrapilled.com registrar, and wait for `fly certs check guestbook.ultrapilled.com` to go green.
 
 - `TURNSTILE_SECRET_KEY` is the same widget secret the Orby bug-report API uses; the widget must list `ultrapilled.com`.
-- Production sends through Gmail: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURITY=ssl`, `SMTP_USERNAME` = the Gmail address, `SMTP_PASSWORD` = a Google app password. Without those overrides, `isso.cfg` defaults to Resend (`SMTP_PASSWORD` = API key, sender on a verified domain).
+- Prefer Resend (`SMTP_PASSWORD` = API key, sender on a verified domain). Gmail app passwords work (`SMTP_HOST=smtp.gmail.com`, etc.) but a leaked secret can send as that mailbox — the app logs a startup warning if Gmail is configured.
 
 Later deploys: `cd guestbook && fly deploy`.
 
