@@ -8073,16 +8073,40 @@ html[data-theme="day"] .bug-report__message {
 
 .guestbook-modal__foot {
   flex-shrink: 0;
+  display: flex;
+  justify-content: flex-start;
   padding: var(--space-2) var(--space-3) var(--space-3);
   border-top: 1px solid var(--panel-rule);
 }
 
 .guestbook-modal__done {
-  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-mute);
+  font: inherit;
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    text-decoration-color 0.15s ease;
 }
 
-.guestbook-modal__body :is(button).pill,
-.guestbook-modal__foot button.pill {
+@media (hover: hover) and (pointer: fine) {
+  .guestbook-modal__done:hover {
+    color: var(--pill-fun-face);
+    text-decoration-color: currentColor;
+  }
+}
+
+.guestbook-modal__body :is(button).pill {
   min-height: calc(54px * var(--ui-scale));
   font-size: calc(15px * var(--ui-scale));
 }

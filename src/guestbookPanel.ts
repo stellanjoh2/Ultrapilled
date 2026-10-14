@@ -368,7 +368,7 @@ export function openGuestbook(): void {
         </section>
       </div>
       <footer class="guestbook-modal__foot">
-        <button type="button" class="pill pill--commit guestbook-modal__done" data-guestbook-close data-tip="Close guestbook">Ok, take me back</button>
+        <button type="button" class="guestbook-modal__done" data-guestbook-close>Ok, take me back</button>
       </footer>
     </div>
   `;
