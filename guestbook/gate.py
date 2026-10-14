@@ -27,7 +27,7 @@ TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverif
 MAX_BODY_BYTES = 8 * 1024
 MIN_NAME = 1
 MAX_NAME = 40
-MIN_TEXT = 3
+MIN_WORDS = 5
 MAX_TEXT = 500
 
 _MODERATE_PATH = re.compile(r"^/id/\d+/(?:activate|delete|edit)/[^/]+$")
@@ -122,8 +122,11 @@ def entry_problem(author: str, text: str) -> tuple[str, str] | None:
         return "name_length", f"Name must be 1–{MAX_NAME} characters."
     if "\n" in author:
         return "name_length", "Name must be a single line."
-    if not (MIN_TEXT <= len(text) <= MAX_TEXT):
-        return "text_length", f"Message must be {MIN_TEXT}–{MAX_TEXT} characters."
+    words = [w for w in text.split() if w]
+    if len(words) < MIN_WORDS:
+        return "too_short", f"Message must be at least {MIN_WORDS} words."
+    if len(text) > MAX_TEXT:
+        return "text_length", f"Message must be at most {MAX_TEXT} characters."
     if _LINK.search(author) or _LINK.search(text):
         return "links_not_allowed", "Links and email addresses aren’t allowed in the guestbook."
     if re.search(r"(.)\1{14,}", text):

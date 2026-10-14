@@ -7,8 +7,13 @@ export const GUESTBOOK_TURNSTILE_ACTION = "guestbook";
 export const GUESTBOOK_PAGE_SIZE = 20;
 
 export const MAX_GUESTBOOK_NAME = 40;
-export const MIN_GUESTBOOK_TEXT = 3;
+export const MIN_GUESTBOOK_WORDS = 5;
 export const MAX_GUESTBOOK_TEXT = 500;
+
+export function guestbookWordCount(message: string): number {
+  const trimmed = message.trim();
+  return trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
+}
 
 const LINK =
   /(?:https?:|ftp:|mailto:|www\.|\]\(|<a\s|\[url|\b[\w-]+\.(?:com|net|org|info|biz|ru|cn|xyz|top|io|co|me|ly|link|click|site|online|shop|app|dev|gg|tk|ml|ga|cf|bit)\b|[\w.+-]+@[\w-]+\.[\w.-]+)/i;
@@ -48,7 +53,9 @@ export function guestbookProblem(author: string, text: string): string | null {
   const body = text.trim();
   if (!name) return "Add your name.";
   if (name.length > MAX_GUESTBOOK_NAME) return `Keep your name under ${MAX_GUESTBOOK_NAME} characters.`;
-  if (body.length < MIN_GUESTBOOK_TEXT) return "Write a few more characters.";
+  if (guestbookWordCount(body) < MIN_GUESTBOOK_WORDS) {
+    return `Write a bit more — at least ${MIN_GUESTBOOK_WORDS} words.`;
+  }
   if (body.length > MAX_GUESTBOOK_TEXT) return `Keep it under ${MAX_GUESTBOOK_TEXT} characters.`;
   if (LINK.test(name) || LINK.test(body)) return "Links and email addresses aren’t allowed in the guestbook.";
   return null;
@@ -103,6 +110,7 @@ const ERROR_COPY: Record<string, string> = {
   turnstile_required: "Complete the security check, then sign.",
   turnstile_failed: "Security check failed. Try again.",
   turnstile_unconfigured: "The guestbook isn’t available right now.",
+  too_short: `Write a bit more — at least ${MIN_GUESTBOOK_WORDS} words.`,
   links_not_allowed: "Links and email addresses aren’t allowed in the guestbook.",
   origin_denied: "The guestbook only accepts entries from ultrapilled.com.",
 };

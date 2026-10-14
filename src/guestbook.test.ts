@@ -18,11 +18,18 @@ describe("guestbook rules", () => {
   });
 
   it("mirrors the server content rules", () => {
-    expect(guestbookProblem("", "hello there")).toMatch(/name/);
-    expect(guestbookProblem("n".repeat(41), "hello there")).toMatch(/40/);
-    expect(guestbookProblem("Ada", "hi")).toMatch(/more/);
-    expect(guestbookProblem("Ada", "x".repeat(501))).toMatch(/500/);
-    for (const text of ["see https://x.y", "www.spam.net", "spam.ru rocks", "me@example.com", "[a](b)"]) {
+    expect(guestbookProblem("", "hello there friends today now")).toMatch(/name/);
+    expect(guestbookProblem("n".repeat(41), "hello there friends today now")).toMatch(/40/);
+    expect(guestbookProblem("Ada", "hi")).toMatch(/5 words/);
+    expect(guestbookProblem("Ada", "one two three four")).toMatch(/5 words/);
+    expect(guestbookProblem("Ada", `${"word ".repeat(5)}${"x".repeat(480)}`)).toMatch(/500/);
+    for (const text of [
+      "see https://x.y right now please",
+      "www.spam.net is not allowed here",
+      "spam.ru rocks please leave now",
+      "mail me@example.com about this soon",
+      "[a](b) is a markdown link",
+    ]) {
       expect(guestbookProblem("Ada", text)).toMatch(/Links/);
     }
     expect(guestbookProblem("Ada", "Love the bouncy pills! e.g. the purple ones")).toBeNull();
@@ -126,19 +133,43 @@ describe("guestbook panel", () => {
     expect(document.querySelector(".guestbook__author")?.textContent).toBe("Ada");
   });
 
-  it("unlocks signing only for a valid entry", () => {
+  it("fills the word meter and unlocks signing at five words", () => {
     openGuestbook();
     const name = document.querySelector<HTMLInputElement>("#guestbook-name")!;
     const message = document.querySelector<HTMLTextAreaElement>("#guestbook-message")!;
     const send = document.querySelector<HTMLButtonElement>("[data-guestbook-send]")!;
+    const fill = document.querySelector<HTMLElement>("[data-guestbook-word-meter-fill]");
+    const meter = document.querySelector<HTMLElement>("[data-guestbook-word-meter]");
     expect(send.disabled).toBe(true);
+    expect(meter?.getAttribute("aria-valuemax")).toBe("5");
     name.value = "Ada";
-    message.value = "Hello from Stockholm";
+    message.value = "one two three four";
+    message.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(send.disabled).toBe(true);
+    expect(fill?.classList.contains("is-ready")).toBe(false);
+    message.value = "Hello from Stockholm this evening";
     message.dispatchEvent(new Event("input", { bubbles: true }));
     expect(send.disabled).toBe(false);
-    message.value = "check out spam.com";
+    expect(fill?.classList.contains("is-ready")).toBe(true);
+    message.value = "check out spam.com please now";
     message.dispatchEvent(new Event("input", { bubbles: true }));
     expect(send.disabled).toBe(true);
+  });
+
+  it("mounts Turnstile off the modal", async () => {
+    vi.stubGlobal("turnstile", {
+      render: () => "widget-1",
+      remove: () => {},
+      reset: () => {},
+      getResponse: () => "",
+    });
+    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "test-site-key");
+    openGuestbook();
+    await vi.waitFor(() => expect(document.querySelector("#guestbook-turnstile")).toBeTruthy());
+    expect(document.querySelector(".guestbook__card #guestbook-turnstile")).toBeNull();
+    expect(document.querySelector("#guestbook-turnstile")?.parentElement).toBe(document.body);
+    closeGuestbook();
+    expect(document.querySelector("#guestbook-turnstile")).toBeNull();
   });
 
   it("closes on Escape", () => {

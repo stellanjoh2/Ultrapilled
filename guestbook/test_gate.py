@@ -50,7 +50,7 @@ def post(client, body, origin=ORIGIN, headers=None, ip="203.0.113.7"):
     )
 
 
-ENTRY = {"author": "Ada", "text": "Love the bouncy pills!", "turnstileToken": "tok", "honeypot": ""}
+ENTRY = {"author": "Ada", "text": "Love the bouncy pills a lot!", "turnstileToken": "tok", "honeypot": ""}
 
 
 class RouteTests(unittest.TestCase):
@@ -93,7 +93,7 @@ class NewEntryTests(unittest.TestCase):
         res = post(client, {**ENTRY, "email": "x@y.z", "website": "https://spam", "parent": 3, "mode": 1})
         self.assertEqual(res.status_code, 202)
         forwarded = json.loads(isso.calls[0][3])
-        self.assertEqual(forwarded, {"author": "Ada", "text": "Love the bouncy pills!", "title": "Guestbook",
+        self.assertEqual(forwarded, {"author": "Ada", "text": "Love the bouncy pills a lot!", "title": "Guestbook",
                                      "email": None, "website": None, "parent": None})
 
     def test_rejects_foreign_origin(self):
@@ -123,11 +123,16 @@ class NewEntryTests(unittest.TestCase):
         client, isso = make()
         cases = {
             "links_not_allowed": [
-                "visit https://cheap.example", "go to www.thing.net", "see spam.ru now", "[x](y)",
-                "mail me@example.com", "<a href=x>hi</a>",
+                "please visit https://cheap.example right now",
+                "please go to www.thing.net right away",
+                "please see spam.ru right now",
+                "please check [x](y) right now",
+                "please mail me@example.com right now",
+                "please open <a href=x>hi</a> right now",
             ],
-            "text_length": ["hi", "x" * 501],
-            "repeated": ["aaaaaaaaaaaaaaaaaaaa"],
+            "too_short": ["hi", "one two three four"],
+            "text_length": ["x " * 250 + "x"],
+            "repeated": ["aaaaaaaaaaaaaaaaaaaa hey there friend please"],
         }
         for code, texts in cases.items():
             for text in texts:
@@ -142,10 +147,10 @@ class NewEntryTests(unittest.TestCase):
 
     def test_strips_control_and_bidi_chars(self):
         client, isso = make()
-        post(client, {**ENTRY, "author": " A\u202eda\u200b ", "text": "hey\x00 there\n\n\n\nfriend"})
+        post(client, {**ENTRY, "author": " A\u202eda\u200b ", "text": "hey\x00 there\n\n\n\nfriend please stay"})
         forwarded = json.loads(isso.calls[0][3])
         self.assertEqual(forwarded["author"], "Ada")
-        self.assertEqual(forwarded["text"], "hey there\n\nfriend")
+        self.assertEqual(forwarded["text"], "hey there\n\nfriend please stay")
 
 
 class TurnstileTests(unittest.TestCase):
@@ -229,7 +234,7 @@ class IssoIntegrationTests(unittest.TestCase):
             client = Client(app_module.application)
 
             with self.assertLogs(level="INFO") as logs:
-                res = post(client, {**ENTRY, "text": "Hello *world* <b>x</b>"})
+                res = post(client, {**ENTRY, "text": "Hello *world* and more words here <b>x</b>"})
             self.assertEqual(res.status_code, 202, res.get_data(as_text=True))
             self.assertEqual(res.json["mode"], 2)
 
@@ -245,7 +250,7 @@ class IssoIntegrationTests(unittest.TestCase):
             listing = client.get("/?uri=/guestbook&plain=1&sort=newest", headers={"Origin": ORIGIN})
             [entry] = listing.json["replies"]
             self.assertEqual(entry["author"], "Ada")
-            self.assertEqual(entry["text"], "Hello *world* <b>x</b>")
+            self.assertEqual(entry["text"], "Hello *world* and more words here <b>x</b>")
             self.assertNotIn("email", entry)
             self.assertNotIn("remote_addr", entry)
 

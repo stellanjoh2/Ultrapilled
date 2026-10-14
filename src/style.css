@@ -8105,16 +8105,46 @@ html[data-theme="day"] .guestbook__field {
   outline-offset: calc(2px * var(--ui-scale));
 }
 
-.guestbook__count {
-  margin: calc(6px * var(--ui-scale)) 0 var(--space-1);
-  color: var(--ink-mute);
-  font-size: calc(12px * var(--ui-scale));
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+.guestbook__meter {
+  width: 100%;
+  height: calc(4px * var(--ui-scale));
+  margin: calc(8px * var(--ui-scale)) 0 var(--space-1);
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  box-sizing: border-box;
 }
 
-.guestbook__count.is-over {
-  color: #ff6b6b;
+.guestbook__meter-fill {
+  position: relative;
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff4d4d 0%, #f5a524 100%);
+  transition: width 0.22s ease;
+}
+
+.guestbook__meter-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--play-face);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+.guestbook__meter-fill.is-ready::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guestbook__meter-fill,
+  .guestbook__meter-fill::after {
+    transition: none;
+  }
 }
 
 .guestbook__hp {
@@ -8123,12 +8153,6 @@ html[data-theme="day"] .guestbook__field {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
-}
-
-.guestbook__turnstile:not([hidden]) {
-  display: block;
-  min-height: calc(65px * var(--ui-scale));
-  margin: 0 0 var(--space-1);
 }
 
 .guestbook__status {
@@ -8148,8 +8172,13 @@ html[data-theme="day"] .guestbook__field {
 
 .guestbook__actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-1);
+}
+
+.guestbook__send-wrap {
+  display: block;
+  min-width: 0;
 }
 
 .guestbook__actions .pill {
@@ -8158,7 +8187,7 @@ html[data-theme="day"] .guestbook__field {
   min-height: calc(54px * var(--ui-scale));
 }
 
-.guestbook__actions .pill:disabled {
+.guestbook__send-wrap:has(.pill:disabled) {
   cursor: not-allowed;
 }
 
@@ -8249,6 +8278,38 @@ html[data-theme="day"] .guestbook__field {
 .guestbook__more {
   align-self: center;
   margin-top: var(--space-1);
+}
+
+/* Cloudflare Turnstile — fixed top-right, same placement as bug report. */
+.guestbook-turnstile {
+  position: fixed;
+  top: max(env(safe-area-inset-top, 0px), calc(16px * var(--ui-scale)));
+  right: max(env(safe-area-inset-right, 0px), calc(16px * var(--ui-scale)));
+  left: auto;
+  z-index: 260;
+  margin: 0;
+  pointer-events: auto;
+  transform-origin: top right;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease;
+}
+
+.guestbook-turnstile[hidden] {
+  display: none !important;
+}
+
+.guestbook-turnstile:not([hidden]) {
+  display: block;
+  min-height: 4rem;
+}
+
+.guestbook-turnstile.is-faded {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
+  pointer-events: none;
 }
 
 .unsplash-modal {

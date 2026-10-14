@@ -4,8 +4,10 @@ import {
   GUESTBOOK_TURNSTILE_ACTION,
   MAX_GUESTBOOK_NAME,
   MAX_GUESTBOOK_TEXT,
+  MIN_GUESTBOOK_WORDS,
   fetchGuestbook,
   guestbookProblem,
+  guestbookWordCount,
   postGuestbook,
   type GuestbookEntry,
 } from "./guestbook";
@@ -22,7 +24,9 @@ let sending = false;
 let loadedOffset = 0;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
 let returnFocus: HTMLElement | null = null;
+let turnstileHost: HTMLElement | null = null;
 let turnstileWidgetId: string | number | null = null;
+let turnstileFadeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -36,28 +40,33 @@ function turnstileTheme(): "light" | "dark" {
   return document.documentElement.dataset.theme === "day" ? "light" : "dark";
 }
 
-async function mountTurnstile(host: HTMLElement): Promise<void> {
-  const siteKey = turnstileSiteKey();
-  if (!siteKey) return;
-  try {
-    await ensureTurnstileScript();
-  } catch {
-    return;
-  }
-  if (!window.turnstile || !host.isConnected) return;
-  host.hidden = false;
-  try {
-    turnstileWidgetId = window.turnstile.render(host, {
-      sitekey: siteKey,
-      theme: turnstileTheme(),
-      action: GUESTBOOK_TURNSTILE_ACTION,
-    });
-  } catch {
-    /* widget failed to start — submit will surface the error */
+function clearTurnstileFadeTimer(): void {
+  if (turnstileFadeTimer != null) {
+    clearTimeout(turnstileFadeTimer);
+    turnstileFadeTimer = null;
   }
 }
 
-function unmountTurnstile(): void {
+function revealTurnstileHost(): void {
+  if (!turnstileHost) return;
+  clearTurnstileFadeTimer();
+  turnstileHost.classList.remove("is-faded");
+  turnstileHost.hidden = false;
+  turnstileHost.setAttribute("aria-hidden", "false");
+}
+
+function fadeTurnstileHostOut(): void {
+  if (!turnstileHost) return;
+  clearTurnstileFadeTimer();
+  const delay = reducedMotion() ? 0 : 2450;
+  turnstileFadeTimer = setTimeout(() => {
+    turnstileFadeTimer = null;
+    turnstileHost?.classList.add("is-faded");
+  }, delay);
+}
+
+function clearTurnstileWidget(): void {
+  clearTurnstileFadeTimer();
   if (turnstileWidgetId != null && window.turnstile) {
     try {
       window.turnstile.remove(turnstileWidgetId);
@@ -68,6 +77,46 @@ function unmountTurnstile(): void {
   turnstileWidgetId = null;
 }
 
+function removeTurnstileHost(): void {
+  clearTurnstileWidget();
+  turnstileHost?.remove();
+  turnstileHost = null;
+}
+
+async function prepareTurnstile(): Promise<void> {
+  const siteKey = turnstileSiteKey();
+  if (!siteKey) return;
+  if (!turnstileHost) {
+    turnstileHost = document.createElement("div");
+    turnstileHost.id = "guestbook-turnstile";
+    turnstileHost.className = "guestbook-turnstile";
+    turnstileHost.setAttribute("aria-label", "Security check");
+    turnstileHost.hidden = true;
+    turnstileHost.setAttribute("aria-hidden", "true");
+    document.body.append(turnstileHost);
+  }
+  revealTurnstileHost();
+  try {
+    await ensureTurnstileScript();
+  } catch {
+    return;
+  }
+  if (!turnstileHost || !window.turnstile) return;
+  clearTurnstileWidget();
+  try {
+    turnstileWidgetId = window.turnstile.render(turnstileHost, {
+      sitekey: siteKey,
+      theme: turnstileTheme(),
+      action: GUESTBOOK_TURNSTILE_ACTION,
+      callback: () => fadeTurnstileHostOut(),
+      "expired-callback": () => revealTurnstileHost(),
+    });
+    revealTurnstileHost();
+  } catch {
+    /* widget failed to start — submit will surface the error */
+  }
+}
+
 function resetTurnstile(): void {
   if (turnstileWidgetId != null && window.turnstile) {
     try {
@@ -76,6 +125,7 @@ function resetTurnstile(): void {
       /* ignore */
     }
   }
+  revealTurnstileHost();
 }
 
 function entryElement(entry: GuestbookEntry): HTMLLIElement {
@@ -133,15 +183,29 @@ function setStatus(form: HTMLFormElement, text: string, tone: "" | "error" | "ok
   status.classList.toggle("is-ok", tone === "ok");
 }
 
+function syncWordMeter(form: HTMLFormElement): void {
+  const track = form.querySelector<HTMLElement>("[data-guestbook-word-meter]");
+  const fill = form.querySelector<HTMLElement>("[data-guestbook-word-meter-fill]");
+  const message = form.querySelector<HTMLTextAreaElement>("#guestbook-message");
+  if (!track || !fill || !message) return;
+  const words = guestbookWordCount(message.value);
+  const ready = words >= MIN_GUESTBOOK_WORDS;
+  fill.style.width = `${Math.min(words / MIN_GUESTBOOK_WORDS, 1) * 100}%`;
+  fill.classList.toggle("is-ready", ready);
+  track.setAttribute("aria-valuenow", String(Math.min(words, MIN_GUESTBOOK_WORDS)));
+}
+
 function syncForm(form: HTMLFormElement): void {
+  syncWordMeter(form);
   const name = form.querySelector<HTMLInputElement>("#guestbook-name")!;
   const message = form.querySelector<HTMLTextAreaElement>("#guestbook-message")!;
-  const count = form.querySelector<HTMLElement>("[data-guestbook-count]")!;
   const send = form.querySelector<HTMLButtonElement>("[data-guestbook-send]")!;
-  const length = message.value.trim().length;
-  count.textContent = `${length}/${MAX_GUESTBOOK_TEXT}`;
-  count.classList.toggle("is-over", length > MAX_GUESTBOOK_TEXT);
-  send.disabled = sending || guestbookProblem(name.value, message.value) !== null;
+  const wrap = form.querySelector<HTMLElement>("[data-guestbook-send-wrap]");
+  const problem = guestbookProblem(name.value, message.value);
+  send.disabled = sending || problem !== null;
+  if (!wrap) return;
+  if (send.disabled && problem) wrap.title = problem;
+  else wrap.removeAttribute("title");
 }
 
 async function submit(form: HTMLFormElement): Promise<void> {
@@ -160,11 +224,13 @@ async function submit(form: HTMLFormElement): Promise<void> {
   if (turnstileSiteKey()) {
     if (!window.turnstile || turnstileWidgetId == null) {
       setStatus(form, "Security check isn’t ready yet. Wait a moment and try again.", "error");
+      void prepareTurnstile();
       return;
     }
     turnstileToken = window.turnstile.getResponse(turnstileWidgetId) || "";
     if (!turnstileToken) {
       setStatus(form, "Complete the security check, then sign.", "error");
+      revealTurnstileHost();
       return;
     }
   }
@@ -188,6 +254,7 @@ async function submit(form: HTMLFormElement): Promise<void> {
       if (!result.pending && modalRoot) void loadEntries(modalRoot, true);
     } else {
       setStatus(form, result.message, "error");
+      if (result.code === "turnstile_failed" || result.code === "turnstile_required") resetTurnstile();
     }
   } catch {
     setStatus(form, "Network error. Check your connection.", "error");
@@ -209,7 +276,7 @@ export function closeGuestbook(): void {
   playRemove();
 
   const done = () => {
-    unmountTurnstile();
+    removeTurnstileHost();
     root.remove();
     modalRoot = null;
     closing = false;
@@ -267,17 +334,28 @@ export function openGuestbook(): void {
           class="guestbook__field guestbook__message"
           id="guestbook-message"
           name="text"
-          maxlength="${MAX_GUESTBOOK_TEXT + 50}"
+          maxlength="${MAX_GUESTBOOK_TEXT}"
           rows="4"
-          placeholder="No links, be kind."
+          placeholder="About 5+ words. No links, be kind."
         ></textarea>
-        <p class="guestbook__count" data-guestbook-count aria-hidden="true">0/${MAX_GUESTBOOK_TEXT}</p>
+        <div
+          class="guestbook__meter"
+          data-guestbook-word-meter
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="${MIN_GUESTBOOK_WORDS}"
+          aria-valuenow="0"
+          aria-label="Words of the message"
+        >
+          <div class="guestbook__meter-fill" data-guestbook-word-meter-fill></div>
+        </div>
         <input type="text" name="honeypot" class="guestbook__hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
-        <div class="guestbook__turnstile" aria-label="Security check" hidden></div>
         <p class="guestbook__status" aria-live="polite"></p>
         <div class="guestbook__actions">
           <button type="button" class="pill" data-guestbook-close>Close</button>
-          <button type="submit" class="pill pill--commit" data-guestbook-send disabled>Sign the guestbook</button>
+          <span class="guestbook__send-wrap" data-guestbook-send-wrap>
+            <button type="submit" class="pill pill--commit" data-guestbook-send disabled>Sign the guestbook</button>
+          </span>
         </div>
         <p class="guestbook__fine">Your name, message, and date are public once approved. <a href="${PRIVACY_HREF}#guestbook">How we handle it</a>.</p>
       </form>
@@ -326,7 +404,7 @@ export function openGuestbook(): void {
   playTransition(true);
   name.focus({ preventScroll: true });
   syncForm(form);
-  void mountTurnstile(form.querySelector<HTMLElement>(".guestbook__turnstile")!);
+  void prepareTurnstile();
   void loadEntries(root, true);
 
   if (reducedMotion()) return;
