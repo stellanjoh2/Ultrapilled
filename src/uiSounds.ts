@@ -1,4 +1,4 @@
-import { playSound, unlockAudio, type SoundPlayback } from "@/lib/sound-engine";
+import { getAudioContext, playSound, unlockAudio, type SoundPlayback } from "@/lib/sound-engine";
 import type { SoundAsset } from "@/lib/sound-types";
 import { getPrefs, onPrefsChange } from "./prefs";
 import { drop001Sound } from "@/sounds/drop-001";
@@ -41,6 +41,7 @@ const impactBySlot = new Map<string, string>();
 
 let pendingUri: string | null = null;
 let pendingVolume = 1;
+let pendingRate = 1;
 let pendingGate: () => boolean = () => false;
 let pendingImportant = false;
 let flushQueued = false;
@@ -68,7 +69,10 @@ onPrefsChange(() => {
   uiSounds = prefs.uiSounds;
   hoverSounds = prefs.hoverSounds;
   soundVolume = prefs.soundVolume;
-  if (!soundOn || !uiSounds || soundVolume <= 0 || forceMuted) stopProgress();
+  if (!soundOn || !uiSounds || soundVolume <= 0 || forceMuted) {
+    stopProgress();
+    stopChargeHum();
+  }
 });
 
 /** When true, all UI / impact SFX are skipped (e.g. audio-react mic is on). */
@@ -79,6 +83,7 @@ export function setUiSoundsMuted(next: boolean) {
   activePlayback = null;
   playEpoch += 1;
   stopProgress();
+  stopChargeHum();
 }
 
 function masterAudible(): boolean {
@@ -109,23 +114,26 @@ function requestPlay(
   src: string,
   volume = 1,
   gate: () => boolean = uiAudible,
-  opts?: { important?: boolean },
+  opts?: { important?: boolean; rate?: number },
 ) {
   if (!gate()) return;
   // Block hover for this event before the menu DOM appears under the pointer.
   hoverUntil = Math.max(hoverUntil, performance.now() + HOVER_MIN_INTERVAL_MS);
   const important = Boolean(opts?.important);
+  const rate = opts?.rate ?? 1;
   if (flushQueued) {
     // Pending open/close must not be replaced by a generic click (or vice versa: open wins).
     if (pendingImportant && !important) return;
     pendingUri = src;
     pendingVolume = volume;
+    pendingRate = rate;
     pendingGate = gate;
     if (important) pendingImportant = true;
     return;
   }
   pendingUri = src;
   pendingVolume = volume;
+  pendingRate = rate;
   pendingGate = gate;
   pendingImportant = important;
   flushQueued = true;
@@ -139,8 +147,10 @@ function requestPlay(
     }
     const uri = pendingUri;
     const vol = pendingVolume;
+    const playbackRate = pendingRate;
     pendingUri = null;
     pendingVolume = 1;
+    pendingRate = 1;
     if (!uri) return;
     const now = performance.now();
     // Generic clicks yield to a cue already playing in the lock window.
@@ -153,7 +163,7 @@ function requestPlay(
     lockedUntil = now + SOUND_LOCK_MS;
     hoverUntil = Math.max(hoverUntil, lockedUntil);
     const epoch = ++playEpoch;
-    void playSound(uri, { volume: gain(vol) }).then((playback) => {
+    void playSound(uri, { volume: gain(vol), playbackRate }).then((playback) => {
       if (epoch !== playEpoch) {
         playback.stop();
         return;
@@ -275,6 +285,94 @@ export function startProgress() {
 export function stopProgress() {
   progressPlayback?.stop();
   progressPlayback = null;
+}
+
+const CHARGE_HUM_FROM_HZ = 220;
+const CHARGE_HUM_TO_HZ = 740;
+const CHARGE_HUM_VOLUME = 0.09;
+/** Matches the meter's fade-in delay so quick taps stay silent. */
+const CHARGE_HUM_DELAY_S = 0.08;
+let chargeHum: { stop: () => void } | null = null;
+
+/** Hover-car whirr that glides up over `chargeMs` (t² like the shake) and wobbles at the top. */
+export function startChargeHum(chargeMs: number) {
+  stopChargeHum();
+  if (!uiAudible()) return;
+  const ctx = getAudioContext();
+  if (ctx.state !== "running") return;
+
+  const now = ctx.currentTime;
+  const chargeS = chargeMs / 1000;
+  const steps = 32;
+  const ratio = CHARGE_HUM_TO_HZ / CHARGE_HUM_FROM_HZ;
+  const curve = new Float32Array(steps);
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    curve[i] = CHARGE_HUM_FROM_HZ * ratio ** (t * t);
+  }
+
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0, now);
+  out.gain.setValueAtTime(0, now + CHARGE_HUM_DELAY_S);
+  out.gain.linearRampToValueAtTime(gain(CHARGE_HUM_VOLUME), now + CHARGE_HUM_DELAY_S + 0.06);
+
+  const tone = ctx.createBiquadFilter();
+  tone.type = "lowpass";
+  tone.frequency.value = 2400;
+  tone.connect(out);
+  out.connect(ctx.destination);
+
+  const lfo = ctx.createOscillator();
+  lfo.frequency.setValueAtTime(6, now);
+  lfo.frequency.linearRampToValueAtTime(11, now + chargeS);
+  lfo.frequency.linearRampToValueAtTime(15, now + chargeS + 0.05);
+  const wobble = ctx.createGain();
+  wobble.gain.setValueAtTime(18, now);
+  wobble.gain.linearRampToValueAtTime(40, now + chargeS);
+  lfo.connect(wobble);
+
+  const voices = [
+    { type: "sine" as const, mult: 1, level: 1 },
+    { type: "triangle" as const, mult: 2, level: 0.25 },
+  ].map(({ type, mult, level }) => {
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueCurveAtTime(curve.map((hz) => hz * mult), now, chargeS);
+    wobble.connect(osc.detune);
+    const voiceGain = ctx.createGain();
+    voiceGain.gain.value = level;
+    osc.connect(voiceGain).connect(tone);
+    return osc;
+  });
+
+  const sources = [lfo, ...voices];
+  for (const src of sources) src.start(now);
+
+  chargeHum = {
+    stop: () => {
+      const end = ctx.currentTime;
+      out.gain.cancelScheduledValues(end);
+      out.gain.setValueAtTime(out.gain.value, end);
+      out.gain.linearRampToValueAtTime(0, end + 0.08);
+      for (const src of sources) src.stop(end + 0.1);
+    },
+  };
+}
+
+export function stopChargeHum() {
+  chargeHum?.stop();
+  chargeHum = null;
+}
+
+/** dB below full volume for a zero-charge tap; max charge plays at 0 dB. */
+const SHAKE_RELEASE_FLOOR_DB = -24;
+const SHAKE_RELEASE_RATE = 0.8;
+
+/** 8-bit boom on shake release; `charge` 0–1 maps linearly in dB up to full volume. */
+export function playShakeRelease(charge: number) {
+  const c = Math.min(1, Math.max(0, charge));
+  const volume = 10 ** ((SHAKE_RELEASE_FLOOR_DB * (1 - c)) / 20);
+  requestPlay(S("shake_release"), volume, uiAudible, { important: true, rate: SHAKE_RELEASE_RATE });
 }
 
 function isTypingField(target: EventTarget | null): boolean {

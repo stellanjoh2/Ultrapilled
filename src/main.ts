@@ -145,7 +145,7 @@ import {
 import { fitTextFieldBox, trackingEm, trackingOf } from "./measure";
 import { createWorld } from "./world";
 import { cancelSlotDrag } from "./slotDrag";
-import { bindUiClickSounds, bindUiHoverSounds, bindUiTypeSounds, playButton, playCaution, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, setUiSoundsMuted } from "./uiSounds";
+import { bindUiClickSounds, bindUiHoverSounds, bindUiTypeSounds, playButton, playCaution, playClick, playCreate, playInvert, playNotify, playRemove, playSwipe, playSwitch, playTransition, playShakeRelease, setUiSoundsMuted, startChargeHum, stopChargeHum } from "./uiSounds";
 import gsap from "gsap";
 import "./style.css";
 import { compositionScale, placeZoomedFixed, syncUiScale, UI_REF_H, uiScale } from "./uiScale";
@@ -5862,26 +5862,60 @@ let spaceChargeAt: number | null = null;
 
 function shakeIntensityFromHold(heldMs: number): number {
   const tap = Math.min(SHAKE_TAP, shakeMax);
-  const t = Math.min(1, Math.max(0, heldMs / SHAKE_CHARGE_MS));
   // Ease-in: short taps stay near tap; full charge needs a real hold.
-  const eased = t * t;
-  return Math.round(tap + (shakeMax - tap) * eased);
+  return Math.round(tap + (shakeMax - tap) * shakeChargeFromHold(heldMs));
+}
+
+/** 0 → 1 share of the tap→max range, same easing as the fired shake. */
+function shakeChargeFromHold(heldMs: number): number {
+  const t = Math.min(1, Math.max(0, heldMs / SHAKE_CHARGE_MS));
+  return t * t;
+}
+
+const shakeMeter = document.createElement("div");
+shakeMeter.className = "shake-meter";
+shakeMeter.setAttribute("aria-hidden", "true");
+shakeMeter.innerHTML = `<div class="shake-meter__fill"></div>`;
+document.body.append(shakeMeter);
+let shakeMeterFrame = 0;
+
+function paintShakeMeter() {
+  shakeMeterFrame = 0;
+  if (spaceChargeAt == null) return;
+  const charge = shakeChargeFromHold(performance.now() - spaceChargeAt);
+  shakeMeter.style.setProperty("--charge", charge.toFixed(4));
+  shakeMeter.classList.toggle("is-max", charge >= 1);
+  if (charge < 1) shakeMeterFrame = requestAnimationFrame(paintShakeMeter);
+}
+
+function startSpaceCharge() {
+  spaceChargeAt = performance.now();
+  shakeMeter.style.setProperty("--charge", "0");
+  shakeMeter.classList.remove("is-max");
+  shakeMeter.classList.add("is-charging");
+  cancelAnimationFrame(shakeMeterFrame);
+  shakeMeterFrame = requestAnimationFrame(paintShakeMeter);
+  startChargeHum(SHAKE_CHARGE_MS);
 }
 
 function cancelSpaceCharge() {
   spaceChargeAt = null;
+  stopChargeHum();
+  cancelAnimationFrame(shakeMeterFrame);
+  shakeMeterFrame = 0;
+  shakeMeter.classList.remove("is-charging", "is-max");
 }
 
 function fireSpaceShake() {
   if (spaceChargeAt == null) return;
   const held = performance.now() - spaceChargeAt;
-  spaceChargeAt = null;
+  cancelSpaceCharge();
   if (!running) return;
   if (paused) {
     paused = false;
     world.setRunning(true);
   }
-  playClick();
+  playShakeRelease(shakeChargeFromHold(held));
   world.shakeFloor(shakeIntensityFromHold(held));
 }
 
@@ -7047,7 +7081,7 @@ window.addEventListener("keydown", (event) => {
       paused = false;
       world.setRunning(true);
     }
-    spaceChargeAt = performance.now();
+    startSpaceCharge();
     return;
   }
   if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && state.physics.layoutMode) {

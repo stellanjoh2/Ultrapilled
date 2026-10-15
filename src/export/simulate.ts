@@ -125,7 +125,7 @@ export async function renderLoop(options: {
           frame,
         );
         if (layoutExport) sim.freezePile();
-        else if (options.replayFall) sim.wakeAll();
+        else if (options.replayFall) sim.replayFall(poses, frame);
         else sim.redeployFall();
         sim.sync();
       } else {

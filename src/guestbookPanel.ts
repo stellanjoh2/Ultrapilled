@@ -300,7 +300,7 @@ export function closeGuestbook(): void {
   }
   const tl = gsap.timeline({ onComplete: done });
   tl.to(sheet, { x: 48, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
-  tl.to(scrim, { autoAlpha: 0, duration: 0.28, ease: "power1.in" }, 0);
+  tl.to(scrim, { "--scrim-t": 0, duration: 0.28, ease: "power1.in" }, 0);
 }
 
 export function openGuestbook(): void {
@@ -421,15 +421,12 @@ export function openGuestbook(): void {
   void prepareTurnstile();
   void loadEntries(root, true);
 
-  gsap.set(scrim, { autoAlpha: 0 });
+  if (reducedMotion()) return;
+
+  gsap.set(scrim, { "--scrim-t": 0 });
   gsap.set(sheet, { autoAlpha: 0, x: 56 });
 
-  if (reducedMotion()) {
-    gsap.set([scrim, sheet], { clearProps: "all", autoAlpha: 1, x: 0 });
-    return;
-  }
-
   const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-  tl.to(scrim, { autoAlpha: 1, duration: 0.32 }, 0);
+  tl.to(scrim, { "--scrim-t": 1, duration: 0.32 }, 0);
   tl.to(sheet, { autoAlpha: 1, x: 0, duration: 0.42 }, 0.04);
 }

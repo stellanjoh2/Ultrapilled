@@ -325,6 +325,8 @@ export type WorldHandle = {
   fallStartPoses: () => ChipPose[] | null;
   /** Wake sleeping chips in place (export replay after restore). */
   wakeAll: () => void;
+  /** Wake restored fall-start poses, re-throwing side entries inward. */
+  replayFall: (saved: ChipPose[], frame: { width: number; height: number }) => void;
   purgeFallen: (limitY: number) => void;
   isSettled: () => boolean;
   isQuiet: () => boolean;
@@ -3906,6 +3908,34 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     for (const chip of chips) Sleeping.set(chip.body, false);
   }
 
+  /**
+   * Replay restored fall-start poses. Side entries start outside the walls, so
+   * they need the open gap and inward throw that play() gave them. restore()
+   * ran with the walls closed and centered wide chips, so re-seat them first.
+   */
+  function replayFall(saved: ChipPose[], frame: { width: number; height: number }) {
+    const dir = layoutMode ? "down" : fallDirection(scenePhysics.fallDirection);
+    if ((dir === "left" || dir === "right") && bounds.width >= 8) {
+      entryGap = dir;
+      buildSides(bounds.width, bounds.height);
+      const sx = frame.width > 0 ? bounds.width / frame.width : 1;
+      const sy = frame.height > 0 ? bounds.height / frame.height : 1;
+      const byKey = new Map(saved.map((pose) => [`${pose.slotId}:${pose.seqIndex}`, pose]));
+      const inward = dir === "left" ? 1 : -1;
+      for (const chip of chips) {
+        const pose = byKey.get(`${chip.slotId}:${chip.seqIndex}`);
+        if (pose) Body.setPosition(chip.body, { x: pose.x * sx, y: pose.y * sy });
+        const sideHalf = tiltedHalfWidth(chip.width, chip.height, chip.body.angle);
+        const speed = sideThrowSpeed(chip.body.position.x, sideHalf, bounds.width, dir);
+        Body.setVelocity(chip.body, { x: inward * speed, y: (Math.random() - 0.35) * 2 });
+        syncWallCollision(chip);
+        armAirTilt(chip);
+        seat(chip);
+      }
+    }
+    wakeAll();
+  }
+
   /** Random 0–30° twist for a fresh drop; cleared on first contact. */
   function armAirTilt(chip: DroppedChip) {
     if (layoutMode) {
@@ -4899,6 +4929,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     redeployFall,
     fallStartPoses,
     wakeAll,
+    replayFall,
     purgeFallen,
     isSettled,
     isQuiet,

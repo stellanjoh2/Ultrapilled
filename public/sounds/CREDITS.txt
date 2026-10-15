@@ -24,3 +24,9 @@ Mozayk UI hover
 
 `hover.wav` is the project-owned Mozayk UI hover cue (`uisound-hover.wav`),
 copied for control hover feedback. No external attribution required.
+
+Shake release
+=============
+
+`shake_release.wav` is "8bit explosion" by Duskbreaker (Freesound #641486) —
+https://freesound.org/s/641486/ — played when a Space-charged shake fires.

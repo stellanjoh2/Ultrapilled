@@ -110,7 +110,7 @@ let cycleTimers: number[] = [];
 
 const CYCLE_MS = 1000;
 
-const ABOUT_BLUR_PX = 21;
+const ABOUT_BLUR_PX = 20;
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;

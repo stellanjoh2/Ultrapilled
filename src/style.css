@@ -6000,6 +6000,70 @@ html[data-theme="day"] .shape-swatch {
   }
 }
 
+/* Space-hold shake power — fill grows out from the centre, green → Orby Pink at max. */
+.shake-meter {
+  --charge: 0;
+  --shake-meter-low: #2ee86b;
+  --shake-meter-max: #ff00c4;
+  position: fixed;
+  z-index: 60;
+  left: 0;
+  right: 0;
+  bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  width: min(calc(540px * var(--ui-scale)), calc(100vw - var(--space-3) * 2));
+  height: calc(28px * var(--ui-scale));
+  margin-inline: auto;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--canvas) 80%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent),
+    var(--shadow-2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.shake-meter.is-charging {
+  opacity: 1;
+  /* Short delay so a quick tap doesn't flash the bar. */
+  transition-delay: 0.08s;
+}
+
+.shake-meter__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in oklab,
+    var(--shake-meter-max) calc(var(--charge) * 100%),
+    var(--shake-meter-low)
+  );
+  transform: scaleX(var(--charge));
+  transform-origin: center;
+}
+
+.shake-meter.is-max {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--shake-meter-max) 60%, transparent),
+    0 0 calc(24px * var(--ui-scale)) color-mix(in srgb, var(--shake-meter-max) 45%, transparent),
+    var(--shadow-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shake-meter.is-max {
+    animation: shake-meter-rattle 0.09s linear infinite;
+  }
+}
+
+@keyframes shake-meter-rattle {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(calc(-3px * var(--ui-scale)), calc(1px * var(--ui-scale))) rotate(-0.6deg); }
+  50% { transform: translate(calc(2px * var(--ui-scale)), calc(-1px * var(--ui-scale))) rotate(0.4deg); }
+  75% { transform: translate(calc(-2px * var(--ui-scale)), calc(-1px * var(--ui-scale))) rotate(-0.3deg); }
+  100% { transform: translate(calc(3px * var(--ui-scale)), calc(1px * var(--ui-scale))) rotate(0.6deg); }
+}
+
 .pro-tip {
   position: fixed;
   z-index: 60;
@@ -7752,14 +7816,22 @@ a.pill.about-project__launch:active {
 }
 
 /* Full-viewport dim (also over the Mode Select header, which stays clickable).
-   Fades with the scrim's autoAlpha. */
+   Fades via --scrim-t, not the scrim's opacity — an opacity < 1 ancestor
+   becomes a backdrop root and the blur would vanish mid-fade. */
 .guestbook-modal__scrim::before,
 .bug-report:not(.is-thanks) .bug-report__scrim::before {
   content: "";
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 0.1);
+  background: rgb(0 0 0 / calc(0.2 * var(--scrim-t, 1)));
   pointer-events: none;
+}
+
+/* Mode Select: same underlay blur as About. */
+.guestbook-modal__scrim::before,
+.mode-select-host.is-gate ~ .bug-report:not(.is-thanks) .bug-report__scrim::before {
+  -webkit-backdrop-filter: blur(calc(20px * var(--scrim-t, 1)));
+  backdrop-filter: blur(calc(20px * var(--scrim-t, 1)));
 }
 
 .guestbook-modal__sheet,
