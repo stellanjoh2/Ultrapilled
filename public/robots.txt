@@ -1,0 +1,5 @@
+# https://ultrapilled.com
+User-agent: *
+Allow: /
+
+Sitemap: https://ultrapilled.com/sitemap.xml
