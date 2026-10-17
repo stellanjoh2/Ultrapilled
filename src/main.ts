@@ -5656,11 +5656,16 @@ function isMobileShareViewer(): boolean {
   return mobileShareViewer;
 }
 
-function enableMobileShareViewer(source: { poses: ChipPose[]; frame: { width: number; height: number } }) {
+function enableMobileShareViewer(source: {
+  poses: ChipPose[];
+  frame: { width: number; height: number };
+  canvas?: CanvasRatio;
+}) {
   if (mobileShareViewer) return;
   mobileShareViewer = true;
   document.documentElement.classList.add("is-mobile-share");
   shell.classList.add("is-mobile-share");
+  const sourceCanvas = source.canvas ?? state.canvas;
   state.canvas = "9:16";
   state.physics.layoutMode = false;
   syncCanvas(false);
@@ -5668,9 +5673,11 @@ function enableMobileShareViewer(source: { poses: ChipPose[]; frame: { width: nu
   const from =
     source.frame.width > 1 && source.frame.height > 1
       ? source.frame
-      : { width: to.width * (16 / 9), height: to.height };
-  mobileShareScaleOverride = shareViewerChipScale(from, to);
-  const poses = remapPosesToShareFrame(source.poses, from, to);
+      : sourceCanvas === "9:16"
+        ? { width: to.width, height: to.height }
+        : { width: to.width * (16 / 9), height: to.height };
+  mobileShareScaleOverride = shareViewerChipScale(from, to, sourceCanvas);
+  const poses = remapPosesToShareFrame(source.poses, from, to, sourceCanvas);
   if (poses.length) pinRestoredPoses(poses, to);
   else live({ quiet: true });
 
@@ -7713,10 +7720,11 @@ void (async () => {
         const shared = await fetchShareProject(shareId);
         const sharePoses = shared.poses.map((pose) => ({ ...pose }));
         const shareFrame = { ...shared.frame };
+        const shareCanvas = shared.state.canvas;
         await applyPillProject(shared);
         lastDraftJson = serializePillProject(shared);
         if (isMobileAccessGate() || document.documentElement.classList.contains("is-mobile-share")) {
-          enableMobileShareViewer({ poses: sharePoses, frame: shareFrame });
+          enableMobileShareViewer({ poses: sharePoses, frame: shareFrame, canvas: shareCanvas });
         }
         paintWelcome();
         return;
