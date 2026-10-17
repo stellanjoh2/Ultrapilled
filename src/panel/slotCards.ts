@@ -554,7 +554,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
       <p class="slot-label">Shape</p>
       ${
         slot.shape !== "none"
-          ? `<label class="field" data-tip="${TIPS.pillPad}">${H.settingLabel(slot, "Shape padding", "pillPad", String(pillPadOf(slot, H.state.pillPad)))}
+          ? `<label class="field" data-tip="${TIPS.pillPad}">${H.settingLabel(slot, "Text padding", "pillPad", String(pillPadOf(slot, H.state.pillPad)))}
         <input type="range" data-key="pillPad" min="0" max="100" step="1" value="${pillPadOf(slot, H.state.pillPad)}" />
       </label>`
           : ""

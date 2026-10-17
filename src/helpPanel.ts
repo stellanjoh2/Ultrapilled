@@ -78,7 +78,7 @@ function guideBody(): string {
       </p>
       <p>Maybe you’re…</p>
       <ul class="help-list">
-        <li>running a restaurant and need looping price boards for the TVs — drop your logotype on the background and you’re branded</li>
+        <li>running a restaurant and need looping price boards for the TVs — drop your artwork on the background and you’re branded</li>
         <li>making club-night or VJ graphics that actually move — for Stories, Reels, or the screens</li>
         <li>whipping together a few fun slides for a school presentation in Layout mode</li>
         <li>pulling a quick moodboard together and saving it out before the meeting</li>
@@ -238,7 +238,7 @@ function guideBody(): string {
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Background</span>
-          <span class="help-table__val" role="cell">Canvas fill, grid, logo</span>
+          <span class="help-table__val" role="cell">Canvas fill, grid, artwork</span>
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Export</span>
@@ -267,7 +267,7 @@ function guideBody(): string {
       <p>While things are live you can grab and throw them.</p>
       <p>
         Tune Gravity, Speed, Bounciness, and friends under Create → Physics.
-        <strong>Composition</strong> sets global scale, size random, padding, and amount of shapes.
+        <strong>Composition</strong> sets global scale, size random, and amount of shapes.
         Per-object <strong>Amount</strong> is how many copies of that object exist.
       </p>
       <p class="help-note"><span class="help-fun">Pro move:</span> Loop + a longer Floor pause = settle, then dump, forever — great for looping exports.</p>
@@ -316,7 +316,7 @@ function guideBody(): string {
         <li><strong>Invert</strong> (${keycap("I")}) — straight color invert</li>
         <li><strong>Gradients</strong> — drag on-canvas stops to rotate and scale; click to pick</li>
         <li><strong>Look</strong> — bloom, grain, vignette, saturate on the whole frame</li>
-        <li><strong>Background</strong> — solid, gradient, or image; optional logotype behind/in front</li>
+        <li><strong>Background</strong> — solid, gradient, or image; optional artwork behind/in front</li>
         <li><strong>Templates</strong> — open one, strip it down, steal the structure</li>
       </ul>
     </section>

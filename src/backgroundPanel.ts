@@ -470,43 +470,49 @@ function mountLogo(panel: HTMLElement, controller: BackgroundController) {
   const section = document.createElement("section");
   section.className = "section";
   section.innerHTML = `
-    <h2 data-tip="Centered mark on the stage">Logotype</h2>
-    <button type="button" class="pill" id="logo-upload" data-tip="Upload an SVG or PNG logo">${file ? "Replace logo" : "Upload logo"}</button>
+    <h2 data-tip="Centered artwork on the stage">Artwork</h2>
+    ${
+      file
+        ? `<div class="row">
+            <button type="button" class="pill" id="logo-upload" data-tip="Upload an SVG or PNG">Replace artwork</button>
+            <button type="button" class="pill" id="logo-clear" data-tip="Remove the artwork">Remove artwork</button>
+          </div>`
+        : `<button type="button" class="pill" id="logo-upload" data-tip="Upload an SVG or PNG">Upload artwork</button>`
+    }
     <input class="bg-file" id="logo-file" type="file" accept="image/svg+xml,image/png,.svg,.png" />
     ${
       file
         ? `<div class="logo-preview" id="logo-preview"></div>
           <p class="hint" id="logo-name"></p>
-          <label class="field" data-tip="Size of the centered mark"><span id="logo-scale-label">Scale ${scale.toFixed(2)}</span>
+          <label class="field" data-tip="Size of the centered artwork"><span id="logo-scale-label">Scale ${scale.toFixed(2)}</span>
             <input type="range" id="logo-scale" min="0.25" max="4" step="0.05" value="${scale}" />
           </label>
-          <div class="segment" role="group" aria-label="Logo layer">
-            <button type="button" class="pill${!front ? " is-on" : ""}" data-logo-front="0" aria-pressed="${!front}" data-tip="Draw the logo under falling objects">Behind</button>
-            <button type="button" class="pill${front ? " is-on" : ""}" data-logo-front="1" aria-pressed="${front}" data-tip="Draw the logo over falling objects">In front</button>
+          <div class="segment" role="group" aria-label="Artwork layer">
+            <button type="button" class="pill${!front ? " is-on" : ""}" data-logo-front="0" aria-pressed="${!front}" data-tip="Draw the artwork under falling objects">Behind</button>
+            <button type="button" class="pill${front ? " is-on" : ""}" data-logo-front="1" aria-pressed="${front}" data-tip="Draw the artwork over falling objects">In front</button>
           </div>
-          <label class="field" data-tip="How the logo mixes with the stage and grid. Normal follows the Create mix mode, so Difference shows the grid through a white mark.">Blend mode
+          <label class="field" data-tip="How the artwork mixes with the stage and grid. Normal follows the Create mix mode, so Difference shows the grid through a white mark.">Blend mode
             <select id="logo-blend">
               ${BLEND_MODES.map((mode) => `<option value="${mode.id}"${logoBlend === mode.id ? " selected" : ""}>${mode.label}</option>`).join("")}
             </select>
           </label>
           ${
             svg
-              ? `<div class="field" data-tip="Recolor the SVG logo">Color
-                  <button type="button" class="bg-swatch" id="logo-color" style="background:${current}" aria-label="Logo color" data-tip="Recolor the SVG logo"></button>
+              ? `<div class="field" data-tip="Recolor the SVG">Color
+                  <button type="button" class="bg-swatch" id="logo-color" style="background:${current}" aria-label="Artwork color" data-tip="Recolor the SVG"></button>
                 </div>
                 <div class="tint-row" style="--theme-count:${theme.length + 1}">
                   <button type="button" class="tint${originalOn ? " is-on" : ""}" id="logo-original" style="background:${original}" aria-pressed="${originalOn}" aria-label="Original color" data-tip="Restore the SVG file color"></button>
                   ${theme
                     .map((color, index) => {
                       const on = !background.logoColor && background.logoTint === index;
-                      return `<button type="button" class="tint${on ? " is-on" : ""}" data-logo-tint="${index}" style="background:${color}" aria-pressed="${on}" aria-label="Theme color ${index + 1}" data-tip="Tint the logo with theme color ${index + 1}"></button>`;
+                      return `<button type="button" class="tint${on ? " is-on" : ""}" data-logo-tint="${index}" style="background:${color}" aria-pressed="${on}" aria-label="Theme color ${index + 1}" data-tip="Tint the artwork with theme color ${index + 1}"></button>`;
                     })
                     .join("")}
                 </div>
                 <p class="hint">Pick a color or theme swatch to recolor the SVG. The first swatch restores the file's own color.</p>`
               : ""
-          }
-          <button type="button" class="pill" id="logo-clear" data-tip="Remove the logo">Remove logo</button>`
+          }`
         : ""
     }
     <p class="hint" id="logo-note">SVG or PNG. Centered on the stage — choose whether it sits behind or in front of what falls.</p>

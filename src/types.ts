@@ -418,14 +418,12 @@ export function audioReactAtDefault(audio: AudioReactSettings): boolean {
 export function compositionAtDefault(state: {
   masterScale: number;
   sizeRandom: number;
-  pillPad: number;
   textTracking: number;
   shapeAmount: number;
 }): boolean {
   return (
     state.masterScale === 3.5 &&
     state.sizeRandom === 100 &&
-    state.pillPad === 14 &&
     state.textTracking === 0 &&
     state.shapeAmount === 15
   );

@@ -94,7 +94,6 @@ export type CreatePanelHost = SlotCardHost & {
     format?: (value: number) => string,
   ): void;
   paintPerfHints(): void;
-  syncInheritedPillPads(): void;
   scaleFallingAmounts(amount: number): void;
   paintRange(input: HTMLInputElement): void;
   mountFontPick(
@@ -177,7 +176,6 @@ export function syncCompositionControls(
 ) {
   syncRange(panel, "masterScale", state.masterScale * 10, paintRange, (v) => `${v.toFixed(0)}`);
   syncRange(panel, "sizeRandom", state.sizeRandom, paintRange, (v) => `${Math.round(v)}`);
-  syncRange(panel, "pillPad", state.pillPad, paintRange, (v) => `${Math.round(v)}`);
   syncRange(panel, "shapeAmount", state.shapeAmount, paintRange, (v) => `${Math.round(v)}`);
   paintSectionResets(panel, state);
 }
@@ -299,6 +297,8 @@ export function mountCreatePanel(
   ) => sectionMarkupImpl(openSections, id, title, tip, bodyHtml, options);
   const revealSlotId = host.consumeRevealSlotId();
 const shapes = H.shapeAmountRange();
+const compositionEmpty = H.state.slots.length === 0;
+const compositionLockedTip = "Add objects to the canvas first";
 panel.innerHTML = `
   <section class="section">
     <h2 data-tip="Widescreen or vertical frame">Canvas</h2>
@@ -328,21 +328,24 @@ panel.innerHTML = `
   ${sectionMarkup(
     "composition",
     "Composition",
-    "Overall size and spacing of objects",
-    `<label class="field" data-tip="Overall size of every object">${rangeCaptionHtml("masterScale", "Scale", `${(H.state.masterScale * 10).toFixed(0)}`)}
-      <input type="range" id="masterScale" min="4" max="100" step="1" value="${H.state.masterScale * 10}" />
+    compositionEmpty ? compositionLockedTip : "Overall size and spacing of objects",
+    `<label class="field${compositionEmpty ? " is-muted" : ""}" data-tip="${compositionEmpty ? compositionLockedTip : "Overall size of every object"}">${rangeCaptionHtml("masterScale", "Scale", `${(H.state.masterScale * 10).toFixed(0)}`)}
+      <input type="range" id="masterScale" min="4" max="100" step="1" value="${H.state.masterScale * 10}"${compositionEmpty ? " disabled" : ""} />
     </label>
-    <label class="field" data-tip="How much object sizes vary">${rangeCaptionHtml("sizeRandom", "Size random", String(H.state.sizeRandom))}
-      <input type="range" id="sizeRandom" min="0" max="100" step="1" value="${H.state.sizeRandom}" />
+    <label class="field${compositionEmpty ? " is-muted" : ""}" data-tip="${compositionEmpty ? compositionLockedTip : "How much object sizes vary"}">${rangeCaptionHtml("sizeRandom", "Size random", String(H.state.sizeRandom))}
+      <input type="range" id="sizeRandom" min="0" max="100" step="1" value="${H.state.sizeRandom}"${compositionEmpty ? " disabled" : ""} />
     </label>
-    <label class="field" data-tip="Space inside text holding shapes">${rangeCaptionHtml("pillPad", "Shape padding", String(H.state.pillPad))}
-      <input type="range" id="pillPad" min="0" max="100" step="1" value="${H.state.pillPad}" />
-    </label>
-    <label class="field" data-tip="How many objects drop into the frame">${rangeCaptionHtml("shapeAmount", "Amount of shapes", String(H.state.shapeAmount))}
-      <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${H.state.shapeAmount}" />
+    <label class="field${compositionEmpty ? " is-muted" : ""}" data-tip="${compositionEmpty ? compositionLockedTip : "How many objects drop into the frame"}">${rangeCaptionHtml("shapeAmount", "Amount of shapes", String(H.state.shapeAmount))}
+      <input type="range" id="shapeAmount" min="${shapes.min}" max="${shapes.max}" step="1" value="${H.state.shapeAmount}"${compositionEmpty ? " disabled" : ""} />
     </label>
     <p class="hint" id="amount-perf-hint"${H.state.shapeAmount >= H.SHAPE_PERF_WARN ? "" : " hidden"}>Many objects can drop below 60 fps.</p>`,
-    { resetId: "reset-master", resetLabel: "Reset composition", resetTip: "Reset composition sliders", dirty: !compositionAtDefault(H.state) },
+    {
+      resetId: "reset-master",
+      resetLabel: "Reset composition",
+      resetTip: "Reset composition sliders",
+      dirty: !compositionEmpty && !compositionAtDefault(H.state),
+      muted: compositionEmpty,
+    },
   )}
   ${sectionMarkup(
     "color",
@@ -652,11 +655,6 @@ H.bindRange("sizeRandom", "Size random", (v) => {
   H.state.sizeRandom = Math.round(v);
   H.live();
 }, (v) => `${Math.round(v)}`);
-H.bindRange("pillPad", "Shape padding", (v) => {
-  H.state.pillPad = Math.round(v);
-  H.syncInheritedPillPads();
-  H.live({ quiet: true });
-}, (v) => `${Math.round(v)}`);
 H.bindRange("shapeAmount", "Amount of shapes", (v) => {
   H.scaleFallingAmounts(Math.round(v));
   const input = panel.querySelector<HTMLInputElement>("#shapeAmount");
@@ -668,17 +666,16 @@ H.bindRange("shapeAmount", "Amount of shapes", (v) => {
   H.live();
 }, () => `${H.state.shapeAmount}`);
 panel.querySelector("#reset-master")?.addEventListener("click", () => {
+  if (H.state.slots.length === 0) return;
   H.remember();
   const next = H.demoState();
   H.state.masterScale = next.masterScale;
   H.state.sizeRandom = next.sizeRandom;
-  H.state.pillPad = next.pillPad;
   H.state.textTracking = next.textTracking;
   H.scaleFallingAmounts(next.shapeAmount);
   H.live();
   syncCompositionControls(panel, H.state, (input) => H.paintRange(input));
   H.paintPerfHints();
-  H.syncInheritedPillPads();
 });
 
 const globalFont = panel.querySelector<HTMLElement>("#global-font");

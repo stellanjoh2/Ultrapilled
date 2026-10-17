@@ -2715,6 +2715,13 @@ input[type="file"].bg-file::file-selector-button {
   width: 100%;
 }
 
+.row > #logo-upload,
+.row > #logo-clear {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
 .export-list {
   grid-template-columns: 1fr;
 }
@@ -3473,13 +3480,14 @@ select:focus {
   transition: background 0.15s ease;
 }
 
-.font-pick-trigger:hover,
+.font-pick-trigger:hover:not(:disabled),
 .font-pick-trigger[aria-expanded="true"] {
   background: var(--field-hover);
 }
 
 .font-pick-trigger:disabled {
   cursor: default;
+  color: var(--ink-mute);
 }
 
 .font-pick-trigger:disabled .font-pick-chevron {

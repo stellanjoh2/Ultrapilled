@@ -917,6 +917,7 @@ function mountWeightPick(
     const weights = currentFamily ? weightsFor(currentFamily) : [];
     const locked = weights.length < 2;
     trigger.disabled = locked;
+    host.closest(".field")?.classList.toggle("is-muted", locked);
     value.textContent = !currentFamily || showMixed ? "Mixed" : weightName(current);
     if (locked) trigger.setAttribute("aria-expanded", "false");
   };
@@ -2160,7 +2161,6 @@ function createPanelHost(): CreatePanelHost {
     },
     bindRange,
     paintPerfHints,
-    syncInheritedPillPads,
     scaleFallingAmounts,
     paintRange,
     getAppliedFont() {
@@ -2245,18 +2245,6 @@ function refreshSlotCard(id: string) {
     return;
   }
   renderPanel();
-}
-
-function syncInheritedPillPads() {
-  panel.querySelectorAll<HTMLInputElement>('[data-key="pillPad"]').forEach((input) => {
-    const id = input.closest<HTMLElement>("[data-id]")?.dataset.id;
-    const slot = state.slots.find((item) => item.id === id);
-    if (!slot || slot.kind !== "text" || slot.pillPad != null) return;
-    input.value = String(state.pillPad);
-    paintRange(input);
-    const caption = input.closest("label")?.querySelector("[data-range-label]");
-    if (caption) setRangeCaptionValue(caption, String(state.pillPad));
-  });
 }
 
 function paintRange(input: HTMLInputElement) {

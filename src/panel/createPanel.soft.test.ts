@@ -41,10 +41,6 @@ describe("create panel soft sync", () => {
         <input type="range" id="sizeRandom" min="0" max="100" value="0" />
       </label>
       <label class="field">
-        <span data-range-label>Pad</span>
-        <input type="range" id="pillPad" min="0" max="100" value="14" />
-      </label>
-      <label class="field">
         <span data-range-label>Amount</span>
         <input type="range" id="shapeAmount" min="1" max="40" value="10" />
       </label>
@@ -53,12 +49,10 @@ describe("create panel soft sync", () => {
     const state = blankState();
     state.masterScale = 0.8;
     state.sizeRandom = 25;
-    state.pillPad = 20;
     state.shapeAmount = 12;
     syncCompositionControls(document.body, state, paintPct);
     expect(document.querySelector<HTMLInputElement>("#masterScale")!.value).toBe("8");
     expect(document.querySelector<HTMLInputElement>("#sizeRandom")!.value).toBe("25");
-    expect(document.querySelector<HTMLInputElement>("#pillPad")!.value).toBe("20");
     expect(document.querySelector<HTMLInputElement>("#shapeAmount")!.value).toBe("12");
   });
 });
