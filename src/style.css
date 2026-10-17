@@ -694,6 +694,11 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   box-shadow: 0 0 0 1px color-mix(in srgb, #000 28%, transparent);
 }
 
+/* Phone share viewer: no hard canvas hairline. */
+.app.is-mobile-share .stage.is-portrait .playfield {
+  box-shadow: none;
+}
+
 .stage-veil {
   position: absolute;
   inset: 0;
