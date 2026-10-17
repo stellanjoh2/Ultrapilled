@@ -1,0 +1,7 @@
+__pycache__
+*.pyc
+.venv
+*.db
+blobs
+README.md
+test_*.py

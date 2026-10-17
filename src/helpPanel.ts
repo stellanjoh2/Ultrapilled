@@ -433,8 +433,12 @@ function guideBody(): string {
           <span class="help-table__val" role="cell">Floppy → Save .pill</span>
         </div>
         <div class="help-table__row" role="row">
+          <span class="help-table__key" role="cell">Send a friend</span>
+          <span class="help-table__val" role="cell">Floppy → Share link (expires in 14 days)</span>
+        </div>
+        <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Open again</span>
-          <span class="help-table__val" role="cell">Load .pill</span>
+          <span class="help-table__val" role="cell">Load .pill · or open a Share link</span>
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Auto-draft</span>

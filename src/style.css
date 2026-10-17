@@ -8282,7 +8282,8 @@ html[data-theme="day"] .bug-report__field {
 
 /* Cloudflare Turnstile — fixed top-left, clear of the right-side sheet. */
 .guestbook-turnstile,
-.bug-report-turnstile {
+.bug-report-turnstile,
+.share-turnstile {
   position: fixed;
   top: max(env(safe-area-inset-top, 0px), calc(16px * var(--ui-scale)));
   left: max(env(safe-area-inset-left, 0px), calc(16px * var(--ui-scale)));
@@ -8299,18 +8300,21 @@ html[data-theme="day"] .bug-report__field {
 }
 
 .guestbook-turnstile[hidden],
-.bug-report-turnstile[hidden] {
+.bug-report-turnstile[hidden],
+.share-turnstile[hidden] {
   display: none !important;
 }
 
 .guestbook-turnstile:not([hidden]),
-.bug-report-turnstile:not([hidden]) {
+.bug-report-turnstile:not([hidden]),
+.share-turnstile:not([hidden]) {
   display: block;
   min-height: 4rem;
 }
 
 .guestbook-turnstile.is-faded,
-.bug-report-turnstile.is-faded {
+.bug-report-turnstile.is-faded,
+.share-turnstile.is-faded {
   opacity: 0;
   transform: translateY(-8px) scale(0.97);
   pointer-events: none;

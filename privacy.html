@@ -17,8 +17,9 @@
       </a>
       <h1>Privacy</h1>
       <p class="lede">
-        Last updated 14 October 2026. A free desktop web app.
-        <span class="privacy-warn">We don’t upload your files or use them to train AI.</span>
+        Last updated 17 October 2026. A free desktop web app.
+        <span class="privacy-warn">We don’t use your files to train AI.</span>
+        Scenes stay in this browser unless you choose <strong class="privacy-nice">Share link</strong>.
       </p>
 
       <section>
@@ -28,7 +29,8 @@
           (localStorage and IndexedDB). Exports download to your computer.
           Create → <strong class="privacy-nice">Icon</strong> search uses Phosphor icons bundled with the app —
           no Phosphor network request.
-          <span class="privacy-nice">We do not run an account system or store your projects on our servers.</span>
+          <span class="privacy-nice">We do not run an account system.</span>
+          Projects are not stored on our servers unless you create a Share link.
         </p>
       </section>
 
@@ -59,6 +61,28 @@
           New entries go to a moderation inbox and stay hidden until approved.
           <span class="privacy-warn">Once approved, your name, message, and date are public.</span>
           Entries that are never approved are deleted after 30 days. To remove an approved entry, use the issue report form and tell us the name and date.
+        </p>
+      </section>
+
+      <section id="share">
+        <h2>Share links</h2>
+        <p>
+          <strong class="privacy-nice">Share link</strong> is optional. When you create one, the current scene
+          (a <code>.pill</code> project file, including embedded images you added) is uploaded to
+          <code>share.ultrapilled.com</code>, a small server we run on Fly.io in Stockholm.
+          Anyone with the link can open and remake the scene. There is no public gallery or index —
+          links are unlisted random IDs.
+        </p>
+        <p>
+          Shares expire after <strong class="privacy-nice">14 days</strong> and are then deleted.
+          A size limit applies (about 8&nbsp;MB) so huge GIF or video dumps are rejected.
+          We store a shortened IP address with each share to stop spam and rate-limit abuse.
+          A <strong class="privacy-nice">Cloudflare Turnstile</strong> security check runs before upload;
+          Cloudflare may process technical data under its own policy.
+        </p>
+        <p>
+          <span class="privacy-nice">If you never use Share link, your projects stay only in this browser</span>
+          (plus any <code>.pill</code> files you download yourself).
         </p>
       </section>
 

@@ -94,6 +94,7 @@ import trashSimple from "@phosphor-icons/core/assets/regular/trash-simple.svg?ra
 import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import folderOpen from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
+import linkSimple from "@phosphor-icons/core/assets/regular/link-simple.svg?raw";
 import questionIcon from "@phosphor-icons/core/assets/regular/question.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
 import { warmGifTracks } from "./export/gifFrames";
@@ -127,6 +128,12 @@ import {
   serializePillProject,
   type PillProject,
 } from "./project/pillFormat";
+import {
+  clearShareDeepLink,
+  fetchShareProject,
+  shareIdFromUrl,
+} from "./share";
+import { askShareLink } from "./shareDialog";
 import { imageRemoteOf, relinkProjectImages, relinkSlotImage } from "./remoteImage";
 import { ensureTrim, ensureTrims, gifBlocksStroke, peekTrim } from "./trim";
 import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
@@ -6737,6 +6744,20 @@ function openProjectMenu() {
       }
     })();
   });
+  addItem("Share link", linkSimple, () => {
+    void (async () => {
+      try {
+        const json = serializePillProject(await embedSlotImages(currentPillProject()));
+        await askShareLink({ projectJson: json });
+      } catch {
+        playCaution();
+        void askNotice({
+          title: "Couldn’t share",
+          body: "The scene couldn’t be packed for a share link.",
+        });
+      }
+    })();
+  });
   addItem("Load .pill", folderOpen, () => {
     ensureProjectFileInput().click();
   });
@@ -7577,6 +7598,31 @@ void (async () => {
     resolveBootHold = null;
   };
   try {
+    const shareId = shareIdFromUrl();
+    if (shareId) {
+      clearShareDeepLink();
+      draftReady = true;
+      await introAnimDone;
+      const intro = app.querySelector<HTMLElement>("#app-intro");
+      intro?.querySelector(".app-intro__gif")?.remove();
+      intro?.querySelector(".app-intro__logo")?.remove();
+      try {
+        const shared = await fetchShareProject(shareId);
+        await applyPillProject(shared);
+        lastDraftJson = serializePillProject(shared);
+        paintWelcome();
+        return;
+      } catch (error) {
+        playCaution();
+        await askNotice({
+          title: "Couldn’t open share",
+          body: error instanceof Error ? error.message : "This share link expired or couldn’t be loaded.",
+        });
+        await gateModeSelect();
+        return;
+      }
+    }
+
     if (!getPrefs().rememberLast) {
       draftReady = true;
       await gateModeSelect();

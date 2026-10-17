@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_TURNSTILE_SITE_KEY?: string;
   /** Isso guestbook origin. Defaults to https://guestbook.ultrapilled.com (localhost:8080 in dev). */
   readonly VITE_GUESTBOOK_API_URL?: string;
+  /** Temporary share API. Defaults to https://share.ultrapilled.com (localhost:8081 in dev). */
+  readonly VITE_SHARE_API_URL?: string;
 }
 
 interface ImportMeta {

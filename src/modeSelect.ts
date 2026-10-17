@@ -531,7 +531,7 @@ export function askModeSelect(): Promise<ModeSelectChoice> {
           </a>        </p>
         <p class="mode-select__foot">
           Ultrapilled™ is a <span class="mode-select__playground" style="color: ${VIBE_ACCENT}">free physics playground</span> for dropping text, shapes, Phosphor icons, and images into motion.<br />
-          Everything stays in your browser — <span class="mode-select__privacy" style="color: ${PRIVACY_ACCENT}">we don’t upload your files or use them to train AI</span>. <a href="${PRIVACY_HREF}">How we handle data</a> · <a href="#guestbook" role="button" data-open-guestbook>Sign the guestbook</a>.
+          Everything stays in your browser unless you create a Share link — <span class="mode-select__privacy" style="color: ${PRIVACY_ACCENT}">we don’t use your files to train AI</span>. <a href="${PRIVACY_HREF}">How we handle data</a> · <a href="#guestbook" role="button" data-open-guestbook>Sign the guestbook</a>.
         </p>
         <button type="button" class="mode-select__s icon-hover" data-open-about aria-label="About the creator" data-tip="About the creator">
           <span class="mode-select__s-mark" aria-hidden="true"></span>
