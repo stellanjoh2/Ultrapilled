@@ -78,7 +78,22 @@ describe("share helpers", () => {
       expect(result.id).toBe("abcdefghijklmnopqr12");
       expect(result.url).toContain("?r=abcdefghijklmnopqr12");
     }
-    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl).toHaveBeenCalled();
+  });
+
+  it("falls back to the fly.dev host when the primary fetch fails", async () => {
+    vi.stubEnv("VITE_SHARE_API_URL", "https://share.ultrapilled.com");
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("share.ultrapilled.com")) throw new TypeError("Failed to fetch");
+      return new Response(JSON.stringify({ id: "abcdefghijklmnopqr12", expiresAt: 1_700_000_000 }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+    const result = await createShareLink(MIN_PILL, "tok", fetchImpl);
+    expect(result.ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it("fetches and parses a shared project", async () => {

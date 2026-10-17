@@ -4,6 +4,8 @@ import { parsePillProject, type PillProject } from "./project/pillFormat";
 
 export const SHARE_TURNSTILE_ACTION = "share";
 export const DEFAULT_SHARE_API = "https://share.ultrapilled.com";
+/** Fallback if the custom domain flakes (DNS / cold path). CORS still uses ultrapilled.com Origin. */
+export const SHARE_API_FALLBACK = "https://ultrapilled-share.fly.dev";
 export const LOCAL_SHARE_API = "http://localhost:8081";
 export const SHARE_TTL_DAYS = 14;
 export const SHARE_MAX_BYTES = 8 * 1024 * 1024;
@@ -18,6 +20,13 @@ export function shareApiUrl(): string {
   const raw = import.meta.env.VITE_SHARE_API_URL?.trim();
   if (raw) return raw.replace(/\/+$/, "");
   return import.meta.env.DEV ? LOCAL_SHARE_API : DEFAULT_SHARE_API;
+}
+
+/** Primary + fallback hosts to try (deduped). Skip fallback for local share servers. */
+export function shareApiBases(): string[] {
+  const primary = shareApiUrl();
+  if (primary.includes("localhost") || primary.includes("127.0.0.1")) return [primary];
+  return [...new Set([primary, SHARE_API_FALLBACK])];
 }
 
 export function shareIdFromUrl(url: URL | Location = window.location): string | null {
@@ -100,20 +109,32 @@ export async function createShareLink(
     return { ok: false, status: 400, code: "bad_pill", message: shareErrorMessage("bad_pill") };
   }
 
-  let res: Response;
-  try {
-    res = await fetchImpl(`${shareApiUrl()}/r`, {
-      method: "POST",
-      credentials: "omit",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project, turnstileToken }),
-    });
-  } catch {
+  const body = JSON.stringify({ project, turnstileToken });
+  const headers = { "Content-Type": "application/json" };
+  let res: Response | null = null;
+  let networkFailed = false;
+  for (const base of shareApiBases()) {
+    try {
+      res = await fetchImpl(`${base}/r`, {
+        method: "POST",
+        credentials: "omit",
+        headers,
+        body,
+      });
+      break;
+    } catch {
+      networkFailed = true;
+      res = null;
+    }
+  }
+  if (!res) {
     return {
       ok: false,
       status: 0,
       code: "network",
-      message: "Couldn’t reach the share server. Check your connection and try again.",
+      message: networkFailed
+        ? "Couldn’t reach the share server. Try again in a moment, or open ultrapilled.com (not www) and retry."
+        : "Couldn’t reach the share server. Check your connection and try again.",
     };
   }
 
@@ -149,10 +170,16 @@ export async function fetchShareProject(id: string, fetchImpl: typeof fetch = fe
   if (!isShareId(id)) {
     throw Object.assign(new Error(shareErrorMessage("gone")), { code: "gone" });
   }
-  let res: Response;
-  try {
-    res = await fetchImpl(`${shareApiUrl()}/r/${encodeURIComponent(id)}`, { credentials: "omit" });
-  } catch {
+  let res: Response | null = null;
+  for (const base of shareApiBases()) {
+    try {
+      res = await fetchImpl(`${base}/r/${encodeURIComponent(id)}`, { credentials: "omit" });
+      break;
+    } catch {
+      res = null;
+    }
+  }
+  if (!res) {
     throw Object.assign(new Error("Couldn’t reach the share server."), { code: "network" });
   }
   if (res.status === 410 || res.status === 404) {

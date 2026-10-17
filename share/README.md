@@ -7,7 +7,8 @@ Stores opt-in `.pill` projects for **14 days**, served at `https://share.ultrapi
 ```bash
 cd share
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-SHARE_DEV=1 SHARE_DATA_DIR=/tmp/ultrapilled-share ALLOWED_ORIGINS=http://localhost:5173 \
+SHARE_DEV=1 SHARE_DATA_DIR=/tmp/ultrapilled-share \
+  ALLOWED_ORIGINS="http://localhost:5173 http://127.0.0.1:5173" \
   .venv/bin/gunicorn --bind 127.0.0.1:8081 app:application
 ```
 
