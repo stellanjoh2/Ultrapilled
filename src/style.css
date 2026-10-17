@@ -6429,6 +6429,12 @@ html[data-theme="day"] .shape-swatch {
   gap: var(--space-1);
 }
 
+/* One action (OK / Done): center instead of leaving an empty second column. */
+.reconnect__actions:has(> :only-child) {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
 .reconnect__actions .pill {
   width: 100%;
   min-width: 0;
@@ -6436,6 +6442,12 @@ html[data-theme="day"] .shape-swatch {
   transition:
     background-color 0.18s ease,
     color 0.18s ease;
+}
+
+.reconnect__actions:has(> :only-child) .pill {
+  width: auto;
+  min-width: calc(140px * var(--ui-scale));
+  padding-inline: calc(28px * var(--ui-scale));
 }
 
 body.is-exporting .app {
