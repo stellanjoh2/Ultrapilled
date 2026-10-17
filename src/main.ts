@@ -341,7 +341,7 @@ app.innerHTML = `
           <button type="button" class="pill panel-util" id="loop" aria-pressed="false" data-tip="Repeat the fall on a timer — after Floor pause the floor opens and the cycle restarts">
             <span class="loop-chip__text">Loop</span>
           </button>
-          <button type="button" class="pill panel-util" id="reset-defaults" data-tip="Restore default sliders and options">Reset</button>
+          <button type="button" class="pill panel-util" id="reset-defaults" data-tip="Clear the canvas — can’t be undone">Reset</button>
           <button type="button" class="pill panel-util" id="open-settings" data-tip="Sound, theme, and preferences">Settings</button>
           <button type="button" class="icon-btn icon-hover panel-project" id="open-project" aria-label="Load or save project" aria-haspopup="menu" aria-expanded="false" data-tip="Load or save a .pill project">
             <span aria-hidden="true">${floppyDisk}</span>
@@ -6857,19 +6857,44 @@ projectBtn.addEventListener("click", () => {
 paintTransport();
 paintWelcome();
 app.querySelector("#reset-defaults")?.addEventListener("click", () => {
-  remember();
-  session.setRunning(false);
-  machineFont = "";
-  appliedFont = "";
-  pickedSlotId = null;
-  pickedSlotIds.clear();
-  world.setPicked(null);
-  adoptState(blankState());
-  for (const slot of state.slots) captureBaseline(slot);
-  applyBackground();
-  applyPost();
-  syncCanvas(false);
-  renderPanel();
+  void (async () => {
+    const ok = await askConfirm({
+      title: "Reset canvas?",
+      body: "This clears the scene and can’t be undone — physics piles aren’t something Undo can restore well.",
+      confirmLabel: "Reset",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
+
+    // Not undoable: live physics poses aren’t in the history stack.
+    endGesture();
+    past.length = 0;
+    future.length = 0;
+    session.setRunning(false);
+    running = false;
+    paused = false;
+    posePinned = false;
+    session.phase = "idle";
+    session.dropTicket++;
+    session.clearingDump = false;
+    machineFont = "";
+    appliedFont = "";
+    pickedSlotId = null;
+    pickedSlotIds.clear();
+    world.setPicked(null);
+    world.setFloorOpen(false);
+    world.discardAll();
+    openSlots.clear();
+    adoptState(blankState());
+    for (const slot of state.slots) captureBaseline(slot);
+    applyBackground();
+    applyPost();
+    syncCanvas(false);
+    renderPanel();
+    paintTransport();
+    paintWelcome();
+    scheduleDraft();
+  })();
 });
 
 function activeTemplateLabel(id: string | undefined): string | undefined {
