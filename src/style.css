@@ -9440,18 +9440,49 @@ html.is-mobile-share body {
   inset: 0;
 }
 
-button.pill.play-btn.mobile-share-play {
+/* Apple HIG–style primary CTA: 50pt tall, 17pt semibold system type, 14pt radius. */
+button.mobile-share-play {
   position: fixed;
   left: 50%;
-  bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+  bottom: max(calc(env(safe-area-inset-bottom, 0px) + 12px), 24px);
   z-index: 80;
+  box-sizing: border-box;
   width: min(420px, calc(100vw - 32px));
+  height: 50px;
+  min-height: 50px;
   margin: 0;
+  padding: 0 16px;
+  border: none;
+  border-radius: 14px;
+  background: var(--play-face);
+  color: var(--play-ink);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.41px;
+  line-height: 1.2;
+  text-align: center;
   transform: translateX(-50%);
   -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  box-shadow: none;
 }
 
-button.pill.play-btn.mobile-share-play:active {
-  transform: translateX(-50%) translateY(calc(8px * var(--ui-scale)));
+button.mobile-share-play:active {
+  filter: brightness(0.92);
+  transform: translateX(-50%) scale(0.98);
+}
+
+button.mobile-share-play:focus-visible {
+  outline: 2px solid var(--play-ink);
+  outline-offset: 3px;
 }
 

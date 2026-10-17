@@ -135,6 +135,7 @@ import {
 } from "./share";
 import { askShareLink } from "./shareDialog";
 import { isMobileAccessGate } from "./mobileGate";
+import { remapPosesToShareFrame, shareViewerChipScale } from "./mobileShareScale";
 import { imageRemoteOf, relinkProjectImages, relinkSlotImage } from "./remoteImage";
 import { ensureTrim, ensureTrims, gifBlocksStroke, peekTrim } from "./trim";
 import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
@@ -5648,34 +5649,37 @@ const devPanel = app.querySelector<HTMLElement>("#dev-panel")!;
 /** Share-link phone viewer: 9:16, drag objects, Activate Physics only. */
 let mobileShareViewer = false;
 let mobileSharePlayBtn: HTMLButtonElement | null = null;
+/** Overrides fitScale so remapped 16:9 scenes keep desktop-like size on 9:16. */
+let mobileShareScaleOverride: number | null = null;
 
 function isMobileShareViewer(): boolean {
   return mobileShareViewer;
 }
 
-function enableMobileShareViewer() {
+function enableMobileShareViewer(source: { poses: ChipPose[]; frame: { width: number; height: number } }) {
   if (mobileShareViewer) return;
   mobileShareViewer = true;
   document.documentElement.classList.add("is-mobile-share");
   shell.classList.add("is-mobile-share");
   state.canvas = "9:16";
   state.physics.layoutMode = false;
-  // Keep shared poses; only reflow the frame into 9:16.
   syncCanvas(false);
+  const to = currentFrame();
+  const from =
+    source.frame.width > 1 && source.frame.height > 1
+      ? source.frame
+      : { width: to.width * (16 / 9), height: to.height };
+  mobileShareScaleOverride = shareViewerChipScale(from, to);
+  const poses = remapPosesToShareFrame(source.poses, from, to);
+  if (poses.length) pinRestoredPoses(poses, to);
+  else live({ quiet: true });
 
   if (!mobileSharePlayBtn) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "pill play-btn mobile-share-play";
+    btn.className = "mobile-share-play";
     btn.setAttribute("aria-label", "Activate Physics");
-    btn.innerHTML = `
-      <span class="play-btn__label">
-        <svg class="play-btn__bolt" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-        </svg>
-        <span class="play-btn__text">Activate Physics</span>
-      </span>
-    `;
+    btn.textContent = "Activate Physics";
     btn.addEventListener("click", () => {
       void session.triggerPhysics();
     });
@@ -5997,6 +6001,7 @@ function currentFrame() {
 }
 
 function layoutScale(frame: CanvasFrame): number {
+  if (mobileShareScaleOverride != null) return mobileShareScaleOverride;
   return compositionScale(frame.scale);
 }
 
@@ -7706,10 +7711,12 @@ void (async () => {
       intro?.querySelector(".app-intro__logo")?.remove();
       try {
         const shared = await fetchShareProject(shareId);
+        const sharePoses = shared.poses.map((pose) => ({ ...pose }));
+        const shareFrame = { ...shared.frame };
         await applyPillProject(shared);
         lastDraftJson = serializePillProject(shared);
         if (isMobileAccessGate() || document.documentElement.classList.contains("is-mobile-share")) {
-          enableMobileShareViewer();
+          enableMobileShareViewer({ poses: sharePoses, frame: shareFrame });
         }
         paintWelcome();
         return;
