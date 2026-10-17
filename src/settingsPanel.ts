@@ -77,9 +77,9 @@ function shortcutsMarkup(): string {
     shortcutRow("Toggle grid", keycap("G")),
     shortcutRow("Toggle collision boxes", keycap("C")),
     shortcutRow("Toggle Layout Mode", keycap("L")),
-    shortcutRow("Invert selection", keycap("I"), "Selected object"),
-    shortcutRow("Delete selection", `${keycap("⌫")}${keycap("Del")}`),
-    shortcutRow("Duplicate", `${keycap("⇧")}${keycap("D")}${keycap(mod)}${keycap("D")}`),
+    shortcutRow("Invert object", keycap("I"), "Selected object"),
+    shortcutRow("Delete selection", `${keycap("⌫")} or ${keycap("Del")}`),
+    shortcutRow("Duplicate", `${keycap("⇧")}${keycap("D")} or ${keycap(mod)}${keycap("D")}`),
     shortcutRow("Copy selection", `${keycap(mod)}${keycap("C")}`),
     shortcutRow("Paste selection", `${keycap(mod)}${keycap("V")}`),
     shortcutRow("Undo", `${keycap(mod)}${keycap("Z")}`),
@@ -93,7 +93,7 @@ function shortcutsMarkup(): string {
       "Hold during transform drag",
     ),
     shortcutRow("Move in a straight line", keycap("⇧"), "Hold while dragging an object"),
-    shortcutRow("Add to selection", `${keycap("⇧")}${keycap("Click")}`),
+    shortcutRow("Multi-select", `${keycap("⇧")}${keycap("Click")}`),
   ].join("");
   return `
     <section class="section shortcuts-section${shortcutsOpen ? " is-open" : ""}" data-shortcuts-fold>

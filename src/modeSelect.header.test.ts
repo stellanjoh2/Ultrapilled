@@ -63,6 +63,7 @@ describe("mode select header actions", () => {
     root.querySelector("[data-open-bug-report]")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(isBugReportOpen()).toBe(true);
     expect(document.querySelector(".mode-select")).toBe(root);
+    expect(root.classList.contains("is-sheet-dim")).toBe(true);
 
     root.querySelector<HTMLButtonElement>("[data-mode=layout]")?.click();
     await expect(pending).resolves.toEqual({ kind: "mode", mode: "layout" });
@@ -79,9 +80,11 @@ describe("mode select header actions", () => {
     expect(isGuestbookOpen()).toBe(true);
     expect(pill.classList.contains("is-open")).toBe(true);
     expect(pill.getAttribute("aria-pressed")).toBe("true");
+    expect(root.classList.contains("is-sheet-dim")).toBe(true);
     pill.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(isGuestbookOpen()).toBe(false);
     expect(pill.classList.contains("is-open")).toBe(false);
+    expect(root.classList.contains("is-sheet-dim")).toBe(false);
 
     pill.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     document.querySelector<HTMLButtonElement>(".guestbook-modal__back")!.click();

@@ -274,7 +274,7 @@ export function openGiphyImport(opts: { onPick: (file: File, remote?: ImageRemot
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
     if (target.closest("[data-giphy-close]")) closeGiphy();
     if (target.closest("[data-giphy-load-more]")) loadMore();
   });

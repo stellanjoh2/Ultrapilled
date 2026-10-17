@@ -12,6 +12,7 @@ import {
   type GuestbookEntry,
 } from "./guestbook";
 import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
+import { beginSheetDim, endSheetDim } from "./sheetDim";
 import { PRIVACY_HREF } from "./privacy";
 import { ensureTurnstileScript, turnstileSiteKey } from "./turnstile";
 import { playNotify, playRemove, playTransition } from "./uiSounds";
@@ -38,6 +39,8 @@ export const GUESTBOOK_TOGGLE_EVENT = "guestbook:toggle";
 function announce(open: boolean): void {
   window.dispatchEvent(new CustomEvent<boolean>(GUESTBOOK_TOGGLE_EVENT, { detail: open }));
 }
+
+let sheetDimToken = 0;
 
 export function isGuestbookOpen(): boolean {
   return Boolean(modalRoot);
@@ -278,12 +281,15 @@ export function closeGuestbook(): void {
   const root = modalRoot;
   const scrim = root.querySelector<HTMLElement>(".guestbook-modal__scrim");
   const sheet = root.querySelector<HTMLElement>(".guestbook-modal__sheet");
+  const dim = document.querySelector<HTMLElement>(".mode-select.is-sheet-dim");
+  const token = sheetDimToken;
   if (onKey) window.removeEventListener("keydown", onKey, true);
   onKey = null;
   playRemove();
   announce(false);
 
   const done = () => {
+    endSheetDim(token);
     removeTurnstileHost();
     root.remove();
     modalRoot = null;
@@ -300,7 +306,7 @@ export function closeGuestbook(): void {
   }
   const tl = gsap.timeline({ onComplete: done });
   tl.to(sheet, { x: 48, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
-  tl.to(scrim, { "--scrim-t": 0, duration: 0.28, ease: "power1.in" }, 0);
+  if (dim) tl.to(dim, { "--scrim-t": 0, duration: 0.28, ease: "power1.in" }, 0);
 }
 
 export function openGuestbook(): void {
@@ -380,7 +386,6 @@ export function openGuestbook(): void {
     </div>
   `;
 
-  const scrim = root.querySelector<HTMLElement>(".guestbook-modal__scrim")!;
   const sheet = root.querySelector<HTMLElement>(".guestbook-modal__sheet")!;
   const form = root.querySelector<HTMLFormElement>("#guestbook-form")!;
   const name = form.querySelector<HTMLInputElement>("#guestbook-name")!;
@@ -421,12 +426,16 @@ export function openGuestbook(): void {
   void prepareTurnstile();
   void loadEntries(root, true);
 
+  const dimHold = beginSheetDim();
+  sheetDimToken = dimHold.token;
+  const dim = dimHold.el;
+
   if (reducedMotion()) return;
 
-  gsap.set(scrim, { "--scrim-t": 0 });
+  if (dim) gsap.set(dim, { "--scrim-t": 0 });
   gsap.set(sheet, { autoAlpha: 0, x: 56 });
 
   const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-  tl.to(scrim, { "--scrim-t": 1, duration: 0.32 }, 0);
+  if (dim) tl.to(dim, { "--scrim-t": 1, duration: 0.32 }, 0);
   tl.to(sheet, { autoAlpha: 1, x: 0, duration: 0.42 }, 0.04);
 }

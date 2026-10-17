@@ -290,7 +290,7 @@ export function openUnsplashImport(opts: {
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
     if (target.closest("[data-unsplash-close]")) closeUnsplash();
     if (target.closest("[data-unsplash-load-more]")) loadMore();
   });

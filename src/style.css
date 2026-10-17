@@ -6525,7 +6525,7 @@ body.is-exporting .app {
 .settings-modal__scrim {
   position: absolute;
   inset: 0;
-  background: transparent;
+  background: rgb(0 0 0 / 0.2);
 }
 
 .settings-modal__sheet {
@@ -6837,7 +6837,7 @@ html[data-theme="day"] .help-modal__body .keycap {
 .help-modal__scrim {
   position: absolute;
   inset: 0;
-  background: transparent;
+  background: rgb(0 0 0 / 0.2);
 }
 
 .help-modal__sheet {
@@ -7249,9 +7249,21 @@ html[data-theme="day"] .help-modal__body .keycap {
 }
 
 .about-overlay__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  /* No transform, opacity, or filter on this element — any of those make
+     Chrome drop backdrop-filter, so the About blur never appears. */
+  background: transparent;
+}
+
+.about-overlay__scrim::before {
+  content: "";
   position: absolute;
   inset: 0;
-  background: rgb(0 0 0 / 0.48);
+  background: rgb(0 0 0 / 0.2);
+  opacity: var(--about-dim, 0);
+  pointer-events: none;
 }
 
 .about-overlay__scroll {
@@ -7264,6 +7276,9 @@ html[data-theme="day"] .help-modal__body .keycap {
   overflow-x: hidden;
   overflow-y: auto;
   text-align: left;
+  /* Paint stays in this scroller. Without it, scrolling project layers
+     (translateZ) invalidates the sibling backdrop-filter and the blur flashes. */
+  contain: paint;
 }
 
 .about-overlay__content {
@@ -7630,9 +7645,7 @@ a.pill.about-project__launch:active {
 }
 
 .bug-report.is-thanks .bug-report__scrim {
-  background: color-mix(in srgb, #080808 55%, transparent);
-  -webkit-backdrop-filter: blur(15px);
-  backdrop-filter: blur(15px);
+  background: rgb(0 0 0 / 0.2);
   cursor: pointer;
 }
 
@@ -7815,10 +7828,8 @@ a.pill.about-project__launch:active {
   background: transparent;
 }
 
-/* Full-viewport dim (also over the Mode Select header, which stays clickable).
-   Fades via --scrim-t, not the scrim's opacity — an opacity < 1 ancestor
-   becomes a backdrop root and the blur would vanish mid-fade. */
-.guestbook-modal__scrim::before,
+/* Editor: full-viewport 20% dim. Mode Select uses .mode-select.is-sheet-dim instead,
+   so this layer does not cover the header pills. */
 .bug-report:not(.is-thanks) .bug-report__scrim::before {
   content: "";
   position: fixed;
@@ -7827,11 +7838,8 @@ a.pill.about-project__launch:active {
   pointer-events: none;
 }
 
-/* Mode Select: same underlay blur as About. */
-.guestbook-modal__scrim::before,
 .mode-select-host.is-gate ~ .bug-report:not(.is-thanks) .bug-report__scrim::before {
-  -webkit-backdrop-filter: blur(calc(20px * var(--scrim-t, 1)));
-  backdrop-filter: blur(calc(20px * var(--scrim-t, 1)));
+  content: none;
 }
 
 .guestbook-modal__sheet,
@@ -8368,11 +8376,22 @@ html[data-theme="day"] .bug-report__field {
   background: var(--field);
   color: var(--ink);
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .unsplash-modal__x svg {
   width: calc(16px * var(--ui-scale));
   height: calc(16px * var(--ui-scale));
+}
+
+/* Solid fun fill on hover (not the default icon-hover ink-only accent). */
+@media (hover: hover) and (pointer: fine) {
+  .unsplash-modal__x.icon-hover:hover:not(:disabled) {
+    background: var(--pill-fun-face);
+    color: var(--pill-fun-ink);
+  }
 }
 
 .unsplash-modal__body {
@@ -8889,6 +8908,20 @@ html[data-theme="day"] .unsplash-grid__item--icon:hover img {
   margin: 0;
   z-index: 2;
   pointer-events: auto;
+}
+
+/* Side-sheet 20% darken. Sits under the header pills (Load / Report / Guestbook). */
+.mode-select.is-sheet-dim::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgb(0 0 0 / calc(0.2 * var(--scrim-t, 1)));
+  pointer-events: none;
+}
+
+.mode-select.is-sheet-dim .mode-select__actions {
+  z-index: 3;
 }
 
 /* Global file inputs are visible pills; this one is only opened by Load Project. */

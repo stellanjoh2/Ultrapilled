@@ -111,7 +111,7 @@ export function openYouTubeImport(opts: { onPick: (clip: YouTubeClip) => void })
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
     if (target.closest("[data-youtube-close]")) closeYouTube();
     if (target.closest("[data-youtube-add]")) submit();
   });

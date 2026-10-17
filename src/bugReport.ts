@@ -2,6 +2,7 @@ import gsap from "gsap";
 import arrowLeftIcon from "@phosphor-icons/core/assets/regular/arrow-left.svg?raw";
 import warningCircleIcon from "@phosphor-icons/core/assets/regular/warning-circle.svg?raw";
 import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
+import { beginSheetDim, endSheetDim, modeSelectSheetDim } from "./sheetDim";
 import { PRIVACY_HREF } from "./privacy";
 import { ensureTurnstileScript, turnstileSiteKey } from "./turnstile";
 import { playNotify, playRemove, playTransition } from "./uiSounds";
@@ -46,6 +47,7 @@ let closing = false;
 let sending = false;
 let thanksMode = false;
 let overlayPhysicsHeld = false;
+let sheetDimToken = 0;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
 let returnFocus: HTMLElement | null = null;
 let turnstileHost: HTMLElement | null = null;
@@ -241,6 +243,7 @@ function revealThankYou() {
         ${thanksOkButtonHtml()}
       </div>
     `;
+    endSheetDim(sheetDimToken);
     removeTurnstileHost();
     if (!overlayPhysicsHeld) {
       holdPhysicsForOverlay();
@@ -297,6 +300,7 @@ export function closeBugReport(): void {
   playRemove();
 
   const done = () => {
+    endSheetDim(sheetDimToken);
     gsap.killTweensOf(root.querySelectorAll(".bug-report-thanks__word, .bug-report-thanks__ok"));
     removeTurnstileHost();
     root.remove();
@@ -324,7 +328,12 @@ export function closeBugReport(): void {
     return;
   }
   if (sheet) tl.to(sheet, { x: 48, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
-  tl.to(scrim, { "--scrim-t": 0, duration: 0.28, ease: "power1.in" }, 0);
+  const dim = modeSelectSheetDim();
+  if (dim?.classList.contains("is-sheet-dim")) {
+    tl.to(dim, { "--scrim-t": 0, duration: 0.28, ease: "power1.in" }, 0);
+  } else {
+    tl.to(scrim, { "--scrim-t": 0, duration: 0.28, ease: "power1.in" }, 0);
+  }
 }
 
 function optionsHtml(
@@ -570,12 +579,18 @@ export function openBugReport(): void {
   message.focus({ preventScroll: true });
   void prepareTurnstile();
 
+  const dimHold = beginSheetDim();
+  sheetDimToken = dimHold.token;
+  const dim = dimHold.el;
+
   if (reducedMotion()) return;
 
-  gsap.set(scrim, { "--scrim-t": 0 });
+  if (dim) gsap.set(dim, { "--scrim-t": 0 });
+  else gsap.set(scrim, { "--scrim-t": 0 });
   gsap.set(sheet, { autoAlpha: 0, x: 56 });
 
   const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-  tl.to(scrim, { "--scrim-t": 1, duration: 0.32 }, 0);
+  if (dim) tl.to(dim, { "--scrim-t": 1, duration: 0.32 }, 0);
+  else tl.to(scrim, { "--scrim-t": 1, duration: 0.32 }, 0);
   tl.to(sheet, { autoAlpha: 1, x: 0, duration: 0.42 }, 0.04);
 }

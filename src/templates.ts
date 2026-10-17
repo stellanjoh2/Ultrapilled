@@ -352,7 +352,7 @@ export function newYorkState(): AppState {
   const PINK = 4;
   const bare = "none" as const;
   const box = { shape: "box" as const, radius: 0 };
-  const grotesk = { fontFamily: "Anton", fontWeight: 400, tracking: -40 };
+  const grotesk = { fontFamily: "Climate Crisis", fontWeight: 400, tracking: -40 };
   const didone = (fontWeight: number) => ({ fontFamily: "Playfair Display", fontWeight });
   const serif = (fontWeight: number) => ({ fontFamily: "Libre Baskerville", fontWeight });
   const franklin = (fontWeight: number) => ({ fontFamily: "Libre Franklin", fontWeight });

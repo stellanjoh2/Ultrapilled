@@ -282,7 +282,7 @@ export function openPhosphorImport(opts: { onPick: (file: File, remote?: ImageRe
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
     if (target.closest("[data-phosphor-close]")) closePhosphor();
     if (target.closest("[data-phosphor-load-more]")) loadMore();
     const styleBtn = target.closest<HTMLButtonElement>("[data-phosphor-style]");

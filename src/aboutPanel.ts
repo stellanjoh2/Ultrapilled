@@ -542,7 +542,7 @@ export function closeAbout(): void {
 
   const tl = gsap.timeline({ onComplete: done });
   tl.to(scroll, { y: 12, autoAlpha: 0, duration: 0.28, ease: "power2.in" }, 0);
-  tl.to(scrim, { autoAlpha: 0, duration: 0.35, ease: "power1.in" }, 0);
+  tl.to(scrim, { "--about-dim": 0, duration: 0.35, ease: "power1.in" }, 0);
 }
 
 export function openAbout(): void {
@@ -601,6 +601,7 @@ export function openAbout(): void {
 
   if (reducedMotion()) {
     tweenAboutBlur(true, 0);
+    scrim.style.setProperty("--about-dim", "1");
     gsap.set([words, ...intro, ...projectRevealBits, doneBtn], {
       clearProps: "all",
       autoAlpha: 1,
@@ -614,12 +615,12 @@ export function openAbout(): void {
   gsap.set(words, { autoAlpha: 0, y: -22 });
   gsap.set(intro, { autoAlpha: 0, y: -28 });
   gsap.set([...projectRevealBits, doneBtn], { autoAlpha: 0, y: -28 });
-  gsap.set(scrim, { autoAlpha: 0 });
+  gsap.set(scrim, { "--about-dim": 0 });
 
   // Soften stage + dim together, then stagger copy. Projects wait for scroll.
   tweenAboutBlur(true, 0.55);
   openTl = gsap.timeline({ defaults: { ease: "power3.out" } });
-  openTl.to(scrim, { autoAlpha: 1, duration: 0.55, ease: "power2.out" }, 0);
+  openTl.to(scrim, { "--about-dim": 1, duration: 0.55, ease: "power2.out" }, 0);
   openTl.to(
     words,
     { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend },
