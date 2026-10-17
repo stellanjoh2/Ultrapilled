@@ -2530,8 +2530,8 @@ button.pill.smash-btn.is-on::after {
   color: var(--ink);
 }
 
-.panel-tabs__tab:hover:not(.is-active) {
-  color: var(--ink);
+.panel-tabs__tab:hover {
+  color: var(--pill-fun-face);
 }
 
 .panel-tabs__line {
@@ -5668,13 +5668,13 @@ html[data-theme="day"] .shape-swatch {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .theme-shelf__tab:hover:not(.is-active),
+  .theme-shelf__tab:hover,
   .theme-gallery__item:hover .theme-gallery__label {
-    color: var(--ink);
+    color: var(--pill-fun-face);
   }
 
   .theme-shelf__x:hover {
-    color: var(--ink);
+    color: var(--pill-fun-face);
   }
 }
 
@@ -8375,6 +8375,7 @@ html[data-theme="day"] .bug-report__field {
   border-radius: calc(9999px * var(--ui-scale));
   background: var(--field);
   color: var(--ink);
+  line-height: 0;
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -8382,8 +8383,11 @@ html[data-theme="day"] .bug-report__field {
 }
 
 .unsplash-modal__x svg {
+  display: block;
   width: calc(16px * var(--ui-scale));
   height: calc(16px * var(--ui-scale));
+  /* Path ink sits ~1 unit high in the 24×24 box; nudge into optical center. */
+  translate: 0 calc(1.5px * var(--ui-scale));
 }
 
 /* Solid fun fill on hover (not the default icon-hover ink-only accent). */
