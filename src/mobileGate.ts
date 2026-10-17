@@ -16,6 +16,11 @@ export function isMobileAccessGate(match = globalThis.matchMedia): boolean {
   return match(MOBILE_ACCESS_GATE_QUERY).matches;
 }
 
+/** Phones normally get the access gate; share links (`?r=`) open a minimal viewer instead. */
+export function shouldBootMobileGate(hasShareLink: boolean, match = globalThis.matchMedia): boolean {
+  return isMobileAccessGate(match) && !hasShareLink;
+}
+
 export function modeSelectAssetScale(masterScale: number, mobileGate: boolean, viewW?: number, viewH?: number): number {
   const view = mobileGate ? MODE_SELECT_MOBILE_ASSET_SCALE : compositionScale(1, viewW, viewH);
   return masterScale * view;

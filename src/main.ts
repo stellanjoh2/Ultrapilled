@@ -134,6 +134,7 @@ import {
   shareIdFromUrl,
 } from "./share";
 import { askShareLink } from "./shareDialog";
+import { isMobileAccessGate } from "./mobileGate";
 import { imageRemoteOf, relinkProjectImages, relinkSlotImage } from "./remoteImage";
 import { ensureTrim, ensureTrims, gifBlocksStroke, peekTrim } from "./trim";
 import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
@@ -5644,6 +5645,45 @@ const loopBtn = app.querySelector<HTMLButtonElement>("#loop")!;
 const copyBtn = app.querySelector<HTMLButtonElement>("#copy-settings")!;
 const devPanel = app.querySelector<HTMLElement>("#dev-panel")!;
 
+/** Share-link phone viewer: 9:16, drag objects, Activate Physics only. */
+let mobileShareViewer = false;
+let mobileSharePlayBtn: HTMLButtonElement | null = null;
+
+function isMobileShareViewer(): boolean {
+  return mobileShareViewer;
+}
+
+function enableMobileShareViewer() {
+  if (mobileShareViewer) return;
+  mobileShareViewer = true;
+  document.documentElement.classList.add("is-mobile-share");
+  shell.classList.add("is-mobile-share");
+  state.canvas = "9:16";
+  state.physics.layoutMode = false;
+  // Keep shared poses; only reflow the frame into 9:16.
+  syncCanvas(false);
+
+  if (!mobileSharePlayBtn) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pill play-btn mobile-share-play";
+    btn.setAttribute("aria-label", "Activate Physics");
+    btn.innerHTML = `
+      <span class="play-btn__label">
+        <svg class="play-btn__bolt" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+        </svg>
+        <span class="play-btn__text">Activate Physics</span>
+      </span>
+    `;
+    btn.addEventListener("click", () => {
+      void session.triggerPhysics();
+    });
+    document.body.append(btn);
+    mobileSharePlayBtn = btn;
+  }
+}
+
 /** One playthrough of public/images/intropill.gif (40 frames × 5cs), shortened 0.25s. */
 const INTRO_MS = 2000;
 const INTRO_PILL_SCALE_S = 1.75;
@@ -5927,7 +5967,9 @@ function workBox() {
   const width = stage.clientWidth;
   const height = stage.clientHeight;
   const full = { x: 0, y: 0, width, height };
-  if (shell.classList.contains("ui-hidden") || presenting) return full;
+  if (shell.classList.contains("ui-hidden") || shell.classList.contains("is-mobile-share") || presenting) {
+    return full;
+  }
   const stageRect = stage.getBoundingClientRect();
   let limitRight = width;
   let limitBottom = height;
@@ -7008,6 +7050,29 @@ devPanel.querySelector("#dev-load-404")?.addEventListener("click", () => {
 
 window.addEventListener("keydown", (event) => {
   if (document.body.classList.contains("is-exporting")) return;
+  if (isMobileShareViewer()) {
+    // Phones: Activate Physics (P / Space when idle) and bounce charge only.
+    if (typingInField(event.target)) return;
+    if (event.code === "Space") {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (!running) {
+        void session.triggerPhysics();
+        return;
+      }
+      if (paused) {
+        paused = false;
+        world.setRunning(true);
+      }
+      startSpaceCharge();
+      return;
+    }
+    if ((event.key === "p" || event.key === "P") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      if (!event.repeat) void session.triggerPhysics();
+    }
+    return;
+  }
   const meta = event.metaKey || event.ctrlKey;
   if (meta && !event.altKey && !editingText(event.target)) {
     if (presenting) return;
@@ -7310,6 +7375,20 @@ function pickSlot(
   id: string | null,
   opts?: { force?: boolean; additive?: boolean; quiet?: boolean; retainMulti?: boolean },
 ) {
+  if (isMobileShareViewer()) {
+    // Drag-only: world may still need a pick, but never open the Create panel.
+    if (!id) {
+      pickedSlotId = null;
+      pickedSlotIds.clear();
+      world.setPicked(null);
+      return;
+    }
+    pickedSlotIds.clear();
+    pickedSlotIds.add(id);
+    pickedSlotId = id;
+    world.setPicked(id);
+    return;
+  }
   if (!id) {
     dismissPick();
     return;
@@ -7387,17 +7466,36 @@ world.attach(
   stage,
   pickSlot,
   (id, x, y) => {
+    if (isMobileShareViewer()) return;
     if (id == null) openCanvasMenu(x, y);
     else openSlotMenu(x, y, id, slotMenuHost());
   },
-  (id, at) => editChipText(id, "end", at),
+  (id, at) => {
+    if (isMobileShareViewer()) return;
+    editChipText(id, "end", at);
+  },
   (id) => state.slots.find((item) => item.id === id)?.scale ?? 1,
-  scaleChip,
-  rotateChip,
+  (id, value, phase) => {
+    if (isMobileShareViewer()) return;
+    scaleChip(id, value, phase);
+  },
+  (id, angle, phase) => {
+    if (isMobileShareViewer()) return;
+    rotateChip(id, angle, phase);
+  },
   gradientWheelOf,
-  gradientWheelChip,
-  openGradWheelStop,
-  resizeTextFieldBox,
+  (id, value, phase) => {
+    if (isMobileShareViewer()) return;
+    gradientWheelChip(id, value, phase);
+  },
+  (id, stop, anchor) => {
+    if (isMobileShareViewer()) return;
+    openGradWheelStop(id, stop, anchor);
+  },
+  (id, sx, sy, phase) => {
+    if (isMobileShareViewer()) return;
+    resizeTextFieldBox(id, sx, sy, phase);
+  },
 );
 stage.addEventListener(
   "pointerdown",
@@ -7610,6 +7708,9 @@ void (async () => {
         const shared = await fetchShareProject(shareId);
         await applyPillProject(shared);
         lastDraftJson = serializePillProject(shared);
+        if (isMobileAccessGate() || document.documentElement.classList.contains("is-mobile-share")) {
+          enableMobileShareViewer();
+        }
         paintWelcome();
         return;
       } catch (error) {
@@ -7618,6 +7719,10 @@ void (async () => {
           title: "Couldn’t open share",
           body: error instanceof Error ? error.message : "This share link expired or couldn’t be loaded.",
         });
+        if (isMobileAccessGate() || document.documentElement.classList.contains("is-mobile-share")) {
+          location.replace("/");
+          return;
+        }
         await gateModeSelect();
         return;
       }

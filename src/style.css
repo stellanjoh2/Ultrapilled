@@ -9415,3 +9415,43 @@ button.pill.mode-select__action.is-open:not(.pill--commit):active:not(:disabled)
   }
 }
 
+/* Share-link phone viewer: canvas only + Activate Physics. */
+html.is-mobile-share,
+html.is-mobile-share body {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.app.is-mobile-share .topbar,
+.app.is-mobile-share .panel,
+.app.is-mobile-share .theme-shelf,
+.app.is-mobile-share .theme-shelf.is-open,
+.app.is-mobile-share .dev-panel,
+.app.is-mobile-share .page-strip,
+.app.is-mobile-share .help-trigger,
+.app.is-mobile-share .pro-tip,
+.app.is-mobile-share .canvas-welcome,
+.app.is-mobile-share .canvas-nudge,
+.app.is-mobile-share .chip-chrome-layer {
+  display: none !important;
+}
+
+.app.is-mobile-share .stage {
+  inset: 0;
+}
+
+button.pill.play-btn.mobile-share-play {
+  position: fixed;
+  left: 50%;
+  bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+  z-index: 80;
+  width: min(420px, calc(100vw - 32px));
+  margin: 0;
+  transform: translateX(-50%);
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.pill.play-btn.mobile-share-play:active {
+  transform: translateX(-50%) translateY(calc(8px * var(--ui-scale)));
+}
+
