@@ -1011,6 +1011,7 @@ export function gamesState(): AppState {
     photo("games", "template-games-gameboy.gif", "Game Boy", 114.28571428571429, 0, 3.1452632443694912, {
       colorIndex: WHITE,
       temperature: 4050,
+      collider: "sphere",
     }),
     text({ text: "SEGA!", ...arcade, shape: bare, colorIndex: BLUE, scale: 3.4, tracking: -80 }),
     photo(
@@ -1064,6 +1065,8 @@ export function gamesState(): AppState {
       stroke: 4,
       remote: { kind: "unsplash", id: "PXAcac16eJQ" },
       contrast: 8,
+      ratioW: 1080,
+      ratioH: 810,
     }),
     defaultImageSlot({
       src: "",
@@ -1077,6 +1080,8 @@ export function gamesState(): AppState {
       stroke: 4,
       remote: { kind: "unsplash", id: "b-bnM85Z35o" },
       temperature: 5800,
+      ratioW: 1080,
+      ratioH: 1613,
     }),
     defaultImageSlot({
       src: "",
@@ -1088,6 +1093,7 @@ export function gamesState(): AppState {
       radius: 12,
       stroked: false,
       stroke: 4,
+      color: "#0f3fff",
       youtube: { videoId: "jZl_BM3-hLw", startSec: 3520, loopSec: 30 },
     }),
     text({ text: "Hey! Listen!", ...pixelify, shape: "pill", colorIndex: BLUE, textColor: "#ffffff", scale: 0.75, pillPad: 44 }),
@@ -1103,6 +1109,14 @@ export function gamesState(): AppState {
       remote: { kind: "giphy", id: "hDMJjUNxLhIjK" },
       ratioW: 320,
       ratioH: 320,
+    }),
+    phosphor("fill:joystick", {
+      colorIndex: YELLOW,
+      size: 142.3200859291085,
+      scale: 0.7486919755991203,
+      collider: "block",
+      ratioW: 98,
+      ratioH: 106,
     }),
     text({ text: "Falcon Punch!", ...fight, shape: bare, colorIndex: RED, scale: 1.85, tracking: -50 }),
     text({
@@ -1137,7 +1151,7 @@ export function gamesState(): AppState {
       size: 95.14285714285714,
       amount: 1,
       colorIndex: TEAL,
-      scale: 1.4296206813929326,
+      scale: 2.0671864895113585,
       radius: 1,
       stroke: 4,
       remote: { kind: "giphy", id: "xT9DPEVTWMiTZiM9O0" },
@@ -1194,10 +1208,27 @@ export function gamesState(): AppState {
       scale: 0.9200918086849594,
       textField: true,
       boxW: 421.6931039531781,
-      boxH: 116.60181460483633,
+      boxH: 124,
       boxAuto: false,
       align: "left",
       lineHeight: 50,
+    }),
+    phosphor("fill:game-controller", {
+      colorIndex: RED,
+      size: 131.57894736842107,
+      scale: 1,
+      collider: "block",
+      ratioW: 122,
+      ratioH: 90,
+    }),
+    phosphor("fill:heart-straight", {
+      colorIndex: RED,
+      size: 131.57894736842107,
+      amount: 2,
+      scale: 0.5294705836862548,
+      collider: "block",
+      ratioW: 114,
+      ratioH: 98,
     }),
   ].filter((slot): slot is Slot => slot != null);
   return {
@@ -1217,11 +1248,11 @@ export function gamesState(): AppState {
       gridOpacity: 12,
     },
     canvas: "16:9",
-    masterScale: 1.9,
+    masterScale: 1.8,
     sizeRandom: 0,
     pillPad: 30,
     textTracking: 0,
-    shapeAmount: 12,
+    shapeAmount: 5,
     // Color-picked from classic PSX logo: yellow, red P, teal S, blue S (+ white).
     theme: ["#ffffff", "#f0c000", "#dc0028", "#00a898", "#3068b0"],
     physics: { ...DEFAULT_PHYSICS },
@@ -1230,6 +1261,7 @@ export function gamesState(): AppState {
     slots,
   };
 }
+
 
 /** Stable library id so switching to this template does not leak data URLs. */
 export const ULTRAPILLED_LOGO_ID = "ultrapilled-builtin-logo";
