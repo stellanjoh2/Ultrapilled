@@ -8,7 +8,12 @@ import {
 } from "./phosphorApi";
 import type { PillProject } from "./project/pillFormat";
 import type { ImageRemote, ImageSlot, Slot } from "./types";
-import { getUnsplashPhoto, unsplashConfigured, unsplashPhotoFile } from "./unsplashApi";
+import {
+  getUnsplashPhoto,
+  unsplashConfigured,
+  unsplashHotlinkUrl,
+  unsplashPhotoFile,
+} from "./unsplashApi";
 
 export function parseRemoteFromName(name: string): ImageRemote | null {
   const base = name.trim();
@@ -62,6 +67,27 @@ export async function fileForRemote(remote: ImageRemote): Promise<File | null> {
     }
     if (!phosphorConfigured()) return null;
     return phosphorIconFile(await getPhosphorIcon(remote.id));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hotlink URL for Unsplash / Giphy so shares don’t re-host the bytes.
+ * Phosphor has no public CDN URL here — returns null (caller embeds or relinks).
+ */
+export async function httpsSrcForRemote(remote: ImageRemote): Promise<string | null> {
+  try {
+    if (remote.kind === "unsplash") {
+      if (!unsplashConfigured()) return null;
+      return unsplashHotlinkUrl(await getUnsplashPhoto(remote.id), 1920);
+    }
+    if (remote.kind === "giphy") {
+      if (!giphyConfigured()) return null;
+      const gif = await getGiphyGif(remote.id);
+      return gif.fileUrl || null;
+    }
+    return null;
   } catch {
     return null;
   }

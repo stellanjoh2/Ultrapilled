@@ -6,6 +6,7 @@ import {
   type PillEmbeddedImage,
   type PillProject,
 } from "./project/pillFormat";
+import { httpsSrcForRemote, imageRemoteOf } from "./remoteImage";
 import { uid, type AppState } from "./types";
 
 /** Session cache so draft debounces don't re-encode the same blob. */
@@ -105,11 +106,22 @@ async function blobToDataUrl(src: string): Promise<string> {
   }
 }
 
+export type EmbedSlotImagesOpts = {
+  /**
+   * Share packing: Unsplash / Giphy keep a CDN URL (or empty src + remote id).
+   * Local uploads still bake into data URLs. Phosphor stays embedded (small SVG).
+   */
+  linkRemotes?: boolean;
+};
+
 /**
  * Turn blob: slot / video / background images into data URLs so drafts and
  * custom templates survive reload (blob URLs die with the document).
  */
-export async function embedSlotImages(project: PillProject): Promise<PillProject> {
+export async function embedSlotImages(
+  project: PillProject,
+  opts?: EmbedSlotImagesOpts,
+): Promise<PillProject> {
   const state = structuredClone(project.state);
   const pages = project.pages.map((page) => structuredClone(page));
 
@@ -117,6 +129,15 @@ export async function embedSlotImages(project: PillProject): Promise<PillProject
     await Promise.all(
       slots.map(async (slot) => {
         if (slot.kind !== "image") return;
+        if (opts?.linkRemotes) {
+          const remote = imageRemoteOf(slot);
+          if (remote?.kind === "unsplash" || remote?.kind === "giphy") {
+            slot.remote = remote;
+            const https = await httpsSrcForRemote(remote);
+            slot.src = https ?? "";
+            return;
+          }
+        }
         if (slot.src) slot.src = await blobToDataUrl(slot.src);
         if (slot.video?.src) {
           slot.video = { ...slot.video, src: await blobToDataUrl(slot.video.src) };

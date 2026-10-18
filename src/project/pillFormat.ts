@@ -70,7 +70,13 @@ function isStoredImageSrc(value: unknown): value is string {
   if (typeof value !== "string") return false;
   try {
     const u = new URL(value);
-    return u.protocol === "https:" && /(^|\.)unsplash\.com$/i.test(u.hostname);
+    if (u.protocol !== "https:") return false;
+    // Hotlinked Unsplash / Giphy CDN (share packs remotes as links, not bytes).
+    return (
+      /(^|\.)unsplash\.com$/i.test(u.hostname) ||
+      /(^|\.)giphy\.com$/i.test(u.hostname) ||
+      /(^|\.)giphy\.net$/i.test(u.hostname)
+    );
   } catch {
     return false;
   }

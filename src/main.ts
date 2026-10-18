@@ -6829,7 +6829,9 @@ async function shareCurrentScene() {
     return;
   }
   try {
-    const json = serializePillProject(await embedSlotImages(currentPillProject()));
+    const json = serializePillProject(
+      await embedSlotImages(currentPillProject(), { linkRemotes: true }),
+    );
     const frame = currentFrame();
     await askShareLink({
       projectJson: json,
