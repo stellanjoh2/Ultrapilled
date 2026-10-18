@@ -6407,6 +6407,71 @@ html[data-theme="day"] .shape-swatch {
   margin-bottom: var(--space-3);
 }
 
+/* Share creating — simple back-and-forth line (Uiverse unlucky-mouse-21 bar). */
+.reconnect__card--creating {
+  display: grid;
+  place-items: center;
+  min-height: calc(120px * var(--ui-scale));
+  padding: calc(28px * var(--ui-scale)) calc(36px * var(--ui-scale));
+}
+
+.share-creating-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(14px * var(--ui-scale));
+  width: min(100%, calc(220px * var(--ui-scale)));
+}
+
+.share-creating-loader__text {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-family: var(--font-section);
+  font-size: calc(18px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.share-creating-loader__track {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.share-creating-loader__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 36%;
+  border-radius: inherit;
+  background: #c4ff00;
+  will-change: transform;
+  animation: share-creating-bar 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes share-creating-bar {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(177.777%); /* (100 - 36) / 36 */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .share-creating-loader__fill {
+    animation: none;
+    left: 0;
+    width: 60%;
+    transform: none;
+  }
+}
+
 .reconnect__body {
   margin: 0 auto var(--space-3);
   max-width: 28em;

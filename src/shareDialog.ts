@@ -73,35 +73,37 @@ export async function askShareLink(payload: ShareDialogPayload): Promise<string 
   }
 }
 
-/** Non-dismissible wait state while the scene uploads. */
+/** Non-dismissible wait — label + back-and-forth lime line. */
 function openCreating(): { close: () => void } {
   const root = document.createElement("div");
   root.className = "reconnect";
   root.setAttribute("role", "status");
   root.setAttribute("aria-live", "polite");
   root.setAttribute("aria-busy", "true");
+  root.setAttribute("aria-label", "Generating link");
   root.innerHTML = `
     <div class="reconnect__scrim"></div>
-    <div class="reconnect__card">
-      <h2 class="reconnect__title">Creating link…</h2>
-      <p class="reconnect__body">Uploading your scene. This can take a few seconds.</p>
+    <div class="reconnect__card reconnect__card--creating">
+      <div class="share-creating-loader">
+        <p class="share-creating-loader__text">generating link</p>
+        <div class="share-creating-loader__track" aria-hidden="true">
+          <span class="share-creating-loader__fill"></span>
+        </div>
+      </div>
     </div>
   `;
   const card = root.querySelector<HTMLElement>(".reconnect__card")!;
   const scrim = root.querySelector<HTMLElement>(".reconnect__scrim")!;
-  const content = [
-    root.querySelector<HTMLElement>(".reconnect__title")!,
-    root.querySelector<HTMLElement>(".reconnect__body")!,
-  ];
+  const loader = root.querySelector<HTMLElement>(".share-creating-loader")!;
   document.body.append(root);
   if (!reducedMotion()) {
     gsap.set(scrim, { autoAlpha: 0 });
     gsap.set(card, { autoAlpha: 0, scale: 0.94, y: 16 });
-    gsap.set(content, { autoAlpha: 0, y: 10 });
+    gsap.set(loader, { autoAlpha: 0, y: 10 });
     const tl = gsap.timeline();
     tl.to(scrim, { autoAlpha: 1, duration: 0.28, ease: "power1.out" }, 0);
     tl.to(card, { autoAlpha: 1, scale: 1, y: 0, duration: 0.34, ease: "power3.out" }, 0.04);
-    tl.to(content, { autoAlpha: 1, y: 0, duration: 0.28, stagger: 0.04, ease: "power2.out" }, 0.1);
+    tl.to(loader, { autoAlpha: 1, y: 0, duration: 0.28, ease: "power2.out" }, 0.1);
   }
   let closed = false;
   return {
