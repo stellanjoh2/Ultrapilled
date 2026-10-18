@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { putBackgroundImage } from "./background";
 import { embedSlotImages } from "./customTemplates";
 import { blankState } from "./templates";
+import { seedTrimAspect } from "./trim";
 import { defaultImageSlot } from "./types";
 import type { PillProject } from "./project/pillFormat";
 
@@ -99,6 +100,8 @@ describe("embedSlotImages", () => {
       }),
     );
 
+    seedTrimAspect("blob:http://localhost/giphy-1", 500, 210);
+
     const project: PillProject = {
       state: {
         ...blankState(),
@@ -134,6 +137,8 @@ describe("embedSlotImages", () => {
     expect(giphy.src).toBe("https://media.giphy.com/media/abc123gif/giphy.gif");
     expect(giphy.remote).toEqual({ kind: "giphy", id: "abc123gif" });
     expect(giphy.src.startsWith("data:")).toBe(false);
+    expect(giphy.ratioW).toBe(500);
+    expect(giphy.ratioH).toBe(210);
     expect(local.src.startsWith("data:")).toBe(true);
   });
 });

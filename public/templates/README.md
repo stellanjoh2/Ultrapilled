@@ -6,7 +6,7 @@ Put photos, GIFs, and other bundled media for each template here:
 public/templates/<template-id>/
 ```
 
-Examples: `berlin/`, `halloween/`, `miami/`, `acid/`, `new-york/`, `ultrapilled/`.
+Examples: `berlin/`, `halloween/`, `games/`, `miami/`, `acid/`, `new-york/`, `ultrapilled/`.
 
 ## Naming
 
@@ -20,6 +20,7 @@ template-<template-id>-<asset-name>.<ext>
 | ---------- | ------------------------------------ |
 | Acid       | `template-acid-big-ben.gif`          |
 | Berlin     | `template-berlin-skull.gif`          |
+| Games      | `template-games-gameboy.gif`         |
 | Halloween  | `template-halloween-hi-fi-spider.gif`|
 | Miami      | `template-miami-coast-guard.jpg`     |
 

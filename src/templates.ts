@@ -26,6 +26,7 @@ export type TemplateId =
   | "miami"
   | "berlin"
   | "halloween"
+  | "games"
   | "ultrapilled"
   | typeof MODE_SELECT_THEME_ID
   | typeof NOT_FOUND_THEME_ID;
@@ -36,6 +37,7 @@ export const TEMPLATES: { id: TemplateId; label: string; build: () => AppState; 
   { id: "miami", label: "Miami", build: miamiState },
   { id: "berlin", label: "Berlin", build: berlinState },
   { id: "halloween", label: "Halloween", build: halloweenState },
+  { id: "games", label: "Games", build: gamesState },
   { id: "ultrapilled", label: "Ultrapilled", build: ultrapilledState },
   { id: MODE_SELECT_THEME_ID, label: "Mode Select", build: modeSelectPreviewState },
   { id: NOT_FOUND_THEME_ID, label: "404", build: notFoundPreviewState, devOnly: true },
@@ -352,26 +354,45 @@ export function newYorkState(): AppState {
   const PINK = 4;
   const bare = "none" as const;
   const box = { shape: "box" as const, radius: 0 };
-  const grotesk = { fontFamily: "Climate Crisis", fontWeight: 400, tracking: -40 };
+  const boldonse = { fontFamily: "Boldonse", fontWeight: 400 };
   const didone = (fontWeight: number) => ({ fontFamily: "Playfair Display", fontWeight });
   const serif = (fontWeight: number) => ({ fontFamily: "Libre Baskerville", fontWeight });
   const franklin = (fontWeight: number) => ({ fontFamily: "Libre Franklin", fontWeight });
   const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
-  const face = (char: string, name: string, colorIndex: number, scale = 1) =>
-    defaultImageSlot({ src: "", name, emoji: char, size: 56, amount: 1, colorIndex, scale });
+  const face = (char: string, name: string, colorIndex: number, scale = 1, amount = 1) =>
+    defaultImageSlot({ src: "", name, emoji: char, size: 56, amount, colorIndex, scale });
   const slots = [
-    text({ text: "Issue", ...grotesk, shape: bare, colorIndex: INK, scale: 4.1942332272433775, tracking: -82 }),
+    text({ text: "Issue", ...boldonse, shape: bare, colorIndex: INK, scale: 4.1942332272433775, tracking: -105 }),
     text({ text: "The", ...didone(900), shape: bare, colorIndex: INK, scale: 2, tracking: -60 }),
     presetIcon("Stars", 2, RED, { scale: 0.6 }),
-    text({ text: "Culture", ...grotesk, shape: bare, colorIndex: RED, scale: 2.4 }),
+    text({
+      text: "Schmear",
+      ...boldonse,
+      shape: "pill",
+      colorIndex: INK,
+      textColorIndex: PINK,
+      scale: 1.9924023005359022,
+      tracking: -88,
+      pillPad: 48,
+    }),
     presetIcon("Checks", 1, INK, { scale: 0.8 }),
     text({ text: "&", ...didone(900), shape: bare, colorIndex: BLUE, scale: 4.31 }),
     photo("new-york", "template-new-york-pizza-slice.gif", "Pizza", 114, 0, 1.4660714123441718, {
       colorIndex: BLUE,
       exposure: 22,
     }),
-    text({ text: "Section A", ...franklin(800), ...box, colorIndex: INK, textColorIndex: PAPER, scale: 0.95 }),
-    text({ text: "Subway", ...franklin(900), shape: bare, colorIndex: INK, scale: 1.3699413429881004, tracking: -80 }),
+    text({
+      text: "Section A",
+      ...franklin(800),
+      shape: "box",
+      radius: 4,
+      colorIndex: INK,
+      textColorIndex: PAPER,
+      scale: 0.95,
+      tracking: -21,
+      pillPad: 54,
+    }),
+    text({ text: "Subway", ...franklin(900), shape: bare, colorIndex: INK, scale: 2.272699390605009, tracking: -80 }),
     defaultImageSlot({
       src: "",
       name: "giphy-GIPHY-pOeaTGiDBZgYM.gif",
@@ -383,10 +404,19 @@ export function newYorkState(): AppState {
       stroke: 4,
       remote: { kind: "giphy", id: "pOeaTGiDBZgYM" },
     }),
-    text({ text: "Letters", ...serif(700), shape: "box", radius: 4, colorIndex: RED, textColorIndex: PINK, scale: 1.1 }),
-    text({ text: "Style", ...didone(400), shape: bare, colorIndex: BLUE, scale: 1.4980893904843058, tracking: -40 }),
+    text({
+      text: "Stoop",
+      ...serif(700),
+      shape: "box",
+      radius: 4,
+      colorIndex: RED,
+      textColorIndex: PINK,
+      scale: 1.1,
+      tracking: -46,
+    }),
+    text({ text: "Bodega", ...didone(400), shape: bare, colorIndex: BLUE, scale: 1.6177968802026015, tracking: -85 }),
     presetIcon("Spheres", 1, BLUE, { scale: 0.35 }),
-    text({ text: "Essay", fontFamily: "DM Serif Display", fontWeight: 400, shape: bare, colorIndex: INK, scale: 1.6 }),
+    text({ text: "Slice", fontFamily: "DM Serif Display", fontWeight: 400, shape: bare, colorIndex: RED, scale: 1.6 }),
     defaultImageSlot({
       src: "",
       name: "unsplash-Wes_Hicks-Q_CmcYcMSKo.jpg",
@@ -398,7 +428,7 @@ export function newYorkState(): AppState {
       remote: { kind: "unsplash", id: "Q_CmcYcMSKo" },
     }),
     text({ text: "No. 7", ...didone(700), ...box, textHeight: 61, stroked: true, stroke: 2, colorIndex: BLUE, scale: 1 }),
-    text({ text: "1996", ...grotesk, shape: bare, colorIndex: INK, scale: 4.9902156498069 }),
+    text({ text: "1996", ...boldonse, shape: bare, colorIndex: INK, scale: 4.578192262202997, tracking: -115 }),
     text({
       text: "Special Report",
       ...franklin(800),
@@ -428,7 +458,17 @@ export function newYorkState(): AppState {
     text({ text: "“", ...didone(900), shape: bare, colorIndex: RED, scale: 3 }),
     face("🗞️", "Rolled-Up Newspaper", PINK),
     face("🇺🇸", "Flag United States", RED),
-    text({ text: "Reimagined", fontFamily: "DM Serif Display", fontWeight: 400, shape: bare, colorIndex: BLUE, scale: 1.3 }),
+    text({
+      text: "The Village",
+      fontFamily: "DM Serif Display",
+      fontWeight: 400,
+      shape: "pill",
+      colorIndex: BLUE,
+      textColorIndex: PAPER,
+      scale: 1.3,
+      tracking: -71,
+      pillPad: 54,
+    }),
     phosphor("fill:train", { colorIndex: INK, size: 96.80134680134681, scale: 0.9359301197969678, collider: "block" }),
     text({ text: "Vol. XXVI", ...serif(400), shape: bare, colorIndex: BLUE, scale: 1.1 }),
     presetIcon("Rings", 2, BLUE, { scale: 0.55 }),
@@ -449,6 +489,7 @@ export function newYorkState(): AppState {
     }),
     face("🍕", "Pizza", INK),
     face("🚕", "Taxi", PAPER),
+    face("🐀", "Rat", RED, 0.7452051546241213, 2),
   ].filter((slot): slot is Slot => slot != null);
   return {
     ...demoState(),
@@ -466,11 +507,11 @@ export function newYorkState(): AppState {
       gridColor: "#1c2bc9",
       gridOpacity: 20,
     },
-    masterScale: 3.3,
+    masterScale: 2.9,
     sizeRandom: 100,
     pillPad: 22,
     textTracking: 0,
-    shapeAmount: 19,
+    shapeAmount: 21,
     theme: ["#111111", "#efece5", "#f0462a", "#1c2bc9", "#f7c6d2"],
     post: { bloom: 0, bloomOpacity: 100, grain: 14, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
     physics: { ...DEFAULT_PHYSICS, bounce: TEMPLATE_BOUNCE },
@@ -531,6 +572,9 @@ export function miamiState(): AppState {
       scale: 1.89,
       radius: 40,
       stroke: 4,
+      // Downsized Giphy screen — keeps the collider landscape before relink/trim.
+      ratioW: 500,
+      ratioH: 210,
       remote: { kind: "giphy", id: "sdarezLLwzMkw" },
     }),
     text({ text: "Every Friday", fontFamily: "Space Grotesk", fontWeight: 700, shape: "pill", stroked: true, stroke: 2, colorIndex: CYAN, scale: 0.4, pillPad: 63 }),
@@ -898,6 +942,272 @@ export function halloweenState(): AppState {
     pillPad: 24,
     textTracking: 0,
     template: "halloween",
+    slots,
+  };
+}
+
+/**
+ * Arcade night on PSX primaries (color-picked from the classic logo):
+ * white / yellow #f0c000 / red #dc0028 / teal #00a898 / blue #3068b0.
+ * Type mix (~6): Geist Pixel + Pixelify Sans, Anton + Archivo Black (fighting/arcade),
+ * DM Serif Display + Playfair Display (cinematic / magazine drama).
+ */
+export function gamesState(): AppState {
+  const WHITE = 0;
+  const YELLOW = 1;
+  const RED = 2;
+  const TEAL = 3;
+  const BLUE = 4;
+  const bare = "none" as const;
+  const geist = { fontFamily: "Geist Pixel", fontWeight: 400 as const };
+  const pixelify = { fontFamily: "Pixelify Sans", fontWeight: 700 as const };
+  const fight = { fontFamily: "Anton", fontWeight: 400 as const };
+  const arcade = { fontFamily: "Archivo Black", fontWeight: 400 as const };
+  const serif = { fontFamily: "DM Serif Display", fontWeight: 400 as const };
+  const display = { fontFamily: "Playfair Display", fontWeight: 700 as const };
+  const text = (slot: Partial<TextSlot>) => defaultTextSlot(slot);
+  const slots = [
+    defaultImageSlot({
+      src: "",
+      name: "giphy-GIPHY-IXUgy25IUYDgA.gif",
+      size: 98,
+      amount: 1,
+      colorIndex: TEAL,
+      scale: 1,
+      radius: 9,
+      stroke: 4,
+      remote: { kind: "giphy", id: "IXUgy25IUYDgA" },
+      ratioW: 245,
+      ratioH: 245,
+    }),
+    text({
+      text: "FINISH HIM",
+      ...serif,
+      shape: bare,
+      colorIndex: RED,
+      scale: 4.25,
+      tracking: -40,
+      textAnim: true,
+    }),
+    photo("games", "template-games-gameboy.gif", "Game Boy", 114.28571428571429, 0, 3.1452632443694912, {
+      colorIndex: WHITE,
+      temperature: 4050,
+    }),
+    text({ text: "SEGA!", ...arcade, shape: bare, colorIndex: BLUE, scale: 3.4, tracking: -80 }),
+    photo(
+      "games",
+      "template-games-playstation-oxford-circus.jpg",
+      "PlayStation Oxford Circus",
+      115,
+      8,
+      1.9964651744639457,
+      { colorIndex: RED },
+    ),
+    text({
+      text: "Fatality",
+      ...serif,
+      shape: "pill",
+      colorIndex: RED,
+      textColorIndex: YELLOW,
+      scale: 1.35,
+      pillPad: 48,
+    }),
+    photo(
+      "games",
+      "template-games-fire-flower.gif",
+      "Fire Flower",
+      89.42857142857143,
+      0,
+      0.9246958433562164,
+      { colorIndex: YELLOW, amount: 2 },
+    ),
+    text({ text: "Toasty!", ...pixelify, shape: bare, colorIndex: TEAL, scale: 1.9 }),
+    text({
+      text: "GET OVER HERE",
+      ...fight,
+      shape: "pill",
+      colorIndex: YELLOW,
+      textColorIndex: RED,
+      scale: 1.55,
+      tracking: -30,
+      pillPad: 44,
+      textAnim: true,
+    }),
+    defaultImageSlot({
+      src: "",
+      name: "unsplash-Felix-PXAcac16eJQ.jpg",
+      size: 114.28571428571429,
+      amount: 1,
+      colorIndex: BLUE,
+      scale: 1.514405974946693,
+      radius: 8,
+      stroked: false,
+      stroke: 4,
+      remote: { kind: "unsplash", id: "PXAcac16eJQ" },
+      contrast: 8,
+    }),
+    defaultImageSlot({
+      src: "",
+      name: "unsplash-Nik-b-bnM85Z35o.jpg",
+      size: 114.28571428571429,
+      amount: 1,
+      colorIndex: WHITE,
+      scale: 2.065753602004303,
+      radius: 4,
+      stroked: false,
+      stroke: 4,
+      remote: { kind: "unsplash", id: "b-bnM85Z35o" },
+      temperature: 5800,
+    }),
+    defaultImageSlot({
+      src: "",
+      name: "YouTube",
+      size: 280,
+      amount: 1,
+      colorIndex: YELLOW,
+      scale: 1,
+      radius: 12,
+      stroked: false,
+      stroke: 4,
+      youtube: { videoId: "jZl_BM3-hLw", startSec: 3520, loopSec: 30 },
+    }),
+    text({ text: "Hey! Listen!", ...pixelify, shape: "pill", colorIndex: BLUE, textColor: "#ffffff", scale: 0.75, pillPad: 44 }),
+    defaultImageSlot({
+      src: "",
+      name: "giphy-GIPHY-hDMJjUNxLhIjK.gif",
+      size: 91.42857142857143,
+      amount: 1,
+      colorIndex: RED,
+      scale: 2.75,
+      radius: 11,
+      stroke: 4,
+      remote: { kind: "giphy", id: "hDMJjUNxLhIjK" },
+      ratioW: 320,
+      ratioH: 320,
+    }),
+    text({ text: "Falcon Punch!", ...fight, shape: bare, colorIndex: RED, scale: 1.85, tracking: -50 }),
+    text({
+      text: "Snake? Snake?! SNAAAKE!",
+      ...display,
+      shape: "pill",
+      stroked: true,
+      stroke: 2,
+      colorIndex: TEAL,
+      scale: 0.55,
+      pillPad: 52,
+    }),
+    photo("games", "template-games-atari-fuji.gif", "Atari Fuji", 102.57142857142857, 0, 1.5489184866474863, {
+      colorIndex: YELLOW,
+      exposure: 100,
+    }),
+    text({
+      text: "Wasted",
+      ...pixelify,
+      shape: "box",
+      radius: 8,
+      colorIndex: RED,
+      textColorIndex: YELLOW,
+      scale: 1.4,
+      pillPad: 42,
+    }),
+    text({ text: "Flawless victory", ...fight, shape: bare, colorIndex: WHITE, scale: 1.45, tracking: -35 }),
+    text({ text: "Headshot!", ...pixelify, shape: bare, colorIndex: RED, scale: 1.7 }),
+    defaultImageSlot({
+      src: "",
+      name: "giphy-Sabato-xT9DPEVTWMiTZiM9O0.gif",
+      size: 95.14285714285714,
+      amount: 1,
+      colorIndex: TEAL,
+      scale: 1.4296206813929326,
+      radius: 1,
+      stroke: 4,
+      remote: { kind: "giphy", id: "xT9DPEVTWMiTZiM9O0" },
+      ratioW: 333,
+      ratioH: 250,
+    }),
+    text({ text: "Godlike", ...geist, shape: bare, colorIndex: YELLOW, scale: 4.5, tracking: -40 }),
+    text({ text: "pwned", ...pixelify, shape: "pill", colorIndex: WHITE, textColorIndex: RED, scale: 0.9, pillPad: 50 }),
+    text({
+      text: "Nuclear launch detected",
+      ...serif,
+      shape: "box",
+      radius: 10,
+      stroked: true,
+      stroke: 2,
+      colorIndex: RED,
+      textColorIndex: RED,
+      scale: 0.48,
+      pillPad: 69,
+      textAnim: true,
+    }),
+    defaultImageSlot({
+      src: "",
+      name: "giphy-GIPHY-u4th4weIsJfuE.gif",
+      size: 181.8181818181818,
+      amount: 1,
+      colorIndex: BLUE,
+      scale: 1,
+      radius: 0,
+      stroke: 4,
+      remote: { kind: "giphy", id: "u4th4weIsJfuE" },
+      ratioW: 500,
+      ratioH: 500,
+    }),
+    defaultImageSlot({
+      src: "",
+      name: "giphy-slicedbread-PgNiaDQ1QsWvsGrCaq.gif",
+      size: 190.47619047619048,
+      amount: 1,
+      colorIndex: WHITE,
+      scale: 1.15,
+      radius: 0,
+      stroke: 4,
+      remote: { kind: "giphy", id: "PgNiaDQ1QsWvsGrCaq" },
+      ratioW: 480,
+      ratioH: 360,
+    }),
+    text({
+      text: '"[Playstation Portable] ...will elevate portable entertainment out of the handheld gaming ghetto, and Sony is the only company that can do it."\n\n- Kaz Hirai',
+      ...serif,
+      fontSize: 18,
+      shape: bare,
+      colorIndex: RED,
+      scale: 0.9200918086849594,
+      textField: true,
+      boxW: 421.6931039531781,
+      boxH: 116.60181460483633,
+      boxAuto: false,
+      align: "left",
+      lineHeight: 50,
+    }),
+  ].filter((slot): slot is Slot => slot != null);
+  return {
+    ...demoState(),
+    stageColor: "#000b41",
+    background: {
+      ...defaultBackground(),
+      kind: "solid",
+      shape: "radial",
+      stops: [
+        { id: uid(), color: "#0a1628", at: 0 },
+        { id: uid(), color: "#080808", at: 100 },
+      ],
+      grid: true,
+      gridDensity: "fine",
+      gridColor: "#ffffff",
+      gridOpacity: 12,
+    },
+    canvas: "16:9",
+    masterScale: 1.9,
+    sizeRandom: 0,
+    pillPad: 30,
+    textTracking: 0,
+    shapeAmount: 12,
+    // Color-picked from classic PSX logo: yellow, red P, teal S, blue S (+ white).
+    theme: ["#ffffff", "#f0c000", "#dc0028", "#00a898", "#3068b0"],
+    physics: { ...DEFAULT_PHYSICS },
+    post: { bloom: 0, bloomOpacity: 100, grain: 0, vignette: 0, saturate: 100, hue: 0, blend: "normal" },
+    template: "games",
     slots,
   };
 }

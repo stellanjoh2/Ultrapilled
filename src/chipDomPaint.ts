@@ -12,7 +12,7 @@ import {
   stopTextAnimIn,
 } from "./textAnim";
 import { inkOn } from "./theme";
-import { isGifSrc, peekTrim } from "./trim";
+import { gifLogicalScreen, isGifSrc, peekTrim, seedTrimAspect } from "./trim";
 import { dropShadowCssColor, dropShadowDistanceOf, dropShadowRadiusOf, isTextField, sanitizeTextMotion, textAlignOf, textFieldLineHeight, type ImageSlot, type Slot, type TextSlot } from "./types";
 import { armYouTubeLoop, clearYouTubeLoop, youtubeEmbedKey, youtubeEmbedSrc } from "./youtube";
 
@@ -402,6 +402,9 @@ async function ensureGifBloomPlayer(src: string): Promise<GifBloomPlayer | null>
     if (!res.ok) throw new Error("gif fetch failed");
     const data = await res.arrayBuffer();
     if (!gifBloomPlayers.has(src)) return null;
+    // Seed aspect ASAP so square placeholder colliders remesh before frames paint.
+    const screen = gifLogicalScreen(data);
+    if (screen) seedTrimAspect(src, screen.w, screen.h);
     const decoder = new ImageDecoder({ data, type: "image/gif", preferAnimation: true });
     await decoder.tracks.ready;
     if (gifBloomPlayers.get(src) !== player) {

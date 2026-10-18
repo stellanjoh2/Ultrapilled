@@ -7,6 +7,7 @@ import {
   type PillProject,
 } from "./project/pillFormat";
 import { httpsSrcForRemote, imageRemoteOf } from "./remoteImage";
+import { peekTrim, stampSlotAspect } from "./trim";
 import { uid, type AppState } from "./types";
 
 /** Session cache so draft debounces don't re-encode the same blob. */
@@ -132,13 +133,18 @@ export async function embedSlotImages(
         if (opts?.linkRemotes) {
           const remote = imageRemoteOf(slot);
           if (remote?.kind === "unsplash" || remote?.kind === "giphy") {
+            // Keep aspect for remakes — CDN src won't have the blob's trim cache.
+            stampSlotAspect(slot, peekTrim(slot.src));
             slot.remote = remote;
             const https = await httpsSrcForRemote(remote);
             slot.src = https ?? "";
             return;
           }
         }
-        if (slot.src) slot.src = await blobToDataUrl(slot.src);
+        if (slot.src) {
+          stampSlotAspect(slot, peekTrim(slot.src));
+          slot.src = await blobToDataUrl(slot.src);
+        }
         if (slot.video?.src) {
           slot.video = { ...slot.video, src: await blobToDataUrl(slot.video.src) };
         }

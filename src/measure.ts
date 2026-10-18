@@ -416,6 +416,14 @@ export function measureTextSlot(slot: TextSlot, pad = 1, tracking = 0.02): ChipS
   };
 }
 
+function fitLongEdge(size: number, ratioW: number, ratioH: number): ChipSize {
+  const fit = size / Math.max(ratioW, ratioH);
+  return {
+    width: Math.max(8, Math.round(ratioW * fit)),
+    height: Math.max(8, Math.round(ratioH * fit)),
+  };
+}
+
 export function measureImageSlot(slot: ImageSlot): ChipSize {
   const size = Math.max(24, slot.size);
   if (slot.youtube) {
@@ -427,11 +435,7 @@ export function measureImageSlot(slot: ImageSlot): ChipSize {
     const vw = slot.video.width;
     const vh = slot.video.height;
     if (vw && vh) {
-      const fit = size / Math.max(vw, vh);
-      return {
-        width: Math.max(8, Math.round(vw * fit)),
-        height: Math.max(8, Math.round(vh * fit)),
-      };
+      return fitLongEdge(size, vw, vh);
     }
     const width = size;
     const height = Math.max(8, Math.round((width * 9) / 16));
@@ -439,12 +443,13 @@ export function measureImageSlot(slot: ImageSlot): ChipSize {
   }
   if (slot.emoji) return measureEmojiBox(slot.emoji, size);
   const trim = peekTrim(slot.src);
-  if (!trim) return { width: size, height: size };
-  const fit = size / Math.max(trim.ratioW, trim.ratioH);
-  return {
-    width: Math.max(8, Math.round(trim.ratioW * fit)),
-    height: Math.max(8, Math.round(trim.ratioH * fit)),
-  };
+  if (trim) return fitLongEdge(size, trim.ratioW, trim.ratioH);
+  // Share remakes / CDN hotlinks: aspect stamped at pack time so we don't
+  // spawn a square collider (object-fit:contain then letterboxes inside it).
+  const rw = slot.ratioW;
+  const rh = slot.ratioH;
+  if (rw && rh && rw > 0 && rh > 0) return fitLongEdge(size, rw, rh);
+  return { width: size, height: size };
 }
 
 export function measureSlot(slot: Slot, pad = 1, tracking = 0.02): ChipSize {

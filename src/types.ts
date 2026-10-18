@@ -205,6 +205,13 @@ export type ImageSlot = {
   video?: LocalVideo;
   /** Unsplash / Giphy / Phosphor identity so blob URLs can be re-fetched after reconnect. */
   remote?: ImageRemote;
+  /**
+   * Intrinsic pixel aspect (from trim / GIF screen). Lets measure keep the right
+   * collider before a CDN re-fetch finishes — share packs stamp this so remakes
+   * don’t fall back to a square box (which balloons rounded GIF hitboxes).
+   */
+  ratioW?: number;
+  ratioH?: number;
 };
 
 export type ImageRemote = {

@@ -144,7 +144,14 @@ import {
   shareViewerTargetCanvas,
 } from "./mobileShareScale";
 import { imageRemoteOf, relinkProjectImages, relinkSlotImage } from "./remoteImage";
-import { ensureTrim, ensureTrims, gifBlocksStroke, peekTrim } from "./trim";
+import {
+  ensureTrim,
+  ensureTrims,
+  gifBlocksStroke,
+  peekTrim,
+  stampSlotAspect,
+  TRIM_SEEDED_EVENT,
+} from "./trim";
 import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
 import {
   attractorReachOf,
@@ -1857,6 +1864,9 @@ async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolea
   syncCanvas(false);
   const fontSlots = [...state.slots, ...pages.flatMap((page) => page.slots)];
   await Promise.all([ensureTrims(state.slots), ensureTextFonts(fontSlots)]);
+  for (const slot of state.slots) {
+    if (slot.kind === "image") stampSlotAspect(slot);
+  }
 
   const hasPoses = Boolean(opts?.pinPoses !== false && project.poses.length);
   if (hasPoses) pinRestoredPoses(project.poses, project.frame);
@@ -2503,6 +2513,7 @@ function assignImageFile(slot: ImageSlot, file: File, remote?: ImageRemote): Pro
     .then((trim) => {
       if (slot.src !== url) return null;
       if (trim) {
+        stampSlotAspect(slot, trim);
         slot.size = importSlotSize(trim.nativeW, trim.nativeH, svg ? { minWidth: IMPORT_SVG_MIN_WIDTH_PX } : undefined);
         if (gifBlocksStroke(url, file.name)) slot.stroked = undefined;
       }
@@ -5632,6 +5643,9 @@ function live(opts?: { quiet?: boolean; skipFit?: boolean }) {
   bump();
   void Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]).then(() => {
     clearGifStrokes(state.slots);
+    for (const slot of state.slots) {
+      if (slot.kind === "image") stampSlotAspect(slot);
+    }
     bump();
   });
   if (state.physics.layoutMode) scheduleLiveThumb();
@@ -7127,6 +7141,9 @@ async function loadTemplate(next: AppState) {
     for (const slot of state.slots) captureBaseline(slot);
     resetPages();
     await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
+    for (const slot of state.slots) {
+      if (slot.kind === "image") stampSlotAspect(slot);
+    }
   })();
 
   await tweenPlayfieldAlpha(0, TEMPLATE_FADE_OUT_S);
@@ -7709,6 +7726,11 @@ warmUltraDecomp();
 }
 void ensureTrims(state.slots);
 void ensureTextFonts(state.slots);
+// ImageDecoder / CDN GIF header may learn aspect after chips spawned as squares.
+window.addEventListener(TRIM_SEEDED_EVENT, () => {
+  if (world.chipCount() === 0) return;
+  live({ quiet: true });
+});
 document.fonts.addEventListener("loadingdone", () => {
   if (world.chipCount() === 0) return;
   relayout();

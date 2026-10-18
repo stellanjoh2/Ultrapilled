@@ -1,0 +1,21 @@
+Games template media. Remotes (Unsplash / Giphy / YouTube) resolve at runtime from slot ids.
+Wikimedia photos resized to 960 px wide when larger.
+
+template-games-playstation-oxford-circus.jpg
+  "Playstation logo Oxford Circus London" (24 November 2020) by Kwh1050
+  License: CC BY-SA 4.0 — https://creativecommons.org/licenses/by-sa/4.0/
+  https://commons.wikimedia.org/wiki/File:Playstation_logo_Oxford_Circus_London.jpg
+
+Local turntable / sprite GIFs — fill in Sketchfab or other sources before shipping.
+
+template-games-gameboy.gif
+  (attribution TBD)
+
+template-games-fire-flower.gif
+  (attribution TBD)
+
+template-games-atari-fuji.gif
+  (attribution TBD)
+
+template-games-sonic-racing.gif
+  (attribution TBD; not yet used in gamesState slots)

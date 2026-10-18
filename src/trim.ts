@@ -1,4 +1,4 @@
-import type { Slot } from "./types";
+import type { ImageSlot, Slot } from "./types";
 
 export type ImageTrim = {
   ratioW: number;
@@ -14,8 +14,50 @@ export type ImageTrim = {
 const ready = new Map<string, ImageTrim>();
 const pending = new Map<string, Promise<ImageTrim | null>>();
 
+/** Fired when aspect is first known for a src (ImageDecoder / fetch header). */
+export const TRIM_SEEDED_EVENT = "up-trim-seeded";
+
 export function peekTrim(src: string): ImageTrim | undefined {
   return ready.get(src);
+}
+
+/** GIF89a logical screen size (bytes 6–9), little-endian. */
+export function gifLogicalScreen(buf: ArrayBuffer): { w: number; h: number } | null {
+  if (buf.byteLength < 10) return null;
+  const u8 = new Uint8Array(buf);
+  if (u8[0] !== 0x47 || u8[1] !== 0x49 || u8[2] !== 0x46) return null;
+  const w = u8[6]! | (u8[7]! << 8);
+  const h = u8[8]! | (u8[9]! << 8);
+  if (w < 1 || h < 1) return null;
+  return { w, h };
+}
+
+/**
+ * Record aspect before / without a full trim probe. Returns true when newly set
+ * so callers can quiet-remesh colliders that spawned as squares.
+ */
+export function seedTrimAspect(src: string, ratioW: number, ratioH: number): boolean {
+  if (!src || !(ratioW > 0) || !(ratioH > 0)) return false;
+  if (ready.has(src)) return false;
+  ready.set(src, {
+    ratioW,
+    ratioH,
+    displaySrc: src,
+    nativeW: ratioW,
+    nativeH: ratioH,
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(TRIM_SEEDED_EVENT, { detail: { src } }));
+  }
+  return true;
+}
+
+/** Copy trim (or peek) aspect onto the slot for share packs / offline measure. */
+export function stampSlotAspect(slot: ImageSlot, trim?: ImageTrim | null): void {
+  const t = trim ?? (slot.src ? peekTrim(slot.src) : undefined);
+  if (!t || !(t.ratioW > 0) || !(t.ratioH > 0)) return;
+  slot.ratioW = t.ratioW;
+  slot.ratioH = t.ratioH;
 }
 
 export function ensureTrim(src: string, name = ""): Promise<ImageTrim | null> {
@@ -170,8 +212,47 @@ function sharpSvg(
   return `data:image/svg+xml;utf8,${encodeURIComponent(rewritten)}`;
 }
 
+async function trimHttpsGif(src: string): Promise<ImageTrim | null> {
+  // Same fetch path as ImageDecoder — CDN hotlinks often work here when a bare
+  // Image() probe is flaky, and the GIF header gives aspect without a full decode.
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const screen = gifLogicalScreen(buf);
+    if (!screen) return null;
+    let transparent: boolean | undefined;
+    try {
+      const blobUrl = URL.createObjectURL(new Blob([buf], { type: "image/gif" }));
+      try {
+        const img = await loadImage(blobUrl);
+        transparent = frameHasTransparency(img, screen.w, screen.h);
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+    } catch {
+      transparent = undefined;
+    }
+    return {
+      ratioW: screen.w,
+      ratioH: screen.h,
+      displaySrc: src,
+      nativeW: screen.w,
+      nativeH: screen.h,
+      transparent,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function computeTrim(src: string, name = ""): Promise<ImageTrim | null> {
   try {
+    if (isGifSrc(src, name) && /^https?:/i.test(src)) {
+      const hot = await trimHttpsGif(src);
+      if (hot) return hot;
+    }
+
     const img = await loadImage(src);
     const naturalW = img.naturalWidth || img.width;
     const naturalH = img.naturalHeight || img.height;

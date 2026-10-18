@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { TEXT_INK_PAD, fitTextFieldBox, measureTextInk, textFieldPad, textGlyphSideOverhangs, trackedRunWidth, trackingEm } from "./measure";
-import { defaultTextFieldSlot, defaultTypeSlot } from "./types";
+import {
+  TEXT_INK_PAD,
+  fitTextFieldBox,
+  measureImageSlot,
+  measureTextInk,
+  textFieldPad,
+  textGlyphSideOverhangs,
+  trackedRunWidth,
+  trackingEm,
+} from "./measure";
+import { defaultImageSlot, defaultTextFieldSlot, defaultTypeSlot } from "./types";
 
 describe("measureTextInk", () => {
   it("keeps a bleed pad so AA glyph edges aren't clipped", () => {
@@ -85,6 +94,25 @@ describe("textFieldPad", () => {
     const pad = textFieldPad(slot, 260, 140);
     expect(pad.x).toBe(Math.max(2, 18 * 0.12));
     expect(pad.y).toBe(pad.x);
+  });
+});
+
+describe("measureImageSlot", () => {
+  it("falls back to a square when aspect is unknown", () => {
+    expect(measureImageSlot(defaultImageSlot({ size: 100, src: "/missing.png" }))).toEqual({
+      width: 100,
+      height: 100,
+    });
+  });
+
+  it("uses stamped ratioW/ratioH when trim has not loaded yet", () => {
+    // 500×210 Giphy (Scarface) at long-edge 114 — landscape, not a square.
+    const size = measureImageSlot(
+      defaultImageSlot({ size: 114, src: "https://media.giphy.com/media/x/giphy.gif", ratioW: 500, ratioH: 210 }),
+    );
+    expect(size.width).toBe(114);
+    expect(size.height).toBe(Math.round((210 / 500) * 114));
+    expect(size.height).toBeLessThan(size.width);
   });
 });
 
