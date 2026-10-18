@@ -32,6 +32,21 @@ export default defineConfig({
       },
     },
   },
+  plugins: [
+    {
+      name: "share-path-to-index",
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          const path = req.url?.split("?")[0] ?? "";
+          if (/^\/r\/[A-Za-z0-9_-]{16,64}\/?$/.test(path)) {
+            const qs = req.url?.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+            req.url = `/${qs}`;
+          }
+          next();
+        });
+      },
+    },
+  ],
   test: {
     environment: "happy-dom",
     include: ["src/**/*.test.ts"],

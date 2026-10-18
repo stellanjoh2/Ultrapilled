@@ -319,7 +319,7 @@ class ShareApp:
             {
                 "id": share_id,
                 "expiresAt": int(expires),
-                "urlHint": f"/?r={share_id}",
+                "urlHint": f"/r/{share_id}",
             },
         )
 

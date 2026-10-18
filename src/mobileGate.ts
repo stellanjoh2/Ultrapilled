@@ -16,7 +16,7 @@ export function isMobileAccessGate(match = globalThis.matchMedia): boolean {
   return match(MOBILE_ACCESS_GATE_QUERY).matches;
 }
 
-/** Phones normally get the access gate; share links (`?r=`) open a minimal viewer instead. */
+/** Phones normally get the access gate; share links (`/r/…`) open a minimal viewer instead. */
 export function shouldBootMobileGate(hasShareLink: boolean, match = globalThis.matchMedia): boolean {
   return isMobileAccessGate(match) && !hasShareLink;
 }

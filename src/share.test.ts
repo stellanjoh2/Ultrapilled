@@ -36,11 +36,18 @@ describe("share helpers", () => {
     expect(isShareId("bad/id/here!!!!!!!!!!")).toBe(false);
   });
 
-  it("reads ?r= and #r= deep links", () => {
+  it("reads /r/, ?r=, and #r= deep links", () => {
     const id = "abcdefghijklmnopqr12";
+    expect(shareIdFromUrl(new URL(`https://ultrapilled.com/r/${id}`))).toBe(id);
     expect(shareIdFromUrl(new URL(`https://ultrapilled.com/?r=${id}`))).toBe(id);
     expect(shareIdFromUrl(new URL(`https://ultrapilled.com/#r=${id}`))).toBe(id);
     expect(shareIdFromUrl(new URL("https://ultrapilled.com/"))).toBeNull();
+  });
+
+  it("reads a stashed share id after a /r/ → / hop", () => {
+    sessionStorage.setItem("up-share-id", "abcdefghijklmnopqr12");
+    history.replaceState(null, "", "/");
+    expect(shareIdFromUrl()).toBe("abcdefghijklmnopqr12");
   });
 
   it("clears the deep link from the address bar", () => {
@@ -49,9 +56,17 @@ describe("share helpers", () => {
     expect(window.location.search).toBe("");
   });
 
-  it("builds a public share url", () => {
+  it("clears /r/ path and session stash", () => {
+    sessionStorage.setItem("up-share-id", "abcdefghijklmnopqr12");
+    history.replaceState(null, "", "/r/abcdefghijklmnopqr12");
+    clearShareDeepLink();
+    expect(window.location.pathname).toBe("/");
+    expect(sessionStorage.getItem("up-share-id")).toBeNull();
+  });
+
+  it("builds a public share url as /r/<id>", () => {
     expect(publicShareUrl("abcdefghijklmnopqr12", "https://ultrapilled.com")).toBe(
-      "https://ultrapilled.com/?r=abcdefghijklmnopqr12",
+      "https://ultrapilled.com/r/abcdefghijklmnopqr12",
     );
   });
 
@@ -76,7 +91,7 @@ describe("share helpers", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.id).toBe("abcdefghijklmnopqr12");
-      expect(result.url).toContain("?r=abcdefghijklmnopqr12");
+      expect(result.url).toContain("/r/abcdefghijklmnopqr12");
     }
     expect(fetchImpl).toHaveBeenCalled();
   });

@@ -136,7 +136,12 @@ import {
 } from "./share";
 import { askShareLink } from "./shareDialog";
 import { isMobileAccessGate } from "./mobileGate";
-import { remapPosesToShareFrame, shareViewerChipScale } from "./mobileShareScale";
+import {
+  clampSharePinch,
+  remapPosesToShareFrame,
+  shareViewerChipScale,
+  shareViewerTargetCanvas,
+} from "./mobileShareScale";
 import { imageRemoteOf, relinkProjectImages, relinkSlotImage } from "./remoteImage";
 import { ensureTrim, ensureTrims, gifBlocksStroke, peekTrim } from "./trim";
 import { isColorMask, isSvgSource, type ChipPose } from "./chipKinds";
@@ -5657,14 +5662,32 @@ const loopBtn = app.querySelector<HTMLButtonElement>("#loop")!;
 const copyBtn = app.querySelector<HTMLButtonElement>("#copy-settings")!;
 const devPanel = app.querySelector<HTMLElement>("#dev-panel")!;
 
-/** Share-link phone viewer: 9:16, drag objects, Activate Physics only. */
+/** Share-link viewer: canvas + Trigger Physics; pinch scales objects inside the border. */
 let mobileShareViewer = false;
 let mobileSharePlayBtn: HTMLButtonElement | null = null;
-/** Overrides fitScale so remapped 16:9 scenes keep desktop-like size on 9:16. */
+/** Overrides fitScale so remapped scenes keep the intended size on the share frame. */
 let mobileShareScaleOverride: number | null = null;
+let mobileShareBase: {
+  poses: ChipPose[];
+  frame: { width: number; height: number };
+  chipScale: number;
+} | null = null;
+let mobileShareUserScale = 1;
+let mobileSharePinch: {
+  startDist: number;
+  startUserScale: number;
+} | null = null;
+let mobileSharePinchRaf = 0;
 
 function isMobileShareViewer(): boolean {
   return mobileShareViewer;
+}
+
+function applyMobileShareUserScale() {
+  if (!mobileShareBase) return;
+  mobileShareScaleOverride = mobileShareBase.chipScale * mobileShareUserScale;
+  if (mobileShareBase.poses.length) pinRestoredPoses(mobileShareBase.poses, mobileShareBase.frame);
+  else live({ quiet: true });
 }
 
 function enableMobileShareViewer(source: {
@@ -5677,7 +5700,11 @@ function enableMobileShareViewer(source: {
   document.documentElement.classList.add("is-mobile-share");
   shell.classList.add("is-mobile-share");
   const sourceCanvas = source.canvas ?? state.canvas;
-  state.canvas = "9:16";
+  state.canvas = shareViewerTargetCanvas(
+    sourceCanvas,
+    stage.clientWidth,
+    stage.clientHeight,
+  );
   state.physics.layoutMode = false;
   syncCanvas(false);
   const to = currentFrame();
@@ -5687,23 +5714,84 @@ function enableMobileShareViewer(source: {
       : sourceCanvas === "9:16"
         ? { width: to.width, height: to.height }
         : { width: to.width * (16 / 9), height: to.height };
-  mobileShareScaleOverride = shareViewerChipScale(from, to, sourceCanvas);
+  const chipScale = shareViewerChipScale(from, to, sourceCanvas);
   const poses = remapPosesToShareFrame(source.poses, from, to, sourceCanvas);
+  mobileShareUserScale = 1;
+  mobileShareBase = { poses, frame: to, chipScale };
+  mobileShareScaleOverride = chipScale;
   if (poses.length) pinRestoredPoses(poses, to);
   else live({ quiet: true });
 
   if (!mobileSharePlayBtn) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "mobile-share-play";
-    btn.setAttribute("aria-label", "Activate Physics");
-    btn.textContent = "Activate Physics";
+    btn.className = "pill play-btn mobile-share-play";
+    btn.setAttribute("aria-label", "Trigger Physics");
+    btn.innerHTML = `<span class="play-btn__label">
+      <svg class="play-btn__bolt" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+      </svg>
+      <span class="play-btn__text">Trigger Physics</span>
+    </span>`;
     btn.addEventListener("click", () => {
       void session.triggerPhysics();
     });
     document.body.append(btn);
     mobileSharePlayBtn = btn;
   }
+
+  bindMobileSharePinch();
+}
+
+function touchDistance(a: Touch, b: Touch): number {
+  const dx = a.clientX - b.clientX;
+  const dy = a.clientY - b.clientY;
+  return Math.hypot(dx, dy);
+}
+
+function bindMobileSharePinch() {
+  const onStart = (event: TouchEvent) => {
+    if (!mobileShareViewer || event.touches.length !== 2) return;
+    const a = event.touches.item(0);
+    const b = event.touches.item(1);
+    if (!a || !b) return;
+    event.preventDefault();
+    mobileSharePinch = {
+      startDist: Math.max(1, touchDistance(a, b)),
+      startUserScale: mobileShareUserScale,
+    };
+  };
+  const onMove = (event: TouchEvent) => {
+    if (!mobileSharePinch || event.touches.length < 2) return;
+    const a = event.touches.item(0);
+    const b = event.touches.item(1);
+    if (!a || !b) return;
+    event.preventDefault();
+    const dist = Math.max(1, touchDistance(a, b));
+    mobileShareUserScale = clampSharePinch(
+      mobileSharePinch.startUserScale * (dist / mobileSharePinch.startDist),
+    );
+    if (mobileSharePinchRaf) return;
+    mobileSharePinchRaf = requestAnimationFrame(() => {
+      mobileSharePinchRaf = 0;
+      applyMobileShareUserScale();
+    });
+  };
+  const onEnd = (event: TouchEvent) => {
+    if (!mobileSharePinch) return;
+    if (event.touches.length >= 2) return;
+    mobileSharePinch = null;
+    if (mobileSharePinchRaf) {
+      cancelAnimationFrame(mobileSharePinchRaf);
+      mobileSharePinchRaf = 0;
+    }
+    applyMobileShareUserScale();
+  };
+  const opts: AddEventListenerOptions = { passive: false, capture: true };
+  playfield.addEventListener("touchstart", onStart, opts);
+  playfield.addEventListener("touchmove", onMove, opts);
+  playfield.addEventListener("touchend", onEnd, opts);
+  playfield.addEventListener("touchcancel", onEnd, opts);
 }
 
 /** One playthrough of public/images/intropill.gif (40 frames × 5cs), shortened 0.25s. */
@@ -7086,7 +7174,7 @@ devPanel.querySelector("#dev-load-404")?.addEventListener("click", () => {
 window.addEventListener("keydown", (event) => {
   if (document.body.classList.contains("is-exporting")) return;
   if (isMobileShareViewer()) {
-    // Phones: Activate Physics (P / Space when idle) and bounce charge only.
+    // Phones: Trigger Physics (P / Space when idle) and bounce charge only.
     if (typingInField(event.target)) return;
     if (event.code === "Space") {
       event.preventDefault();

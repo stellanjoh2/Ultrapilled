@@ -7,6 +7,18 @@
     <title>Page not found — Ultrapilled</title>
     <meta name="description" content="That page isn’t part of the Ultrapilled experience." />
     <meta name="robots" content="noindex" />
+    <script>
+      /* Share links use /r/<id>. GitHub Pages serves this 404 for that path —
+         stash the id and boot the main app so Messenger can’t strip ?r=. */
+      (function () {
+        var m = location.pathname.match(/^\/r\/([A-Za-z0-9_-]{16,64})\/?$/);
+        if (!m) return;
+        try {
+          sessionStorage.setItem("up-share-id", m[1]);
+        } catch (e) {}
+        location.replace("/" + location.search + location.hash);
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

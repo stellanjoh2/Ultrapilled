@@ -9,8 +9,11 @@ export const SHARE_API_FALLBACK = "https://ultrapilled-share.fly.dev";
 export const LOCAL_SHARE_API = "http://localhost:8081";
 export const SHARE_TTL_DAYS = 14;
 export const SHARE_MAX_BYTES = 8 * 1024 * 1024;
-/** Query/hash used to open a shared scene. */
+/** Path / query / hash segment used to open a shared scene (`/r/<id>`, `?r=`, `#r=`). */
 export const SHARE_DEEP_LINK = "r";
+/** Survives Messenger/Facebook stripping `?r=` — 404.html stashes then boots `/`. */
+export const SHARE_SESSION_KEY = "up-share-id";
+const SHARE_PATH_RE = /^\/r\/([A-Za-z0-9_-]{16,64})\/?$/;
 
 export type ShareCreateResult =
   | { ok: true; id: string; expiresAt: number; url: string }
@@ -29,11 +32,48 @@ export function shareApiBases(): string[] {
   return [...new Set([primary, SHARE_API_FALLBACK])];
 }
 
+export function isShareId(value: string): boolean {
+  return /^[A-Za-z0-9_-]{16,64}$/.test(value);
+}
+
+function shareIdFromPath(pathname: string): string | null {
+  const match = pathname.match(SHARE_PATH_RE);
+  const id = match?.[1];
+  return id && isShareId(id) ? id : null;
+}
+
+function shareIdFromSession(): string | null {
+  try {
+    const stored = sessionStorage.getItem(SHARE_SESSION_KEY)?.trim();
+    if (stored && isShareId(stored)) return stored;
+  } catch {
+    /* private mode */
+  }
+  return null;
+}
+
+/** Stash id so a GH Pages 404 → `/` hop still opens the share viewer. */
+export function stashShareId(id: string): void {
+  if (!isShareId(id)) return;
+  try {
+    sessionStorage.setItem(SHARE_SESSION_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function shareIdFromUrl(url: URL | Location = window.location): string | null {
-  const params = new URLSearchParams(url.search);
+  const pathname = "pathname" in url ? url.pathname : new URL(url.href).pathname;
+  const fromPath = shareIdFromPath(pathname);
+  if (fromPath) return fromPath;
+
+  const search = "search" in url ? url.search : new URL(url.href).search;
+  const params = new URLSearchParams(search);
   const fromQuery = params.get(SHARE_DEEP_LINK)?.trim();
   if (fromQuery && isShareId(fromQuery)) return fromQuery;
-  const hash = url.hash.replace(/^#/, "");
+
+  const hashRaw = "hash" in url ? url.hash : new URL(url.href).hash;
+  const hash = hashRaw.replace(/^#/, "");
   if (hash.startsWith(`${SHARE_DEEP_LINK}=`)) {
     const value = hash.slice(SHARE_DEEP_LINK.length + 1).trim();
     if (isShareId(value)) return value;
@@ -42,14 +82,11 @@ export function shareIdFromUrl(url: URL | Location = window.location): string | 
     const value = hash.slice(SHARE_DEEP_LINK.length + 1).trim();
     if (isShareId(value)) return value;
   }
-  return null;
+
+  return shareIdFromSession();
 }
 
-export function isShareId(value: string): boolean {
-  return /^[A-Za-z0-9_-]{16,64}$/.test(value);
-}
-
-/** Drop ?r= / #r= after opening so refresh doesn’t re-fetch. */
+/** Drop path / query / hash / session stash after opening so refresh doesn’t re-fetch. */
 export function clearShareDeepLink(): void {
   const url = new URL(window.location.href);
   const hadQuery = url.searchParams.has(SHARE_DEEP_LINK);
@@ -58,10 +95,19 @@ export function clearShareDeepLink(): void {
     hash === SHARE_DEEP_LINK ||
     hash.startsWith(`${SHARE_DEEP_LINK}=`) ||
     hash.startsWith(`${SHARE_DEEP_LINK}/`);
-  if (!hadQuery && !hadHash) return;
+  const hadPath = Boolean(shareIdFromPath(url.pathname));
+  let hadSession = false;
+  try {
+    hadSession = Boolean(sessionStorage.getItem(SHARE_SESSION_KEY));
+    sessionStorage.removeItem(SHARE_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+  if (!hadQuery && !hadHash && !hadPath && !hadSession) return;
   url.searchParams.delete(SHARE_DEEP_LINK);
   if (hadHash) url.hash = "";
-  history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  const path = hadPath ? "/" : url.pathname;
+  history.replaceState(null, "", `${path}${url.search}${url.hash}`);
 }
 
 export function utf8ByteLength(text: string): number {
@@ -72,8 +118,9 @@ export function shareTooLargeMessage(): string {
   return `This scene is over ${SHARE_MAX_BYTES / (1024 * 1024)} MB. Shrink or remove large GIFs and video uploads, or use Unsplash photos, then try again.`;
 }
 
+/** Path form survives in-app browsers that strip `?r=` (Messenger, Instagram, etc.). */
 export function publicShareUrl(id: string, origin = typeof window !== "undefined" ? window.location.origin : "https://ultrapilled.com"): string {
-  return `${origin.replace(/\/+$/, "")}/?${SHARE_DEEP_LINK}=${encodeURIComponent(id)}`;
+  return `${origin.replace(/\/+$/, "")}/r/${encodeURIComponent(id)}`;
 }
 
 const ERROR_COPY: Record<string, string> = {
