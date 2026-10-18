@@ -17,7 +17,7 @@
       </a>
       <h1>Privacy</h1>
       <p class="lede">
-        Last updated 17 October 2026. A free desktop web app.
+        Last updated 18 October 2026. A free desktop web app.
         <span class="privacy-warn">We don’t use your files to train AI.</span>
         Scenes stay in this browser unless you choose <strong class="privacy-nice">Share link</strong>.
       </p>
@@ -67,18 +67,30 @@
       <section id="share">
         <h2>Share links</h2>
         <p>
-          <strong class="privacy-nice">Share link</strong> is optional. When you create one, the current scene
-          (a <code>.pill</code> project file, including embedded images you added) is uploaded to
+          <strong class="privacy-nice">Share link</strong> is optional. Nothing is uploaded until you confirm
+          and pass a <strong class="privacy-nice">Cloudflare Turnstile</strong> check
+          (Cloudflare may process technical data under its own policy).
+          The current scene is packed as a <code>.pill</code> project and sent to
           <code>share.ultrapilled.com</code>, a small server we run on Fly.io in Stockholm.
+        </p>
+        <p>
+          Uploads, custom images, and most GIFs you added yourself are embedded in that file.
+          <span class="privacy-nice">Unsplash photos and Giphy GIFs stay as links to those CDNs when possible</span>,
+          so the share stays smaller and those hosts still serve the media.
+          We may also store a small JPEG canvas preview so messengers can show a link card.
+        </p>
+        <p>
           Anyone with the link can open and remake the scene. There is no public gallery or index —
-          links are unlisted random IDs.
+          links are unlisted random IDs. Public URLs look like
+          <code>share.ultrapilled.com/o/…</code> (preview card) and
+          <code>ultrapilled.com/r/…</code> (the scene). On a phone, a shared link opens a minimal viewer
+          (play physics / pinch) instead of the full editor.
         </p>
         <p>
           Shares expire after <strong class="privacy-nice">14 days</strong> and are then deleted.
-          A size limit applies (about 8&nbsp;MB) so huge GIF or video dumps are rejected.
-          We store a shortened IP address with each share to stop spam and rate-limit abuse.
-          A <strong class="privacy-nice">Cloudflare Turnstile</strong> security check runs before upload;
-          Cloudflare may process technical data under its own policy.
+          A size limit applies (about 8&nbsp;MB).
+          We store a shortened IP address with each share to stop spam and rate-limit abuse
+          (a few creates per hour / day per IP).
         </p>
         <p>
           <span class="privacy-nice">If you never use Share link, your projects stay only in this browser</span>
@@ -104,7 +116,10 @@
           Files you export are yours. Third-party
           fonts, icons, photos, sounds, and video remain under their own licenses.
         </p>
-        <p>Desktop browsers only. Phones and most tablets cannot open the editor.</p>
+        <p>
+          Desktop browsers only for the editor. Phones and most tablets cannot open Create —
+          except via a Share link, which opens a minimal viewer.
+        </p>
       </section>
 
       <a class="home" href="/">Go back to ultrapilled.com</a>

@@ -33,8 +33,10 @@ describe("help panel", () => {
     expect(document.querySelector("#help-why")).toBeTruthy();
     expect(document.querySelector("#help-objects")).toBeTruthy();
     expect(document.querySelector("#help-orby")).toBeTruthy();
+    expect(document.querySelector("#help-share")).toBeTruthy();
     expect(document.body.textContent).toContain("What’s this for?");
     expect(document.body.textContent).toContain("Double-click");
+    expect(document.body.textContent).toContain("Share a link");
     expect(document.querySelector('.help-orby-cta[href="https://orby.studio/"]')?.textContent?.trim()).toBe(
       "Visit Orby.studio",
     );

@@ -46,3 +46,7 @@ Later deploys: `cd share && fly deploy`.
 | Max body | 8 MiB |
 | Creates / IP | 5 / hour, 20 / day |
 | No public index | unlisted IDs only |
+
+## Packing notes
+
+The client embeds user uploads in the `.pill`. Unsplash / Giphy / Phosphor remotes stay as CDN URLs when packing for share (`linkRemotes`), which keeps many scenes under the size cap. An optional JPEG preview is stored for the `/o/<id>` Open Graph card.

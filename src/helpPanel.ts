@@ -47,7 +47,7 @@ function guideBody(): string {
   return `
     <p class="help-lede">
       New here? This walks you through the ${fun("fun stuff")} — right-clicking objects onto the canvas,
-      editing text, ${fun("triggering the fall")}, tuning the look, and exporting when you’re ready.
+      editing text, ${fun("triggering the fall")}, tuning the look, exporting, and ${fun("sharing a link")} when you’re ready.
       Take it section by section, or jump around with the chips below.
     </p>
 
@@ -66,6 +66,7 @@ function guideBody(): string {
       ${tocLink("help-media", "Media")}
       ${tocLink("help-orby", "Orby")}
       ${tocLink("help-export", "Export")}
+      ${tocLink("help-share", "Share")}
       ${tocLink("help-path", "Path")}
       ${tocLink("help-index", "Index")}
     </nav>
@@ -250,6 +251,7 @@ function guideBody(): string {
         <li><strong>Loop</strong> — after Floor pause, the floor opens on a timer and the cycle repeats</li>
         <li><strong>Settings</strong> — sound, theme, shortcuts</li>
         <li>Floppy icon — Save / Load <code>.pill</code></li>
+        <li>Share icon — temporary link (14 days); see <a class="help-link" href="#help-share">Share a link</a></li>
       </ul>
       <p>
         The <strong>Objects</strong> list is everything on the canvas. Drag cards to change fall / stack order
@@ -433,10 +435,6 @@ function guideBody(): string {
           <span class="help-table__val" role="cell">Floppy → Save .pill</span>
         </div>
         <div class="help-table__row" role="row">
-          <span class="help-table__key" role="cell">Send a friend</span>
-          <span class="help-table__val" role="cell">Share icon → temporary link (expires in 14 days)</span>
-        </div>
-        <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Open again</span>
           <span class="help-table__val" role="cell">Load .pill · or open a Share link</span>
         </div>
@@ -466,8 +464,28 @@ function guideBody(): string {
       </p>
     </section>
 
+    <section class="help-section" id="help-share">
+      <h3 class="help-section__title">13. Share a link</h3>
+      <p>
+        Want someone to open the scene — not just a still or GIF?
+        Tap the ${fun("Share")} icon next to Save. You’ll see the packed size, confirm, and pass a quick security check.
+        Nothing leaves the browser until you continue.
+      </p>
+      <ul class="help-list">
+        <li>Link lasts ${fun("14 days")}, then it’s deleted</li>
+        <li>About ${fun("8 MB")} max — prefer Unsplash / Giphy over huge uploads when you can</li>
+        <li>Unsplash photos and Giphy GIFs stay as CDN links; your own uploads travel inside the file</li>
+        <li>Anyone with the link can open and remake the scene — no public gallery, just an unlisted ID</li>
+        <li>Desktop opens the full editor; phones get a simple viewer (${fun("Trigger Physics")} + pinch)</li>
+      </ul>
+      <p class="help-note">
+        <span class="help-fun">Tip:</span> keep a <code>.pill</code> save for yourself. Share is for sending;
+        Save is for keeping.
+      </p>
+    </section>
+
     <section class="help-section" id="help-path">
-      <h3 class="help-section__title">13. A gentle learning path</h3>
+      <h3 class="help-section__title">14. A gentle learning path</h3>
       <ol class="help-list help-list--numbered">
         <li>Pick Physics, aspect 16:9</li>
         <li>Right-click → add a Pill, a few Shapes, and an Icon</li>
@@ -478,6 +496,7 @@ function guideBody(): string {
         <li>Tweak Gravity / Bounciness once</li>
         <li>${keycap("H")} to hide UI; admire; ${keycap("H")} again</li>
         <li>Export a PNG, then Save .pill</li>
+        <li>Optional: Share a link so a friend can remake it</li>
         <li>Press ${keycap("L")}, arrange overlapping layers, try Presentation</li>
       </ol>
       <p>${fun("That’s the whole loop.")} Everything else is taste, templates, and optical polish.</p>
@@ -514,13 +533,17 @@ function guideBody(): string {
           <span class="help-table__key" role="cell">Project file</span>
           <span class="help-table__val" role="cell"><code>.pill</code></span>
         </div>
+        <div class="help-table__row" role="row">
+          <span class="help-table__key" role="cell">${fun("Share link")}</span>
+          <span class="help-table__val" role="cell">Share icon · 14 days</span>
+        </div>
       </div>
     </section>
   `;
 }
 
 function bindToc(body: HTMLElement): void {
-  body.querySelectorAll<HTMLAnchorElement>(".help-toc__link").forEach((link) => {
+  body.querySelectorAll<HTMLAnchorElement>('a[href^="#help-"]').forEach((link) => {
     link.addEventListener("click", (event) => {
       const href = link.getAttribute("href");
       if (!href?.startsWith("#")) return;

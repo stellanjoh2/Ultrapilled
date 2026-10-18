@@ -1,8 +1,8 @@
 # Ultrapilled™
 
-A desktop web physics playground for playful motion graphics. Drop pills, words, longer text, shapes, emoji, Phosphor icons, uploads, Unsplash photos, Giphy GIFs, and muted YouTube or MP4 clips into **Physics** (fall, bounce, stack) or **Layout** (place freely, multi-page). Theme with palettes, fonts, and look FX—including optional mic-driven Audio react—then export stills, sequences, GIF, MP4, or transparent ProRes, or save a local `.pill` project. Live at [ultrapilled.com](https://ultrapilled.com/). Built on [Matter.js](https://brm.io/matter-js/).
+A desktop web physics playground for playful motion graphics. Drop pills, words, longer text, shapes, emoji, Phosphor icons, uploads, Unsplash photos, Giphy GIFs, and muted YouTube or MP4 clips into **Physics** (fall, bounce, stack) or **Layout** (place freely, multi-page). Theme with palettes, fonts, and look FX—including optional mic-driven Audio react—then export stills, sequences, GIF, MP4, or transparent ProRes, save a local `.pill` project, or create an optional temporary **Share link**. Live at [ultrapilled.com](https://ultrapilled.com/). Built on [Matter.js](https://brm.io/matter-js/).
 
-**Desktop browsers only.** Phones and most tablets are gated at the door. Privacy: [ultrapilled.com/privacy.html](https://ultrapilled.com/privacy.html) (also in this repo as [`privacy.html`](privacy.html)).
+**Desktop browsers only** for the editor. Phones and most tablets are gated at the door — except Share links, which open a minimal mobile viewer. Privacy: [ultrapilled.com/privacy.html](https://ultrapilled.com/privacy.html) (also in this repo as [`privacy.html`](privacy.html)).
 
 ## Run
 
@@ -22,9 +22,21 @@ npm test
 1. Pick **Physics** (things fall) or **Layout** (place freely, like Figma).
 2. Add text, shapes, emoji, Phosphor icons (Solid / Outlined), uploads, Unsplash photos, Giphy GIFs, or a YouTube / MP4 clip from Create.
 3. Tune gravity, speed, and bounciness (Physics), or arrange layers (Layout).
-4. Press **P** to trigger the fall. Tap or hold **Space** to bounce the floor (hold charges a bigger bounce). Export GIF / MP4 / MOV / PNG, or save a `.pill` project.
+4. Press **P** to trigger the fall. Tap or hold **Space** to bounce the floor (hold charges a bigger bounce). Export GIF / MP4 / MOV / PNG, save a `.pill` project, or tap **Share** for a temporary link.
 
 YouTube and uploaded video do not rasterize — export warns, then draws a play-button stand-in.
+
+## Share links
+
+Opt-in only — nothing is uploaded until you confirm. The share control packs the current scene and posts it to [`share.ultrapilled.com`](https://share.ultrapilled.com) (Fly.io, Stockholm) after a Cloudflare Turnstile check.
+
+- **TTL** — 14 days, then hard-deleted. Unlisted random IDs; no public gallery.
+- **Size** — about 8&nbsp;MB max. Uploaded images/GIFs/video are embedded in the `.pill`; Unsplash photos and Giphy GIFs stay as CDN links when possible (smaller shares).
+- **URL** — `share.ultrapilled.com/o/<id>` serves an Open Graph card (canvas preview) for Messenger and friends, then sends people to `ultrapilled.com/r/<id>`.
+- **Opening a link** — desktop loads the full editor with the shared scene; phones get Trigger Physics + pinch zoom (no Create panel). Landscape 16:9 scenes on a tall phone get a short heads-up that the canvas was made for 16:9.
+- **Abuse limits** — per-IP create caps; shortened IP stored with each share.
+
+Server ops and env notes: [`share/README.md`](share/README.md). Privacy wording: [`privacy.html`](privacy.html#share).
 
 ## Icons
 
