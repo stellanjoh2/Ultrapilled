@@ -63,17 +63,15 @@ export function stashShareId(id: string): void {
 }
 
 export function shareIdFromUrl(url: URL | Location = window.location): string | null {
-  const pathname = "pathname" in url ? url.pathname : new URL(url.href).pathname;
-  const fromPath = shareIdFromPath(pathname);
+  // URL and Location both expose pathname / search / hash — read them directly
+  // (branching on `"pathname" in url` narrows the else to `never` under tsc).
+  const fromPath = shareIdFromPath(url.pathname);
   if (fromPath) return fromPath;
 
-  const search = "search" in url ? url.search : new URL(url.href).search;
-  const params = new URLSearchParams(search);
-  const fromQuery = params.get(SHARE_DEEP_LINK)?.trim();
+  const fromQuery = new URLSearchParams(url.search).get(SHARE_DEEP_LINK)?.trim();
   if (fromQuery && isShareId(fromQuery)) return fromQuery;
 
-  const hashRaw = "hash" in url ? url.hash : new URL(url.href).hash;
-  const hash = hashRaw.replace(/^#/, "");
+  const hash = url.hash.replace(/^#/, "");
   if (hash.startsWith(`${SHARE_DEEP_LINK}=`)) {
     const value = hash.slice(SHARE_DEEP_LINK.length + 1).trim();
     if (isShareId(value)) return value;
