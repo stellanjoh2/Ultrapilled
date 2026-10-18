@@ -6,9 +6,11 @@ import {
   clearShareDeepLink,
   createShareLink,
   fetchShareProject,
+  formatShareRetryAfter,
   isShareId,
   publicShareUrl,
   shareIdFromUrl,
+  shareRateLimitedMessage,
   shareTooLargeMessage,
   utf8ByteLength,
 } from "./share";
@@ -130,5 +132,30 @@ describe("share helpers", () => {
 
   it("counts utf8 bytes", () => {
     expect(utf8ByteLength("aé")).toBe(3);
+  });
+
+  it("formats retry-after waits for rate-limit copy", () => {
+    expect(formatShareRetryAfter(30)).toBe("less than a minute");
+    expect(formatShareRetryAfter(60)).toBe("about a minute");
+    expect(formatShareRetryAfter(12 * 60)).toBe("about 12 minutes");
+    expect(formatShareRetryAfter(3600)).toBe("about an hour");
+    expect(shareRateLimitedMessage(720)).toBe(
+      "You’re sharing a little too often. Try again in about 12 minutes.",
+    );
+  });
+
+  it("surfaces retryAfter from a 429 create response", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ code: "rate_limited", retryAfter: 900 }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "900" },
+      }),
+    ) as unknown as typeof fetch;
+    const result = await createShareLink(MIN_PILL, "tok", fetchImpl);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("rate_limited");
+      expect(result.message).toBe("You’re sharing a little too often. Try again in about 15 minutes.");
+    }
   });
 });

@@ -7863,6 +7863,14 @@ void (async () => {
         lastDraftJson = serializePillProject(shared);
         if (isMobileAccessGate() || document.documentElement.classList.contains("is-mobile-share")) {
           enableMobileShareViewer({ poses: sharePoses, frame: shareFrame, canvas: shareCanvas });
+          // 16:9 boards are remapped onto a tall phone frame — flag that once.
+          if (shareCanvas === "16:9" && state.canvas === "9:16") {
+            await askNotice({
+              title: "Made for 16:9",
+              body: "This canvas was created for 16:9 compositions and might look a bit weird on a phone.",
+              confirmLabel: "Got it",
+            });
+          }
         }
         paintWelcome();
         return;

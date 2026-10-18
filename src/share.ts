@@ -148,6 +148,44 @@ export function shareErrorMessage(code: string, fallback?: string): string {
   return ERROR_COPY[code] ?? fallback ?? "Could not create a share link. Try again later.";
 }
 
+/** Human wait string from Retry-After / retryAfter seconds. */
+export function formatShareRetryAfter(seconds: number, now = Date.now()): string {
+  const sec = Math.max(1, Math.ceil(seconds));
+  if (sec < 60) return "less than a minute";
+  if (sec < 3600) {
+    const mins = Math.max(1, Math.round(sec / 60));
+    return mins === 1 ? "about a minute" : `about ${mins} minutes`;
+  }
+  if (sec < 86400) {
+    const hours = Math.max(1, Math.round(sec / 3600));
+    return hours === 1 ? "about an hour" : `about ${hours} hours`;
+  }
+  const when = new Intl.DateTimeFormat(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }).format(
+    new Date(now + sec * 1000),
+  );
+  return `around ${when}`;
+}
+
+export function shareRateLimitedMessage(retryAfterSec?: number | null): string {
+  if (retryAfterSec == null || !Number.isFinite(retryAfterSec) || retryAfterSec <= 0) {
+    return ERROR_COPY.rate_limited;
+  }
+  return `You’re sharing a little too often. Try again in ${formatShareRetryAfter(retryAfterSec)}.`;
+}
+
+function readRetryAfterSeconds(res: Response, body: { retryAfter?: unknown }): number | null {
+  const fromBody = body.retryAfter;
+  if (typeof fromBody === "number" && Number.isFinite(fromBody) && fromBody > 0) {
+    return fromBody;
+  }
+  if (typeof fromBody === "string" && /^\d+$/.test(fromBody)) {
+    return Number(fromBody);
+  }
+  const header = res.headers.get("Retry-After");
+  if (header && /^\d+$/.test(header.trim())) return Number(header.trim());
+  return null;
+}
+
 export async function createShareLink(
   projectJson: string,
   turnstileToken: string,
@@ -212,18 +250,22 @@ export async function createShareLink(
     };
   }
 
-  let err: { error?: string; code?: string } = {};
+  let err: { error?: string; code?: string; retryAfter?: unknown } = {};
   try {
     err = (await res.json()) as typeof err;
   } catch {
     err = {};
   }
   const code = err.code ?? (res.status === 413 ? "too_large" : res.status === 429 ? "rate_limited" : "unknown");
+  const message =
+    code === "rate_limited"
+      ? shareRateLimitedMessage(readRetryAfterSeconds(res, err))
+      : shareErrorMessage(code, err.error);
   return {
     ok: false,
     status: res.status,
     code,
-    message: shareErrorMessage(code, err.error),
+    message,
   };
 }
 

@@ -60,7 +60,8 @@ export async function askShareLink(payload: ShareDialogPayload): Promise<string 
     creating.close();
     if (!result.ok) {
       playCaution();
-      await shareNotice("Couldn’t create link", result.message);
+      const title = result.code === "rate_limited" ? "Couldn’t create Share Link" : "Couldn’t create link";
+      await shareNotice(title, result.message);
       return null;
     }
     await shareSuccess(result.url, result.expiresAt);

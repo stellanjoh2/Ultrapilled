@@ -6532,9 +6532,11 @@ html[data-theme="day"] .shape-swatch {
     color 0.18s ease;
 }
 
+/* Single OK / Done: full-width tap target (phone-friendly), still centered in the card. */
 .reconnect__actions:has(> :only-child) .pill {
-  width: auto;
-  min-width: calc(140px * var(--ui-scale));
+  width: 100%;
+  max-width: 28em;
+  min-height: max(44px, calc(54px * var(--ui-scale)));
   padding-inline: calc(28px * var(--ui-scale));
 }
 
@@ -9528,7 +9530,7 @@ html.is-mobile-share body {
   inset: 0;
 }
 
-/* Same Trigger Physics pill as desktop, fixed over the share canvas. */
+/* Same Trigger Physics pill look as desktop; phone px so --ui-scale doesn’t shrink the tap target. */
 button.pill.play-btn.mobile-share-play {
   position: fixed;
   left: 50%;
@@ -9536,13 +9538,22 @@ button.pill.play-btn.mobile-share-play {
   z-index: 80;
   box-sizing: border-box;
   width: min(420px, calc(100vw - 32px));
+  min-height: 50px;
   margin: 0;
+  padding: 14px 24px;
+  font-size: 15px;
+  box-shadow: 0 8px 0 var(--play-edge);
   transform: translateX(-50%);
   -webkit-tap-highlight-color: transparent;
 }
 
+button.pill.play-btn.mobile-share-play .play-btn__bolt {
+  width: 22px;
+  height: 22px;
+}
+
 button.pill.play-btn.mobile-share-play:active {
-  transform: translateX(-50%) translateY(calc(8px * var(--ui-scale)));
+  transform: translateX(-50%) translateY(8px);
   box-shadow: 0 0 0 var(--play-edge);
   filter: none;
 }
