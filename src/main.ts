@@ -94,7 +94,8 @@ import trashSimple from "@phosphor-icons/core/assets/regular/trash-simple.svg?ra
 import xIcon from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import floppyDisk from "@phosphor-icons/core/assets/regular/floppy-disk.svg?raw";
 import folderOpen from "@phosphor-icons/core/assets/regular/folder-open.svg?raw";
-import linkSimple from "@phosphor-icons/core/assets/regular/link-simple.svg?raw";
+import gearIcon from "@phosphor-icons/core/assets/regular/gear.svg?raw";
+import shareIcon from "@phosphor-icons/core/assets/regular/share.svg?raw";
 import questionIcon from "@phosphor-icons/core/assets/regular/question.svg?raw";
 import { mountExportPanel } from "./export/exportPanel";
 import { warmGifTracks } from "./export/gifFrames";
@@ -342,10 +343,17 @@ app.innerHTML = `
             <span class="loop-chip__text">Loop</span>
           </button>
           <button type="button" class="pill panel-util" id="reset-defaults" data-tip="Restore default sliders and options">Reset</button>
-          <button type="button" class="pill panel-util" id="open-settings" data-tip="Sound, theme, and preferences">Settings</button>
-          <button type="button" class="icon-btn icon-hover panel-project" id="open-project" aria-label="Load or save project" aria-haspopup="menu" aria-expanded="false" data-tip="Load or save a .pill project">
-            <span aria-hidden="true">${floppyDisk}</span>
-          </button>
+          <div class="panel-actions__icons">
+            <button type="button" class="icon-btn icon-hover panel-project" id="share-link" aria-label="Share link" data-tip="Create a temporary share link">
+              <span aria-hidden="true">${shareIcon}</span>
+            </button>
+            <button type="button" class="icon-btn icon-hover panel-project" id="open-project" aria-label="Load or save project" aria-haspopup="menu" aria-expanded="false" data-tip="Load or save a .pill project">
+              <span aria-hidden="true">${floppyDisk}</span>
+            </button>
+            <button type="button" class="icon-btn icon-hover panel-project" id="open-settings" aria-label="Settings" data-tip="Sound, theme, and preferences">
+              <span aria-hidden="true">${gearIcon}</span>
+            </button>
+          </div>
         </div>
         <button type="button" class="pill" id="copy-settings" hidden data-tip="Copy the current settings as text">Copy settings</button>
       </div>
@@ -1514,9 +1522,12 @@ function currentPillProject(): PillProject {
   snapshotActivePage();
   const frame = currentFrame();
   const current = pages[pageIndex];
+  // Prefer live poses when chips exist — an empty page.poses array is truthy for ??.
+  const poses =
+    world.chipCount() > 0 ? world.poses() : (current?.poses ?? []);
   return {
     state: structuredClone(state),
-    poses: current?.poses ?? (world.chipCount() > 0 ? world.poses() : []),
+    poses,
     frame: { width: frame.width, height: frame.height },
     images: [],
     loop: repeat,
@@ -6718,6 +6729,32 @@ app.querySelector("#open-help")?.addEventListener("click", () => {
   toggleHelp();
 });
 
+async function shareCurrentScene() {
+  snapshotActivePage();
+  if (state.slots.length === 0) {
+    playCaution();
+    void askNotice({
+      title: "Nothing to share",
+      body: "Add some objects to the canvas first, then create a link.",
+    });
+    return;
+  }
+  try {
+    const json = serializePillProject(await embedSlotImages(currentPillProject()));
+    await askShareLink({ projectJson: json });
+  } catch {
+    playCaution();
+    void askNotice({
+      title: "Couldn’t share",
+      body: "The scene couldn’t be packed for a share link.",
+    });
+  }
+}
+
+app.querySelector("#share-link")?.addEventListener("click", () => {
+  void shareCurrentScene();
+});
+
 const projectBtn = app.querySelector<HTMLButtonElement>("#open-project")!;
 let closeProjectMenu: (() => void) | null = null;
 let projectFileInput: HTMLInputElement | null = null;
@@ -6794,20 +6831,6 @@ function openProjectMenu() {
         void askNotice({
           title: "Couldn’t save project",
           body: "The .pill file couldn’t be written.",
-        });
-      }
-    })();
-  });
-  addItem("Share link", linkSimple, () => {
-    void (async () => {
-      try {
-        const json = serializePillProject(await embedSlotImages(currentPillProject()));
-        await askShareLink({ projectJson: json });
-      } catch {
-        playCaution();
-        void askNotice({
-          title: "Couldn’t share",
-          body: "The scene couldn’t be packed for a share link.",
         });
       }
     })();
@@ -7718,6 +7741,19 @@ void (async () => {
       intro?.querySelector(".app-intro__logo")?.remove();
       try {
         const shared = await fetchShareProject(shareId);
+        if (shared.state.slots.length === 0) {
+          playCaution();
+          await askNotice({
+            title: "Empty share",
+            body: "This link doesn’t include any objects. Create a new share from a scene that has objects on the canvas.",
+          });
+          if (isMobileAccessGate() || document.documentElement.classList.contains("is-mobile-share")) {
+            location.replace("/");
+            return;
+          }
+          await gateModeSelect();
+          return;
+        }
         const sharePoses = shared.poses.map((pose) => ({ ...pose }));
         const shareFrame = { ...shared.frame };
         const shareCanvas = shared.state.canvas;

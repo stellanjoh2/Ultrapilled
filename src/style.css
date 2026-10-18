@@ -694,9 +694,14 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   box-shadow: 0 0 0 1px color-mix(in srgb, #000 28%, transparent);
 }
 
-/* Phone share viewer: no hard canvas hairline. */
+/* Phone share viewer: no hard canvas hairline; clip everything to the board. */
 .app.is-mobile-share .stage.is-portrait .playfield {
   box-shadow: none;
+  overflow: hidden;
+}
+
+.app.is-mobile-share .stage-veil {
+  display: none !important;
 }
 
 .stage-veil {
@@ -2219,7 +2224,13 @@ html:is(.is-asset-anims-frozen, .is-overlay-anims-frozen) .mode-select__vibe.is-
 
 .panel-actions__bar {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-1);
+  align-items: stretch;
+}
+
+.panel-actions__icons {
+  display: flex;
   gap: var(--space-1);
   align-items: stretch;
 }

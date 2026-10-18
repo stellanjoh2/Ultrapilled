@@ -434,7 +434,7 @@ function guideBody(): string {
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Send a friend</span>
-          <span class="help-table__val" role="cell">Floppy → Share link (expires in 14 days)</span>
+          <span class="help-table__val" role="cell">Share icon → temporary link (expires in 14 days)</span>
         </div>
         <div class="help-table__row" role="row">
           <span class="help-table__key" role="cell">Open again</span>
