@@ -27,6 +27,8 @@ function formatExpiry(expiresAt: number): string {
 export type ShareDialogPayload = {
   /** Serialized .pill JSON (already image-embedded). */
   projectJson: string;
+  /** Optional JPEG (base64, no data: prefix) for Messenger / link preview. */
+  capturePreview?: () => Promise<string | null>;
 };
 
 /**
@@ -41,24 +43,89 @@ export async function askShareLink(payload: ShareDialogPayload): Promise<string 
     return null;
   }
 
-  const confirmed = await shareConfirm();
+  const confirmed = await shareConfirm(bytes);
   if (!confirmed) return null;
 
-  const result = await createShareLink(payload.projectJson, confirmed.token);
-  if (!result.ok) {
+  const creating = openCreating();
+  try {
+    let previewJpeg: string | null = null;
+    if (payload.capturePreview) {
+      try {
+        previewJpeg = await payload.capturePreview();
+      } catch {
+        previewJpeg = null;
+      }
+    }
+    const result = await createShareLink(payload.projectJson, confirmed.token, fetch, previewJpeg);
+    creating.close();
+    if (!result.ok) {
+      playCaution();
+      await shareNotice("Couldn’t create link", result.message);
+      return null;
+    }
+    await shareSuccess(result.url, result.expiresAt);
+    return result.url;
+  } catch {
+    creating.close();
     playCaution();
-    await shareNotice("Couldn’t create link", result.message);
+    await shareNotice("Couldn’t create link", "Something went wrong while creating the link. Try again.");
     return null;
   }
-
-  await shareSuccess(result.url, result.expiresAt);
-  return result.url;
 }
 
-function shareConfirm(): Promise<{ token: string } | null> {
+/** Non-dismissible wait state while the scene uploads. */
+function openCreating(): { close: () => void } {
+  const root = document.createElement("div");
+  root.className = "reconnect";
+  root.setAttribute("role", "status");
+  root.setAttribute("aria-live", "polite");
+  root.setAttribute("aria-busy", "true");
+  root.innerHTML = `
+    <div class="reconnect__scrim"></div>
+    <div class="reconnect__card">
+      <h2 class="reconnect__title">Creating link…</h2>
+      <p class="reconnect__body">Uploading your scene. This can take a few seconds.</p>
+    </div>
+  `;
+  const card = root.querySelector<HTMLElement>(".reconnect__card")!;
+  const scrim = root.querySelector<HTMLElement>(".reconnect__scrim")!;
+  const content = [
+    root.querySelector<HTMLElement>(".reconnect__title")!,
+    root.querySelector<HTMLElement>(".reconnect__body")!,
+  ];
+  document.body.append(root);
+  if (!reducedMotion()) {
+    gsap.set(scrim, { autoAlpha: 0 });
+    gsap.set(card, { autoAlpha: 0, scale: 0.94, y: 16 });
+    gsap.set(content, { autoAlpha: 0, y: 10 });
+    const tl = gsap.timeline();
+    tl.to(scrim, { autoAlpha: 1, duration: 0.28, ease: "power1.out" }, 0);
+    tl.to(card, { autoAlpha: 1, scale: 1, y: 0, duration: 0.34, ease: "power3.out" }, 0.04);
+    tl.to(content, { autoAlpha: 1, y: 0, duration: 0.28, stagger: 0.04, ease: "power2.out" }, 0.1);
+  }
+  let closed = false;
+  return {
+    close: () => {
+      if (closed) return;
+      closed = true;
+      root.remove();
+    },
+  };
+}
+
+function formatShareMb(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  if (mb < 0.1) return mb.toFixed(2);
+  if (mb < 10) return mb.toFixed(1);
+  return String(Math.round(mb));
+}
+
+function shareConfirm(bytes: number): Promise<{ token: string } | null> {
+  const limitMb = SHARE_MAX_BYTES / (1024 * 1024);
+  const sizeLabel = `${formatShareMb(bytes)}&nbsp;MB`;
   return openCard({
     title: "Share link?",
-    body: `Uploads this scene for ${SHARE_TTL_DAYS} days, then deletes it. Anyone with the link can open and remake it. Nothing is uploaded unless you continue.`,
+    body: `Uploads this scene for ${SHARE_TTL_DAYS} days, then deletes it. Anyone with the link can open and remake it. Nothing is uploaded unless you continue.<br><br>Limit ${limitMb} MB · this scene is <span class="share-size">${sizeLabel}</span>.`,
     confirmLabel: "Create link",
     cancelLabel: "Cancel",
     withTurnstile: true,

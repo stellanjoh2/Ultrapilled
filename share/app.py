@@ -10,10 +10,13 @@ Env:
   SHARE_TTL_DAYS         Default 14
   SHARE_MAX_BYTES        Default 8388608 (8 MiB)
   SHARE_DEV=1            Local only: skip Turnstile
+  SITE_ORIGIN            Human redirect target, default https://ultrapilled.com
 """
 
 from __future__ import annotations
 
+import base64
+import html
 import json
 import logging
 import os
@@ -33,6 +36,9 @@ from store import ShareStore
 TURNSTILE_ACTION = "share"
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+PREVIEW_MAX_BYTES = 200_000
+# Pill + base64 preview envelope headroom.
+CREATE_ENVELOPE_EXTRA = PREVIEW_MAX_BYTES + 80_000
 
 Verifier = Callable[[str, str], dict]
 
@@ -51,6 +57,8 @@ class Settings:
     allow_missing_turnstile: bool = False
     trust_fly_client_ip: bool = False
     rate_dbpath: str = ""
+    # Where humans land after the OG card (ultrapilled.com).
+    site_origin: str = "https://ultrapilled.com"
     # 5 / hour and 20 / day per IP; modest global caps.
     write_per_ip: tuple[Window, ...] = (Window(5, 3600), Window(20, 86400))
     write_global: tuple[Window, ...] = (Window(120, 3600), Window(800, 86400))
@@ -226,6 +234,14 @@ class ShareApp:
         if path == "/r" and method == "POST":
             return self._create(environ, start_response, ip)
 
+        open_match = re.fullmatch(r"/o/([A-Za-z0-9_-]{16,64})", path)
+        if open_match and method in ("GET", "HEAD"):
+            return self._open_card(environ, start_response, open_match.group(1), ip)
+
+        og_match = re.fullmatch(r"/r/([A-Za-z0-9_-]{16,64})/og\.jpg", path)
+        if og_match and method in ("GET", "HEAD"):
+            return self._og_jpeg(environ, start_response, og_match.group(1), ip)
+
         match = re.fullmatch(r"/r/([A-Za-z0-9_-]{16,64})", path)
         if match and method in ("GET", "HEAD"):
             return self._fetch(environ, start_response, match.group(1), ip)
@@ -265,7 +281,7 @@ class ShareApp:
         except ValueError:
             length = 0
         # Envelope overhead; pill itself is capped by max_bytes after parse.
-        if length <= 0 or length > self.store.max_bytes + 4096:
+        if length <= 0 or length > self.store.max_bytes + CREATE_ENVELOPE_EXTRA:
             return self._json(environ, start_response, 413, {"error": "Share is too large", "code": "too_large"})
 
         try:
@@ -300,12 +316,14 @@ class ShareApp:
         if validate_pill_json(pill_bytes) is None:
             return self._json(environ, start_response, 400, {"error": "Not a valid .pill project", "code": "bad_pill"})
 
+        preview = decode_preview_jpeg(body.get("previewJpeg"))
+
         wait = self.write_limiter.check(ip)
         if wait > 0:
             return self._rate_limited(environ, start_response, wait)
 
         try:
-            share_id, _created, expires = self.store.put(pill_bytes, ip)
+            share_id, _created, expires = self.store.put(pill_bytes, ip, preview=preview)
         except ValueError:
             return self._json(environ, start_response, 413, {"error": "Share is too large", "code": "too_large"})
         except Exception:
@@ -319,7 +337,7 @@ class ShareApp:
             {
                 "id": share_id,
                 "expiresAt": int(expires),
-                "urlHint": f"/r/{share_id}",
+                "urlHint": f"/o/{share_id}",
             },
         )
 
@@ -350,6 +368,95 @@ class ShareApp:
         ]
         if origin in self.settings.allowed_origins:
             headers += [("Access-Control-Allow-Origin", origin), ("Vary", "Origin")]
+        if environ.get("REQUEST_METHOD") == "HEAD":
+            start_response("200 OK", headers)
+            return [b""]
+        start_response("200 OK", headers)
+        return [body]
+
+    def _request_base(self, environ) -> str:
+        host = (environ.get("HTTP_HOST") or "share.ultrapilled.com").split(",")[0].strip()
+        scheme = environ.get("wsgi.url_scheme") or "https"
+        if environ.get("HTTP_X_FORWARDED_PROTO", "").split(",")[0].strip() == "https":
+            scheme = "https"
+        return f"{scheme}://{host}"
+
+    def _open_card(self, environ, start_response, share_id: str, ip: str):
+        """HTML landing with OG tags so Messenger can show a canvas preview."""
+        if not ID_RE.fullmatch(share_id):
+            return self._json(environ, start_response, 404, {"error": "Not found", "code": "not_found"})
+
+        wait = self.read_limiter.check(ip)
+        if wait > 0:
+            return self._rate_limited(environ, start_response, wait)
+
+        self.store.purge_expired()
+        got = self.store.get(share_id)
+        if got is None:
+            return self._json(environ, start_response, 410, {"error": "Share expired or missing", "code": "gone"})
+
+        site = self.settings.site_origin.rstrip("/")
+        dest = f"{site}/r/{share_id}"
+        base = self._request_base(environ)
+        has_preview = self.store.preview_path(share_id).is_file()
+        image = f"{base}/r/{share_id}/og.jpg" if has_preview else f"{site}/share.jpg"
+        safe_dest = html.escape(dest, quote=True)
+        safe_image = html.escape(image, quote=True)
+        page = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ultrapilled</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Ultrapilled" />
+  <meta property="og:description" content="Open this physics scene on Ultrapilled." />
+  <meta property="og:url" content="{safe_dest}" />
+  <meta property="og:image" content="{safe_image}" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Ultrapilled" />
+  <meta name="twitter:image" content="{safe_image}" />
+  <meta http-equiv="refresh" content="0;url={safe_dest}" />
+  <script>location.replace({json.dumps(dest)})</script>
+</head>
+<body>
+  <p><a href="{safe_dest}">Open scene</a></p>
+</body>
+</html>
+"""
+        data = page.encode("utf-8")
+        headers = [
+            ("Content-Type", "text/html; charset=utf-8"),
+            ("Content-Length", str(len(data))),
+            ("Cache-Control", "no-store"),
+        ]
+        if environ.get("REQUEST_METHOD") == "HEAD":
+            start_response("200 OK", headers)
+            return [b""]
+        start_response("200 OK", headers)
+        return [data]
+
+    def _og_jpeg(self, environ, start_response, share_id: str, ip: str):
+        if not ID_RE.fullmatch(share_id):
+            return self._json(environ, start_response, 404, {"error": "Not found", "code": "not_found"})
+
+        wait = self.read_limiter.check(ip)
+        if wait > 0:
+            return self._rate_limited(environ, start_response, wait)
+
+        self.store.purge_expired()
+        got = self.store.get_preview(share_id)
+        if got is None:
+            return self._json(environ, start_response, 404, {"error": "Not found", "code": "not_found"})
+
+        body, expires = got
+        headers = [
+            ("Content-Type", "image/jpeg"),
+            ("Content-Length", str(len(body))),
+            ("Cache-Control", "public, max-age=3600"),
+            ("X-Share-Expires", str(int(expires))),
+        ]
         if environ.get("REQUEST_METHOD") == "HEAD":
             start_response("200 OK", headers)
             return [b""]
@@ -410,6 +517,21 @@ class ShareApp:
         return [data]
 
 
+def decode_preview_jpeg(raw) -> bytes | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    text = raw.strip()
+    if text.startswith("data:"):
+        text = text.split(",", 1)[-1]
+    try:
+        data = base64.b64decode(text, validate=False)
+    except (ValueError, TypeError):
+        return None
+    if len(data) > PREVIEW_MAX_BYTES or not data.startswith(b"\xff\xd8"):
+        return None
+    return data
+
+
 def build_app() -> ShareApp:
     logging.basicConfig(level=logging.INFO)
     dev = os.environ.get("SHARE_DEV") == "1"
@@ -419,6 +541,7 @@ def build_app() -> ShareApp:
     max_bytes = int(os.environ.get("SHARE_MAX_BYTES", str(8 * 1024 * 1024)))
     rate_db = os.environ.get("RATE_DBPATH") or str(Path(data_dir) / "rate.db")
     secret = os.environ.get("TURNSTILE_SECRET_KEY", "")
+    site_origin = os.environ.get("SITE_ORIGIN", "https://ultrapilled.com").rstrip("/")
     if not secret and not dev:
         raise RuntimeError("TURNSTILE_SECRET_KEY is required")
 
@@ -430,6 +553,7 @@ def build_app() -> ShareApp:
         allow_missing_turnstile=dev,
         trust_fly_client_ip=not dev,
         rate_dbpath=rate_db,
+        site_origin=site_origin,
     )
     return ShareApp(store, settings)
 

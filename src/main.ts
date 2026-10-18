@@ -135,6 +135,7 @@ import {
   shareIdFromUrl,
 } from "./share";
 import { askShareLink } from "./shareDialog";
+import { paintShareOgJpeg } from "./sharePreview";
 import { isMobileAccessGate } from "./mobileGate";
 import {
   clampSharePinch,
@@ -6829,7 +6830,18 @@ async function shareCurrentScene() {
   }
   try {
     const json = serializePillProject(await embedSlotImages(currentPillProject()));
-    await askShareLink({ projectJson: json });
+    const frame = currentFrame();
+    await askShareLink({
+      projectJson: json,
+      capturePreview: () =>
+        paintShareOgJpeg({
+          draws: world.draws(),
+          state,
+          background: state.background,
+          stageWidth: frame.width,
+          stageHeight: frame.height,
+        }),
+    });
   } catch {
     playCaution();
     void askNotice({

@@ -61,16 +61,24 @@ class ShareStore:
                 if ids:
                     db.executemany("DELETE FROM shares WHERE id = ?", [(i,) for i in ids])
         for share_id in ids:
-            path = self.blobs / share_id
+            self._unlink_blob(share_id)
+        return len(ids)
+
+    def preview_path(self, share_id: str) -> Path:
+        return self.blobs / f"{share_id}.jpg"
+
+    def _unlink_blob(self, share_id: str) -> None:
+        for path in (self.blobs / share_id, self.preview_path(share_id)):
             try:
                 path.unlink(missing_ok=True)
             except OSError:
                 pass
-        return len(ids)
 
-    def put(self, body: bytes, ip: str) -> tuple[str, float, float]:
+    def put(self, body: bytes, ip: str, preview: bytes | None = None) -> tuple[str, float, float]:
         if len(body) > self.max_bytes:
             raise ValueError("too_large")
+        if preview is not None and len(preview) > 200_000:
+            preview = None
         now = time.time()
         self.purge_expired(now)
         expires = now + self.ttl_seconds
@@ -79,7 +87,7 @@ class ShareStore:
             for _ in range(8):
                 share_id = new_share_id()
                 path = self.blobs / share_id
-                if path.exists():
+                if path.exists() or self.preview_path(share_id).exists():
                     continue
                 try:
                     with sqlite3.connect(self.dbpath) as db:
@@ -88,6 +96,11 @@ class ShareStore:
                             (share_id, now, expires, len(body), truncated),
                         )
                     path.write_bytes(body)
+                    if preview:
+                        try:
+                            self.preview_path(share_id).write_bytes(preview)
+                        except OSError:
+                            pass
                     return share_id, now, expires
                 except sqlite3.IntegrityError:
                     continue
@@ -111,15 +124,41 @@ class ShareStore:
                     expired = True
                 else:
                     expired = False
-        path = self.blobs / share_id
         if expired:
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                pass
+            self._unlink_blob(share_id)
             return None
+        path = self.blobs / share_id
         try:
             body = path.read_bytes()
         except OSError:
             return None
         return body, expires
+
+    def get_preview(self, share_id: str) -> tuple[bytes, float] | None:
+        """Return (jpeg bytes, expires) when the share and preview still exist."""
+        if not share_id or "/" in share_id or ".." in share_id or len(share_id) > 64:
+            return None
+        now = time.time()
+        with self.lock:
+            with sqlite3.connect(self.dbpath) as db:
+                row = db.execute(
+                    "SELECT expires FROM shares WHERE id = ?", (share_id,)
+                ).fetchone()
+                if not row:
+                    return None
+                expires = float(row[0])
+                if expires <= now:
+                    db.execute("DELETE FROM shares WHERE id = ?", (share_id,))
+                    expired = True
+                else:
+                    expired = False
+        if expired:
+            self._unlink_blob(share_id)
+            return None
+        try:
+            jpeg = self.preview_path(share_id).read_bytes()
+        except OSError:
+            return None
+        if not jpeg.startswith(b"\xff\xd8"):
+            return None
+        return jpeg, expires

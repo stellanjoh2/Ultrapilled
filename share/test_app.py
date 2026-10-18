@@ -129,11 +129,40 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(code, 201)
             self.assertIn("id", payload)
             self.assertIn("expiresAt", payload)
+            self.assertTrue(payload["urlHint"].startswith("/o/"))
             share_id = payload["id"]
             code, pill, headers = call(app, "GET", f"/r/{share_id}")
             self.assertEqual(code, 200)
             self.assertEqual(pill["ultrapilled"], "project")
             self.assertIn("Access-Control-Allow-Origin", headers)
+
+    def test_create_with_preview_and_open_card(self):
+        import base64
+
+        jpeg = b"\xff\xd8\xff\xd9" + b"\x00" * 32
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make(tmp)
+            code, payload, _ = call(
+                app,
+                "POST",
+                "/r",
+                {
+                    "turnstileToken": "tok",
+                    "project": MIN_PILL,
+                    "previewJpeg": base64.b64encode(jpeg).decode("ascii"),
+                },
+            )
+            self.assertEqual(code, 201)
+            share_id = payload["id"]
+            code, page, _ = call(app, "GET", f"/o/{share_id}", origin="")
+            self.assertEqual(code, 200)
+            raw = page if isinstance(page, (bytes, bytearray)) else str(page).encode()
+            self.assertIn(b"og:image", raw)
+            self.assertIn(f"/r/{share_id}/og.jpg".encode(), raw)
+            code, body, headers = call(app, "GET", f"/r/{share_id}/og.jpg", origin="")
+            self.assertEqual(code, 200)
+            self.assertEqual(headers.get("Content-Type"), "image/jpeg")
+            self.assertEqual(body, jpeg)
 
     def test_origin_denied(self):
         with tempfile.TemporaryDirectory() as tmp:

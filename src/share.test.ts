@@ -64,9 +64,9 @@ describe("share helpers", () => {
     expect(sessionStorage.getItem("up-share-id")).toBeNull();
   });
 
-  it("builds a public share url as /r/<id>", () => {
-    expect(publicShareUrl("abcdefghijklmnopqr12", "https://ultrapilled.com")).toBe(
-      "https://ultrapilled.com/r/abcdefghijklmnopqr12",
+  it("builds a public share url as share-host /o/<id>", () => {
+    expect(publicShareUrl("abcdefghijklmnopqr12", "https://share.ultrapilled.com")).toBe(
+      "https://share.ultrapilled.com/o/abcdefghijklmnopqr12",
     );
   });
 
@@ -91,7 +91,7 @@ describe("share helpers", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.id).toBe("abcdefghijklmnopqr12");
-      expect(result.url).toContain("/r/abcdefghijklmnopqr12");
+      expect(result.url).toContain("/o/abcdefghijklmnopqr12");
     }
     expect(fetchImpl).toHaveBeenCalled();
   });

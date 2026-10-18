@@ -1,6 +1,8 @@
 # Ultrapilled temporary share links
 
-Stores opt-in `.pill` projects for **14 days**, served at `https://share.ultrapilled.com`. The site opens them via `https://ultrapilled.com/r/<id>` (path form so Messenger can’t strip a `?r=` query).
+Stores opt-in `.pill` projects for **14 days**, served at `https://share.ultrapilled.com`.
+
+Shared links use `https://share.ultrapilled.com/o/<id>` (Open Graph card + canvas JPEG preview), then redirect people to `https://ultrapilled.com/r/<id>`.
 
 ## Local
 

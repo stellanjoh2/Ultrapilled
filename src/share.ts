@@ -118,8 +118,19 @@ export function shareTooLargeMessage(): string {
   return `This scene is over ${SHARE_MAX_BYTES / (1024 * 1024)} MB. Shrink or remove large GIFs and video uploads, or use Unsplash photos, then try again.`;
 }
 
-/** Path form survives in-app browsers that strip `?r=` (Messenger, Instagram, etc.). */
-export function publicShareUrl(id: string, origin = typeof window !== "undefined" ? window.location.origin : "https://ultrapilled.com"): string {
+/**
+ * Open-graph landing on the share host (`/o/<id>`), which redirects humans to
+ * ultrapilled.com/r/<id>. Messenger reads og:image from this page.
+ */
+export function publicShareUrl(id: string, apiBase = shareApiUrl()): string {
+  return `${apiBase.replace(/\/+$/, "")}/o/${encodeURIComponent(id)}`;
+}
+
+/** Direct scene URL on the main site (after the OG hop). */
+export function publicShareSceneUrl(
+  id: string,
+  origin = typeof window !== "undefined" ? window.location.origin : "https://ultrapilled.com",
+): string {
   return `${origin.replace(/\/+$/, "")}/r/${encodeURIComponent(id)}`;
 }
 
@@ -143,6 +154,7 @@ export async function createShareLink(
   projectJson: string,
   turnstileToken: string,
   fetchImpl: typeof fetch = fetch,
+  previewJpeg?: string | null,
 ): Promise<ShareCreateResult> {
   const bytes = utf8ByteLength(projectJson);
   if (bytes > SHARE_MAX_BYTES) {
@@ -156,7 +168,11 @@ export async function createShareLink(
     return { ok: false, status: 400, code: "bad_pill", message: shareErrorMessage("bad_pill") };
   }
 
-  const body = JSON.stringify({ project, turnstileToken });
+  const body = JSON.stringify({
+    project,
+    turnstileToken,
+    ...(previewJpeg ? { previewJpeg } : {}),
+  });
   const headers = { "Content-Type": "application/json" };
   let res: Response | null = null;
   let networkFailed = false;

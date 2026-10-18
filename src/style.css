@@ -6417,6 +6417,13 @@ html[data-theme="day"] .shape-swatch {
   letter-spacing: -0.01em;
 }
 
+/* Orby Lime — current share size callout in the Share link? dialog. */
+.share-size {
+  color: #c4ff00;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
 .reconnect__input {
   display: block;
   width: 100%;
