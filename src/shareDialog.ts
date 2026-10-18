@@ -85,7 +85,7 @@ function openCreating(): { close: () => void } {
     <div class="reconnect__scrim"></div>
     <div class="reconnect__card reconnect__card--creating">
       <div class="share-creating-loader">
-        <p class="share-creating-loader__text">generating link</p>
+        <p class="share-creating-loader__text">Generating link</p>
         <div class="share-creating-loader__track" aria-hidden="true">
           <span class="share-creating-loader__fill"></span>
         </div>
