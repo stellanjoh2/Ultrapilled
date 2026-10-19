@@ -9,6 +9,8 @@ export type ImageTrim = {
   nativeH: number;
   /** GIF first-frame probe: true when any sampled pixel is not fully opaque. */
   transparent?: boolean;
+  /** Header/aspect seed only — ensureTrim should still run a full probe. */
+  seeded?: boolean;
 };
 
 const ready = new Map<string, ImageTrim>();
@@ -45,6 +47,7 @@ export function seedTrimAspect(src: string, ratioW: number, ratioH: number): boo
     displaySrc: src,
     nativeW: ratioW,
     nativeH: ratioH,
+    seeded: true,
   });
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(TRIM_SEEDED_EVENT, { detail: { src } }));
@@ -63,14 +66,25 @@ export function stampSlotAspect(slot: ImageSlot, trim?: ImageTrim | null): void 
 export function ensureTrim(src: string, name = ""): Promise<ImageTrim | null> {
   if (!src) return Promise.resolve(null);
   const cached = ready.get(src);
-  if (cached) return Promise.resolve(cached);
+  // Aspect seeds are good enough to remesh immediately, but still run a full probe
+  // (transparency, SVG crop, displaySrc) so we don't stick on the seed forever.
+  if (cached && !cached.seeded) return Promise.resolve(cached);
   const inflight = pending.get(src);
   if (inflight) return inflight;
 
   const work = computeTrim(src, name).then((result) => {
     pending.delete(src);
-    if (result) ready.set(src, result);
-    return result;
+    if (result) {
+      ready.set(src, result);
+      return result;
+    }
+    if (cached?.seeded) {
+      // Keep the aspect seed but clear `seeded` so we don't re-probe every call.
+      const settled = { ...cached, seeded: false };
+      ready.set(src, settled);
+      return settled;
+    }
+    return cached ?? null;
   });
   pending.set(src, work);
   return work;

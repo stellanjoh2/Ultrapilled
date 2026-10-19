@@ -1526,6 +1526,7 @@ const exportController = {
   replayFall: () => !state.physics.layoutMode && world.fallStartPoses() != null,
   state: () => state,
   async saveProject() {
+    await warmProjectTrims();
     const json = serializePillProject(await embedSlotImages(currentPillProject()));
     downloadPillJson(json, defaultPillFileName());
     lastDraftJson = json;
@@ -1568,11 +1569,22 @@ function scheduleDraft() {
 
 let draftSaveWarned = false;
 
+/** Decode/aspect before embed so drafts stamp ratioW/H (avoids square+radius collider balloon on reconnect). */
+async function warmProjectTrims() {
+  snapshotActivePage();
+  const slots = [...state.slots, ...pages.flatMap((page) => page.slots)];
+  await ensureTrims(slots);
+  for (const slot of slots) {
+    if (slot.kind === "image") stampSlotAspect(slot);
+  }
+}
+
 async function writeDraftNow() {
   if (!getPrefs().rememberLast) return;
   try {
     // Bake blob: uploads into data URLs — otherwise reconnect restores poses but
     // photos are dead forever, and Trigger Physics looks like the stock template.
+    await warmProjectTrims();
     const json = serializePillProject(await embedSlotImages(currentPillProject()));
     if (json === lastDraftJson) return;
     await writeDraftJson(json);
@@ -6758,7 +6770,11 @@ function endGesture() {
   gesture = null;
 }
 
-function restore(snap: Snapshot) {
+/** Undo/redo restore — await trims so image aspect/radius/collider remesh isn't racing decode. */
+let restoreTicket = 0;
+
+async function restore(snap: Snapshot) {
+  const ticket = ++restoreTicket;
   tintPicker?.close();
   pages = structuredClone(snap.pages);
   pageIndex = clampPageIndex(snap.pageIndex, pages.length);
@@ -6768,6 +6784,11 @@ function restore(snap: Snapshot) {
   applyBackground();
   applyPost();
   syncCanvas(world.chipCount() > 0);
+  await Promise.all([ensureTrims(state.slots), ensureTextFonts(state.slots)]);
+  if (ticket !== restoreTicket) return;
+  for (const slot of state.slots) {
+    if (slot.kind === "image") stampSlotAspect(slot);
+  }
   const page = pages[pageIndex];
   const pinned = Boolean(page?.poses.length) && pinRestoredPoses(page.poses, page.frame);
   renderPanel();
@@ -6781,7 +6802,7 @@ function undo() {
   endGesture();
   future.push(takeSnapshot());
   if (future.length > UNDO_LIMIT) future.shift();
-  restore(snap);
+  void restore(snap);
   playClick();
 }
 
@@ -6791,7 +6812,7 @@ function redo() {
   endGesture();
   past.push(takeSnapshot());
   if (past.length > UNDO_LIMIT) past.shift();
-  restore(snap);
+  void restore(snap);
   playClick();
 }
 window.addEventListener("pointerdown", () => {
@@ -6854,6 +6875,7 @@ async function shareCurrentScene() {
     return;
   }
   try {
+    await warmProjectTrims();
     const json = serializePillProject(
       await embedSlotImages(currentPillProject(), { linkRemotes: true }),
     );
@@ -7042,6 +7064,7 @@ async function saveCurrentAsTemplate() {
   });
   if (!name) return;
   try {
+    await warmProjectTrims();
     const project = await embedSlotImages(currentPillProject());
     const saved = saveCustomTemplate(name, project);
     state.template = saved.id;

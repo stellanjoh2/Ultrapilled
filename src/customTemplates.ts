@@ -133,7 +133,8 @@ export async function embedSlotImages(
         if (opts?.linkRemotes) {
           const remote = imageRemoteOf(slot);
           if (remote?.kind === "unsplash" || remote?.kind === "giphy") {
-            // Keep aspect for remakes — CDN src won't have the blob's trim cache.
+            // Caller should ensureTrims first — peek stamps ratioW/H so reconnect
+            // doesn't spawn a square collider (balloons rounded image hitboxes).
             stampSlotAspect(slot, peekTrim(slot.src));
             slot.remote = remote;
             const https = await httpsSrcForRemote(remote);

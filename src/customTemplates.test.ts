@@ -41,6 +41,46 @@ describe("embedSlotImages", () => {
     expect(slot.src).not.toContain("blob:");
   });
 
+  it("stamps ratioW/H from trim before baking so reconnect keeps rounded colliders", async () => {
+    const blobUrl = "blob:http://localhost/wide-1";
+    seedTrimAspect(blobUrl, 500, 210);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }))),
+    );
+
+    const project: PillProject = {
+      state: {
+        ...blankState(),
+        slots: [
+          defaultImageSlot({
+            id: "img-wide",
+            src: blobUrl,
+            name: "wide.png",
+            radius: 28,
+            collider: "block",
+          }),
+        ],
+        template: "blank",
+      },
+      poses: [],
+      frame: { width: 1280, height: 720 },
+      images: [],
+      loop: false,
+      pages: [],
+      pageIndex: 0,
+    };
+
+    const embedded = await embedSlotImages(project);
+    const slot = embedded.state.slots[0];
+    expect(slot?.kind).toBe("image");
+    if (slot?.kind !== "image") return;
+    expect(slot.ratioW).toBe(500);
+    expect(slot.ratioH).toBe(210);
+    expect(slot.radius).toBe(28);
+    expect(slot.collider).toBe("block");
+  });
+
   it("bakes blob: background images into the project images list", async () => {
     const blobUrl = "blob:http://localhost/bg-1";
     putBackgroundImage("bg-blob", blobUrl, "bg.png", 100, 80);

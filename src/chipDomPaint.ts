@@ -1406,7 +1406,8 @@ export function applyVisual(
   } else {
     face.classList.remove("is-gradient-animated");
     face.replaceChildren();
-    face.style.clipPath = "";
+    // Parent .chip-image keeps overflow:visible (drop shadows); round the face itself.
+    face.style.clipPath = radius > 0 ? `inset(0 round ${radius}px)` : "";
     face.style.removeProperty("--sweep-duration");
     face.style.removeProperty("--grad-angle");
     if (slot.gradient && gradientTo) {
@@ -1426,5 +1427,6 @@ export function applyVisual(
   face.style.maskRepeat = "no-repeat";
   face.style.webkitMaskPosition = "center";
   face.style.maskPosition = "center";
+  face.style.borderRadius = `${radius}px`;
   mountLookChild(el, face);
 }
