@@ -2938,6 +2938,11 @@ input[type="file"].bg-file::file-selector-button {
     border-top-color 0.15s ease;
 }
 
+/* No reset control (Look, Keyboard Shortcuts): park the chevron on the trailing edge. */
+.section-toggle + .section-chevron {
+  margin-left: auto;
+}
+
 /* Hover only the control under the pointer — not the whole section-head row
    (that made the chevron/reset corner go lime while still over the title). */
 @media (hover: hover) {

@@ -1263,6 +1263,15 @@ function bootRevealGrid() {
     releaseAutoObjectNudge();
     return;
   }
+  // Template/project load may have already revealed the grid under the dump —
+  // don't yank opacity back to 0 for the boot fade.
+  if (!layer.hidden && layer.style.getPropertyValue("--grid-reveal").trim() === "1") {
+    applyGrid();
+    if (state.background.logoId) applyLogo();
+    releaseProTips();
+    releaseAutoObjectNudge();
+    return;
+  }
   const { background, canvas } = state;
   const { cols, rows } = gridDivisions(canvas, background.gridDensity);
   const strength = (background.gridOpacity ?? 0) / 100;
@@ -1853,6 +1862,8 @@ async function applyPillProject(project: PillProject, opts?: { pinPoses?: boolea
   await relinkProjectImages(project);
   hydratePillImages(project.images);
   adoptState(project.state);
+  // Same as loadTemplate — don't leave Mode Select's hold suppressing a project grid.
+  gridHoldForHandoff = false;
   pages = project.pages.length ? project.pages.map((page) => structuredClone(page)) : [];
   pageIndex = clampPageIndex(project.pageIndex, pages.length);
   pageThumbs.clear();
@@ -7125,6 +7136,11 @@ async function loadTemplate(next: AppState) {
   world.setPicked(null);
   openSlots.clear();
   adoptState(keepSelectedCanvas(next, state.canvas));
+  // Clear Mode Select's hold as soon as the template owns state — waiting until
+  // after the fade left Berlin/Games with grid:true but --grid-reveal stuck at 0
+  // whenever the dump handoff outlasted the swap (or an aborted swap skipped the
+  // late clear).
+  gridHoldForHandoff = false;
   renderPanel();
 
   // Prep the next scene off-screen while the current one fades out.
@@ -7155,9 +7171,6 @@ async function loadTemplate(next: AppState) {
   await prep;
   if (ticket !== templateSwapTicket) return;
 
-  // Template owns the stage now — don't keep Mode Select's grid hold suppressing
-  // --grid-reveal (Berlin etc. ship grid: true but stayed invisible under the hold).
-  gridHoldForHandoff = false;
   applyBackground();
   applyPost();
   syncCanvas(false);
