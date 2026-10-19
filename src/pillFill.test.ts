@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { pillGradient, pillSweepBand, pillSweepGradient, pillSweepStops, textSweepImage } from "./pillFill";
+import {
+  gradientAngleLabel,
+  pillGradient,
+  pillSweepBand,
+  pillSweepGradient,
+  pillSweepStops,
+  textSweepImage,
+} from "./pillFill";
 
 function cssColors(image: string): string[] {
   return image.match(/#[0-9a-f]{6}/gi) ?? [];
 }
+
+describe("gradientAngleLabel", () => {
+  it("rounds to whole degrees with a ° suffix", () => {
+    expect(gradientAngleLabel(39.47748760845951)).toBe("39°");
+    expect(gradientAngleLabel(45)).toBe("45°");
+  });
+});
 
 describe("text gradient sweep", () => {
   it("repeats a from→to→from tile whose ends match", () => {

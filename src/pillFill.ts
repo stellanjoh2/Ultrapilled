@@ -162,6 +162,11 @@ export function gradientAngleOf(angle: number | undefined): number {
   return ((value % 360) + 360) % 360;
 }
 
+/** Panel readout: whole degrees + ° (avoids long floats from the wheel). */
+export function gradientAngleLabel(angle: number | undefined): string {
+  return `${Math.round(gradientAngleOf(angle))}°`;
+}
+
 export function gradientSpeedOf(speed: number | undefined): number {
   const value = speed ?? DEFAULT_GRADIENT_SPEED;
   if (!Number.isFinite(value)) return DEFAULT_GRADIENT_SPEED;

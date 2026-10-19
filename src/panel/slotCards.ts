@@ -21,6 +21,7 @@ import { pillPadOf, trackingOf } from "../measure";
 import { imageRemoteOf } from "../remoteImage";
 import { gifBlocksStroke } from "../trim";
 import {
+  gradientAngleLabel,
   gradientAngleOf,
   gradientScaleOf,
   gradientSpeedOf,
@@ -600,7 +601,7 @@ function textFields(slot: TextSlot, open: boolean): HTMLElement {
           ? `<div class="field" data-tip="${TIPS.endColor}">${H.settingLabel(slot, "End color", "gradientColor")}
         ${H.gradientTintRow(slot)}
       </div>
-      <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
+      <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", gradientAngleLabel(slot.gradientAngle))}
         <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
       </label>
       <label class="field" data-tip="${TIPS.gradScale}">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
@@ -779,7 +780,7 @@ function shapeFields(slot: ImageSlot, open: boolean): HTMLElement {
         ? `<div class="field" data-tip="${TIPS.endColor}">${H.settingLabel(slot, "End color", "gradientColor")}
       ${H.gradientTintRow(slot)}
     </div>
-    <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
+    <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", gradientAngleLabel(slot.gradientAngle))}
       <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
     </label>
     <label class="field" data-tip="${TIPS.gradScale}">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}
@@ -1084,7 +1085,7 @@ function photoFields(slot: ImageSlot, open: boolean): HTMLElement {
         ? `<div class="field" data-tip="${TIPS.endColor}">${H.settingLabel(slot, "End color", "gradientColor")}
       ${H.gradientTintRow(slot)}
     </div>
-    <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", String(gradientAngleOf(slot.gradientAngle)))}
+    <label class="field" data-tip="${TIPS.gradAngle}">${H.settingLabel(slot, "Gradient angle", "gradientAngle", gradientAngleLabel(slot.gradientAngle))}
       <input type="range" data-key="gradientAngle" min="0" max="360" step="1" value="${gradientAngleOf(slot.gradientAngle)}" />
     </label>
     <label class="field" data-tip="${TIPS.gradScale}">${H.settingLabel(slot, "Gradient scale", "gradientScale", String(gradientScaleOf(slot.gradientScale)))}

@@ -52,7 +52,7 @@ import { activateFamily, listedFamilies, localWeights, maybeQueryLocalCatalog, q
 import { closeBackgroundUi, handleBackgroundStopDelete, mountBackgroundPanel } from "./backgroundPanel";
 import { backgroundImage, backgroundPaint, gridDivisions, logoBackdropColor, logoFill, logoSize, isSvgLogo } from "./background";
 import { mountColorPicker } from "./colorPicker";
-import { fillSample, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
+import { fillSample, gradientAngleLabel, gradientAngleOf, gradientEnd, gradientEndIndex, gradientPeriodMs, gradientScaleOf, gradientSpeedOf, pillGradient, pillSweepGradient } from "./pillFill";
 import { applyRollingText, setTextAnimsPaused, stopTextAnim, textAnimSpeedOf } from "./textAnim";
 import { logotypePillColor, pickGridColor, pickTheme, resolveTextColor, resolveTextSwatchIndex } from "./theme";
 import {
@@ -3946,7 +3946,9 @@ function bindSlotInputs(root: HTMLElement, slot: Slot) {
         if (caption) {
           setRangeCaptionValue(
             caption,
-            String(Math.round(Number(input.value))),
+            key === "gradientAngle"
+              ? gradientAngleLabel(Number(input.value))
+              : String(Math.round(Number(input.value))),
           );
         }
         const card = input.closest(".slot-card");
@@ -4460,7 +4462,7 @@ function syncSlotGradientWheelUi(slot: Slot) {
     paintRange(angleInput);
   }
   const angleCaption = card.querySelector('[data-range-label="gradientAngle"]');
-  if (angleCaption) setRangeCaptionValue(angleCaption, String(Math.round(angle)));
+  if (angleCaption) setRangeCaptionValue(angleCaption, gradientAngleLabel(angle));
   paintFieldReset(card, slot, "gradientAngle");
   const scaleInput = card.querySelector<HTMLInputElement>('input[data-key="gradientScale"]');
   if (scaleInput) {
