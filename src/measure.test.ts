@@ -4,12 +4,44 @@ import {
   fitTextFieldBox,
   measureImageSlot,
   measureTextInk,
+  shapedTextBaselineY,
   textFieldPad,
   textGlyphSideOverhangs,
+  textShiftEm,
   trackedRunWidth,
   trackingEm,
 } from "./measure";
 import { defaultImageSlot, defaultTextFieldSlot, defaultTypeSlot } from "./types";
+
+describe("shapedTextBaselineY", () => {
+  it("matches CSS flex + line-height:1 (not canvas middle) for tall font boxes", () => {
+    // Boldonse-like: font-bounding box taller than the em square.
+    const height = 100;
+    const fontSize = 56;
+    const y = shapedTextBaselineY(height, fontSize, 0, {
+      fontBoundingBoxAscent: 85,
+      fontBoundingBoxDescent: 22,
+    });
+    // height/2 + (ascent - descent)/2 — same strut math as DOM flex centering.
+    expect(y).toBe(81.5);
+    // Canvas "middle" at height/2 would leave glyphs far too high for this face.
+    expect(y).toBeGreaterThan(height / 2 + 20);
+  });
+
+  it("applies text-height shift in ems like translateY(shiftEm em)", () => {
+    const fontSize = 40;
+    const shift = textShiftEm(30);
+    const base = shapedTextBaselineY(80, fontSize, 0, {
+      fontBoundingBoxAscent: 32,
+      fontBoundingBoxDescent: 8,
+    });
+    const shifted = shapedTextBaselineY(80, fontSize, shift, {
+      fontBoundingBoxAscent: 32,
+      fontBoundingBoxDescent: 8,
+    });
+    expect(shifted - base).toBeCloseTo(shift * fontSize, 5);
+  });
+});
 
 describe("measureTextInk", () => {
   it("keeps a bleed pad so AA glyph edges aren't clipped", () => {

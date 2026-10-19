@@ -2,7 +2,7 @@ import { backgroundImage, isSvgLogo, paintBackdrop, paintGrid, paintLogo, paintU
 import { gradientEnd, gradientLine, gradientPhase, pillGradientStops, pillSweepStops, textGradientFill } from "../pillFill";
 import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
-import { measureTextInk, measureTrackedTextWidth, paintTextInk, textFieldPad, textInkGlyphStarts } from "../measure";
+import { measureTextInk, measureTrackedTextWidth, paintTextInk, shapedTextBaselineY, textFieldPad, textInkGlyphStarts } from "../measure";
 import { isGifSrc, peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
 import { chipContributesBloom, applyWhiteBalance, imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags, whiteBalanceGains } from "../chipLook";
@@ -450,6 +450,13 @@ function drawText(
     return;
   }
 
+  const font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
+  ctx.font = font;
+  ctx.letterSpacing = "0px";
+  // Match live flex + line-height:1 — never canvas "middle" (Boldonse etc. sit too high).
+  const metrics = ctx.measureText(slot.text || "M");
+  const baseline = shapedTextBaselineY(height, fontSize, chip.shiftEm, metrics);
+
   if (rolling) {
     ctx.save();
     round(ctx, width, height, radius);
@@ -463,30 +470,26 @@ function drawText(
       chip.tracking,
       chip.ink,
       width / 2,
-      height / 2 + chip.shiftEm * fontSize,
+      baseline,
       travel,
       timeMs,
       slot.textAnimSpeed,
       "center",
-      "middle",
+      "alphabetic",
     );
     ctx.restore();
     return;
   }
 
-  const font = `${slot.fontWeight} ${fontSize}px "${slot.fontFamily}", sans-serif`;
-  ctx.font = font;
   ctx.fillStyle = chip.ink;
   ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
+  ctx.textBaseline = "alphabetic";
   // Same rule as the live pill: no trailing letter-spacing, or the last glyph
   // is clipped when tracking is negative and a phantom gap appears when it is positive.
-  ctx.letterSpacing = "0px";
   const text = slot.text || "";
   const lineW = measureTrackedTextWidth(text, fontSize, chip.tracking, font);
   const starts = textInkGlyphStarts(ctx, text, fontSize, chip.tracking, (width - lineW) / 2);
   const chars = [...text];
-  const baseline = height / 2 + chip.shiftEm * fontSize;
   for (let i = 0; i < chars.length; i++) {
     ctx.fillText(chars[i] === " " ? "\u00a0" : chars[i]!, starts[i] ?? 0, baseline);
   }

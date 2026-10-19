@@ -90,6 +90,27 @@ export function textShiftEm(slider: number): number {
 }
 
 /**
+ * Alphabetic Y for shaped pills/boxes so export matches the live DOM
+ * (flex center + line-height:1 + translateY(shiftEm em)).
+ *
+ * Do not use canvas `textBaseline: "middle"`: fonts whose font-bounding box
+ * is taller than the em square (Boldonse, etc.) sit far too high in export.
+ */
+export function shapedTextBaselineY(
+  height: number,
+  fontSize: number,
+  shiftEm: number,
+  metrics: Pick<TextMetrics, "fontBoundingBoxAscent" | "fontBoundingBoxDescent"> | {
+    fontBoundingBoxAscent?: number;
+    fontBoundingBoxDescent?: number;
+  },
+): number {
+  const ascent = metrics.fontBoundingBoxAscent ?? fontSize * 0.8;
+  const descent = metrics.fontBoundingBoxDescent ?? fontSize * 0.2;
+  return height / 2 + (ascent - descent) / 2 + shiftEm * fontSize;
+}
+
+/**
  * Bleed outside actualBoundingBox* so antialiased glyph edges aren't clipped by
  * the ink canvas / physics box (visible on round bottoms and final stems).
  */
