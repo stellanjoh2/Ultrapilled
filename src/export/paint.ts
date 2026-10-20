@@ -2,7 +2,7 @@ import { backgroundImage, isSvgLogo, paintBackdrop, paintGrid, paintLogo, paintU
 import { gradientEnd, gradientLine, gradientPhase, pillGradientStops, pillSweepStops, textGradientFill } from "../pillFill";
 import type { CanvasRatio } from "../canvas";
 import { EMOJI_FONT } from "../emojis";
-import { measureTextInk, measureTrackedTextWidth, paintTextInk, shapedTextBaselineY, textFieldPad, textInkGlyphStarts } from "../measure";
+import { measureTextInk, measureTrackedTextWidth, paintTextInk, shapedTextBaselineY, textFieldBaselineY, textFieldPad, textInkGlyphStarts } from "../measure";
 import { isGifSrc, peekTrim } from "../trim";
 import { isColorMask, type ChipDraw } from "../chipKinds";
 import { chipContributesBloom, applyWhiteBalance, imageAdjustActive, imageRasterFilter, rasterRing, textLookFlags, whiteBalanceGains } from "../chipLook";
@@ -353,7 +353,9 @@ function drawTextField(
   ctx.beginPath();
   ctx.rect(0, 0, width, height);
   ctx.clip();
-  let y = pad.y + fontSize * 0.92 + chip.shiftEm * fontSize;
+  // Match live CSS line boxes — not fontSize*0.92 (Boldonse clips in MP4 while DOM looks fine).
+  const metrics = ctx.measureText(lines[0] || slot.text || "M");
+  let y = textFieldBaselineY(pad.y, fontSize, lineHeight, chip.shiftEm, metrics);
   for (const line of lines) {
     if (line) ctx.fillText(line, x, y);
     y += lineHeight;

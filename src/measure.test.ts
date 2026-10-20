@@ -5,6 +5,7 @@ import {
   measureImageSlot,
   measureTextInk,
   shapedTextBaselineY,
+  textFieldBaselineY,
   textFieldPad,
   textGlyphSideOverhangs,
   textShiftEm,
@@ -39,6 +40,32 @@ describe("shapedTextBaselineY", () => {
       fontBoundingBoxAscent: 32,
       fontBoundingBoxDescent: 8,
     });
+    expect(shifted - base).toBeCloseTo(shift * fontSize, 5);
+  });
+});
+
+describe("textFieldBaselineY", () => {
+  it("uses CSS half-leading + font ascent, not fontSize*0.92", () => {
+    const fontSize = 18;
+    const lineH = fontSize * 1.48;
+    const padY = 2;
+    // Boldonse-like: taller than the em square.
+    const y = textFieldBaselineY(padY, fontSize, lineH, 0, {
+      fontBoundingBoxAscent: 27,
+      fontBoundingBoxDescent: 7,
+    });
+    const fontBox = 27 + 7;
+    expect(y).toBeCloseTo(padY + (lineH - fontBox) / 2 + 27, 5);
+    // Old export heuristic sat too high and clipped caps in MP4.
+    expect(y).toBeGreaterThan(padY + fontSize * 0.92);
+  });
+
+  it("applies text-height shift like live translateY", () => {
+    const fontSize = 18;
+    const shift = textShiftEm(33);
+    const metrics = { fontBoundingBoxAscent: 14, fontBoundingBoxDescent: 4 };
+    const base = textFieldBaselineY(2, fontSize, fontSize * 1.3, 0, metrics);
+    const shifted = textFieldBaselineY(2, fontSize, fontSize * 1.3, shift, metrics);
     expect(shifted - base).toBeCloseTo(shift * fontSize, 5);
   });
 });
@@ -191,5 +218,6 @@ describe("fitTextFieldBox", () => {
     expect(slot.boxW).toBe(120);
     expect(slot.boxH).toBeGreaterThan(40);
   });
+
 });
 

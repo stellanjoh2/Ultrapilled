@@ -361,6 +361,29 @@ function textFieldAutoWrapAt(slot: TextSlot): number {
   return Math.max(TEXT_FIELD_BOX_MIN, slot.fontSize * TEXT_FIELD_AUTO_LINE_EM);
 }
 
+/**
+ * First-line alphabetic Y for wrapping text fields so export matches live CSS
+ * (padding + half-leading + font ascent + textHeight translateY).
+ *
+ * Do not use `fontSize * 0.92`: Boldonse etc. have a taller font-bounding box, and
+ * that heuristic sits the baseline too high — MP4 clips tops/bottoms while the DOM looks fine.
+ */
+export function textFieldBaselineY(
+  padY: number,
+  fontSize: number,
+  lineHeightPx: number,
+  shiftEm: number,
+  metrics: Pick<TextMetrics, "fontBoundingBoxAscent" | "fontBoundingBoxDescent"> | {
+    fontBoundingBoxAscent?: number;
+    fontBoundingBoxDescent?: number;
+  },
+): number {
+  const ascent = metrics.fontBoundingBoxAscent ?? fontSize * 0.8;
+  const descent = metrics.fontBoundingBoxDescent ?? fontSize * 0.2;
+  const fontBox = ascent + descent;
+  return padY + (lineHeightPx - fontBox) / 2 + ascent + shiftEm * fontSize;
+}
+
 /** Ink + pad needed to show wrapped copy at `wrapAt` (box width). */
 export function measureTextFieldContent(slot: TextSlot, tracking: number, wrapAt: number): ChipSize {
   const fontSize = slot.fontSize;
