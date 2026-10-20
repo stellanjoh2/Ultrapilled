@@ -13,9 +13,9 @@ function cssColors(image: string): string[] {
 }
 
 describe("gradientAngleLabel", () => {
-  it("rounds to whole degrees with a ° suffix", () => {
-    expect(gradientAngleLabel(39.47748760845951)).toBe("39°");
-    expect(gradientAngleLabel(45)).toBe("45°");
+  it("rounds to whole degrees (° comes from CSS)", () => {
+    expect(gradientAngleLabel(39.47748760845951)).toBe("39");
+    expect(gradientAngleLabel(45)).toBe("45");
   });
 });
 

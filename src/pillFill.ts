@@ -162,9 +162,9 @@ export function gradientAngleOf(angle: number | undefined): number {
   return ((value % 360) + 360) % 360;
 }
 
-/** Panel readout: whole degrees + ° (avoids long floats from the wheel). */
+/** Panel readout number; degree mark is painted via CSS on [data-range-label=gradientAngle]. */
 export function gradientAngleLabel(angle: number | undefined): string {
-  return `${Math.round(gradientAngleOf(angle))}°`;
+  return String(Math.round(gradientAngleOf(angle)));
 }
 
 export function gradientSpeedOf(speed: number | undefined): number {

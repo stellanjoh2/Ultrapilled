@@ -4419,7 +4419,7 @@ function syncTextFieldBox(slot: Slot) {
   fitTextFieldBox(slot, trackingEm(trackingOf(slot, state.textTracking)));
 }
 
-function liveChip(id: string, opts?: { quiet?: boolean; skipFit?: boolean }) {
+function liveChip(id: string, opts?: { quiet?: boolean; skipFit?: boolean; previewOnly?: boolean }) {
   const slot = state.slots.find((item) => item.id === id);
   if (slot && !opts?.skipFit) syncTextFieldBox(slot);
   world.refreshSlot(
@@ -4526,12 +4526,15 @@ function resizeTextFieldBox(id: string, sx: number, sy: number, phase: "start" |
   slot.boxAuto = false;
   slot.boxW = Math.max(TEXT_FIELD_BOX_MIN, start.w * sx);
   slot.boxH = Math.max(TEXT_FIELD_BOX_MIN, start.h * sy);
-  liveChip(id, { quiet: true, skipFit: true });
+  // Move: paint + pin only (no remesh). End: bake collider once so the pile stays calm.
   if (phase === "end") {
+    liveChip(id, { quiet: true, skipFit: true });
     textFieldBoxStart.delete(id);
     endGesture();
     scheduleDraft();
+    return;
   }
+  liveChip(id, { quiet: true, skipFit: true, previewOnly: true });
 }
 
 function scaleChip(id: string, scale: number, phase: "start" | "move" | "end") {

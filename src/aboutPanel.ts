@@ -57,6 +57,15 @@ const ABOUT_PROJECTS = [
     href: "https://www.youtube.com/watch?v=SXf1NswrDpw",
   },
   {
+    id: "mozayk",
+    name: "Mozayk",
+    title: "Mozayk — Complex visuals, made easy",
+    lede: "Mozayk™ is a free mosaic generator for random abstract visuals — start on a blank canvas, generate a clean layout, or import a photo or video. Scramble, restyle, and export. Shape palettes, colour, overlays, and a timeline, then ship stills or a short animation.",
+    image: "/images/projects/mozayk.jpg",
+    imageAlt: "Mozayk mosaic generator — abstract grid mosaics",
+    href: "https://mozayk.design/",
+  },
+  {
     id: "orby",
     name: "Orby",
     title: "Orby — Your virtual studio, in the browser",
@@ -73,15 +82,6 @@ const ABOUT_PROJECTS = [
     image: "/images/projects/lx01.webp",
     imageAlt: "LX01 speech synthesizer — robotic voice vocoder",
     href: "https://stellanjoh2.github.io/Cyborg/",
-  },
-  {
-    id: "mozayk",
-    name: "Mozayk",
-    title: "Mozayk — Complex visuals, made easy",
-    lede: "Mozayk™ is a free mosaic generator for random abstract visuals — start on a blank canvas, generate a clean layout, or import a photo or video. Scramble, restyle, and export. Shape palettes, colour, overlays, and a timeline, then ship stills or a short animation.",
-    image: "/images/projects/mozayk.jpg",
-    imageAlt: "Mozayk mosaic generator — abstract grid mosaics",
-    href: "https://mozayk.design/",
   },
   {
     id: "ritual",

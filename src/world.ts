@@ -298,7 +298,7 @@ export type WorldHandle = {
     pillPad: number,
     tracking: number,
     sizeRandom: number,
-    opts?: { quiet?: boolean },
+    opts?: { quiet?: boolean; previewOnly?: boolean },
   ) => void;
   setSimulationScale: (scale: number) => void;
   /**
@@ -2268,7 +2268,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     pillPad: number,
     tracking: number,
     sizeRandom: number,
-    opts?: { quiet?: boolean },
+    opts?: { quiet?: boolean; previewOnly?: boolean },
   ) {
     const slot = slots.find((item) => item.id === slotId);
     if (!slot) return;
@@ -2276,6 +2276,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     lookPad = pillPad;
     const grown: DroppedChip[] = [];
     let remeshed = 0;
+    const previewOnly = Boolean(opts?.previewOnly);
     for (const chip of chips) {
       if (chip.slotId !== slotId) continue;
       const prevW = chip.width;
@@ -2299,6 +2300,27 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         chamfer = chamferFor(radius, size.width, size.height);
       }
       paint(chip, scaled, size, radius, theme, trackingEm(trackingOf(slot, tracking)), glyphShift(slot));
+      // Text-field box drag: reflow the writing area in the DOM only. Remeshing every
+      // move wakes the pile (settleQuietRemesh) and fights the opposite-corner pin.
+      if (previewOnly) {
+        const drag = xformDrag;
+        const keepCorner =
+          Boolean(drag?.boxResize && !drag.centerAnchored && drag.chip.body.id === chip.body.id);
+        const opp = drag && keepCorner ? oppositeXformCorner(drag.corner) : null;
+        const before = opp ? xformCornerWorld(chip, opp, 1, 0) : null;
+        chip.width = size.width;
+        chip.height = size.height;
+        if (before && opp) {
+          const after = xformCornerWorld(chip, opp, 1, 0);
+          Body.setPosition(chip.body, {
+            x: chip.body.position.x + (before.x - after.x),
+            y: chip.body.position.y + (before.y - after.y),
+          });
+        }
+        pinInsideWalls(chip);
+        seat(chip);
+        continue;
+      }
       if (chip.meshKey !== meshKey(slot, size.width, size.height, chamfer, physicsComplexity(physics.complexity))) {
         const drag = xformDrag;
         const keepCorner =
@@ -2317,6 +2339,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         if (size.width > prevW + 1 || size.height > prevH + 1) grown.push(chip);
       }
       syncWallCollision(chip);
+    }
+    if (previewOnly) {
+      sync();
+      return;
     }
     if (grown.length > 0) {
       // Quiet: pad / free-transform bake — remesh without the upward releaseGrowth shove.
@@ -2916,7 +2942,8 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
 
   const XFORM_TIP =
     "Drag to rotate and scale — Shift scales from corner, Shift+Alt from center";
-  const XFORM_BOX_TIP = "Drag to resize the writing area — Alt from center";
+  const XFORM_BOX_TIP =
+    "Drag to resize the writing area — Shift locks ratio, Alt from center, ⌘/Ctrl scales type";
   const GRAD_FROM_TIP = "Start color — drag to rotate and scale, click to pick";
   const GRAD_TO_TIP = "End color — drag to rotate and scale, click to pick";
 
@@ -2945,9 +2972,11 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       byCorner.clear();
     }
 
+    // Text fields: every corner resizes the writing area (Figma / area-type). Hold
+    // ⌘/Ctrl on a corner for uniform scale + rotate like other objects.
     const field = isTextField(chip.look?.slot);
     for (const { id } of XFORM_CORNERS) {
-      const box = field && (id === "ne" || id === "sw");
+      const box = field;
       const iconKey = box ? "bounding-box" : "hand-grabbing";
       const label = box ? "Resize writing area" : "Rotate and scale";
       const tip = box ? XFORM_BOX_TIP : XFORM_TIP;
@@ -3699,24 +3728,36 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     return xformDrag.bodyFactor;
   }
 
-  function boxSizeFromPointer(point: { x: number; y: number }): { sx: number; sy: number } | null {
+  function boxSizeFromPointer(
+    point: { x: number; y: number },
+    lockRatio = false,
+  ): { sx: number; sy: number } | null {
     if (!xformDrag?.boxResize) return null;
     const { chip, corner, centerAnchored, startW, startH } = xformDrag;
     const angle = chip.body.angle;
     const cos = Math.cos(-angle);
     const sin = Math.sin(-angle);
+    // Use start size for the opposite-corner pivot so remesh-free preview stays stable
+    // (live chip.width changes every move; world anchor was captured at gesture start).
     const pivot = centerAnchored
       ? { x: chip.body.position.x, y: chip.body.position.y }
-      : xformCornerWorld(chip, oppositeXformCorner(corner), 1, 0);
+      : { x: xformDrag.anchorX, y: xformDrag.anchorY };
     const dx = point.x - pivot.x;
     const dy = point.y - pivot.y;
     const lx = dx * cos - dy * sin;
     const ly = dx * sin + dy * cos;
     const { sx, sy } = xformCornerSigns(corner, chip.flipX, chip.flipY);
-    const nextW = centerAnchored ? Math.abs(lx) * 2 : lx * sx;
-    const nextH = centerAnchored ? Math.abs(ly) * 2 : ly * sy;
+    let nextW = centerAnchored ? Math.abs(lx) * 2 : lx * sx;
+    let nextH = centerAnchored ? Math.abs(ly) * 2 : ly * sy;
     const minW = 48;
     const minH = 32;
+    if (lockRatio && startW > 0 && startH > 0) {
+      // Dominant axis wins (Illustrator / Figma Shift-constrain).
+      const rawSx = Math.max(minW, nextW) / startW;
+      const rawSy = Math.max(minH, nextH) / startH;
+      const factor = Math.abs(rawSx - 1) >= Math.abs(rawSy - 1) ? rawSx : rawSy;
+      return { sx: factor, sy: factor };
+    }
     return {
       sx: Math.max(minW, nextW) / Math.max(1, startW),
       sy: Math.max(minH, nextH) / Math.max(1, startH),
@@ -3772,7 +3813,14 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const corner = readXformHandleCorner(handle);
     // Alt at gesture start → center-anchored scale; else opposite corner (PS-style).
     const centerAnchored = event.altKey;
-    const anchor = xformCornerWorld(chip, oppositeXformCorner(corner), 1);
+    // Default: reflow the writing area. ⌘/Ctrl opts into uniform scale + rotate.
+    const boxResize =
+      isTextField(chip.look?.slot) &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      (pickedIds.size <= 1 || (pickedIds.size === 1 && pickedIds.has(chip.slotId)));
+    // Box resize pins the true frame corner (pad 0); free-transform uses the handle inset.
+    const anchor = xformCornerWorld(chip, oppositeXformCorner(corner), 1, boxResize ? 0 : 12);
     const pivotX = centerAnchored ? chip.body.position.x : anchor.x;
     const pivotY = centerAnchored ? chip.body.position.y : anchor.y;
     const dx = point.x - pivotX;
@@ -3795,10 +3843,6 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const startScale = startScales.get(chip.slotId) ?? 1;
     const startPointerAngle = Math.atan2(dy, dx);
     const startBodyAngle = chip.body.angle;
-    const boxResize =
-      isTextField(chip.look?.slot) &&
-      (corner === "ne" || corner === "sw") &&
-      (pickedIds.size <= 1 || (pickedIds.size === 1 && pickedIds.has(chip.slotId)));
     xformHover = { bodyId: chip.body.id, corner, phase: "hot" };
     xformDrag = {
       chip,
@@ -4239,6 +4283,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
             xformDrag.chip,
             oppositeXformCorner(xformDrag.corner),
             xformDrag.bodyFactor,
+            xformDrag.boxResize ? 0 : 12,
           );
           xformDrag.anchorX = anchor.x;
           xformDrag.anchorY = anchor.y;
@@ -4278,7 +4323,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
         nextAngle = xformDrag.startBodyAngle + (pointerAngle - xformDrag.startPointerAngle);
       }
       if (xformDrag.boxResize) {
-        const size = boxSizeFromPointer(point);
+        const size = boxSizeFromPointer(point, scaleOnly);
         if (size) {
           const sizeChanged =
             Math.abs(size.sx - xformDrag.lastSx) >= 0.001 || Math.abs(size.sy - xformDrag.lastSy) >= 0.001;

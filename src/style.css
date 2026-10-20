@@ -3088,9 +3088,15 @@ input[type="file"].bg-file::file-selector-button {
 }
 
 .field-caption-value {
+  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum", "ss01";
   cursor: default;
+}
+
+/* Degree mark as ::after so it can't be dropped by a bare numeric caption update. */
+[data-range-label="gradientAngle"] .field-caption-value::after {
+  content: "\00B0";
 }
 
 /* Beat global input[type=text] (min-height 40px, width 100%, padding) —
