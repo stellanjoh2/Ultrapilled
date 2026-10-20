@@ -111,6 +111,8 @@ export function youtubeEmbedKey(clip: YouTubeClip): string {
 }
 
 const loopTimers = new WeakMap<HTMLIFrameElement, number>();
+/** Clip keyed while armed so overlay freeze can re-arm after pause. */
+const loopClips = new WeakMap<HTMLIFrameElement, YouTubeClip>();
 
 export function clearYouTubeLoop(iframe: HTMLIFrameElement): void {
   const id = loopTimers.get(iframe);
@@ -119,9 +121,27 @@ export function clearYouTubeLoop(iframe: HTMLIFrameElement): void {
   loopTimers.delete(iframe);
 }
 
+/** Stop segment reloads while a modal is up (iframe keeps its current frame). */
+export function pauseAllYouTubeLoops(): void {
+  for (const node of document.querySelectorAll("iframe.chip-youtube__frame")) {
+    if (!(node instanceof HTMLIFrameElement)) continue;
+    clearYouTubeLoop(node);
+  }
+}
+
+/** Re-arm loops cleared by {@link pauseAllYouTubeLoops}. */
+export function resumeAllYouTubeLoops(): void {
+  for (const node of document.querySelectorAll("iframe.chip-youtube__frame")) {
+    if (!(node instanceof HTMLIFrameElement)) continue;
+    const clip = loopClips.get(node);
+    if (clip) armYouTubeLoop(node, clip);
+  }
+}
+
 /** Reload the iframe when the segment should end so `start` is honored on every pass. */
 export function armYouTubeLoop(iframe: HTMLIFrameElement, clip: YouTubeClip): void {
   clearYouTubeLoop(iframe);
+  loopClips.set(iframe, clip);
   const ms = clampLoopSec(clip.loopSec) * 1000 + 250;
   const tick = () => {
     if (!iframe.isConnected) {

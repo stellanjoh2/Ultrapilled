@@ -204,19 +204,18 @@ export function createPlaySession(host: PlaySessionHost): PlaySession {
     const dt = prevFrame ? now - prevFrame : 0;
     prevFrame = now;
     if (dt > 0) host.world.adaptFrameBudget(dt);
-    host.tickAudioReact(now);
 
-    // Full-screen blur overlays: freeze the level (no Matter, no hold/dump clocks).
+    // Full-screen overlays: freeze the level (no Matter, no audio digs, no debug paint).
+    // Painting under About's filter:blur dirties the bitmap and flashes.
     const heldByOverlay = isPhysicsHeldByOverlay();
     if (heldByOverlay) {
       overlayHeld = true;
       host.world.setRunning(false);
-      // Keep collision peeks / eye-toggle wireframes painting while overlays hold physics.
-      host.paintPhysDebug();
       if (host.shouldContinue?.() === false) return;
       requestAnimationFrame(frame);
       return;
     }
+    host.tickAudioReact(now);
     if (overlayHeld) {
       overlayHeld = false;
       if (host.getRunning() && !host.getPaused()) host.world.setRunning(true);

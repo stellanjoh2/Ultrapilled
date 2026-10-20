@@ -1268,6 +1268,10 @@ html[data-theme="day"] .stage.is-portrait .playfield {
   }
 }
 
+html.is-overlay-anims-frozen .chip-chrome.is-picked > .chip-xform-frame {
+  animation-play-state: paused;
+}
+
 /* Transform grab: four corner handles stay hidden until proximity.
    Soft (outer) → mini tile on nearest corner; hot (inner / drag) → large arrows-out.
    Polar drag — radial = scale, angular = rotate. */
@@ -7425,11 +7429,29 @@ html[data-theme="day"] .help-modal__body .keycap {
 }
 
 /*
- * About underlay blur is backdrop-filter on .about-overlay__scrim (aboutPanel),
- * not filter:blur on #app / Mode Select — full-bleed filter fringes a bright
- * edge light-leak. Clears fully on close so Mode Select frost isn’t left in a
- * filter containing block.
+ * About blur: filter:blur on the frozen underlay (#app / Mode Select), NOT
+ * backdrop-filter. Animating About copy invalidates backdrop-filter every frame
+ * and flashes. Physics + media are held so the filtered layer stays a still bitmap.
+ * No scale() — that read as an unwanted zoom on open.
  */
+body.is-about-open {
+  background: #000;
+  overflow: hidden;
+}
+
+/* Tips sit in the editor chrome — keep them off while About owns the screen. */
+body.is-about-open .ui-tip,
+body.is-about-open .pro-tip {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.is-about-open #app,
+body.is-about-open .mode-select-host {
+  filter: blur(20px) saturate(1.12);
+  pointer-events: none;
+  /* Never transition filter — tweening it re-rasters and flickers. */
+}
 
 .about-overlay {
   position: fixed;
@@ -7439,14 +7461,13 @@ html[data-theme="day"] .help-modal__body .keycap {
   display: block;
   padding: 0;
   pointer-events: auto;
+  background: transparent;
 }
 
 .about-overlay__scrim {
   position: fixed;
   inset: 0;
   z-index: 0;
-  /* No transform, opacity, or filter on this element — any of those make
-     Chrome drop backdrop-filter, so the About blur never appears. */
   background: transparent;
 }
 
@@ -7454,7 +7475,8 @@ html[data-theme="day"] .help-modal__body .keycap {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgb(0 0 0 / 0.2);
+  /* Soft plate over the blurred stage — fade only this, never the blur. */
+  background: rgb(0 0 0 / 0.42);
   opacity: var(--about-dim, 0);
   pointer-events: none;
 }
@@ -7462,16 +7484,13 @@ html[data-theme="day"] .help-modal__body .keycap {
 .about-overlay__scroll {
   position: relative;
   z-index: 1;
-  isolation: isolate;
   width: 100%;
   height: 100%;
   margin: 0;
   overflow-x: hidden;
   overflow-y: auto;
   text-align: left;
-  /* Paint stays in this scroller. Without it, scrolling project layers
-     (translateZ) invalidates the sibling backdrop-filter and the blur flashes. */
-  contain: paint;
+  background: transparent;
 }
 
 .about-overlay__content {

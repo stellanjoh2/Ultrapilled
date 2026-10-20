@@ -1,5 +1,5 @@
 ---
-description: Side sheets share one 20% darken; only About blurs
+description: Side sheets share one 20% darken; About blurs the frozen underlay
 globs: src/**/*.{ts,css}
 alwaysApply: true
 ---
@@ -10,4 +10,4 @@ Side sheets share one backdrop. Do not invent a blur or a different dim for one 
 
 - **Side sheets** (Settings, Help, Guestbook, Report issue): 20% black, no blur. Same fade.
 - **Mode Select** sheets (Guestbook, Report issue): that 20% sits under the header pills (Load Project, Report issue, Guestbook). Use `beginSheetDim` / `is-sheet-dim`, not a full-viewport layer over the pills.
-- **About**: blur plus 20% black. About is the only overlay that blurs.
+- **About**: blur via `filter: blur()` on the frozen `#app` / `.mode-select-host` (no scale/zoom), plus a soft dim that fades. Never use `backdrop-filter` on About — animating copy over it flashes. Never tween the underlay filter. Hold physics/media before adding `body.is-about-open`.

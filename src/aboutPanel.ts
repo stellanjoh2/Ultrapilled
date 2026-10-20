@@ -1,7 +1,9 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
+import { setProTipsSuspended } from "./proTip";
 import { DEFAULT_THEME } from "./theme";
+import { setTooltipsSuspended } from "./tooltip";
 import { playRemove, playTransition } from "./uiSounds";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -104,67 +106,13 @@ let modalRoot: HTMLElement | null = null;
 let closing = false;
 let onKey: ((event: KeyboardEvent) => void) | null = null;
 let openTl: gsap.core.Timeline | null = null;
-let blurTween: gsap.core.Tween | null = null;
 let projectTriggers: ScrollTrigger[] = [];
 let cycleTimers: number[] = [];
 
 const CYCLE_MS = 1000;
 
-const ABOUT_BLUR_PX = 20;
-
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-/** Scrim for the open About overlay — blur lives here, not on #app / Mode Select. */
-function aboutBlurScrim(): HTMLElement | null {
-  return modalRoot?.querySelector<HTMLElement>(".about-overlay__scrim") ?? null;
-}
-
-/**
- * Soften whatever sits under About via backdrop-filter on the scrim.
- * Avoids full-bleed filter:blur on #app / Mode Select, which fringes a bright
- * light-leak at the viewport edges. Clears fully when off (same as before so
- * Mode Select frost / mix-blend aren’t left in a filter containing block).
- */
-function setAboutBlurPx(scrim: HTMLElement, px: number): void {
-  if (px <= 0.05) {
-    scrim.style.removeProperty("backdrop-filter");
-    scrim.style.removeProperty("-webkit-backdrop-filter");
-    return;
-  }
-  const value = `blur(${px}px)`;
-  scrim.style.setProperty("-webkit-backdrop-filter", value);
-  scrim.style.backdropFilter = value;
-}
-
-/** Tween scrim blur so open/close isn’t a hard cut. */
-function tweenAboutBlur(on: boolean, duration: number): void {
-  const scrim = aboutBlurScrim();
-  if (!scrim) return;
-  blurTween?.kill();
-  blurTween = null;
-
-  const from = on ? 0 : ABOUT_BLUR_PX;
-  const to = on ? ABOUT_BLUR_PX : 0;
-
-  if (reducedMotion() || duration <= 0) {
-    setAboutBlurPx(scrim, to);
-    return;
-  }
-
-  const state = { px: from };
-  setAboutBlurPx(scrim, from);
-  blurTween = gsap.to(state, {
-    px: to,
-    duration,
-    ease: on ? "power2.out" : "power1.in",
-    onUpdate: () => setAboutBlurPx(scrim, state.px),
-    onComplete: () => {
-      setAboutBlurPx(scrim, to);
-      blurTween = null;
-    },
-  });
 }
 
 function fillBio(el: HTMLElement): HTMLElement[] {
@@ -531,9 +479,9 @@ export function closeAbout(): void {
     modalRoot = null;
     closing = false;
     releasePhysicsForOverlay();
+    setTooltipsSuspended(false);
+    setProTipsSuspended(false);
   };
-
-  tweenAboutBlur(false, reducedMotion() ? 0 : 0.35);
 
   if (reducedMotion() || !scroll || !scrim) {
     done();
@@ -592,15 +540,17 @@ export function openAbout(): void {
 
   document.body.append(root);
   modalRoot = root;
-  document.body.classList.add("is-about-open");
+  // Freeze stage first, then engage underlay filter:blur (body.is-about-open).
   holdPhysicsForOverlay();
+  setTooltipsSuspended(true);
+  setProTipsSuspended(true);
+  document.body.classList.add("is-about-open");
   playTransition(true);
   doneBtn.focus({ preventScroll: true });
 
   const intro = [links, projectsTitle];
 
   if (reducedMotion()) {
-    tweenAboutBlur(true, 0);
     scrim.style.setProperty("--about-dim", "1");
     gsap.set([words, ...intro, ...projectRevealBits, doneBtn], {
       clearProps: "all",
@@ -617,16 +567,14 @@ export function openAbout(): void {
   gsap.set([...projectRevealBits, doneBtn], { autoAlpha: 0, y: -28 });
   gsap.set(scrim, { "--about-dim": 0 });
 
-  // Soften stage + dim together, then stagger copy. Projects wait for scroll.
-  tweenAboutBlur(true, 0.55);
+  // Fade only the dim over a frozen filter:blur underlay — never tween the blur.
   openTl = gsap.timeline({ defaults: { ease: "power3.out" } });
   openTl.to(scrim, { "--about-dim": 1, duration: 0.55, ease: "power2.out" }, 0);
-  openTl.to(
-    words,
-    { autoAlpha: 1, y: 0, duration: 0.55, stagger: 0.06, clearProps: clearBlend },
-    0.12,
-  );
-  openTl.to(links, { autoAlpha: 1, y: 0, duration: 0.55, clearProps: clearBlend }, ">");
+  openTl.to(words, { autoAlpha: 1, y: 0, duration: 0.41, stagger: 0.045 }, 0.09);
+  openTl.to(links, { autoAlpha: 1, y: 0, duration: 0.41 }, ">");
+  openTl.add(() => {
+    gsap.set([...words, links], { clearProps: clearBlend });
+  });
   // Projects (incl. the first still in view) wait until bio + social finish.
   openTl.add(() => {
     if (modalRoot !== root || closing) return;

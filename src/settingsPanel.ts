@@ -14,6 +14,7 @@ import sunIcon from "@phosphor-icons/core/assets/regular/sun.svg?raw";
 import { getPrefs, setPrefs, type AppPrefs, type ChromeTheme } from "./prefs";
 import { isBugReportOpen, openBugReport, reportCardHtml } from "./bugReport";
 import { checkInput } from "./checkBox";
+import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
 import { playRemove, playSwitch, playTransition } from "./uiSounds";
 import { bindRangeValueEdit, rangeCaptionHtml, setRangeCaptionValue } from "./rangeCaption";
 
@@ -355,6 +356,7 @@ export function closeSettings(): void {
     modalRoot = null;
     panelEl = null;
     closing = false;
+    releasePhysicsForOverlay();
   };
 
   if (reducedMotion() || !scrim || !sheet) {
@@ -417,6 +419,7 @@ export function openSettings(controller: SettingsController): void {
 
   document.body.append(root);
   modalRoot = root;
+  holdPhysicsForOverlay();
   mountSettingsBody(body, controller);
   playTransition(true);
   doneBtn.focus({ preventScroll: true });

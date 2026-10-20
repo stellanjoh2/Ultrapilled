@@ -63,6 +63,9 @@ function typing(target: EventTarget | null): boolean {
 }
 
 let enabled = true;
+/** About / full-screen overlays — hide tips without touching the Settings prefs. */
+let suspended = false;
+let resumeIndex: number | null = null;
 let hostEl: Element | null = null;
 let tip: HTMLElement | null = null;
 let hold = 0;
@@ -219,7 +222,7 @@ function paintCard(opts: { title: string; hint: Hint; index?: number; oneOff?: b
 }
 
 function show(index: number) {
-  if (!enabled || !hostEl) return;
+  if (!enabled || suspended || !hostEl) return;
   const hint = queue()[index];
   if (!hint) return;
   paintCard({ title: "Pro Tip", hint, index, stop: true });
@@ -227,7 +230,7 @@ function show(index: number) {
 
 /** One-time canvas notice: YouTube / uploaded video skip raster export. */
 export function hintMediaExportOnce() {
-  if (lsGet(MEDIA_EXPORT_HINT_KEY) === "1" || !hostEl) return;
+  if (suspended || lsGet(MEDIA_EXPORT_HINT_KEY) === "1" || !hostEl) return;
   lsSet(MEDIA_EXPORT_HINT_KEY, "1");
   const cycling = Boolean(showTimer || gapTimer || (tip && tip.dataset.oneOff !== "1"));
   const index = tip?.dataset.index != null ? Number(tip.dataset.index) : 0;
@@ -245,9 +248,34 @@ export function setProTipsEnabled(on: boolean) {
   enabled = on;
   if (on) return;
   afterHint = null;
+  resumeIndex = null;
   if (tip?.dataset.oneOff === "1") return;
   clearTimers();
   remove();
+}
+
+/** Pause the tip cycle while About is up — does not change Settings prefs. */
+export function setProTipsSuspended(on: boolean) {
+  if (on) {
+    if (tip && tip.dataset.oneOff !== "1" && tip.dataset.index != null) {
+      resumeIndex = Number(tip.dataset.index);
+    } else if (showTimer || gapTimer) {
+      resumeIndex = resumeIndex ?? 0;
+    }
+    clearTimers();
+    remove();
+    suspended = true;
+    return;
+  }
+  suspended = false;
+  if (!enabled || !hostEl) {
+    resumeIndex = null;
+    return;
+  }
+  const index = resumeIndex ?? 0;
+  resumeIndex = null;
+  clearTimers();
+  showTimer = window.setTimeout(() => show(index), GAP_MS);
 }
 
 /**
@@ -255,7 +283,7 @@ export function setProTipsEnabled(on: boolean) {
  * Safe to call more than once — resets any early flash.
  */
 export function releaseProTips(delayMs = AFTER_READY_MS) {
-  if (!hostEl) return;
+  if (!hostEl || suspended) return;
   if (tip?.dataset.oneOff === "1") {
     afterHint = () => {
       showTimer = window.setTimeout(() => show(0), delayMs);

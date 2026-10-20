@@ -248,9 +248,21 @@ const gifBloomCanvasSrc = new WeakMap<HTMLCanvasElement, string>();
 const gifBloomFaces = new WeakSet<HTMLElement>();
 /** Srcs that failed decode — fall back to dual `<img>` for the session. */
 const gifBloomFailedSrc = new Set<string>();
+/** Modal / overlay hold — keep the current frame, stop advancing. */
+let gifBloomPaused = false;
 
 function gifImageDecoderAvailable(): boolean {
   return typeof ImageDecoder !== "undefined";
+}
+
+/** Pause ImageDecoder GIF clocks (About / Settings / sheets). Same frame until resume. */
+export function setGifBloomPaused(paused: boolean): void {
+  if (gifBloomPaused === paused) return;
+  gifBloomPaused = paused;
+  if (paused) return;
+  for (const player of gifBloomPlayers.values()) {
+    if (player.targets.size > 0 && player.decoder) void pumpGifBloomPlayer(player);
+  }
 }
 
 /** Raster GIF that needs a shared face/glow clock when bloom is live. */
@@ -336,6 +348,12 @@ async function pumpGifBloomPlayer(player: GifBloomPlayer) {
   const gen = player.generation;
   try {
     while (gen === player.generation && player.targets.size > 0 && player.decoder) {
+      if (gifBloomPaused) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 120);
+        });
+        continue;
+      }
       const now = performance.now();
       if (now < player.due) {
         await new Promise<void>((resolve) => {

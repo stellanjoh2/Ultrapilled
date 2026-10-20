@@ -575,6 +575,10 @@ export function openBugReport(): void {
 
   document.body.append(root);
   modalRoot = root;
+  if (!overlayPhysicsHeld) {
+    holdPhysicsForOverlay();
+    overlayPhysicsHeld = true;
+  }
   playTransition(true);
   message.focus({ preventScroll: true });
   void prepareTurnstile();

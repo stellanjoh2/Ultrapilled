@@ -1,5 +1,6 @@
 import gsap from "gsap";
 import arrowLeftIcon from "@phosphor-icons/core/assets/regular/arrow-left.svg?raw";
+import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
 import { playRemove, playTransition } from "./uiSounds";
 
 let modalRoot: HTMLElement | null = null;
@@ -578,6 +579,7 @@ export function closeHelp(): void {
     root.remove();
     modalRoot = null;
     closing = false;
+    releasePhysicsForOverlay();
   };
 
   if (reducedMotion() || !scrim || !sheet) {
@@ -638,6 +640,7 @@ export function openHelp(): void {
   bindToc(body);
   document.body.append(root);
   modalRoot = root;
+  holdPhysicsForOverlay();
 
   document.querySelectorAll<HTMLButtonElement>("[data-open-help]").forEach((btn) => {
     btn.classList.add("is-on");

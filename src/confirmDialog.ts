@@ -1,4 +1,5 @@
 import gsap from "gsap";
+import { holdPhysicsForOverlay, releasePhysicsForOverlay } from "./physicsOverlayHold";
 import { playCaution, playNotify, playRemove } from "./uiSounds";
 
 function reducedMotion(): boolean {
@@ -72,6 +73,7 @@ function openDialog(opts: {
 
       const done = () => {
         root.remove();
+        releasePhysicsForOverlay();
         resolve(ok ? (input ? value : true) : false);
       };
 
@@ -117,6 +119,7 @@ function openDialog(opts: {
     });
 
     document.body.append(root);
+    holdPhysicsForOverlay();
     window.addEventListener("keydown", onKey);
     playCaution();
     if (input) {

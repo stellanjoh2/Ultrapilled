@@ -6,6 +6,8 @@ const GAP = 8;
 const EDGE = 8;
 
 let enabled = true;
+/** About / full-screen overlays — hide tips without touching the Settings prefs. */
+let suspended = false;
 let tip: HTMLElement | null = null;
 let active: HTMLElement | null = null;
 let timer = 0;
@@ -86,7 +88,7 @@ function place(el: HTMLElement) {
 }
 
 function show(el: HTMLElement) {
-  if (!tip || !enabled) return;
+  if (!tip || !enabled || suspended) return;
   window.clearTimeout(fadeTimer);
   fadeTimer = 0;
   tip.classList.remove("is-leaving");
@@ -99,7 +101,7 @@ function show(el: HTMLElement) {
 }
 
 function entering(el: HTMLElement, related: EventTarget | null) {
-  if (!enabled) return;
+  if (!enabled || suspended) return;
   if (related instanceof Node && el.contains(related)) return;
   if (el === active) return;
   window.clearTimeout(timer);
@@ -125,6 +127,12 @@ function leaving(el: HTMLElement, related: EventTarget | null) {
 export function setTooltipsEnabled(on: boolean) {
   enabled = on;
   if (!on) hide();
+}
+
+/** Pause hover tips while About (etc.) is up — does not change Settings prefs. */
+export function setTooltipsSuspended(on: boolean) {
+  suspended = on;
+  if (on) hide();
 }
 
 /** Hide a lingering canvas-handle tip when the control goes away. */

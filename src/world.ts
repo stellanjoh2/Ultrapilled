@@ -769,7 +769,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   }
 
   function setRunning(on: boolean) {
-    // Overlay hold owns the runner — ignore wakeups until About / blur modals close.
+    // Overlay hold owns the runner — ignore wakeups until About / sheet modals close.
     if (on && isPhysicsHeldByOverlay()) return;
     if (on && !running) {
       Runner.run(runner, engine);
