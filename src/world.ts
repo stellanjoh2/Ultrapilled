@@ -2943,7 +2943,7 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
   const XFORM_TIP =
     "Drag to rotate and scale — Shift scales from corner, Shift+Alt from center";
   const XFORM_BOX_TIP =
-    "Drag to resize the writing area — Shift locks ratio, Alt from center, ⌘/Ctrl scales type";
+    "Drag to resize the writing area — Shift locks ratio, Alt from center";
   const GRAD_FROM_TIP = "Start color — drag to rotate and scale, click to pick";
   const GRAD_TO_TIP = "End color — drag to rotate and scale, click to pick";
 
@@ -2972,11 +2972,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
       byCorner.clear();
     }
 
-    // Text fields: every corner resizes the writing area (Figma / area-type). Hold
-    // ⌘/Ctrl on a corner for uniform scale + rotate like other objects.
+    // Text fields: NE/SW reflow the writing area; NW/SE scale + rotate the whole object.
     const field = isTextField(chip.look?.slot);
     for (const { id } of XFORM_CORNERS) {
-      const box = field;
+      const box = field && (id === "ne" || id === "sw");
       const iconKey = box ? "bounding-box" : "hand-grabbing";
       const label = box ? "Resize writing area" : "Rotate and scale";
       const tip = box ? XFORM_BOX_TIP : XFORM_TIP;
@@ -3813,9 +3812,10 @@ export function createWorld(options?: { paused?: boolean }): WorldHandle {
     const corner = readXformHandleCorner(handle);
     // Alt at gesture start → center-anchored scale; else opposite corner (PS-style).
     const centerAnchored = event.altKey;
-    // Default: reflow the writing area. ⌘/Ctrl opts into uniform scale + rotate.
+    // Text fields: NE/SW reflow the box; NW/SE scale the whole object (⌘/Ctrl forces scale).
     const boxResize =
       isTextField(chip.look?.slot) &&
+      (corner === "ne" || corner === "sw") &&
       !event.metaKey &&
       !event.ctrlKey &&
       (pickedIds.size <= 1 || (pickedIds.size === 1 && pickedIds.has(chip.slotId)));
