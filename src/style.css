@@ -112,21 +112,24 @@ html[data-theme="day"] {
   --panel-rule: rgba(0, 0, 0, 0.14);
 }
 
-/* Brief night↔day crossfade — only while .theme-animating is set from prefs. */
-@media (prefers-reduced-motion: no-preference) {
-  html.theme-animating,
-  html.theme-animating *,
-  html.theme-animating *::before,
-  html.theme-animating *::after {
-    transition:
-      background-color 0.16s ease,
-      background 0.16s ease,
-      color 0.16s ease,
-      border-color 0.16s ease,
-      box-shadow 0.16s ease,
-      fill 0.16s ease,
-      stroke 0.16s ease,
-      outline-color 0.16s ease !important;
+/* Night↔day cover — real body node (html::before paints under body). */
+.theme-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  background: var(--theme-veil-color, var(--canvas-soft));
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.theme-veil.is-on {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-veil {
+    transition: none;
   }
 }
 
@@ -5678,7 +5681,7 @@ html[data-theme="day"] .shape-swatch {
   z-index: 1;
   pointer-events: none;
   border-radius: inherit;
-  box-shadow: none;
+  box-sizing: border-box;
 }
 
 .theme-gallery__band {
@@ -5694,15 +5697,40 @@ html[data-theme="day"] .shape-swatch {
   color: var(--ink-mute);
 }
 
+/* Same Orby angle-chase ring as stage / slot / icon selection. */
 .theme-gallery__item.is-active .theme-gallery__swatch::after {
-  box-shadow: inset 0 0 0 2px var(--primary);
+  padding: 2px;
+  background: linear-gradient(
+    var(--stroke-rotate),
+    var(--loop-stroke-a) 0%,
+    var(--loop-stroke-b) 32%,
+    transparent 40%,
+    transparent 46%,
+    transparent 51%,
+    transparent 58%,
+    var(--loop-stroke-a) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .theme-gallery__item.is-active .theme-gallery__swatch::after {
+    animation: smash-stroke-spin calc(16s / 3) linear infinite;
+  }
 }
 
 .theme-gallery__item.is-active .theme-gallery__label {
   color: var(--ink);
 }
 
-.theme-gallery__item:focus-visible .theme-gallery__swatch::after {
+.theme-gallery__item:focus-visible:not(.is-active) .theme-gallery__swatch::after {
   box-shadow: inset 0 0 0 2px var(--primary);
 }
 

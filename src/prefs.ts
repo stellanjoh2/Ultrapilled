@@ -93,27 +93,125 @@ export function setPrefs(patch: Partial<AppPrefs>) {
   notify();
 }
 
-const THEME_ANIM_MS = 160;
-let themeAnimTimer = 0;
+/** Cover → swap → uncover so night↔day never crossfades mid-token. */
+const THEME_FADE_MS = 180;
+let themeFadeToken = 0;
+let themePending: ChromeTheme | null = null;
+let themeFading = false;
+let themeVeilEl: HTMLElement | null = null;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function paintChromeTheme(theme: ChromeTheme) {
+  const root = document.documentElement;
+  root.dataset.theme = theme;
+  root.style.colorScheme = theme === "day" ? "light" : "dark";
+}
+
+function ensureThemeVeil(): HTMLElement {
+  if (themeVeilEl?.isConnected) return themeVeilEl;
+  const el = document.createElement("div");
+  el.className = "theme-veil";
+  el.setAttribute("aria-hidden", "true");
+  document.body.append(el);
+  themeVeilEl = el;
+  return el;
+}
+
+function removeThemeVeil() {
+  themeVeilEl?.remove();
+  themeVeilEl = null;
+}
+
+function cancelThemeFade() {
+  themeFadeToken += 1;
+  themePending = null;
+  // Leave themeFading to the in-flight run's finally so a follow-up
+  // animate pass can re-queue via themePending without double-starting.
+  removeThemeVeil();
+}
+
+async function setVeilOn(el: HTMLElement, on: boolean): Promise<void> {
+  if (el.classList.contains("is-on") === on) return;
+  el.classList.toggle("is-on", on);
+  // Prefer transitionend so we never swap mid-fade; timeout is a fallback.
+  await new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      el.removeEventListener("transitionend", onEnd);
+      resolve();
+    };
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target !== el || event.propertyName !== "opacity") return;
+      finish();
+    };
+    el.addEventListener("transitionend", onEnd);
+    window.setTimeout(finish, THEME_FADE_MS + 40);
+  });
+}
+
+async function runThemeFade() {
+  if (themeFading) return;
+  const root = document.documentElement;
+  themeFading = true;
+
+  try {
+    while (themePending) {
+      const target = themePending;
+      themePending = null;
+      if (root.dataset.theme === target) continue;
+
+      const token = ++themeFadeToken;
+      const veilColor =
+        getComputedStyle(document.body).backgroundColor ||
+        getComputedStyle(root).getPropertyValue("--canvas-soft").trim() ||
+        "#1c1c1c";
+
+      const veil = ensureThemeVeil();
+      veil.style.setProperty("--theme-veil-color", veilColor);
+      veil.getBoundingClientRect();
+      await setVeilOn(veil, true);
+      if (token !== themeFadeToken) return;
+
+      const final = themePending ?? target;
+      themePending = null;
+      paintChromeTheme(final);
+      // Settle new tokens under the opaque cover before lifting.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      if (token !== themeFadeToken) return;
+
+      await setVeilOn(veil, false);
+      if (token !== themeFadeToken) return;
+      removeThemeVeil();
+    }
+  } finally {
+    themeFading = false;
+    if (themePending) void runThemeFade();
+  }
+}
 
 /** Applies night/day chrome before first paint and after changes. */
 export function applyChromeTheme(theme: ChromeTheme = prefs.theme, options?: { animate?: boolean }) {
-  const root = document.documentElement;
   const reduce =
     typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const animate = Boolean(options?.animate) && !reduce;
 
-  if (animate) {
-    root.classList.add("theme-animating");
-    window.clearTimeout(themeAnimTimer);
-    themeAnimTimer = window.setTimeout(() => {
-      root.classList.remove("theme-animating");
-      themeAnimTimer = 0;
-    }, THEME_ANIM_MS);
+  if (!animate) {
+    cancelThemeFade();
+    paintChromeTheme(theme);
+    return;
   }
 
-  root.dataset.theme = theme;
-  root.style.colorScheme = theme === "day" ? "light" : "dark";
+  themePending = theme;
+  void runThemeFade();
 }
 
 applyChromeTheme();

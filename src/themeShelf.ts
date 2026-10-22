@@ -4,7 +4,7 @@ import {
   type PaletteCategory,
   type PalettePreset,
 } from "./palettePresets";
-import { playRemove } from "./uiSounds";
+import { playClick, playRemove } from "./uiSounds";
 import { lsGet, lsRemove, lsSet } from "./legacyStorage";
 
 const TABS: PaletteCategory[] = ["common", "retro", "feral"];
@@ -112,6 +112,8 @@ export function createThemeShelf(options: {
 
     item.append(swatch, label);
     item.addEventListener("click", () => {
+      // Shelf mounts on body outside #app, so bindUiClickSounds(app) never hears these.
+      playClick();
       onApply([...preset.colors], preset.stage);
       paintGallery();
     });
