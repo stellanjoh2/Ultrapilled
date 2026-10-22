@@ -100,12 +100,6 @@ let themePending: ChromeTheme | null = null;
 let themeFading = false;
 let themeVeilEl: HTMLElement | null = null;
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
 function paintChromeTheme(theme: ChromeTheme) {
   const root = document.documentElement;
   root.dataset.theme = theme;
